@@ -7,12 +7,12 @@ const USE_CUDA = true
 const TRAIN_TEST_RATIO = 10
 
 ###############################################################################
-#=
+
 if USE_CUDA
-    using CuArrays
-    CuArrays.allowscalar(false)
+  using CuArrays
+  using CUDAdrv
+  CuArrays.allowscalar(false)
 end
-=#
 
 using Statistics
 using LinearAlgebra: norm
@@ -124,14 +124,12 @@ end
 
 using Printf
 
-
 function print_legend()
   @printf("%8s %8s %8s", "Accuracy", "Loss", "MaxW")
 end
 
 function evalcb()
-  #a = 100 * accuracy(cpu.((NN, Xtest, Ytest))...)
-  a = 0.
+  a = 100 * accuracy(cpu.((NN, Xtest, Ytest))...)
   l = loss(Xtrain, Ytrain)
   w = maximum_weight(NN)
   @printf("%8.1f %8.3f %8.3f\n", a, l, w)
@@ -143,14 +141,18 @@ function dataset(n)
 end
 
 function fullbatch_dataset(n)
-  repeated((Xtrain, Ytrain), n)
+  Iterators.repeated((Xtrain, Ytrain), n)
 end
 
 opt = ADAM(1e-3)
 
-Flux.train!(loss, params(NN), dataset(1), opt)
+# To compile
+Flux.train!(loss, params(NN), dataset(1), opt, cb=throttle(evalcb, 2))
 
-@time Flux.train!(loss, params(NN), fullbatch_dataset(10000), opt, cb=throttle(evalcb, 2))
+data = dataset(1000*10)
+#data = fullbatch_dataset(1000)
+
+CUDAdrv.@profile Flux.train!(loss, params(NN), data, opt, cb=throttle(evalcb, 2))
 
 print(typeof(Xtrain))
 
