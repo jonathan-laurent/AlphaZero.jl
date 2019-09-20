@@ -2,45 +2,17 @@
 # Solving simple tic tac toe with MCTS
 ################################################################################
 
-using AlphaZero.MCTS
+include("tictactoe.jl")
 
-using Gobblet.TicTacToe
+using AlphaZero.MCTS
 
 ################################################################################
 
 const PROFILE = false
 const INTERACTIVE = true
 
-const INITIAL_TRAINING = 1. # second
-const TIMEOUT = 0.5 # seconds
-
-################################################################################
-  
-MCTS.white_playing(s::State) = s.curplayer == Red
-
-MCTS.board(s::State) = copy(s.board)
-
-MCTS.board_symmetric(s::State) = map!(symmetric, similar(s.board), s.board)
-
-MCTS.play!(s::State, a) = execute_action!(s, a)
-
-MCTS.undo!(s::State, a) = cancel_action!(s, a)
-
-function MCTS.white_reward(s::State) :: Union{Nothing, Float64}
-  s.finished || return nothing
-  isnothing(s.winner) && return 0
-  s.winner == Red && return 1
-  return -1
-end
-
-function MCTS.available_actions(s::State)
-  actions = Action[]
-  sizehint!(actions, NUM_POSITIONS)
-  fold_actions(s, actions) do actions, a
-    push!(actions, a)
-  end
-  return actions
-end
+const INITIAL_TRAINING = 50_000
+const TIMEOUT = 5_000
 
 ################################################################################
 # Write the evaluator
@@ -50,10 +22,10 @@ struct RolloutEvaluator end
 function rollout(board)
   state = State(copy(board), first_player=Red)
   while true
-    reward = MCTS.white_reward(state)
+    reward = GI.white_reward(state)
     isnothing(reward) || (return reward)
-    action = rand(MCTS.available_actions(state))
-    MCTS.play!(state, action)
+    action = rand(GI.available_actions(state))
+    GI.play!(state, action)
    end
 end
 
@@ -66,18 +38,17 @@ end
 
 ################################################################################
 
-const GobbletMCTS = MCTS.Env{State, Board, Action, RolloutEvaluator}
+const GobbletMCTS = MCTS.Env{State, Board, Action}
 
 struct MonteCarloAI <: AI
   env :: GobbletMCTS
-  timeout :: Float64
+  timeout :: Int
 end
 
 import Gobblet.TicTacToe: play
 
 function play(ai::MonteCarloAI, state)
-  MCTS.set_root!(ai.env, state)
-  MCTS.explore!(ai.env, ai.timeout)
+  MCTS.explore!(ai.env, state, ai.timeout)
   actions, distr = MCTS.policy(ai.env)
   actions[argmax(distr)]
 end
@@ -113,8 +84,7 @@ end
 
 env = GobbletMCTS(RolloutEvaluator())
 state = State()
-MCTS.set_root!(env, state)
-MCTS.explore!(env, INITIAL_TRAINING)
+MCTS.explore!(env, state, INITIAL_TRAINING)
 
 if INTERACTIVE
   interactive!(state, red=MonteCarloAI(env, TIMEOUT), blue=Human())
