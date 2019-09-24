@@ -38,7 +38,7 @@ function generate_named_constructors(T)
   fields_withdef = [Expr(:kw, f, :($base.$f)) for f in fields]
   quote
     $Tname(;$(fields...)) = $Tname($(fields...))
-    #$Tname($base::$Tname; $(fields_withdef...)) = $Tname($(fields...))
+    $Tname($base::$Tname; $(fields_withdef...)) = $Tname($(fields...))
   end
 end
 

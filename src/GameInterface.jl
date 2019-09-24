@@ -41,6 +41,15 @@ module GameInterface
   function action end
   function action_id end
 
+  function actions_mask(G, available_actions) # Derived function
+    nactions = num_actions(G)
+    mask = falses(nactions)
+    for a in available_actions
+      mask[action_id(G, a)] = true
+    end
+    return mask
+  end
+
 end
 
 ################################################################################

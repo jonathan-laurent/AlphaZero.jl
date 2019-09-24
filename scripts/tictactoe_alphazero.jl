@@ -9,6 +9,7 @@ using Distributions: Categorical
 ################################################################################
 # Params
 
+using Base: @kwdef
 import AlphaZero.Util.Records
 
 struct Params
@@ -29,10 +30,10 @@ Records.generate_named_constructors(Params) |> eval
 # For dirichlet noise, see:
 # https://medium.com/oracledevs/lessons-from-alphazero-part-3
 
-const STD_PARAMS = Params(;
+const STD_PARAMS = Params(
   num_learning_iters       = 1_000,
-  num_episodes_per_iter    = 100,
-  num_mcts_iters_per_turn  = 50,  # 25 in Nair's implementation
+  num_episodes_per_iter    = 100,  # 100
+  num_mcts_iters_per_turn  = 100,  # 25 in Nair's implementation
   mem_buffer_size          = 200_000,
   num_eval_games           = 40,
   update_threshold         = 0.6,
@@ -43,13 +44,12 @@ const STD_PARAMS = Params(;
 # 4.9 million games of self play
 # Parameters updated from 700,000 minibatches of 2048 positions
 # Neural network: 20 residual blocks
-# momenum para: 0.9
-# c = 1e-4
+# momenum param: 0.9
 # Checkpoint after 1000 training steps
 # First 30 moves, τ=1, then τ → 0
 # Question: when pitting network against each other,
 # where does randomness come from?
-const ALPHA_GO_ZERO_PARAMS = Params(;
+const ALPHA_GO_ZERO_PARAMS = Params(
   num_learning_iters       = 200, # = 5M/25K
   num_episodes_per_iter    = 25_000,
   num_mcts_iters_per_turn  = 1600, # 0.4s thinking time per move
@@ -105,28 +105,28 @@ end
 ################################################################################
 # Interface to the neural network
 
-struct Oracle{Game}
+struct Oracle{Game} <: MCTS.Oracle
   nn :: Network
 
   function Oracle{G}() where G
     hsize = 100
     nn = Network(GI.board_dim(G), GI.num_actions(G), hsize)
-    nparams = sum(length(p) for p in params(nn))
-    println("Number of parameters: ", nparams)
     new(nn)
   end
 end
 
-function MCTS.evaluate(ev::Oracle{G}, board, available_actions) where G
-  # Build the mask
-  nactions = GI.num_actions(G)
-  mask = falses(nactions)
-  for a in available_actions
-    mask[GI.action_id(G, a)] = true
-  end
-  # Call the NN
+num_parameters(oracle) = sum(length(p) for p in params(o.nn))
+
+function Base.copy(o::Oracle{G}) where G
+  new = Oracle{G}()
+  Flux.loadparams!(new.nn, params(o.nn))
+  return new
+end
+
+function MCTS.evaluate(o::Oracle{G}, board, available_actions) where G
+  mask = GI.actions_mask(G, available_actions)
   input = GI.vectorize_board(G, board)
-  P, V = ev.nn(input, mask)
+  P, V = o.nn(input, mask)
   P = P[mask]
   return Vector{Float64}(Tracker.data(P)), Float64(Tracker.data(V)[1])
 end
@@ -155,7 +155,9 @@ struct MemoryBuffer{Board}
   end
 end
 
-function push_state!(buf::MemoryBuffer, board, policy, white_playing)
+get(b::MemoryBuffer) = b.mem[:]
+
+function push_sample!(buf::MemoryBuffer, board, policy, white_playing)
   player_code = white_playing ? 1.0 : -1.0
   ex = TrainingExample(board, policy, player_code)
   push!(buf.cur, ex)
@@ -171,50 +173,151 @@ end
 
 ################################################################################
 
-struct AlphaZero{Game, Board, Action}
-  params :: Params
-  memory :: MemoryBuffer{Board}
-  bestnn :: Oracle{Game}
-  function AlphaZero{G, B, A}(params) where {G, B, A}
-    memory = MemoryBuffer{B}(params.mem_buffer_size)
-    new(params, memory)
-  end
+const BATCH_SIZE = 32
+const NUM_GRADIENT_STEPS = 1000
+const LR = 1e-3
+
+norm2(x) = x' * x
+
+function random_minibatch(X, A, P, V; batchsize)
+  n = size(X, 2)
+  indices = rand(1:n, batchsize)
+  return ((X[:,indices], A[:,indices]), (P[:,indices], V[:,indices]))
 end
 
-AlphaZero(Game) = AlphaZero{Game, GI.Board(Game), GI.Action(Game)}
+using Printf
+
+function convert_sample(Game, e::TrainingExample)
+  x = Vector{R}(GI.vectorize_board(Game, e.b))
+  actions = GI.available_actions(Game(e.b))
+  a = GI.actions_mask(Game, actions)
+  p = zeros(R, size(a))
+  p[[GI.action_id(Game, a) for a in actions]] = e.π
+  v = [R(e.z)]
+  return (x, a, p, v)
+end
+
+function train!(oracle::Oracle{G}, examples::Vector{<:TrainingExample}) where G
+  ces = [convert_sample(G, e) for e in examples]
+  X = reduce(hcat, (e[1] for e in ces))
+  A = reduce(hcat, (e[2] for e in ces))
+  P = reduce(hcat, (e[3] for e in ces))
+  V = reduce(hcat, (e[4] for e in ces))
+
+  print_legend() = @printf("%12s", "Loss\n")
+
+  function loss((X, A), (P₀, V₀))
+    P, V = oracle.nn(X, A)
+    return Flux.crossentropy(P .+ eps(R), P₀) + Flux.mse(V, V₀)
+  end
+
+  function cb()
+    L = loss((X, A), (P, V))
+    @printf("%12.7f\n", L)
+  end
+
+  opt = Flux.ADAM(LR)
+  data = (
+    random_minibatch(X, A, P, V; batchsize=BATCH_SIZE)
+    for i in 1:NUM_GRADIENT_STEPS)
+  @show loss((X, A), (P, V))
+  #Flux.train!(loss, params(oracle.nn), data, opt, cb=Flux.throttle(cb, 5))
+end
 
 ################################################################################
 
-function play_game!(env::AlphaZero{Game}, mcts; record=true) where Game
+struct AlphaZero{Game, Board}
+  params :: Params
+  memory :: MemoryBuffer{Board}
+  bestnn :: Oracle{Game}
+  function AlphaZero{Game}(params) where Game
+    Board = GI.Board(Game)
+    memory = MemoryBuffer{Board}(params.mem_buffer_size)
+    oracle = Oracle{Game}()
+    new{Game, Board}(params, memory, oracle)
+  end
+end
+
+################################################################################
+
+struct MctsPlayer{M}
+  mcts :: M
+  niters :: Int
+end
+
+function think(p::MctsPlayer, state)
+  MCTS.explore!(p.mcts, state, p.niters)
+  MCTS.policy(p.mcts)
+end
+
+################################################################################
+
+function self_play!(env::AlphaZero{Game}, p::MctsPlayer) where Game
   state = Game()
   while true
     z = GI.white_reward(state)
     if !isnothing(z)
-      record && push_game!(env.memory, z)
-      return z
+      push_game!(env.memory, z)
+      return
     end
-    explore!(mcts, state, env.params.num_mcts_iters_per_turn)
-    actions, π = policy(mcts)
-    record && push_state!(
-      env.memory, GI.board(state), π, GI.white_playing(state))
+    actions, π = think(p, state)
+    push_sample!(env.memory, GI.board(state), π, GI.white_playing(state))
     GI.play!(state, actions[rand(Categorical(π))])
   end
 end
 
 ################################################################################
 # Pitting Arena.
-# There are two ways to fight: build an oracle that behaves
-# differently for white and black OR build two separate players
 
-#=
-using Statistics: mean
-
-function evaluate(env::AlphaZero, oracle)
-  N = 1:env.params.num_eval_games
-  mcts = ...
-  z = mean(play_game(env, record=false) for i in 1:N)
+function play_game(env::AlphaZero{Game}, white::MctsPlayer, black) where Game
+  state = Game()
+  while true
+    z = GI.white_reward(state)
+    isnothing(z) || (return z)
+    player = GI.white_playing(state) ? white : black
+    actions, π = think(player, state)
+    GI.play!(state, actions[rand(Categorical(π))])
+  end
 end
-=#
+
+# Returns average reward for the evaluated player
+function evaluate(env::AlphaZero{G}, oracle) where G
+  best_mcts = MCTS.Env{G}(env.bestnn, env.params.cpuct)
+  new_mcts = MCTS.Env{G}(oracle, env.params.cpuct)
+  best = MctsPlayer(best_mcts, env.params.num_mcts_iters_per_turn)
+  new = MctsPlyer(new_mcts, env.params.num_mcts_iters_per_turn)
+  zsum = 0.0
+  best_first = true
+  N = env.params.num_eval_games
+  for i in 1:N
+    white = best_first ? best : new
+    black = best_first ? new : best
+    z = play_game(env, white, black)
+    best_first && (z = -z)
+    zsum += z
+    best_first = !best_first
+  end
+  return zsum / N
+end
+
+################################################################################
+
+using ProgressMeter
+
+function train!(env::AlphaZero{G}) where G
+  # Collect data using self-play
+  println("Collecting data using self-play....")
+  mcts = MCTS.Env{G}(env.bestnn, env.params.cpuct)
+  player = MctsPlayer(mcts, env.params.num_mcts_iters_per_turn)
+  @progress for i in 1:env.params.num_episodes_per_iter
+    self_play!(env, player)
+  end
+  # Train new network
+  newnn = copy(env.bestnn)
+  examples = get(env.memory)
+  train!(newnn, examples)
+end
+
 ################################################################################
 
 function debug_tree(mcts; k=10)
@@ -228,10 +331,7 @@ function debug_tree(mcts; k=10)
 end
 
 include("tictactoe.jl")
-env = AlphaZero(Game)(STD_PARAMS)
-oracle = Oracle{Game}()
-mcts = MCTS.Env{Game, GI.Board(Game), GI.Action(Game)}(oracle)
-play_game!(env, mcts; record=true)
-debug_tree(mcts)
+env = AlphaZero{Game}(STD_PARAMS)
+train!(env)
 
 ################################################################################
