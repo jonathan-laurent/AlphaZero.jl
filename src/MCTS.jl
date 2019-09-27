@@ -143,7 +143,7 @@ function explore!(env, state, nsims=1)
 end
 
 # Returns (actions, distr)
-function policy(env, τ=1.0)
+function policy(env; τ=1.0)
   info, _ = state_info(env)
   τinv = 1 / τ
   D = [a.N ^ τinv for a in info.stats]

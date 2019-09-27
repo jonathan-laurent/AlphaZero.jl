@@ -50,6 +50,10 @@ module GameInterface
     return mask
   end
 
+  function canonical_board(state)
+    white_playing(state) ? board(state) : board_symmetric(state)
+  end
+
 end
 
 ################################################################################
