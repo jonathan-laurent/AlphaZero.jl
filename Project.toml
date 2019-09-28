@@ -1,0 +1,7 @@
+[deps]
+CUDAdrv = "c5f51814-7f29-56b8-a69c-e4d8f6be1fde"
+CuArrays = "3a865a2d-5b23-5a0f-bc46-62713ec82fae"
+DataStructures = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
+Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
+Flux = "587475ba-b771-5e3f-ad9e-33799f191a9c"
+ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
