@@ -146,6 +146,7 @@ struct TrainingExample{Board}
   b :: Board
   π :: Vector{Float64}
   z :: Float64
+  w :: Float64 # Sample weights
 end
 
 struct MemoryBuffer{Board}
@@ -166,70 +167,80 @@ Base.length(b::MemoryBuffer) = size(b.mem)
 
 function push_sample!(buf::MemoryBuffer, board, policy, white_playing)
   player_code = white_playing ? 1.0 : -1.0
-  ex = TrainingExample(board, policy, player_code)
+  ex = TrainingExample(board, policy, player_code, 1.0)
   push!(buf.cur, ex)
 end
 
 function push_game!(buf::MemoryBuffer, white_reward)
   for ex in buf.cur
     r = ex.z * white_reward
-    push!(buf.mem, TrainingExample(ex.b, ex.π, r))
+    push!(buf.mem, TrainingExample(ex.b, ex.π, r, ex.w))
   end
   empty!(buf.cur)
 end
 
 ################################################################################
 
-const BATCH_SIZE = 32
-const NUM_GRADIENT_STEPS = 10_000
-const LOSS_EPS = 1e-3
-const LR = 1e-3
+weighted_mse(ŷ, y, w) = sum((ŷ .- y).^2 .* w) * 1 // length(y)
 
-function random_minibatch(X, A, P, V; batchsize)
+function random_minibatch(W, X, A, P, V; batchsize)
   n = size(X, 2)
   indices = rand(1:n, batchsize)
-  return ((X[:,indices], A[:,indices]), (P[:,indices], V[:,indices]))
+  return (W[:,indices], X[:,indices], A[:,indices], P[:,indices], V[:,indices])
 end
 
 function convert_sample(Game, e::TrainingExample)
+  w = [R(e.w)]
   x = Vector{R}(GI.vectorize_board(Game, e.b))
   actions = GI.available_actions(Game(e.b))
   a = GI.actions_mask(Game, actions)
   p = zeros(R, size(a))
   p[[GI.action_id(Game, a) for a in actions]] = e.π
   v = [R(e.z)]
-  return (x, a, p, v)
+  return (w, x, a, p, v)
 end
 
 function convert_samples(Game, es::Vector{<:TrainingExample})
   ces = [convert_sample(Game, e) for e in es]
-  X = reduce(hcat, (e[1] for e in ces))
-  A = reduce(hcat, (e[2] for e in ces))
-  P = reduce(hcat, (e[3] for e in ces))
-  V = reduce(hcat, (e[4] for e in ces))
-  return (X, A, P, V)
+  W = reduce(hcat, (e[1] for e in ces))
+  X = reduce(hcat, (e[2] for e in ces))
+  A = reduce(hcat, (e[3] for e in ces))
+  P = reduce(hcat, (e[4] for e in ces))
+  V = reduce(hcat, (e[5] for e in ces))
+  return (W, X, A, P, V)
 end
 
-function train!(oracle::Oracle{G}, examples::Vector{<:TrainingExample}) where G
-  X, A, P, V = convert_samples(G, examples)
-  function loss((X, A), (P₀, V₀))
+function train!(
+    oracle::Oracle{G},
+    examples::Vector{<:TrainingExample};
+    batch_size = 32,
+    num_batches = 10_000,
+    loss_eps = 1e-3,
+    lr = 1e-3
+  ) where G
+  
+  W, X, A, P, V = convert_samples(G, examples)
+  function loss(W, X, A, P₀, V₀)
     let (P, V) = oracle.nn(X, A)
-    return Flux.crossentropy(P .+ eps(R), P₀) + Flux.mse(V, V₀) end
+      Lp = Flux.crossentropy(P .+ eps(R), P₀, weight = W)
+      Lv = weighted_mse(V, V₀, W)
+      return Lp + Lv
+    end
   end
   function print_legend()
     @printf("%12s", "Loss\n")
   end
   prevloss = Inf32
   function cb()
-    L = loss((X, A), (P, V))
-    abs(L - prevloss) < LOSS_EPS && Flux.stop()
+    L = loss(W, X, A, P, V)
+    abs(L - prevloss) < loss_eps && Flux.stop()
     prevloss = L
     @printf("%12.7f\n", L)
   end
-  opt = Flux.ADAM(LR)
+  opt = Flux.ADAM(lr)
   data = (
-    random_minibatch(X, A, P, V; batchsize=BATCH_SIZE)
-    for i in 1:NUM_GRADIENT_STEPS)
+    random_minibatch(W, X, A, P, V; batchsize=batch_size)
+    for i in 1:num_batches)
   print_legend()
   Flux.train!(loss, params(oracle.nn), data, opt, cb=Flux.throttle(cb, 1.0))
 end
@@ -283,7 +294,8 @@ function self_play!(env::AlphaZero{Game}, p::MctsPlayer) where Game
       return
     end
     actions, π = think(p, state)
-    push_sample!(env.memory, GI.board(state), π, GI.white_playing(state))
+    cboard = GI.canonical_board(state)
+    push_sample!(env.memory, cboard, π, GI.white_playing(state))
     GI.play!(state, actions[rand(Categorical(π))])
   end
 end
@@ -331,7 +343,7 @@ function train!(env::AlphaZero{G}) where G
   println("Collecting data using self-play....")
   mcts = MCTS.Env{G}(env.bestnn, env.params.cpuct)
   player = MctsPlayer(mcts, env.params.num_mcts_iters_per_turn)
-  @progress for i in 1:env.params.num_episodes_per_iter
+  @showprogress for i in 1:env.params.num_episodes_per_iter
     self_play!(env, player)
   end
   # Train new network
@@ -382,30 +394,45 @@ using Serialization: serialize, deserialize
 
 include("tictactoe.jl")
 
-if !isfile(GAMES_DATA)
-  env = AlphaZero{Game}(STD_PARAMS)
-  mcts = MCTS.Env{Game}(env.bestnn, env.params.cpuct)
-  player = MctsPlayer(mcts, 1000)
-  @progress for i in 1:1000
-    self_play!(env, player)
-  end
-  serialize(GAMES_DATA, (env, mcts))
-else
-  env, mcts = deserialize(GAMES_DATA)
-end
-println("Number of games collected: ", length(env.memory))
-#train!(newnn, examples)
+# Two steps: explore new network, explore dataset
+
+#z = evaluate(env, newnn)
+#pwin = (z + 1) / 2
+#@printf("Win rate of new network: %.0f%%\n", 100 * pwin)
 
 ################################################################################
 
-# Interactive console to play a game:
-# Look at most visited
-# input board
-# access info, navigate in tree
-# play?
+################################################################################
+# Explore dataset
 
-# command: goto
-# to print: P, Q, statistics...
+function inspect_memory(env, board::Board)
+  mem = get(env.memory)
+  relevant = findall(mem) do ex
+    ex.b == board
+  end
+  N = length(relevant)
+  iszero(N) && return nothing
+  z = sum(mem[i].z for i in relevant) / N
+  π = sum(mem[i].π for i in relevant) / N
+  return N, z, π
+end
+
+function inspect_memory(env, state::State)
+  b = GI.canonical_board(state)
+  info = inspect_memory(env, b)
+  if isnothing(info)
+    println("Not in memory\n")
+  else
+    N, z, π = info
+    @show N
+    @show z
+    println("")
+    as = GI.available_actions(state)
+    for (i, p) in sort(collect(enumerate(π)), by=(((i,p),)->p), rev=true)
+      @printf("%1s %8.3f\n\n", action_str(as[i]), p)
+    end
+  end
+end
 
 function input_board()
   str = reduce(*, ((readline() * "   ")[1:3] for i in 1:3))
@@ -447,13 +474,14 @@ function print_state_statistics(mcts, state)
     @printf("N: %d, V: %.3f\n\n", info.Ntot, info.Vest)
     actions = enumerate(info.actions) |> collect
     actions = sort(actions, by=(((i,a),) -> info.stats[i].N), rev=true)
-    @printf("%1s %7s %8s %6s\n", "", "N (%)", "Q", "P")
+    ucts = MCTS.uct_scores(info, mcts.cpuct)
+    @printf("%1s %7s %8s %6s %8s\n", "", "N (%)", "Q", "P", "UCT")
     for (i, a) in actions
       stats = info.stats[i]
       Nr = 100 * stats.N / info.Ntot
       Q = stats.N > 0 ? stats.W / stats.N : 0.
       astr = action_str(a)
-      @printf("%1s %7.2f %8.4f %6.2f\n", astr, Nr, Q, stats.P)
+      @printf("%1s %7.2f %8.4f %6.2f %8.4f\n", astr, Nr, Q, stats.P, ucts[i])
     end
   else
     print("Unexplored board.")
@@ -461,29 +489,98 @@ function print_state_statistics(mcts, state)
   println("")
 end
 
+using DataStructures: Stack
 
-function explore_tree(mcts)
-  state = State()
+mutable struct Explorer
+  env
+  state
+  history
+  mcts
+  Explorer(env, state, mcts) = new(env, state, Stack{Any}(), mcts)
+end
+
+save_state!(exp::Explorer) = push!(exp.history, deepcopy(exp.state))
+
+function interpret!(exp::Explorer, cmd, args=[])
+  if cmd == "go"
+    st = input_state()
+    if !isnothing(st)
+      save_state!(exp)
+      exp.state = st
+      return true
+    end
+  elseif cmd == "undo"
+    if !isempty(exp.history)
+      exp.state = pop!(exp.history)
+      return true
+    end
+  elseif cmd == "do"
+    length(args) == 1 || return false
+    a = TicTacToe.parse_action(exp.state, args[1])
+    isnothing(a) && return false
+    a ∈ GI.available_actions(exp.state) || return false
+    save_state!(exp)
+    GI.play!(exp.state, a)
+    return true
+  elseif cmd == "mem"
+    inspect_memory(exp.env, exp.state)
+    return false
+  end
+  return false
+end
+
+function launch(exp::Explorer)
   while true
     # Print the state
-    TicTacToe.print_board(state, with_position_names=true)
+    TicTacToe.print_board(exp.state, with_position_names=true)
     println("")
-    print_state_statistics(mcts, state)
+    print_state_statistics(exp.mcts, exp.state)
     # Interpret command
-    print("> ")
-    cmd = readline() # split(lowercase(readline()))
-    if cmd == "go"
-      st = input_state()
-      if !isnothing(st)
-        state = st
-        continue
-      end
-    elseif cmd == ""
-      break
+    while true
+      print("> ")
+      inp = readline() |> lowercase |> split
+      isempty(inp) && return
+      cmd = inp[1]
+      args = inp[2:end]
+      interpret!(exp, cmd, args) && break
     end
   end
 end
 
-explore_tree(mcts)
+################################################################################
+
+if !isfile(GAMES_DATA)
+  env = AlphaZero{Game}(STD_PARAMS)
+  mcts = MCTS.Env{Game}(env.bestnn, env.params.cpuct)
+  player = MctsPlayer(mcts, 100)
+  @showprogress for i in 1:100
+    self_play!(env, player)
+  end
+  serialize(GAMES_DATA, (env, mcts))
+else
+  env, mcts = deserialize(GAMES_DATA)
+end
+println("Number of games collected: ", length(env.memory))
+
+
+newnn = copy(env.bestnn)
+examples = get(env.memory)
+println("Training new network.")
+train!(newnn, examples, num_batches = 100_000)
+
+
+explorer = Explorer(env, State(), mcts)
+launch(explorer)
+
+#=
+newnn = copy(env.bestnn)
+examples = get(env.memory)
+println("Training new network.")
+train!(newnn, examples, num_batches = 100_000)
+=#
+
+#explorer = Explorer(env, State(), mcts)
+#interpret!(explorer, "do", ["1e"])
+#launch(explorer)
 
 ################################################################################
