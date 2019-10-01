@@ -40,7 +40,7 @@ end
   num_learning_iters :: Int = 100
   num_episodes_per_iter :: Int = 25
   mem_buffer_size :: Int = 200_000
-  cpuct :: Float64 = 1.0
+  cpuct :: Float64 = 1.
 end
 
 # Some standard values for params:
@@ -49,33 +49,42 @@ end
 # https://medium.com/oracledevs/lessons-from-alphazero-part-3
 
 ################################################################################
-# Alpha go test
-# 4.9 million games of self play
-# Parameters updated from 700,000 minibatches of 2048 positions
-# Neural network: 20 residual blocks
-# momenum param: 0.9
-# Checkpoint after 1000 training steps
-# First 30 moves, τ=1, then τ → 0
-# Question: when pitting network against each other,
-# where does randomness come from?
-#=
-const ALPHA_GO_ZERO_PARAMS = Params(
-  num_learning_iters       = 200, # = 5M/25K
-  num_episodes_per_iter    = 25_000,
-  num_mcts_iters_per_turn  = 1600, # 0.4s thinking time per move
-  mem_buffer_size          = 500_000,
-  num_eval_games           = 400,
-  update_threshold         = 0.55,
-  dirichlet_noise_n        = 10,
-  dirichlet_noise_ϵ        = 0.25,
-  cpuct                    = 1.0)
-=#
-# Alpha go final:
-# 29 million games, 31 million minibatches of 2048
+# Alpha Zero dev
+# + 4.9 millions games of self play
+# + Parameters updated from 700,000 minibatches of 2048 positions
+# + Neural network: 20 residual blocks
+# + 1600 MCTS iterations per turn (0.4s)
+# + Checkpoint after 1000 training steps
+# + First 30 moves, τ=1, then τ → 0 (not implemented here)
+# Alpha Zero final
+# + 29 million games, 31 million minibatches of 2048 positions
+################################################################################
+
+const ALPHA_ZERO_PAPER_PARAMS = Params(
+  arena = ArenaParams(
+    num_games = 400,
+    num_mcts_iters_per_turn = 1600, #0.4s
+    update_threshold = 0.55
+  ),
+  self_play = SelfPlayParams(
+    num_mcts_iters_per_turn = 1600,
+    dirichlet_noise_nα = 10.,
+    dirichlet_noise_ϵ = 0.25
+  ),
+  learning = LearningParams(
+    batch_size = 2048,
+    num_batches = 1000
+  ),
+  num_episodes_per_iter = 25_000,
+  num_learning_iters = 200, # 5M / 25K
+  mem_buffer_size = 500_000,
+  cpuct = 1.
+)
 
 ################################################################################
 
-using Flux
+import Flux
+using Flux: Tracker, Chain, Dense, relu, softmax
 
 const R = Float32
 
@@ -287,15 +296,17 @@ end
 
 ################################################################################
 
-mutable struct AlphaZero{Game, Board}
+mutable struct AlphaZero{Game, Board, Mcts}
   params :: Params
   memory :: MemoryBuffer{Board}
   bestnn :: Oracle{Game}
+  mcts   :: Mcts
   function AlphaZero{Game}(params) where Game
     Board = GI.Board(Game)
     memory = MemoryBuffer{Board}(params.mem_buffer_size)
     oracle = Oracle{Game}()
-    new{Game, Board}(params, memory, oracle)
+    mcts = MCTS.Env{Game}(oracle, params.cpuct)
+    new{Game, Board, typeof(mcts)}(params, memory, oracle, mcts)
   end
 end
 
@@ -357,6 +368,9 @@ function play_game(env::AlphaZero{Game}, white::MctsPlayer, black) where Game
 end
 
 # Returns average reward for the evaluated player
+# Question: when pitting network against each other,
+# where does randomness come from?
+# Answer: we leave a nonzero temperature
 function evaluate_oracle(
     env::AlphaZero{G},
     oracle;
@@ -389,11 +403,10 @@ function train!(
     env::AlphaZero{G},
     num_iters=env.params.num_learning_iters
   ) where G
-  mcts = MCTS.Env{G}(env.bestnn, env.params.cpuct)
   for i in 1:num_iters
     # Collect data using self-play
     println("Collecting data using self-play....")
-    player = MctsPlayer(mcts,
+    player = MctsPlayer(env.mcts,
       env.params.self_play.num_mcts_iters_per_turn,
       τ = env.params.self_play.temperature,
       nα = env.params.self_play.dirichlet_noise_nα,
@@ -411,7 +424,7 @@ function train!(
     @printf("Win rate of new network: %.0f%%\n", 100 * pwin)
     if pwin > env.params.arena.update_threshold
       env.bestnn = newnn
-      mcts = MCTS.Env{G}(env.bestnn, env.params.cpuct)
+      env.mcts = MCTS.Env{G}(env.bestnn, env.params.cpuct)
       @printf("Replacing network.\n")
     end
   end
@@ -529,7 +542,7 @@ mutable struct Explorer
   history
   mcts
   oracle
-  Explorer(env, state, mcts, oracle=nothing) =
+  Explorer(env, state, mcts=env.mcts, oracle=env.bestnn) =
     new(env, state, Stack{Any}(), mcts, oracle)
 end
 
@@ -559,6 +572,16 @@ function interpret!(exp::Explorer, cmd, args=[])
   elseif cmd == "mem"
     inspect_memory(exp.env, exp.state)
     return false
+  elseif cmd == "explore"
+    try
+      if isempty(args)
+        n = exp.env.params.self_play.num_mcts_iters_per_turn
+      else
+        n = parse(Int, args[1])
+      end
+      MCTS.explore!(exp.mcts, exp.state, n)
+      return true
+    catch ArgumentError return false end
   end
   return false
 end
@@ -566,6 +589,7 @@ end
 function launch(exp::Explorer)
   while true
     # Print the state
+    println("")
     TicTacToe.print_board(exp.state, with_position_names=true)
     println("")
     print_state_statistics(exp.mcts, exp.state, exp.oracle)
@@ -582,42 +606,12 @@ function launch(exp::Explorer)
 end
 
 ################################################################################
-#=
+
 using Serialization: serialize, deserialize
 
-const GAMES_DATA = "games.data"
+const ENV_DATA = "env.data"
 
-const CACHE = true
-
-if !CACHE || !isfile(GAMES_DATA)
-  env = AlphaZero{Game}(STD_PARAMS)
-  mcts = MCTS.Env{Game}(env.bestnn, env.params.cpuct)
-  player = MctsPlayer(mcts, 200, ϵ=0.25, nα=10.)
-  @showprogress for i in 1:10_000
-    self_play!(env, player)
-  end
-  serialize(GAMES_DATA, (env, mcts))
-else
-  env, mcts = deserialize(GAMES_DATA)
-end
-println("Number of games collected: ", length(env.memory))
-
-show_memory_stats(env)
-
-newnn = copy(env.bestnn)
-examples = get(env.memory)
-println("Training new network.")
-train!(newnn, examples, num_batches=100_000)
-
-z = evaluate(env, newnn, num_mcts_iters=10, num_games=10)
-pwin = (z + 1) / 2
-@printf("Win rate of new network: %.0f%%\n", 100 * pwin)
-
-explorer = Explorer(env, State(), mcts, newnn)
-launch(explorer)
-=#
-
-################################################################################
+const CACHE = false
 
 arena = ArenaParams(
   update_threshold=0.55,
@@ -631,10 +625,17 @@ learning = LearningParams()
 
 params = Params(self_play=self_play, arena=arena,
   num_learning_iters=3,
-  num_episodes_per_iter=1000)
+  num_episodes_per_iter=100)
+  
+if !CACHE || !isfile(ENV_DATA)
+  env = AlphaZero{Game}(params)
+  train!(env)
+  serialize(ENV_DATA, env)
+else
+  env = deserialize(ENV_DATA)
+end
 
-env = AlphaZero{Game}(params)
-
-train!(env)
+explorer = Explorer(env, State())
+launch(explorer)
 
 ################################################################################
