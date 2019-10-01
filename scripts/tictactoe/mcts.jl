@@ -2,7 +2,7 @@
 # Solving simple tic tac toe with MCTS
 ################################################################################
 
-include("tictactoe.jl")
+include("interface.jl")
 
 using AlphaZero.MCTS
 
@@ -17,7 +17,7 @@ const TIMEOUT = 5_000
 ################################################################################
 # Write the evaluator
 
-struct RolloutEvaluator end
+struct RolloutEvaluator <: MCTS.Oracle end
 
 function rollout(board)
   state = State(copy(board), first_player=Red)
@@ -38,16 +38,12 @@ end
 
 ################################################################################
 
-const GobbletMCTS = MCTS.Env{State, Board, Action}
-
 struct MonteCarloAI <: AI
-  env :: GobbletMCTS
+  env :: MCTS.Env
   timeout :: Int
 end
 
-import Gobblet.TicTacToe: play
-
-function play(ai::MonteCarloAI, state)
+function TicTacToe.play(ai::MonteCarloAI, state)
   MCTS.explore!(ai.env, state, ai.timeout)
   actions, distr = MCTS.policy(ai.env)
   actions[argmax(distr)]
@@ -70,19 +66,19 @@ end
 # In our experiments, we can simulate ~10000 games per second
 
 using Profile
-using ProfileView
+#using ProfileView
 
 if PROFILE
-  env = GobbletMCTS(RolloutEvaluator())
+  env = MCTS.Env{State}(RolloutEvaluator())
   MCTS.explore!(env, 0.1)
   Profile.clear()
   @profile MCTS.explore!(env, 2.0)
-  ProfileView.svgwrite("profile_mcts.svg")
+  #ProfileView.svgwrite("profile_mcts.svg")
   # To examine code:
   # code_warntype(MCTS.select!, Tuple{GobbletMCTS})
 end
 
-env = GobbletMCTS(RolloutEvaluator())
+env = MCTS.Env{State}(RolloutEvaluator())
 state = State()
 MCTS.explore!(env, state, INITIAL_TRAINING)
 
