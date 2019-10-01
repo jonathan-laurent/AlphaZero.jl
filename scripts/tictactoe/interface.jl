@@ -66,7 +66,6 @@ function GI.action_string(::Type{Game}, a)
   TicTacToe.print_pos(a.to)
 end
 
-
 function read_board(::Type{Game})
   str = reduce(*, ((readline() * "   ")[1:3] for i in 1:3))
   white = ['w', 'r', 'o']

@@ -4,7 +4,7 @@
 
 import AlphaZero
 
-include("tictactoe.jl")
+include("interface.jl")
 
 using Serialization: serialize, deserialize
 
@@ -20,7 +20,8 @@ arena = AlphaZero.ArenaParams(
 self_play = AlphaZero.SelfPlayParams(
   num_mcts_iters_per_turn=100)
 
-learning = AlphaZero.LearningParams()
+learning = AlphaZero.LearningParams(
+  num_batches=1000)
 
 params = AlphaZero.Params(
   arena=arena,
