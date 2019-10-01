@@ -7,12 +7,14 @@ using Base: @kwdef
 @kwdef struct ArenaParams
   num_mcts_iters_per_turn :: Int = 25
   num_games :: Int = 40
+  cpuct :: Float64 = 1.
   temperature :: Float64 = 0.4
   update_threshold :: Float64 = 0.55 # 0.6 in Nair'simplementation
 end
 
 @kwdef struct SelfPlayParams
   num_mcts_iters_per_turn :: Int = 250
+  cpuct :: Float64 = 1.
   temperature :: Float64 = 1.
   dirichlet_noise_nα :: Float64 = 10.
   dirichlet_noise_ϵ :: Float64 = 0.25
@@ -32,7 +34,6 @@ end
   num_learning_iters :: Int = 100
   num_episodes_per_iter :: Int = 25
   mem_buffer_size :: Int = 200_000
-  cpuct :: Float64 = 1.
 end
 
 # Some standard values for params:
@@ -70,7 +71,6 @@ const ALPHA_ZERO_PAPER_PARAMS = Params(
   num_episodes_per_iter = 25_000,
   num_learning_iters = 200, # 5M / 25K
   mem_buffer_size = 500_000,
-  cpuct = 1.
 )
 
 ################################################################################

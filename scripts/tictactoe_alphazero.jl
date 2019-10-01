@@ -10,7 +10,7 @@ using Serialization: serialize, deserialize
 
 const ENV_DATA = "env.data"
 
-const CACHE = true
+const CACHE = false
 
 arena = AlphaZero.ArenaParams(
   update_threshold=0.55,
