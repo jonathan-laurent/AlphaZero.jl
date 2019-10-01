@@ -6,6 +6,7 @@ using Printf
 using AlphaZero.GameInterface
 using AlphaZero.MCTS
 using Distributions: Categorical, Dirichlet
+import AlphaZero.Util
 
 ################################################################################
 # Params
@@ -216,23 +217,6 @@ end
 
 ################################################################################
 
-# concat_cols(cols) == hcat(cols...)
-function concat_columns(cols)
-  @assert !isempty(cols)
-  nsamples = length(cols)
-  excol = first(cols)
-  sdim = length(excol)
-  arr = similar(excol, (sdim, nsamples))
-  for (i, col) in enumerate(cols)
-    arr[:,i] = col
-  end
-  return arr
-end
-
-infinity(::Type{R}) where R <: Real = one(R) / zero(R)
-
-weighted_mse(ŷ, y, w) = sum((ŷ .- y).^2 .* w) * 1 // length(y)
-
 function random_minibatch(W, X, A, P, V; batchsize)
   n = size(X, 2)
   indices = rand(1:n, batchsize)
@@ -252,11 +236,11 @@ end
 
 function convert_samples(Game, es::Vector{<:TrainingExample})
   ces = [convert_sample(Game, e) for e in es]
-  W = concat_columns((e[1] for e in ces))
-  X = concat_columns((e[2] for e in ces))
-  A = concat_columns((e[3] for e in ces))
-  P = concat_columns((e[4] for e in ces))
-  V = concat_columns((e[5] for e in ces))
+  W = Util.concat_columns((e[1] for e in ces))
+  X = Util.concat_columns((e[2] for e in ces))
+  A = Util.concat_columns((e[3] for e in ces))
+  P = Util.concat_columns((e[4] for e in ces))
+  V = Util.concat_columns((e[5] for e in ces))
   return (W, X, A, P, V)
 end
 
@@ -268,11 +252,11 @@ function train!(
 
   opt = Flux.ADAM(params.learning_rate)
   let (W, X, A, P, V) = convert_samples(G, examples)
-  let prevloss = infinity(R)
+  let prevloss = Util.infinity(R)
     function loss(W, X, A, P₀, V₀)
       let (P, V) = oracle.nn(X, A)
         Lp = Flux.crossentropy(P .+ eps(R), P₀, weight = W)
-        Lv = weighted_mse(V, V₀, W)
+        Lv = Util.weighted_mse(V, V₀, W)
         return Lp + Lv
       end
     end
