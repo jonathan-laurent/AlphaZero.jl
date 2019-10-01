@@ -61,3 +61,42 @@ function GI.vectorize_board(::Type{Game}, board)
 end
 
 ################################################################################
+
+function GI.action_string(::Type{Game}, a)
+  TicTacToe.print_pos(a.to)
+end
+
+
+function read_board(::Type{Game})
+  str = reduce(*, ((readline() * "   ")[1:3] for i in 1:3))
+  white = ['w', 'r', 'o']
+  black = ['b', 'b', 'x']
+  board = TicTacToe.make_board()
+  for i in 1:9
+    c = nothing
+    str[i] ∈ white && (c = Red)
+    str[i] ∈ black && (c = Blue)
+    board[i,1] = c
+  end
+  return board
+end
+
+# Enter a state from command line (returns `nothing` if invalid)
+function GI.read_state(::Type{Game})
+  b = read_board(G)
+  nr = count(==(Red), b[:,1])
+  nb = count(==(Blue), b[:,1])
+  if nr == nb # red turn
+    State(b, first_player=Red)
+  elseif nr == nb + 1
+    State(b, first_player=Blue)
+  else
+    nothing
+  end
+end
+
+GI.parse_action(s::State, str) = TicTacToe.parse_action(s, str)
+
+GI.print_state(s::State) = TicTacToe.print_board(s, with_position_names=true)
+
+################################################################################

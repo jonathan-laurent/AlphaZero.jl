@@ -10,7 +10,7 @@ using Serialization: serialize, deserialize
 
 const ENV_DATA = "env.data"
 
-const CACHE = false
+const CACHE = true
 
 arena = AlphaZero.ArenaParams(
   update_threshold=0.55,
@@ -36,7 +36,7 @@ else
   env = deserialize(ENV_DATA)
 end
 
-# explorer = Explorer(env, State())
-# launch(explorer)
+explorer = AlphaZero.Explorer(env, State())
+AlphaZero.launch(explorer)
 
 ################################################################################

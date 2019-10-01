@@ -40,6 +40,12 @@ module GameInterface
   function num_actions end
   function action end
   function action_id end
+  
+  # Interactive exploration tools
+  function action_string end
+  function parse_action end
+  function read_state end
+  function print_state end
 
   function actions_mask(G, available_actions) # Derived function
     nactions = num_actions(G)

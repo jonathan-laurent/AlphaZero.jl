@@ -2,32 +2,30 @@
 # Explorer.jl
 ################################################################################
 
-function inspect_memory(env, board::Board)
-  mem = get(env.memory)
-  relevant = findall((ex -> ex.b == board), mem)
-  isempty(relevant) && (return nothing)
-  @assert length(relevant) == 1
-  return mem[relevant[1]]
-end
+import Plots
 
-function inspect_memory(env, state::State)
-  b = GI.canonical_board(state)
-  e = inspect_memory(env, b)
-  if isnothing(e)
+################################################################################
+# Inspect experience buffer
+
+function inspect_memory(env::Env{G}, state::G) where G
+  mem = get(env.memory)
+  board = GI.canonical_board(state)
+  relevant = findall((ex -> ex.b == board), mem)
+  if isempty(relevant)
     println("Not in memory\n")
   else
+    @assert length(relevant) == 1
+    e = mem[relevant[1]]
     @printf("N: %d, z: %.4f\n\n", e.n, e.z)
     as = GI.available_actions(state)
     for (i, p) in sort(collect(enumerate(e.π)), by=(((i,p),)->p), rev=true)
-      @printf("%1s %6.3f\n", action_str(as[i]), p)
+      @printf("%1s %6.3f\n", GI.action_string(G, as[i]), p)
     end
   end
   println("")
 end
 
-import Plots
-
-function show_memory_stats(env)
+function viz_memory(env)
   mem = get(env.memory)
   ns = [e.n for e in mem]
   println("Number of distinct board configurations: $(length(ns))")
@@ -35,66 +33,46 @@ function show_memory_stats(env)
 end
 
 ################################################################################
+# Env explorer
 
-function input_board()
-  str = reduce(*, ((readline() * "   ")[1:3] for i in 1:3))
-  white = ['w', 'r', 'o']
-  black = ['b', 'b', 'x']
-  board = TicTacToe.make_board()
-  for i in 1:9
-    c = nothing
-    str[i] ∈ white && (c = Red)
-    str[i] ∈ black && (c = Blue)
-    board[i,1] = c
-  end
-  return board
-end
-
-# Enter a state from command line (returns `nothing` if invalid)
-function input_state()
-  b = input_board()
-  nr = count(==(Red), b[:,1])
-  nb = count(==(Blue), b[:,1])
-  if nr == nb # red turn
-    State(b, first_player=Red)
-  elseif nr == nb + 1
-    State(b, first_player=Blue)
-  else
-    nothing
+mutable struct Explorer{Game}
+  env :: Env{Game}
+  state :: Game
+  history
+  mcts
+  oracle
+  function Explorer(env, state, mcts=env.mcts, oracle=env.bestnn)
+    new{typeof(state)}(env, state, Stack{Any}(), mcts, oracle)
   end
 end
 
-function action_str(a)
-  TicTacToe.print_pos(a.to)
-end
+save_state!(exp::Explorer) = push!(exp.history, deepcopy(exp.state))
 
 ################################################################################
 
-function print_state_statistics(mcts, state, oracle = nothing)
-  wp = GI.white_playing(state)
-  b = GI.canonical_board(state)
-  if haskey(mcts.tree, b)
-    info = mcts.tree[b]
-    if !isnothing(oracle)
-      board = GI.canonical_board(state)
-      Pnet, Vnet = MCTS.evaluate(oracle, board, info.actions)
+function print_state_statistics(exp::Explorer{G}) where G
+  board = GI.canonical_board(exp.state)
+  if haskey(exp.mcts.tree, board)
+    info = exp.mcts.tree[board]
+    if !isnothing(exp.oracle)
+      Pnet, Vnet = MCTS.evaluate(exp.oracle, board, info.actions)
     end
     @printf("N: %d, V: %.3f", info.Ntot, info.Vest)
-    isnothing(oracle) || @printf(", Vnet: %.3f", Vnet)
+    isnothing(exp.oracle) || @printf(", Vnet: %.3f", Vnet)
     @printf("\n\n")
     actions = enumerate(info.actions) |> collect
     actions = sort(actions, by=(((i,a),) -> info.stats[i].N), rev=true)
-    ucts = MCTS.uct_scores(info, mcts.cpuct)
+    ucts = MCTS.uct_scores(info, exp.mcts.cpuct)
     @printf("%1s %7s %8s %6s %8s ", "", "N (%)", "Q", "P", "UCT")
-    isnothing(oracle) || @printf("%8s", "Pnet")
+    isnothing(exp.oracle) || @printf("%8s", "Pnet")
     @printf("\n")
     for (i, a) in actions
       stats = info.stats[i]
       Nr = 100 * stats.N / info.Ntot
       Q = stats.N > 0 ? stats.W / stats.N : 0.
-      astr = action_str(a)
+      astr = GI.action_string(G, a)
       @printf("%1s %7.2f %8.4f %6.2f %8.4f ", astr, Nr, Q, stats.P, ucts[i])
-      isnothing(oracle) || @printf("%8.4f", Pnet[i])
+      isnothing(exp.oracle) || @printf("%8.4f", Pnet[i])
       @printf("\n")
     end
   else
@@ -105,25 +83,9 @@ end
 
 ################################################################################
 
-using DataStructures: Stack
-
-mutable struct Explorer
-  env
-  state
-  history
-  mcts
-  oracle
-  Explorer(env, state, mcts=env.mcts, oracle=env.bestnn) =
-    new(env, state, Stack{Any}(), mcts, oracle)
-end
-
-save_state!(exp::Explorer) = push!(exp.history, deepcopy(exp.state))
-
-################################################################################
-
-function interpret!(exp::Explorer, cmd, args=[])
+function interpret!(exp::Explorer{G}, cmd, args=[]) where G
   if cmd == "go"
-    st = input_state()
+    st = GI.read_state(G)
     if !isnothing(st)
       save_state!(exp)
       exp.state = st
@@ -136,7 +98,7 @@ function interpret!(exp::Explorer, cmd, args=[])
     end
   elseif cmd == "do"
     length(args) == 1 || return false
-    a = TicTacToe.parse_action(exp.state, args[1])
+    a = GI.parse_action(exp.state, args[1])
     isnothing(a) && return false
     a ∈ GI.available_actions(exp.state) || return false
     save_state!(exp)
@@ -159,13 +121,15 @@ function interpret!(exp::Explorer, cmd, args=[])
   return false
 end
 
+################################################################################
+
 function launch(exp::Explorer)
   while true
     # Print the state
     println("")
-    TicTacToe.print_board(exp.state, with_position_names=true)
+    GI.print_state(exp.state)
     println("")
-    print_state_statistics(exp.mcts, exp.state, exp.oracle)
+    print_state_statistics(exp)
     # Interpret command
     while true
       print("> ")
