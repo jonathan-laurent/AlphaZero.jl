@@ -43,7 +43,7 @@ mutable struct Explorer{Game}
   end
 end
 
-save_state!(exp::Explorer) = push!(exp.history, deepcopy(exp.state))
+save_state!(exp::Explorer) = push!(exp.history, copy(exp.state))
 
 function print_state_statistics(exp::Explorer{G}) where G
   board = GI.canonical_board(exp.state)

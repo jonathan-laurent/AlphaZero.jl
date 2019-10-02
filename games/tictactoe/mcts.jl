@@ -17,7 +17,7 @@ end
 
 function GI.select_move(ai::MonteCarloAI, state)
   MCTS.explore!(ai.env, state, ai.timeout)
-  actions, distr = MCTS.policy(ai.env)
+  actions, distr = MCTS.policy(ai.env, state)
   actions[rand(Categorical(distr))]
 end
 

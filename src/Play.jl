@@ -15,7 +15,7 @@ end
 
 function think(p::MctsPlayer, state)
   MCTS.explore!(p.mcts, state, p.niters)
-  actions, π_mcts = MCTS.policy(p.mcts, τ=p.τ)
+  actions, π_mcts = MCTS.policy(p.mcts, state, τ=p.τ)
   if iszero(p.ϵ)
     π_exp = π_mcts
   else

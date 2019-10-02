@@ -61,15 +61,16 @@ end
 mutable struct Env{Game, Board, Action}
   # Store state statistics assuming player one is to play for nonterminal states
   tree  :: Dict{Board, BoardInfo{Action}}
-  stack :: Stack{Action}
-  state :: Game
+  stack :: Stack{Tuple{Board, Bool, Action}}
   cpuct :: Float64
   # External oracle to evaluate positions
   oracle :: Oracle{Game}
-  function Env{S}(oracle, cpuct=1.0) where {S}
-    B = GI.Board(S)
-    A = GI.Action(S)
-    new{S, B, A}(Dict{B, BoardInfo{A}}(), Stack{A}(), S(), cpuct, oracle)
+  function Env{G}(oracle, cpuct=1.0) where {G}
+    B = GI.Board(G)
+    A = GI.Action(G)
+    tree = Dict{B, BoardInfo{A}}()
+    stack = Stack{Tuple{B, Bool, A}}()
+    new{G, B, A}(tree, stack, cpuct, oracle)
   end
 end
 
@@ -85,7 +86,7 @@ function init_board_info(oracle, board, actions)
   BoardInfo(actions, stats, 0, V)
 end
 
-function update_board_info!(info, board, action, reward)
+function update_board_info!(info, action, reward)
   aid = findfirst(==(action), info.actions)
   stats = info.stats[aid]
   info.Ntot += 1
@@ -104,32 +105,16 @@ symmetric(s::ActionStats) = ActionStats(s.P, symmetric_reward(s.W), s.N)
 symmetric(s::BoardInfo) = StateInfo(s.actions, map(symmetric, s.stats))
 
 # Returns statistics for the current player, true if new node
-function state_info(env)
-  if GI.white_playing(env.state)
-    b = GI.board(env.state)
-  else
-    b = GI.board_symmetric(env.state)
-  end
+function state_info(env, state)
+  b = GI.canonical_board(state)
   if haskey(env.tree, b)
     return (env.tree[b], false)
   else
-    actions = GI.available_actions(env.state)
+    actions = GI.available_actions(state)
     info = init_board_info(env.oracle, b, actions)
     env.tree[b] = info
     return (info, true)
   end
-end
-
-# The statistics has to be in the tree already
-function update_state_info!(env, action, white_reward)
-  if GI.white_playing(env.state)
-    r = white_reward
-    b = GI.board(env.state)
-  else
-    r = symmetric_reward(white_reward)
-    b = GI.board_symmetric(env.state)
-  end
-  update_board_info!(env.tree[b], b, action, r)
 end
 
 
@@ -160,41 +145,49 @@ function uct_scores(info::BoardInfo, cpuct)
   end
 end
 
-function select!(env)
+function push_state_action!(env, state, a)
+  b = GI.canonical_board(state)
+  wp = GI.white_playing(state)
+  push!(env.stack, (b, wp, a))
+end
+
+function select!(env, state)
+  state = copy(state)
   while true
-    wr = GI.white_reward(env.state)
+    wr = GI.white_reward(state)
     isnothing(wr) || (return wr)
-    let (info, new_node) = state_info(env)
+    let (info, new_node) = state_info(env, state)
       new_node && (return info.Vest)
       scores = uct_scores(info, env.cpuct)
       best_action = info.actions[argmax(scores)]
-      push!(env.stack, best_action)
-      GI.play!(env.state, best_action)
+      push_state_action!(env, state, best_action)
+      GI.play!(state, best_action)
     end
   end
 end
 
 function backprop!(env, white_reward)
   while !isempty(env.stack)
-    action = pop!(env.stack)
-    GI.undo!(env.state, action)
-    update_state_info!(env, action, white_reward)
+    board, white_playing, action = pop!(env.stack)
+    reward = white_playing ?
+      white_reward :
+      symmetric_reward(white_reward)
+    update_board_info!(env.tree[board], action, reward)
   end
 end
 
 function explore!(env, state, nsims=1)
-  env.state = state
   for i in 1:nsims
     @assert isempty(env.stack)
-    white_reward = select!(env)
+    white_reward = select!(env, state)
     backprop!(env, white_reward)
     @assert isempty(env.stack)
   end
 end
 
 # Returns (actions, distr)
-function policy(env; τ=1.0)
-  info, _ = state_info(env)
+function policy(env, state; τ=1.0)
+  info, _ = state_info(env, state)
   τinv = 1 / τ
   D = [a.N ^ τinv for a in info.stats]
   return info.actions, D ./ sum(D)

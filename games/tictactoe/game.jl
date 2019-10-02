@@ -58,6 +58,8 @@ end
 ##### Game API
 #####
 
+Base.copy(g::Game) = Game(g.board, g.curplayer)
+
 GI.available_actions(g::Game) = findall(==(nothing), g.board)
 
 GI.board(g::Game) = g.board
@@ -80,11 +82,6 @@ end
 function GI.play!(g::Game, pos)
   g.board = setindex(g.board, g.curplayer, pos)
   g.curplayer = !g.curplayer
-end
-
-function GI.undo!(g::Game, pos)
-  g.curplayer = !g.curplayer
-  g.board = setindex(g.board, nothing, pos)
 end
 
 

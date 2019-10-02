@@ -17,8 +17,14 @@ module GameInterface
 ##### API functions
 #####
 
+# Types
 function Board end
 function Action end
+
+# Constructors
+# - Game()
+# - Game(board, white_playing=true)
+# - Base.copy(::Game)
 
 # Game functions
 function white_playing end
@@ -27,7 +33,6 @@ function board end
 function board_symmetric end
 function available_actions end
 function play! end
-function undo! end
 
 # Machine learning interface
 function board_dim end
