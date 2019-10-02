@@ -5,33 +5,24 @@
 module TicTacToe
 
 import AlphaZero.GI
-
 using StaticArrays
 
 const BOARD_SIDE = 3
-
 const NUM_POSITIONS = BOARD_SIDE ^ 2
 
-const Cell = Union{Nothing, Bool}
-
-const Board = SVector{NUM_POSITIONS, Cell}
-
 const Player = Bool
-
 const WHITE = true
-
 const BLACK = false
 
+const Cell = Union{Nothing, Player}
+const Board = SVector{NUM_POSITIONS, Cell}
 const INITIAL_BOARD = Board(repeat([nothing], NUM_POSITIONS))
 
 mutable struct Game
   board     :: Board
   curplayer :: Player
-  finished  :: Bool
-  winner    :: Union{Nothing, Bool}
-  free      :: Vector{Int}
-  function Game()
-    new(INITIAL_BOARD, WHITE, false, nothing, collect(1:NUM_POSITIONS))
+  function Game(board=INITIAL_BOARD, player=WHITE)
+    new(board, player)
   end
 end
 
@@ -63,65 +54,35 @@ function has_won(g::Game, player)
   end
 end
 
-function update_free!(g::Game)
-  g.free = findall(==(nothing), g.board)
-end
-
 ################################################################################
 
-function Game(board, player=WHITE)
-  g = Game()
-  g.board = board
-  update_free!(g)
-  if isempty(g.free)
-    g.finished = true
-    g.winner = nothing
-  elseif has_won(g, WHITE)
-    g.finished = true
-    g.winner = WHITE
-  elseif has_won(g, BLACK)
-    g.finished = true
-    g.winner = BLACK
-  end
-  return g
-end
-
-GI.available_actions(g::Game) = g.free
+GI.available_actions(g::Game) = findall(==(nothing), g.board)
 
 GI.board(g::Game) = g.board
 
 function GI.board_symmetric(g::Game)
   symmetric(c::Cell) = isnothing(c) ? nothing : !c
+  # Inference fails when using `map`
   @SVector Cell[symmetric(g.board[i]) for i in 1:NUM_POSITIONS]
 end
 
 GI.white_playing(g::Game) = g.curplayer
 
 function GI.white_reward(g::Game)
-  g.finished || return nothing
-  isnothing(g.winner) && return 0.
-  return g.winner ? 1. : -1.
+  isempty(GI.available_actions(g)) && return 0.
+  has_won(g, WHITE) && return 1.
+  has_won(g, BLACK) && return -1.
+  return nothing
 end
 
 function GI.play!(g::Game, pos)
   g.board = setindex(g.board, g.curplayer, pos)
-  update_free!(g)
-  if isempty(g.free)
-    g.finished = true
-    g.winner = nothing
-  elseif has_won(g, g.curplayer)
-    g.finished = true
-    g.winner = g.curplayer
-  end
   g.curplayer = !g.curplayer
 end
 
 function GI.undo!(g::Game, pos)
   g.curplayer = !g.curplayer
-  g.finished = false
-  g.winner = nothing
   g.board = setindex(g.board, nothing, pos)
-  update_free!(g)
 end
 
 ################################################################################
