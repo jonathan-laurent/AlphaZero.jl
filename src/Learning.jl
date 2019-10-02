@@ -1,10 +1,8 @@
-################################################################################
-# Learning.jl
-################################################################################
+#####
+##### Defining the canonical network architecture
+#####
 
-import Flux
-using Flux: Tracker, Chain, Dense, relu, softmax
-
+# Numeric type used for learning (Float32 faster on GPUs)
 const R = Float32
 
 struct Network
@@ -41,15 +39,17 @@ function (nn::Network)(board, actions_mask)
   return (p, v)
 end
 
-################################################################################
-# Interface to the neural network
 
-struct Oracle{Game} <: MCTS.Oracle
+#####
+##### Oracle: bridge between MCTS and the neural network
+#####
+
+struct Oracle{Game} <: MCTS.Oracle{Game}
   nn :: Network
   function Oracle{G}() where G
     hsize = 100
     nn = Network(GI.board_dim(G), GI.num_actions(G), hsize)
-    new(nn)
+    new{G}(nn)
   end
 end
 
@@ -69,7 +69,10 @@ function MCTS.evaluate(o::Oracle{G}, board, available_actions) where G
   return Vector{Float64}(Tracker.data(P)), Float64(Tracker.data(V)[1])
 end
 
-################################################################################
+
+#####
+##### Training procedure
+#####
 
 function random_minibatch(W, X, A, P, V; batchsize)
   n = size(X, 2)
@@ -131,5 +134,3 @@ function train!(
       loss, Flux.params(oracle.nn), data, opt, cb=Flux.throttle(cb, 1.0))
   end end
 end
-
-################################################################################

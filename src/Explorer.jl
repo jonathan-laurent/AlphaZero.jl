@@ -1,11 +1,6 @@
-################################################################################
-# Explorer.jl
-################################################################################
-
-import Plots
-
-################################################################################
-# Inspect experience buffer
+#####
+##### Inspecting the experience buffer
+#####
 
 function inspect_memory(env::Env{G}, state::G) where G
   mem = get(env.memory)
@@ -32,8 +27,10 @@ function viz_memory(env)
   Plots.histogram(ns, weights=ns, legend=nothing)
 end
 
-################################################################################
-# Env explorer
+
+#####
+##### Interactive exploration of the environment
+#####
 
 mutable struct Explorer{Game}
   env :: Env{Game}
@@ -47,8 +44,6 @@ mutable struct Explorer{Game}
 end
 
 save_state!(exp::Explorer) = push!(exp.history, deepcopy(exp.state))
-
-################################################################################
 
 function print_state_statistics(exp::Explorer{G}) where G
   board = GI.canonical_board(exp.state)
@@ -80,8 +75,6 @@ function print_state_statistics(exp::Explorer{G}) where G
   end
   println("")
 end
-
-################################################################################
 
 function interpret!(exp::Explorer{G}, cmd, args=[]) where G
   if cmd == "go"
@@ -121,8 +114,6 @@ function interpret!(exp::Explorer{G}, cmd, args=[]) where G
   return false
 end
 
-################################################################################
-
 function launch(exp::Explorer)
   while true
     # Print the state
@@ -140,5 +131,3 @@ function launch(exp::Explorer)
     end
   end
 end
-
-################################################################################

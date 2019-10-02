@@ -1,7 +1,3 @@
-################################################################################
-# Driver for Tic Tac Toe
-################################################################################
-
 import AlphaZero
 
 include("game.jl") ; import .TicTacToe
@@ -28,7 +24,7 @@ params = AlphaZero.Params(
   self_play=self_play,
   num_learning_iters=3,
   num_episodes_per_iter=100)
-  
+
 if !CACHE || !isfile(ENV_DATA)
   env = AlphaZero.Env{TicTacToe.Game}(params)
   AlphaZero.train!(env)
@@ -39,5 +35,3 @@ end
 
 explorer = AlphaZero.Explorer(env, TicTacToe.Game())
 AlphaZero.launch(explorer)
-
-################################################################################

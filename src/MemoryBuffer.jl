@@ -1,16 +1,13 @@
-################################################################################
-# Memory Buffer
-# Structure for collecting experience
-################################################################################
-
-using Statistics: mean
-using DataStructures: CircularBuffer
+#####
+##### Memory Buffer:
+##### datastructure to collect self-play experience
+#####
 
 struct TrainingExample{Board}
   b :: Board
   π :: Vector{Float64}
   z :: Float64
-  n :: Int # Sample weight
+  n :: Int # number of times the board position `b` has been seen
 end
 
 struct MemoryBuffer{Board}
@@ -35,7 +32,7 @@ function merge_samples(es::Vector{TrainingExample{B}}) where B
   return TrainingExample{B}(b, π, z, n)
 end
 
-# Get memory content
+# Get memory content, merging samples for identical boards
 function get(b::MemoryBuffer{B}) where B
   dict = Dict{B, Vector{TrainingExample{B}}}()
   sizehint!(dict, length(b))
@@ -62,5 +59,3 @@ function push_game!(buf::MemoryBuffer, white_reward)
   end
   empty!(buf.cur)
 end
-
-################################################################################

@@ -1,21 +1,49 @@
-################################################################################
-# MCTS.jl
-# Generic Implementation for Monte Carlo Tree Search
-################################################################################
+"""
+    MCTS
 
+A generic implementation of Monte Carlo Tree Search (with an external oracle).
+Relies on `AlphaZero.GameInterface`.
+
+"""
 module MCTS
 
 using DataStructures: Stack
 
-import ..GameInterface; const GI = GameInterface
+import ..GI
 
-################################################################################
+#####
+##### Interface for external oracles
+#####
 
-abstract type Oracle end
+abstract type Oracle{Game} end
 
 function evaluate end
 
-################################################################################
+# The simplest way to evaluate a position is to perform rollouts
+# Alternatively, the user can provide a NN-based oracle
+struct RolloutOracle{Game} <: Oracle{Game} end
+
+function rollout(::Type{Game}, board) where Game
+  state = Game(board)
+  while true
+    reward = GI.white_reward(state)
+    isnothing(reward) || (return reward)
+    action = rand(GI.available_actions(state))
+    GI.play!(state, action)
+   end
+end
+
+function evaluate(::RolloutOracle{G}, board, available_actions) where G
+  V = rollout(G, board)
+  n = length(available_actions)
+  P = [1 / n for a in available_actions]
+  return P, V
+end
+
+
+#####
+##### MCTS Environment
+#####
 
 struct ActionStats
   P :: Float64
@@ -30,14 +58,14 @@ mutable struct BoardInfo{Action}
   Vest    :: Float64
 end
 
-mutable struct Env{State, Board, Action}
+mutable struct Env{Game, Board, Action}
   # Store state statistics assuming player one is to play for nonterminal states
   tree  :: Dict{Board, BoardInfo{Action}}
   stack :: Stack{Action}
-  state :: State
+  state :: Game
   cpuct :: Float64
   # External oracle to evaluate positions
-  oracle :: Oracle
+  oracle :: Oracle{Game}
   function Env{S}(oracle, cpuct=1.0) where {S}
     B = GI.Board(S)
     A = GI.Action(S)
@@ -45,7 +73,10 @@ mutable struct Env{State, Board, Action}
   end
 end
 
-################################################################################
+
+#####
+##### Initialize and update board information
+#####
 
 # white is to play
 function init_board_info(oracle, board, actions)
@@ -61,7 +92,10 @@ function update_board_info!(info, board, action, reward)
   info.stats[aid] = ActionStats(stats.P, stats.W + reward, stats.N + 1)
 end
 
-################################################################################
+
+#####
+##### Update and access state information
+#####
 
 symmetric_reward(R) = -R
 
@@ -98,7 +132,25 @@ function update_state_info!(env, action, white_reward)
   update_board_info!(env.tree[b], b, action, r)
 end
 
-################################################################################
+
+#####
+##### Exploration utilities
+#####
+
+function debug_tree(env::Env{Game}; k=10) where Game
+  pairs = collect(env.tree)
+  k = min(k, length(pairs))
+  most_visited = sort(pairs, by=(x->x.second.Ntot), rev=true)[1:k]
+  for (b, info) in most_visited
+    println("N: ", info.Ntot)
+    GI.print_state(Game(b))
+  end
+end
+
+
+#####
+##### Main algorithm
+#####
 
 function uct_scores(info::BoardInfo, cpuct)
   sqrtNtot = sqrt(info.Ntot)
@@ -130,8 +182,6 @@ function backprop!(env, white_reward)
   end
 end
 
-################################################################################
-
 function explore!(env, state, nsims=1)
   env.state = state
   for i in 1:nsims
@@ -150,13 +200,4 @@ function policy(env; τ=1.0)
   return info.actions, D ./ sum(D)
 end
 
-################################################################################
-
 end
-
-# Some resources
-# https://web.stanford.edu/~surag/posts/alphazero.html
-# https://int8.io/monte-carlo-tree-search-beginners-guide/
-# https://medium.com/oracledevs/lessons-from-alpha-zero
-
-################################################################################

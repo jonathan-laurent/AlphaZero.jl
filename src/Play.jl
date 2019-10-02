@@ -1,19 +1,16 @@
-################################################################################
-# MCTS player
-################################################################################
-
-using Distributions: Categorical, Dirichlet
-
-################################################################################
+#####
+##### An MCTS-based player
+#####
 
 struct MctsPlayer{M}
   mcts :: M
   niters :: Int
-  τ  :: Float64 # Temperature
+  τ :: Float64 # Temperature
   nα :: Float64 # Dirichlet noise parameter
-  ϵ  :: Float64 # Dirichlet noise weight
-  MctsPlayer(mcts, niters; τ=1., nα=10., ϵ=0.) =
+  ϵ :: Float64 # Dirichlet noise weight
+  function MctsPlayer(mcts, niters; τ=1., nα=10., ϵ=0.)
     new{typeof(mcts)}(mcts, niters, τ, nα, ϵ)
+  end
 end
 
 function think(p::MctsPlayer, state)
@@ -30,9 +27,14 @@ function think(p::MctsPlayer, state)
   return π_mcts, a
 end
 
-################################################################################
 
-function play(Game, white::MctsPlayer, black, memory=nothing) :: Float64
+#####
+##### MCTS players can play against each other
+#####
+
+function play(
+  ::Type{Game}, white::MctsPlayer, black::MctsPlayer, memory=nothing
+  ) where Game
   state = Game()
   while true
     z = GI.white_reward(state)
@@ -50,15 +52,21 @@ function play(Game, white::MctsPlayer, black, memory=nothing) :: Float64
   end
 end
 
-self_play!(Game, player, memory) = play(Game, player, player, memory)
+self_play!(G, player, memory) = play(G, player, player, memory)
 
-################################################################################
+
+#####
+##### Evaluating the latest NN
+##### by pitting it against the best one so far
+#####
 
 # Returns average reward for the evaluated player
-# Question: when pitting network against each other,
-# where does randomness come from?
-# Answer: we leave a nonzero temperature
-function evaluate_oracle(G, baseline, oracle, params::ArenaParams)
+#   Question: when pitting network against each other,
+#   where does randomness come from?
+#   Answer: we leave a nonzero temperature
+function evaluate_oracle(
+    ::Type{G}, baseline::Oracle{G}, oracle::Oracle{G}, params::ArenaParams
+  ) where G
   τ = params.temperature
   n_mcts = params.num_mcts_iters_per_turn
   n_episodes = params.num_games
@@ -78,5 +86,3 @@ function evaluate_oracle(G, baseline, oracle, params::ArenaParams)
   end
   return zsum / n_episodes
 end
-
-################################################################################

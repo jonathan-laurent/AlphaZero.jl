@@ -1,7 +1,3 @@
-################################################################################
-# Simple Tic Tac Toe Implementation
-################################################################################
-
 module TicTacToe
 
 import AlphaZero.GI
@@ -30,7 +26,10 @@ GI.Board(::Type{Game}) = Board
 
 GI.Action(::Type{Game}) = Int
 
-################################################################################
+
+#####
+##### Defining winning conditions
+#####
 
 pos_of_xy((x, y)) = (y - 1) * BOARD_SIDE + (x - 1) + 1
 
@@ -54,7 +53,10 @@ function has_won(g::Game, player)
   end
 end
 
-################################################################################
+
+#####
+##### Game API
+#####
 
 GI.available_actions(g::Game) = findall(==(nothing), g.board)
 
@@ -85,7 +87,10 @@ function GI.undo!(g::Game, pos)
   g.board = setindex(g.board, nothing, pos)
 end
 
-################################################################################
+
+#####
+##### Machine Learning API
+#####
 
 GI.board_dim(::Type{Game}) = 3 * NUM_POSITIONS
 
@@ -101,7 +106,10 @@ function GI.vectorize_board(::Type{Game}, ::Type{R}, board) where R
      for i in 1:NUM_POSITIONS ]
 end
 
-################################################################################
+
+#####
+##### Interaction API
+#####
 
 function GI.action_string(::Type{Game}, a)
   Char(Int('A') + a - 1)
@@ -172,5 +180,3 @@ function GI.print_state(g::Game; with_position_names=true, botmargin=true)
 end
 
 end
-
-################################################################################

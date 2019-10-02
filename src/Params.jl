@@ -1,8 +1,11 @@
-################################################################################
-# AlphaZero Parameters
-################################################################################
+#####
+##### AlphaZero Parameters
+#####
 
-using Base: @kwdef
+# The default values are inspired by:
+# https://github.com/suragnair/alpha-zero-general/blob/master/main.py
+# For dirichlet noise parameters, see:
+# https://medium.com/oracledevs/lessons-from-alphazero-part-3
 
 @kwdef struct ArenaParams
   num_mcts_iters_per_turn :: Int = 25
@@ -36,12 +39,11 @@ end
   mem_buffer_size :: Int = 200_000
 end
 
-# Some standard values for params:
-# https://github.com/suragnair/alpha-zero-general/blob/master/main.py
-# For dirichlet noise, see:
-# https://medium.com/oracledevs/lessons-from-alphazero-part-3
 
-################################################################################
+#####
+##### Parameters from the original AlphaZero paper
+#####
+
 # Alpha Zero dev
 # + 4.9 millions games of self play
 # + Parameters updated from 700,000 minibatches of 2048 positions
@@ -51,7 +53,6 @@ end
 # + First 30 moves, τ=1, then τ → 0 (not implemented here)
 # Alpha Zero final
 # + 29 million games, 31 million minibatches of 2048 positions
-################################################################################
 
 const ALPHA_ZERO_PAPER_PARAMS = Params(
   arena = ArenaParams(
@@ -72,5 +73,3 @@ const ALPHA_ZERO_PAPER_PARAMS = Params(
   num_learning_iters = 200, # 5M / 25K
   mem_buffer_size = 500_000,
 )
-
-################################################################################

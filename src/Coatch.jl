@@ -1,6 +1,6 @@
-################################################################################
-# Coatch.jl
-################################################################################
+#####
+##### High level training procedure
+#####
 
 mutable struct Env{Game, Board, Mcts}
   params :: Params
@@ -15,8 +15,6 @@ mutable struct Env{Game, Board, Mcts}
     new{Game, Board, typeof(mcts)}(params, memory, oracle, mcts)
   end
 end
-
-################################################################################
 
 function train!(
     env::Env{G},
@@ -48,5 +46,3 @@ function train!(
     end
   end
 end
-
-################################################################################
