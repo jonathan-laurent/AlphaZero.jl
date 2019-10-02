@@ -4,7 +4,7 @@
 
 import AlphaZero
 
-include("interface.jl")
+include("game.jl") ; import .TicTacToe
 
 using Serialization: serialize, deserialize
 
@@ -30,14 +30,14 @@ params = AlphaZero.Params(
   num_episodes_per_iter=100)
   
 if !CACHE || !isfile(ENV_DATA)
-  env = AlphaZero.Env{Game}(params)
+  env = AlphaZero.Env{TicTacToe.Game}(params)
   AlphaZero.train!(env)
   serialize(ENV_DATA, env)
 else
   env = deserialize(ENV_DATA)
 end
 
-explorer = AlphaZero.Explorer(env, State())
+explorer = AlphaZero.Explorer(env, TicTacToe.Game())
 AlphaZero.launch(explorer)
 
 ################################################################################

@@ -2,9 +2,11 @@
 # Solving simple tic tac toe with MCTS
 ################################################################################
 
-include("interface.jl")
+import AlphaZero.MCTS
+import AlphaZero.GI
 
-using AlphaZero.MCTS
+include("game.jl")
+import .TicTacToe
 
 ################################################################################
 
@@ -20,7 +22,7 @@ const TIMEOUT = 5_000
 struct RolloutEvaluator <: MCTS.Oracle end
 
 function rollout(board)
-  state = State(copy(board), first_player=Red)
+  state = TicTacToe.Game(board, TicTacToe.WHITE)
   while true
     reward = GI.white_reward(state)
     isnothing(reward) || (return reward)
@@ -38,12 +40,12 @@ end
 
 ################################################################################
 
-struct MonteCarloAI <: AI
+struct MonteCarloAI <: GI.Player
   env :: MCTS.Env
   timeout :: Int
 end
 
-function TicTacToe.play(ai::MonteCarloAI, state)
+function GI.select_move(ai::MonteCarloAI, state)
   MCTS.explore!(ai.env, state, ai.timeout)
   actions, distr = MCTS.policy(ai.env)
   actions[argmax(distr)]
@@ -78,12 +80,12 @@ if PROFILE
   # code_warntype(MCTS.select!, Tuple{GobbletMCTS})
 end
 
-env = MCTS.Env{State}(RolloutEvaluator())
-state = State()
+env = MCTS.Env{TicTacToe.Game}(RolloutEvaluator())
+state = TicTacToe.Game()
 MCTS.explore!(env, state, INITIAL_TRAINING)
 
 if INTERACTIVE
-  interactive!(state, red=MonteCarloAI(env, TIMEOUT), blue=Human())
+  GI.interactive!(state, MonteCarloAI(env, TIMEOUT), GI.Human())
 end
 
 ################################################################################

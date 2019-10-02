@@ -5,6 +5,7 @@
 """
 A generic interface for zero-sum, symmetric games.
 
+  + `Game()` and `Game(::Board)` constructors
   + `white_playing(::State) :: Bool`
   + `white_reward(::State) :: Union{Nothing, Float64}`
   + `board(::State)`
@@ -46,8 +47,11 @@ module GameInterface
   function parse_action end
   function read_state end
   function print_state end
+  
+  ##############################################################################
+  # Derived functions
 
-  function actions_mask(G, available_actions) # Derived function
+  function actions_mask(G, available_actions)
     nactions = num_actions(G)
     mask = falses(nactions)
     for a in available_actions
@@ -58,6 +62,42 @@ module GameInterface
 
   function canonical_board(state)
     white_playing(state) ? board(state) : board_symmetric(state)
+  end
+  
+  ##############################################################################
+  # Minimalistic interface to test the game
+  
+  abstract type Player end
+  
+  struct Human <: Player end
+  
+  struct Quit <: Exception end
+  
+  function select_move(::Human, game)
+    a = nothing
+    while isnothing(a) || a ∉ available_actions(game)
+      print("> ")
+      str = readline()
+      print("\n")
+      isempty(str) && throw(Quit())
+      a = parse_action(game, str)
+    end
+    return a
+  end
+  
+  function interactive!(game, white::Player, black::Player)
+    try
+    print_state(game)
+    while isnothing(white_reward(game))
+      player = white_playing(game) ? white : black
+      action = select_move(player, game)
+      play!(game, action)
+      print_state(game)
+    end
+    catch e
+      isa(e, Quit) || rethrow(e)
+      return
+    end
   end
 
 end

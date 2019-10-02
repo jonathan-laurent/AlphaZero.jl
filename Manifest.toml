@@ -216,14 +216,6 @@ git-tree-sha1 = "4bf5706f3b9a2c5adbbc473c8c91582c1fa816a3"
 uuid = "4d00f742-c7ba-57c2-abde-4428a4b178cb"
 version = "0.7.6"
 
-[[Gobblet]]
-deps = ["Crayons", "ProgressMeter", "Serialization", "StaticArrays", "Test"]
-git-tree-sha1 = "aa04f98639790186b84315d0731dd5b31411ad90"
-repo-rev = "master"
-repo-url = "https://github.com/jonathan-laurent/Gobblet.jl"
-uuid = "27c1c01c-cea3-11e9-38f3-4df8979e16fa"
-version = "0.1.0"
-
 [[InteractiveUtils]]
 deps = ["Markdown"]
 uuid = "b77e0a4c-d291-57a0-90e8-8db25a27a240"

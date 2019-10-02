@@ -128,7 +128,6 @@ function launch(exp::Explorer)
     # Print the state
     println("")
     GI.print_state(exp.state)
-    println("")
     print_state_statistics(exp)
     # Interpret command
     while true

@@ -63,7 +63,7 @@ end
 
 function MCTS.evaluate(o::Oracle{G}, board, available_actions) where G
   mask = GI.actions_mask(G, available_actions)
-  input = GI.vectorize_board(G, board)
+  input = GI.vectorize_board(G, R, board)
   P, V = o.nn(input, mask)
   P = P[mask]
   return Vector{Float64}(Tracker.data(P)), Float64(Tracker.data(V)[1])
@@ -79,7 +79,7 @@ end
 
 function convert_sample(Game, e::TrainingExample)
   w = [log2(R(e.n)) + one(R)]
-  x = Vector{R}(GI.vectorize_board(Game, e.b))
+  x = Vector{R}(GI.vectorize_board(Game, R, e.b))
   actions = GI.available_actions(Game(e.b))
   a = GI.actions_mask(Game, actions)
   p = zeros(R, size(a))
