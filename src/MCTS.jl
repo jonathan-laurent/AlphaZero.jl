@@ -8,6 +8,7 @@ Relies on `AlphaZero.GameInterface`.
 module MCTS
 
 using DataStructures: Stack
+using Distributions: Categorical
 
 import ..GI
 
@@ -192,5 +193,33 @@ function policy(env, state; τ=1.0)
   D = [a.N ^ τinv for a in info.stats]
   return info.actions, D ./ sum(D)
 end
+
+
+#####
+##### MCTS AI (for illustration purposes)
+#####
+
+struct AI <: GI.Player
+  env :: Env
+  timeout :: Float64
+  random :: Bool
+  function AI(env; timeout=3., random=false)
+    new(env, timeout, random)
+  end
+end
+
+function GI.select_move(ai::AI, state)
+  start = time()
+  while time() - start < ai.timeout
+    explore!(ai.env, state, 100)
+  end
+  actions, distr = policy(ai.env, state)
+  if ai.random
+    return actions[rand(Categorical(distr))]
+  else
+    return actions[argmax(distr)]
+  end
+end
+
 
 end
