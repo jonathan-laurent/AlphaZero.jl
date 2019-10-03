@@ -1,11 +1,12 @@
 module Mancala
 
+export Game, Board
+
 import AlphaZero.GI
 
 using Printf
 using Crayons
 using StaticArrays
-
 
 const NUM_HOUSES_PER_PLAYER = 6
 
@@ -138,7 +139,7 @@ GI.board(g::Game) = g.board
 function GI.board_symmetric(g::Game) :: Board
   b = g.board
   stores = @SVector[b.stores[2], b.stores[1]]
-  houses = vcat(b.houses[2,:], b.houses[1,:])
+  houses = vcat(b.houses[2,:]', b.houses[1,:]')
   Board(stores, houses)
 end
 
@@ -146,12 +147,23 @@ GI.white_playing(g::Game) = g.curplayer == WHITE
 
 game_terminated(g::Game) = all(==(0), g.board.houses)
 
+
+#####
+##### Reward shaping
+#####
+
+function zero_one_reward(nw, nb)
+  nw > nb && return 1.
+  nw < nb && return -1.
+  return 0.
+end
+
+linear_reward(nw, nb) = (nw - nb) / NUM_SEEDS
+
 function GI.white_reward(g::Game)
   if game_terminated(g)
-    wseeds, bseeds = g.board.stores
-    wseeds > bseeds && (return 1.)
-    wseeds < bseeds && (return -1.)
-    return 0.
+    nw, nb = g.board.stores
+    return zero_one_reward(nw, nb) + linear_reward(nw, nb)
   else
     return nothing
   end
@@ -159,7 +171,24 @@ end
 
 
 #####
-##### Interactive
+##### ML interface
+#####
+
+GI.board_dim(::Type{Game}) = NUM_HOUSES + 2
+
+GI.num_actions(::Type{Game}) = NUM_HOUSES_PER_PLAYER
+
+GI.action_id(::Type{Game}, a) = a
+
+GI.action(::Type{Game}, id) = id
+
+function GI.vectorize_board(::Type{Game}, ::Type{R}, board) where R
+  R[board.houses[1,:]; board.stores[1]; board.houses[2,:]; board.stores[2]]
+end
+
+
+#####
+##### User interface
 #####
 
 GI.action_string(::Type{Game}, a) = string(a)
@@ -227,5 +256,42 @@ function GI.print_state(g::Game, with_position_names=true)
   hline(NUM_HOUSES_PER_PLAYER + 2)
   show_labels(reverse(1:NUM_HOUSES_PER_PLAYER))
 end
+
+function GI.read_state(::Type{Game})
+  #try
+    function read_houses(player)
+      print("Player $(player) houses: ")
+      houses = [parse(Int, s) for s in split(readline())]
+      @assert all(>=(0), houses)
+      @assert length(houses) == NUM_HOUSES_PER_PLAYER
+      return houses
+    end
+    function read_store(player)
+      print("Player $(player) store: ")
+      store = parse(Int, readline())
+      @assert store >= 0
+      return store
+    end
+    # Read board
+    h1 = read_houses(1)
+    h2 = read_houses(2)
+    s1 = read_store(1)
+    #s2 = read_store(2)
+    nsofar = sum(h1) + sum(h2) + s1
+    @assert nsofar <= NUM_SEEDS
+    s2 = NUM_SEEDS - nsofar
+    board = Board([s1, s2], [h1'; h2'])
+    # Read current player
+    print("Current player (1/2): ")
+    curplayer = parse(Int, readline())
+    @assert 1 <= curplayer <= 2
+    return Game(board, curplayer == WHITE)
+  #catch
+  #  return nothing
+  #end
+end
+
+# Example of creating game objects manually:
+# Game(Board([10, 20], [[1 0 0 0 0 0]; [1 0 2 0 2 0]]), true)
 
 end
