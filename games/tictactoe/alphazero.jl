@@ -9,29 +9,31 @@ const ENV_DATA = "env.data"
 const CACHE = false
 
 arena = AlphaZero.ArenaParams(
-  update_threshold=0.55,
+  reset_mcts=true,
+  update_threshold=(2 * 0.55 - 1),
   num_mcts_iters_per_turn=20,
-  num_games=100)
+  num_games=200)
 
 self_play = AlphaZero.SelfPlayParams(
+  num_games=500,
   num_mcts_iters_per_turn=100)
 
-learning = AlphaZero.LearningParams(
-  num_batches=1000)
+learning = AlphaZero.LearningParams()
 
 params = AlphaZero.Params(
   arena=arena,
   self_play=self_play,
-  num_learning_iters=3,
-  num_episodes_per_iter=100)
+  num_iters=2)
 
 if !CACHE || !isfile(ENV_DATA)
   env = AlphaZero.Env{TicTacToe.Game}(params)
   AlphaZero.train!(env)
+  println("\n")
   serialize(ENV_DATA, env)
 else
   env = deserialize(ENV_DATA)
 end
 
+println("Launching explorer.")
 explorer = AlphaZero.Explorer(env, TicTacToe.Game())
 AlphaZero.launch(explorer)

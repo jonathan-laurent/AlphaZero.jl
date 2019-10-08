@@ -39,6 +39,22 @@ function (nn::Network)(board, actions_mask)
   return (p, v)
 end
 
+function regularized_weights(nn::Network)
+  W(mlp) = [l.W for l in mlp if isa(l, Dense)]
+  return [W(nn.common); W(nn.vbranch); W(nn.pbranch)]
+end
+
+function network_report(nn::Network) :: Report.Network
+  Ws = Tracker.data.(regularized_weights(nn))
+  maxw = maximum(maximum(abs.(W)) for W in Ws)
+  meanw = mean(mean(abs.(W)) for W in Ws)
+  pbiases = nn.pbranch[end-1].b |> Tracker.data
+  vbias = nn.vbranch[end].b |> Tracker.data
+  return Report.Network(maxw, meanw, pbiases, vbias[1])
+end
+
+num_parameters(nn::Network) = sum(length(p) for p in Flux.params(nn))
+
 
 #####
 ##### Oracle: bridge between MCTS and the neural network
@@ -47,19 +63,19 @@ end
 struct Oracle{Game} <: MCTS.Oracle{Game}
   nn :: Network
   function Oracle{G}() where G
-    hsize = 100
+    hsize = 300
     nn = Network(GI.board_dim(G), GI.num_actions(G), hsize)
     new{G}(nn)
   end
 end
-
-num_parameters(oracle) = sum(length(p) for p in params(o.nn))
 
 function Base.copy(o::Oracle{G}) where G
   new = Oracle{G}()
   Flux.loadparams!(new.nn, Flux.params(o.nn))
   return new
 end
+
+num_parameters(o::Oracle) = num_parameters(o.nn)
 
 function MCTS.evaluate(o::Oracle{G}, board, available_actions) where G
   mask = GI.actions_mask(G, available_actions)
@@ -73,12 +89,6 @@ end
 #####
 ##### Training procedure
 #####
-
-function random_minibatch(W, X, A, P, V; batchsize)
-  n = size(X, 2)
-  indices = rand(1:n, batchsize)
-  return (W[:,indices], X[:,indices], A[:,indices], P[:,indices], V[:,indices])
-end
 
 function convert_sample(Game, e::TrainingExample)
   w = [log2(R(e.n)) + one(R)]
@@ -101,36 +111,51 @@ function convert_samples(Game, es::Vector{<:TrainingExample})
   return (W, X, A, P, V)
 end
 
-function train!(
+mse_wmean(ŷ, y, w) = sum((ŷ .- y).^2 .* w) ./ sum(w)
+
+klloss_wmean(π̂, π, w) = -sum(π .* log.(π̂ .+ eps(eltype(π))) .* w) ./ sum(w)
+
+entropy_wmean(π, w) = -sum(π .* log.(π .+ eps(eltype(π))) .* w) ./ sum(w)
+
+function losses(oracle, Wmean, (W, X, A, P, V))
+  P̂, V̂ = oracle.nn(X, A)
+  C = mean(W) / Wmean
+  Lp = C * klloss_wmean(P̂, P, W)
+  Lv = C * mse_wmean(V̂, V, W)
+  Lreg = zero(Lv)
+  return (Lp, Lv, Lreg)
+end
+
+struct Trainer
+  oracle
+  samples
+  Wmean
+  HP
+  optimizer
+  batch_size
+  function Trainer(
     oracle::Oracle{G},
     examples::Vector{<:TrainingExample},
     params::LearningParams
   ) where G
+    samples = convert_samples(G, examples)
+    W, X, A, P, V = samples
+    Wmean = mean(W)
+    HP = entropy_wmean(P, W) |> Tracker.data
+    optimizer = Flux.ADAM(params.learning_rate)
+    batch_size = params.batch_size
+    return new(oracle, samples, Wmean, HP, optimizer, batch_size)
+  end
+end
 
-  opt = Flux.ADAM(params.learning_rate)
-  let (W, X, A, P, V) = convert_samples(G, examples)
-  let prevloss = Util.infinity(R)
-    function loss(W, X, A, P₀, V₀)
-      let (P, V) = oracle.nn(X, A)
-        Lp = Flux.crossentropy(P .+ eps(R), P₀, weight = W)
-        Lv = Util.weighted_mse(V, V₀, W)
-        return Lp + Lv
-      end
-    end
-    function print_legend()
-      @printf("%12s", "Loss\n")
-    end
-    function cb()
-      L = loss(W, X, A, P, V)
-      prevloss - L < params.loss_eps && Flux.stop()
-      prevloss = L
-      @printf("%12.7f\n", L)
-    end
-    data = (
-      random_minibatch(W, X, A, P, V; batchsize=params.batch_size)
-      for i in 1:params.num_batches)
-    print_legend()
-    Flux.train!(
-      loss, Flux.params(oracle.nn), data, opt, cb=Flux.throttle(cb, 1.0))
-  end end
+function training_epoch!(tr::Trainer)
+  loss(batch...) = sum(losses(tr.oracle, tr.Wmean, batch))
+  data = Util.random_batches(tr.samples, tr.batch_size)
+  Flux.train!(loss, Flux.params(tr.oracle.nn), data, tr.optimizer)
+end
+
+function loss_report(tr::Trainer)
+  Lp, Lv, Lreg = Tracker.data.(losses(tr.oracle, tr.Wmean, tr.samples))
+  L = Lp + Lv + Lreg
+  return Report.Loss(L, Lp, Lv, Lreg, tr.HP)
 end

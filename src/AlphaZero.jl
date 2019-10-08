@@ -19,6 +19,8 @@ import Plots
 import Flux
 
 using Printf
+using Formatting
+using Crayons
 using ProgressMeter
 using Base: @kwdef
 using DataStructures: Stack, CircularBuffer
@@ -27,10 +29,12 @@ using Flux: Tracker, Chain, Dense, relu, softmax
 using Statistics: mean
 
 include("Params.jl")
+include("Report.jl")
+include("Logger.jl")
 include("MemoryBuffer.jl")
 include("Learning.jl")
 include("Play.jl")
-include("Coatch.jl")
+include("Training.jl")
 include("Explorer.jl")
 
 end

@@ -194,6 +194,8 @@ function policy(env, state; τ=1.0)
   return info.actions, D ./ sum(D)
 end
 
+reset!(env) = empty!(env.tree)
+
 
 #####
 ##### MCTS AI (for illustration purposes)
