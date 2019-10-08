@@ -15,6 +15,9 @@ const GI = GameInterface
 include("MCTS.jl")
 import .MCTS
 
+include("Log.jl")
+using .Log
+
 import Plots
 import Flux
 
@@ -30,7 +33,6 @@ using Statistics: mean
 
 include("Params.jl")
 include("Report.jl")
-include("Logger.jl")
 include("MemoryBuffer.jl")
 include("Learning.jl")
 include("Play.jl")

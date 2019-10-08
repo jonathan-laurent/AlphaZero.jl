@@ -55,7 +55,6 @@ end
 
 num_parameters(nn::Network) = sum(length(p) for p in Flux.params(nn))
 
-
 #####
 ##### Oracle: bridge between MCTS and the neural network
 #####
@@ -85,9 +84,8 @@ function MCTS.evaluate(o::Oracle{G}, board, available_actions) where G
   return Vector{Float64}(Tracker.data(P)), Float64(Tracker.data(V)[1])
 end
 
-
 #####
-##### Training procedure
+##### Converting samples
 #####
 
 function convert_sample(Game, e::TrainingExample)
@@ -111,6 +109,10 @@ function convert_samples(Game, es::Vector{<:TrainingExample})
   return (W, X, A, P, V)
 end
 
+#####
+##### Learning procedure
+#####
+
 mse_wmean(ŷ, y, w) = sum((ŷ .- y).^2 .* w) ./ sum(w)
 
 klloss_wmean(π̂, π, w) = -sum(π .* log.(π̂ .+ eps(eltype(π))) .* w) ./ sum(w)
@@ -130,7 +132,6 @@ struct Trainer
   oracle
   samples
   Wmean
-  HP
   optimizer
   batch_size
   function Trainer(
@@ -141,10 +142,9 @@ struct Trainer
     samples = convert_samples(G, examples)
     W, X, A, P, V = samples
     Wmean = mean(W)
-    HP = entropy_wmean(P, W) |> Tracker.data
     optimizer = Flux.ADAM(params.learning_rate)
     batch_size = params.batch_size
-    return new(oracle, samples, Wmean, HP, optimizer, batch_size)
+    return new(oracle, samples, Wmean, optimizer, batch_size)
   end
 end
 
@@ -157,5 +157,11 @@ end
 function loss_report(tr::Trainer)
   Lp, Lv, Lreg = Tracker.data.(losses(tr.oracle, tr.Wmean, tr.samples))
   L = Lp + Lv + Lreg
-  return Report.Loss(L, Lp, Lv, Lreg, tr.HP)
+  return Report.Loss(L, Lp, Lv, Lreg)
+end
+
+function learning_status(tr::Trainer)
+  loss = loss_report(tr)
+  net = network_report(tr.oracle.nn)
+  return Report.LearningStatus(loss, net)
 end

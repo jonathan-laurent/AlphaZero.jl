@@ -23,60 +23,45 @@ function learning!(env::Env{G}, lp::LearningParams) where G
   newnn = copy(env.bestnn)
   ap = env.params.arena
   trainer, tconvert = @timed Trainer(newnn, get(env.memory), lp)
-  init_loss = loss_report(trainer)
   epochs = Report.Epoch[]
   checkpoints = Report.Checkpoint[]
-  # Printing utilities
-  num_fmt = ".4f"
-  epoch_table = Table((
-    "Loss"=>num_fmt,
-    "Lp"=>num_fmt,
-    "Lv"=>num_fmt,
-    "MaxW"=>num_fmt,
-    "MeanW"=>num_fmt))
-  function print_loss(lossrep, netrep, checkpoint_comment="")
-    print_table_row(env.logger, epoch_table, (
-      "Loss"=>lossrep.L,
-      "Lp"=>(lossrep.Lp - lossrep.Hp),
-      "Lv"=>lossrep.Lv,
-      "MaxW"=>netrep.maxw,
-      "MeanW"=>netrep.meanw),
-      checkpoint_comment)
-  end
-  print_loss(init_loss, network_report(newnn.nn))
+  init_status = learning_status(trainer)
+  Report.print_learning_status(env.logger, init_status)
   # Loop state variables
   k = 1 # epoch number
   best_eval_score = ap.update_threshold
   next_nn = env.bestnn
   nn_replaced = false
-  last_loss = init_loss.L
+  last_loss = init_status.loss.L
   stable_loss = false
   # Loop over epochs
-  while !stable_loss && k <= lp.max_num_epochs
+  while !stable_loss && k <= lp.max_num_epochs &&
+        !(lp.stop_after_first_winner && nn_replaced)
     ttrain = @elapsed training_epoch!(trainer)
-    lossrep, tloss = @timed loss_report(trainer)
-    netrep = network_report(newnn.nn)
-    stable_loss = (last_loss - lossrep.L < lp.stop_loss_eps)
-    push!(epochs, Report.Epoch(ttrain, tloss, lossrep, netrep))
-    checkpoint_comment = ""
+    status, tloss = @timed learning_status(trainer)
+    stable_loss = (last_loss - status.loss.L < lp.stop_loss_eps)
+    last_loss = status.loss.L
+    push!(epochs, Report.Epoch(ttrain, tloss, status))
+    comments = String[]
+    # Decide whether or not to make a checkpoint
     if stable_loss || k % lp.epochs_per_checkpoint == 0
-      # Make checkpoint
-      evalrep, evaltime = @timed evaluate_oracle(G, env.bestnn, newnn, ap)
-      push!(checkpoints, Report.Checkpoint(k, evaltime, evalrep))
-      checkpoint_comment = "Evaluation reward: $(evalrep.average_reward)"
+      eval, evaltime = @timed evaluate_oracle(G, env.bestnn, newnn, ap)
+      push!(checkpoints, Report.Checkpoint(k, evaltime, eval))
+      push!(comments, "Evaluation reward: $(eval.average_reward)")
       # If eval is good enough, replace network
-      if evalrep.average_reward >= best_eval_score
+      if eval.average_reward >= best_eval_score
         nn_replaced = true
         next_nn = copy(newnn)
-        best_eval_score = evalrep.average_reward
-        checkpoint_comment *= " / Networked replaced"
-        lp.stop_after_first_winner && break
+        best_eval_score = eval.average_reward
+        push!(comments, "Networked replaced")
       end
     end
-    print_loss(lossrep, netrep, checkpoint_comment)
+    stable_loss && push!(comments, "Loss stabilized")
+    Report.print_learning_status(env.logger, status, comments)
     k += 1
   end
-  rep = Report.Learning(tconvert, init_loss, epochs, checkpoints, nn_replaced)
+  rep = Report.Learning(
+    tconvert, init_status, epochs, checkpoints, nn_replaced)
   return next_nn, rep
 end
 
@@ -101,17 +86,13 @@ function train!(
   num_nn_params = num_parameters(env.bestnn)
   iterations = Report.Iteration[]
   for i in 1:num_iters
-    section(env.logger, 1, "Starting iteration $i")
-    section(env.logger, 2, "Starting self-play")
+    Log.section(env.logger, 1, "Starting iteration $i")
+    Log.section(env.logger, 2, "Starting self-play")
     sprep, sptime = @timed self_play!(env, env.params.self_play)
-    print(env.logger, "Number of simulated games: $(length(sprep.games))")
-    avg_len = fmt(".1f", mean(g.length for g in sprep.games))
-    print(env.logger, "Average game length: $avg_len")
-    mem_size = format(length(env.memory), commas=true)
-    print(env.logger, "Total memory size: $mem_size")
-    section(env.logger, 2, "Starting learning")
+    Log.section(env.logger, 2, "Starting learning")
     (newnn, lrep), ltime = @timed learning!(env, env.params.learning)
-    push!(iterations, Report.Iteration(sptime, ltime, sprep, lrep))
+    iterrep = Report.Iteration(sptime, ltime, sprep, lrep)
+    push!(iterations, iterrep)
     if lrep.nn_replaced
       env.bestnn = newnn
       env.mcts = MCTS.Env{G}(env.bestnn, env.params.self_play.cpuct)
