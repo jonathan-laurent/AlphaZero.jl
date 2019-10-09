@@ -182,8 +182,10 @@ GI.action_id(::Type{Game}, a) = a
 
 GI.action(::Type{Game}, id) = id
 
-function GI.vectorize_board(::Type{Game}, ::Type{R}, board) where R
-  R[board.houses[1,:]; board.stores[1]; board.houses[2,:]; board.stores[2]]
+function GI.vectorize_board(::Type{Game}, board)
+  Float64[
+    board.houses[1,:]; board.stores[1];
+    board.houses[2,:]; board.stores[2]]
 end
 
 

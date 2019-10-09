@@ -97,10 +97,11 @@ GI.action(::Type{Game}, id) = id
 
 GI.action_id(::Type{Game}, pos) = pos
 
-function GI.vectorize_board(::Type{Game}, ::Type{R}, board) where R
-  R[ board[i] == c
-     for c in [nothing, WHITE, BLACK]
-     for i in 1:NUM_POSITIONS ]
+function GI.vectorize_board(::Type{Game}, board)
+  Float64[
+    board[i] == c
+    for c in [nothing, WHITE, BLACK]
+    for i in 1:NUM_POSITIONS]
 end
 
 

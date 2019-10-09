@@ -40,6 +40,7 @@ end
   learning :: LearningParams = LearningParams()
   num_iters :: Int = 100
   mem_buffer_size :: Int = 200_000
+  use_gpu :: Bool = false
 end
 
 

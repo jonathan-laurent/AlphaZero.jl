@@ -20,9 +20,8 @@ end
 
 function learning!(env::Env{G}, lp::LearningParams) where G
   # Initialize the training process
-  newnn = copy(env.bestnn)
   ap = env.params.arena
-  trainer, tconvert = @timed Trainer(newnn, get(env.memory), lp)
+  trainer, tconvert = @timed Trainer(env.bestnn, get(env.memory), lp)
   epochs = Report.Epoch[]
   checkpoints = Report.Checkpoint[]
   init_status = learning_status(trainer)
@@ -45,13 +44,14 @@ function learning!(env::Env{G}, lp::LearningParams) where G
     comments = String[]
     # Decide whether or not to make a checkpoint
     if stable_loss || k % lp.epochs_per_checkpoint == 0
-      eval, evaltime = @timed evaluate_oracle(G, env.bestnn, newnn, ap)
+      curnn = get_trained_network(trainer)
+      eval, evaltime = @timed evaluate_oracle(G, env.bestnn, curnn, ap)
       push!(checkpoints, Report.Checkpoint(k, evaltime, eval))
       push!(comments, "Evaluation reward: $(eval.average_reward)")
       # If eval is good enough, replace network
       if eval.average_reward >= best_eval_score
         nn_replaced = true
-        next_nn = copy(newnn)
+        next_nn = curnn
         best_eval_score = eval.average_reward
         push!(comments, "Networked replaced")
       end
@@ -90,9 +90,9 @@ function train!(
     Log.section(env.logger, 1, "Starting iteration $i")
     Log.section(env.logger, 2, "Starting self-play")
     sprep, sptime = @timed self_play!(env, env.params.self_play)
-    Log.section(env.logger, 2, "Analyzing collected samples")
-    srep = analyze_samples(env.memory, env.bestnn, 8)
-    Report.print(env.logger,srep)
+    #Log.section(env.logger, 2, "Analyzing collected samples")
+    #srep = analyze_samples(env.memory, env.bestnn, 8)
+    #Report.print(env.logger,srep)
     Log.section(env.logger, 2, "Starting learning")
     (newnn, lrep), ltime = @timed learning!(env, env.params.learning)
     iterrep = Report.Iteration(sptime, ltime, sprep, lrep)
