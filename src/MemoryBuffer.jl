@@ -8,17 +8,18 @@ struct TrainingExample{Board}
   π :: Vector{Float64}
   z :: Float64
   n :: Int # number of times the board position `b` has been seen
+  t :: Float64 # average time before game end
 end
 
-struct MemoryBuffer{Board}
+mutable struct MemoryBuffer{Board}
   # State-policy pairs accumulated during the current game.
   # The z component is 1 if white was playing and -1 otherwise
   cur :: Vector{TrainingExample{Board}}
   # Long-term memory
   mem :: CircularBuffer{TrainingExample{Board}}
-
+  last_batch_size :: Int
   function MemoryBuffer{B}(size) where B
-    new{B}([], CircularBuffer{TrainingExample{B}}(size))
+    new{B}([], CircularBuffer{TrainingExample{B}}(size), 0)
   end
 end
 
@@ -29,14 +30,15 @@ function merge_samples(es::Vector{TrainingExample{B}}) where B
   π = mean(e.π for e in es)
   z = mean(e.z for e in es)
   n = sum(e.n for e in es)
-  return TrainingExample{B}(b, π, z, n)
+  t = mean(e.t for e in es)
+  return TrainingExample{B}(b, π, z, n, t)
 end
 
-# Get memory content, merging samples for identical boards
-function get(b::MemoryBuffer{B}) where B
+# Merge samples that correspond to identical boards
+function merge_per_board(es::Vector{TrainingExample{B}}) where B
   dict = Dict{B, Vector{TrainingExample{B}}}()
-  sizehint!(dict, length(b))
-  for e in b.mem[:]
+  sizehint!(dict, length(es))
+  for e in es
     if haskey(dict, e.b)
       push!(dict[e.b], e)
     else
@@ -46,16 +48,28 @@ function get(b::MemoryBuffer{B}) where B
   return [merge_samples(es) for es in values(dict)]
 end
 
-function push_sample!(buf::MemoryBuffer, board, policy, white_playing)
-  player_code = white_playing ? 1.0 : -1.0
-  ex = TrainingExample(board, policy, player_code, 1)
+get_raw(buf::MemoryBuffer) = buf.mem[:]
+
+get(buf::MemoryBuffer) = merge_per_board(get_raw(buf))
+
+last_batch_raw(buf::MemoryBuffer) = buf.mem[end-buf.last_batch_size+1:end]
+
+function push_sample!(buf::MemoryBuffer, board, policy, white_playing, turn)
+  player_code = white_playing ? 1. : -1.
+  ex = TrainingExample(board, policy, player_code, 1, float(turn))
   push!(buf.cur, ex)
+  buf.last_batch_size += 1
 end
 
-function push_game!(buf::MemoryBuffer, white_reward)
+function push_game!(buf::MemoryBuffer, white_reward, game_length)
   for ex in buf.cur
     r = ex.z * white_reward
-    push!(buf.mem, TrainingExample(ex.b, ex.π, r, ex.n))
+    t = game_length - ex.t
+    push!(buf.mem, TrainingExample(ex.b, ex.π, r, ex.n, t))
   end
   empty!(buf.cur)
+end
+
+function new_batch!(buf::MemoryBuffer)
+  buf.last_batch_size = 0
 end

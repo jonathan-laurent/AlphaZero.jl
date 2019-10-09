@@ -45,13 +45,20 @@ struct Epoch
   status_after :: LearningStatus
 end
 
-struct Samples
+struct SamplesSub
   num_samples :: Int
   num_boards :: Int
   Wtot :: Float64
-  loss :: Float64
+  loss :: Loss
   Hp :: Float64
   Hp̂ :: Float64
+end
+
+struct Samples
+  latest_batch :: SamplesSub
+  all_samples :: SamplesSub
+  # Average remaining turns, stats
+  per_game_stage :: Vector{Tuple{Float64, SamplesSub}}
 end
 
 struct Learning
@@ -85,54 +92,41 @@ end
 using Formatting
 using ..Log
 
-const LEARNING_STATUS_TABLE =
-  let num_fmt(x) = fmt(".4f", x)
-    Log.Table((
-      "Loss"  => num_fmt,
-      "Lp"    => num_fmt,
-      "Lv"    => num_fmt,
-      "MaxW"  => num_fmt,
-      "MeanW" => num_fmt))
-  end
+const NUM_COL = Log.ColType(7, x -> fmt(".4f", x))
+const BIGINT_COL = Log.ColType(10, n -> format(ceil(Int, n), commas=true))
 
-function print_learning_status(
-    logger::Logger, status::Report.LearningStatus, comments=[])
-  Log.table_row(logger, LEARNING_STATUS_TABLE, (
-    "Loss"  => status.loss.L,
-    "Lp"    => status.loss.Lp,
-    "Lv"    => status.loss.Lv,
-    "MaxW"  => status.network.maxw,
-    "MeanW" => status.network.meanw
-  ), comments)
+const LEARNING_STATUS_TABLE = Log.Table(
+  ("Loss",   NUM_COL,     s -> s.loss.L),
+  ("Lv",     NUM_COL,     s -> s.loss.Lv),
+  ("Lp",     NUM_COL,     s -> s.loss.Lp),
+  ("MaxW",   NUM_COL,     s -> s.network.maxw),
+  ("MeanW",  NUM_COL,     s -> s.network.meanw))
+
+const SAMPLES_STATS_TABLE = Log.Table(
+  ("Loss",   NUM_COL,     s -> s.loss.L),
+  ("Lv",     NUM_COL,     s -> s.loss.Lv),
+  ("Lp",     NUM_COL,     s -> s.loss.Lp),
+  ("Hp",     NUM_COL,     s -> s.Hp),
+  ("Hpnet",  NUM_COL,     s -> s.Hp̂),
+  ("Λtot",   BIGINT_COL,  s -> s.Wtot),
+  ("Nb",     BIGINT_COL,  s -> s.num_boards),
+  ("Ns",     BIGINT_COL,  s -> s.num_samples))
+
+function print(logger::Logger, status::Report.LearningStatus, args...; kw...)
+  Log.table_row(logger, LEARNING_STATUS_TABLE, status, args...; kw...)
 end
 
-const SAMPLES_STATS_TABLE =
-  let num_fmt(x) = fmt(".4f", x)
-  let bigint_fmt(n) = format(n, width=8, autoscale=:metric)
-    Log.Table((
-      "L"  => num_fmt,
-      "Lv" => num_fmt,
-      "Lp" => num_fmt,
-      "Hp" => num_fmt,
-      "Hp̂" => num_fmt,
-      "Nb" => bigint_fmt,
-      "Ns" => bigint_fmt,
-      "W"  => bigint_fmt
-    ))
-  end end
+function print(logger::Logger, stats::Report.SamplesSub, args...; kw...)
+  Log.table_row(logger, SAMPLES_STATS_TABLE, stats, args...; kw...)
+end
 
-function print_samples_stats(
-    logger::Logger, stats::Report.Samples, comments=[])
-  Log.table_row(logger, SAMPLES_STATS_TABLE, (
-    "L"  => stats.loss.L,
-    "Lp" => stats.loss.Lp,
-    "Lv" => stats.loss.Lv,
-    "Hp" => stats.Hp,
-    "Hp̂" => stats.Hp̂,
-    "Nb" => stats.num_boards,
-    "Ns" => stats.num_samples,
-    "W"  => stats.Wtot
-  ), comments)
+function print(logger::Logger, stats::Report.Samples)
+  print(logger, stats.all_samples, ["all samples"], style=Log.BOLD)
+  print(logger, stats.latest_batch, ["latest batch"], style=Log.BOLD)
+  for (t, stats) in stats.per_game_stage
+    rem = fmt(".1f", t)
+    print(logger, stats, ["$rem turns left"])
+  end
 end
 
 end

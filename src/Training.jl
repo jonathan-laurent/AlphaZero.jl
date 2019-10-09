@@ -26,7 +26,7 @@ function learning!(env::Env{G}, lp::LearningParams) where G
   epochs = Report.Epoch[]
   checkpoints = Report.Checkpoint[]
   init_status = learning_status(trainer)
-  Report.print_learning_status(env.logger, init_status)
+  Report.print(env.logger, init_status, style=Log.BOLD)
   # Loop state variables
   k = 1 # epoch number
   best_eval_score = ap.update_threshold
@@ -57,7 +57,7 @@ function learning!(env::Env{G}, lp::LearningParams) where G
       end
     end
     stable_loss && push!(comments, "Loss stabilized")
-    Report.print_learning_status(env.logger, status, comments)
+    Report.print(env.logger, status, comments)
     k += 1
   end
   rep = Report.Learning(
@@ -72,6 +72,7 @@ function self_play!(env::Env{G}, params=env.params.self_play) where G
     nα = params.dirichlet_noise_nα,
     ϵ = params.dirichlet_noise_ϵ)
   games = Vector{Report.Game}(undef, params.num_games)
+  new_batch!(env.memory)
   for i in 1:params.num_games
     grep = self_play!(G, player, env.memory)
     games[i] = grep
@@ -89,6 +90,9 @@ function train!(
     Log.section(env.logger, 1, "Starting iteration $i")
     Log.section(env.logger, 2, "Starting self-play")
     sprep, sptime = @timed self_play!(env, env.params.self_play)
+    Log.section(env.logger, 2, "Analyzing collected samples")
+    srep = analyze_samples(env.memory, env.bestnn, 8)
+    Report.print(env.logger,srep)
     Log.section(env.logger, 2, "Starting learning")
     (newnn, lrep), ltime = @timed learning!(env, env.params.learning)
     iterrep = Report.Iteration(sptime, ltime, sprep, lrep)

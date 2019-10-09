@@ -27,7 +27,6 @@ function think(p::MctsPlayer, state)
   return π_mcts, a
 end
 
-
 #####
 ##### MCTS players can play against each other
 #####
@@ -41,14 +40,14 @@ function play(
   while true
     z = GI.white_reward(state)
     if !isnothing(z)
-      isnothing(memory) || push_game!(memory, z)
+      isnothing(memory) || push_game!(memory, z, nturns)
       return Report.Game(z, nturns)
     end
     player = GI.white_playing(state) ? white : black
     π, a = think(player, state)
     if !isnothing(memory)
       cboard = GI.canonical_board(state)
-      push_sample!(memory, cboard, π, GI.white_playing(state))
+      push_sample!(memory, cboard, π, GI.white_playing(state), nturns)
     end
     GI.play!(state, a)
     nturns += 1
@@ -56,7 +55,6 @@ function play(
 end
 
 self_play!(G, player, memory) = play(G, player, player, memory)
-
 
 #####
 ##### Evaluating the latest NN

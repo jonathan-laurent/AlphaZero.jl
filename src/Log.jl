@@ -15,10 +15,12 @@ const HEADER_COLORS = [crayon"bold yellow", crayon"bold"]
 
 const TABLE_HEADER_STYLE = crayon"negative"
 const TABLE_COMMENTS_STYLE = crayon"italics cyan"
-const TABLE_COMMENTS_MARGIN_LENGTH = 2
-const TABLE_DEFAULT_COL_WIDTH = 6
+const TABLE_COMMENTS_MARGIN = 4
 const TABLE_COL_SEP = 2
 const TABLE_COMMENTS_SEP = " / "
+
+# To be used externally
+const BOLD = crayon"bold"
 
 #####
 ##### Basic nested logging
@@ -60,22 +62,26 @@ end
 ##### Tables
 #####
 
+struct ColType
+  width :: Int
+  format :: Function
+end
+
+struct Column
+  name :: String
+  type :: ColType
+  content :: Function
+end
+
 struct Table
-  fields :: Vector{Pair{String, Function}}
-  col_width :: Int
+  columns :: Vector{Column}
   header_style :: Crayon
   comments_style :: Crayon
-  comments_margin :: String
-  comments_sep :: String
-  function Table(fields; col_width=TABLE_DEFAULT_COL_WIDTH)
-    longest_label = maximum(length(f[1]) for f in fields)
-    col_width = TABLE_COL_SEP + max(col_width, longest_label)
-    comments_margin = repeat(" ", TABLE_COMMENTS_MARGIN_LENGTH)
-    header_style = TABLE_HEADER_STYLE
-    comments_style = TABLE_COMMENTS_STYLE
-    comments_sep = TABLE_COMMENTS_SEP
-    new(collect(fields), col_width, header_style,
-        comments_style, comments_margin, comments_sep)
+  function Table(cols...;
+      header_style=TABLE_HEADER_STYLE,
+      comments_style=TABLE_COMMENTS_STYLE)
+    cols = [Column(c...) for c in cols]
+    new(cols, header_style, comments_style)
   end
 end
 
@@ -84,28 +90,30 @@ fixed_width(str, width) = fmt(">$(width)s", first(str, width))
 intersperse(sep, words) = reduce((x, y) -> x * sep * y, words)
 
 function table_legend(l::Logger, tab::Table)
-  labels = map(tab.fields) do f
-    fixed_width(f[1], tab.col_width)
+  labels = map(tab.columns) do col
+    fixed_width(col.name, col.type.width + TABLE_COL_SEP)
   end
   sep(l)
   print(l, tab.header_style, labels...)
   return
 end
 
-function table_row(l::Logger, tab::Table, fields, comments=[])
+function table_row(l::Logger, tab::Table, obj, comments=[]; style=nothing)
   l.lastrow || table_legend(l, tab)
-  D = Dict(fields...)
-  args = map(tab.fields) do f
-    v = D[f[1]]
-    vstr = f[2](v)
-    fixed_width(vstr, tab.col_width)
+  args = map(tab.columns) do col
+    v = col.content(obj)
+    vstr = col.type.format(v)
+    w = col.type.width + TABLE_COL_SEP
+    fixed_width(vstr, w)
   end
   if isempty(comments)
     commargs = ()
   else
-    comments_str = intersperse(tab.comments_sep, comments)
-    commargs = (tab.comments_margin, tab.comments_style, comments_str)
+    comments_str = intersperse(TABLE_COMMENTS_SEP, comments)
+    margin = repeat(" ", TABLE_COMMENTS_MARGIN)
+    commargs = (margin, tab.comments_style, comments_str)
   end
+  isnothing(style) || (args = (style, args..., crayon"reset"))
   print(l, args..., commargs...)
   l.lastrow = true
   return

@@ -33,8 +33,8 @@ function (nn::Network)(board, actions_mask)
   c = nn.common(board)
   v = nn.vbranch(c)
   p = nn.pbranch(c) .* actions_mask
-  sp = sum(p)
-  @assert sp > 0
+  sp = sum(p, dims=1)
+  @assert all(sp .> 0)
   p = p ./ sp
   return (p, v)
 end
@@ -119,19 +119,21 @@ klloss_wmean(π̂, π, w) = -sum(π .* log.(π̂ .+ eps(eltype(π))) .* w) ./ su
 
 entropy_wmean(π, w) = -sum(π .* log.(π .+ eps(eltype(π))) .* w) ./ sum(w)
 
-function losses(oracle, Wmean, (W, X, A, P, V))
+function losses(oracle, Wmean, Hp, (W, X, A, P, V))
   P̂, V̂ = oracle.nn(X, A)
   C = mean(W) / Wmean
-  Lp = C * klloss_wmean(P̂, P, W)
+  Lp = C * (klloss_wmean(P̂, P, W) - Hp)
   Lv = C * mse_wmean(V̂, V, W)
   Lreg = zero(Lv)
-  return (Lp, Lv, Lreg)
+  L = Lp + Lv + Lreg
+  return (L, Lp, Lv, Lreg)
 end
 
 struct Trainer
   oracle
   samples
   Wmean
+  Hp
   optimizer
   batch_size
   function Trainer(
@@ -142,26 +144,69 @@ struct Trainer
     samples = convert_samples(G, examples)
     W, X, A, P, V = samples
     Wmean = mean(W)
+    Hp = entropy_wmean(P, W)
     optimizer = Flux.ADAM(params.learning_rate)
     batch_size = params.batch_size
-    return new(oracle, samples, Wmean, optimizer, batch_size)
+    return new(oracle, samples, Wmean, Hp, optimizer, batch_size)
   end
 end
 
 function training_epoch!(tr::Trainer)
-  loss(batch...) = sum(losses(tr.oracle, tr.Wmean, batch))
+  loss(batch...) = losses(tr.oracle, tr.Wmean, tr.Hp, batch)[1]
   data = Util.random_batches(tr.samples, tr.batch_size)
   Flux.train!(loss, Flux.params(tr.oracle.nn), data, tr.optimizer)
 end
 
-function loss_report(tr::Trainer)
-  Lp, Lv, Lreg = Tracker.data.(losses(tr.oracle, tr.Wmean, tr.samples))
-  L = Lp + Lv + Lreg
-  return Report.Loss(L, Lp, Lv, Lreg)
+#####
+##### Generating debugging reports
+#####
+
+function loss_report(oracle, samples)
+  W, X, A, P, V = samples
+  Wmean = mean(W)
+  Hp = entropy_wmean(P, W)
+  ltuple = Tracker.data.(losses(oracle, Wmean, Hp, samples))
+  return Report.Loss(ltuple...)
 end
+
+loss_report(tr::Trainer) = loss_report(tr.oracle, tr.samples)
 
 function learning_status(tr::Trainer)
   loss = loss_report(tr)
   net = network_report(tr.oracle.nn)
   return Report.LearningStatus(loss, net)
+end
+
+function analyze_samples(
+    examples::Vector{<:TrainingExample}, # assume not merged yet
+    oracle::Oracle{G}
+  ) :: Report.SamplesSub where G
+  examples = merge_per_board(examples)
+  samples = convert_samples(G, examples)
+  loss = loss_report(oracle, samples)
+  W, X, A, P, V = samples
+  P̂, V̂ = Tracker.data.(oracle.nn(X, A))
+  Hp = entropy_wmean(P, W)
+  Hp̂ = entropy_wmean(P̂, W)
+  Wtot = sum(W)
+  num_samples = sum(e.n for e in examples)
+  num_boards = length(examples)
+  return Report.SamplesSub(num_samples, num_boards, Wtot, loss, Hp, Hp̂)
+end
+
+function analyze_samples(mem::MemoryBuffer, oracle::Oracle{G}, nstages) where G
+  latest_batch = analyze_samples(last_batch_raw(mem), oracle)
+  all_samples = analyze_samples(get_raw(mem), oracle)
+  per_game_stage = begin
+    es = get_raw(mem)
+    sort!(es, by=(e->e.t))
+    csize = ceil(Int, length(es) / nstages)
+    stages = collect(Iterators.partition(es, csize))
+    map(stages) do es
+      t = mean(e.t for e in es)
+      stats = analyze_samples(es, oracle)
+      (t, stats)
+    end
+  end
+  return Report.Samples(latest_batch, all_samples, per_game_stage)
 end
