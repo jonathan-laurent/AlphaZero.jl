@@ -45,7 +45,7 @@ struct Epoch
   status_after :: LearningStatus
 end
 
-struct SamplesSub
+struct Samples
   num_samples :: Int
   num_boards :: Int
   Wtot :: Float64
@@ -54,11 +54,11 @@ struct SamplesSub
   Hp̂ :: Float64
 end
 
-struct Samples
-  latest_batch :: SamplesSub
-  all_samples :: SamplesSub
+struct Memory
+  latest_batch :: Samples
+  all_samples :: Samples
   # Average remaining turns, stats
-  per_game_stage :: Vector{Tuple{Float64, SamplesSub}}
+  per_game_stage :: Vector{Tuple{Float64, Samples}}
 end
 
 struct Learning
@@ -77,6 +77,7 @@ struct Iteration
   time_self_play :: Float64
   time_learning :: Float64
   self_play :: SelfPlay
+  memory :: Memory
   learning :: Learning
 end
 
@@ -116,11 +117,11 @@ function print(logger::Logger, status::Report.LearningStatus, args...; kw...)
   Log.table_row(logger, LEARNING_STATUS_TABLE, status, args...; kw...)
 end
 
-function print(logger::Logger, stats::Report.SamplesSub, args...; kw...)
+function print(logger::Logger, stats::Report.Samples, args...; kw...)
   Log.table_row(logger, SAMPLES_STATS_TABLE, stats, args...; kw...)
 end
 
-function print(logger::Logger, stats::Report.Samples)
+function print(logger::Logger, stats::Report.Memory)
   print(logger, stats.all_samples, ["all samples"], style=Log.BOLD)
   print(logger, stats.latest_batch, ["latest batch"], style=Log.BOLD)
   for (t, stats) in stats.per_game_stage

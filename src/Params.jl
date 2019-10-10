@@ -32,6 +32,7 @@ end
   max_num_epochs :: Int = 20
   stop_loss_eps :: Float64 = 1e-4
   stop_after_first_winner :: Bool = false
+  use_gpu :: Bool = false
 end
 
 @kwdef struct Params
@@ -40,7 +41,7 @@ end
   learning :: LearningParams = LearningParams()
   num_iters :: Int = 100
   mem_buffer_size :: Int = 200_000
-  use_gpu :: Bool = false
+  num_game_stages :: Int = 8 # as featured in memory reports
 end
 
 

@@ -23,10 +23,12 @@ learning = AlphaZero.LearningParams()
 params = AlphaZero.Params(
   arena=arena,
   self_play=self_play,
-  num_iters=2)
+  num_iters=2,
+  num_game_stages=9)
 
 if !CACHE || !isfile(ENV_DATA)
-  env = AlphaZero.Env{TicTacToe.Game}(params)
+  network = AlphaZero.SimpleNet{TicTacToe.Game}()
+  env = AlphaZero.Env{TicTacToe.Game}(params, network)
   AlphaZero.train!(env)
   println("\n")
   serialize(ENV_DATA, env)

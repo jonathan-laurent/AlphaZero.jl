@@ -28,7 +28,7 @@ using ProgressMeter
 using Base: @kwdef
 using DataStructures: Stack, CircularBuffer
 using Distributions: Categorical, Dirichlet
-using Flux: Tracker, Chain, Dense, relu, softmax
+using Flux: Tracker, Chain, Dense, relu, softmax, cpu, gpu
 using Statistics: mean
 
 include("Params.jl")

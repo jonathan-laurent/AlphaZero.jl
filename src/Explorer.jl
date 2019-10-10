@@ -3,7 +3,7 @@
 #####
 
 function inspect_memory(env::Env{G}, state::G) where G
-  mem = get(env.memory)
+  mem = merge_by_board(get(env.memory))
   board = GI.canonical_board(state)
   relevant = findall((ex -> ex.b == board), mem)
   if isempty(relevant)

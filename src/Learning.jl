@@ -9,7 +9,6 @@ Abstract type for a neural network oracle for `Game`.
 It must implement the following interface
   - Flux.gpu(nn), Flux.cpu(nn)
   - Flux.params(nn), Flux.loadparams!(nn, p)
-  - Network{Game}()
   - nn(boards, action_masks)
   - regularized_weights(nn)
   - num_parameters(nn)
@@ -17,8 +16,8 @@ It must implement the following interface
 """
 abstract type Network{G} <: MCTS.Oracle{G} end
 
-function Base.copy(nn::Network{G}) where G
-  new = Network{G}()
+function Base.copy(nn::Net) where Net <: Network
+  new = Net()
   Flux.loadparams!(new, Flux.params(nn))
   return new
 end
@@ -43,27 +42,33 @@ struct SimpleNet{G} <: Network{G}
   common
   vbranch
   pbranch
-  function SimpleNet{G}() where G
-    indim = GI.board_dim(G)
-    outdim = GI.num_actions(G)
-    hsize = SIMPLE_NET_HSIZE
-    common = Chain(
-      Dense(indim, hsize, relu),
-      Dense(hsize, hsize, relu),
-      Dense(hsize, hsize, relu),
-      Dense(hsize, hsize, relu))
-    vbranch = Chain(
-      Dense(hsize, hsize, relu),
-      Dense(hsize, 1, tanh))
-    pbranch = Chain(
-      Dense(hsize, hsize, relu),
-      Dense(hsize, outdim),
-      softmax)
-    new(common, vbranch, pbranch)
-  end
 end
 
-Flux.@treelike SimpleNet
+function SimpleNet{G}() where G
+  indim = GI.board_dim(G)
+  outdim = GI.num_actions(G)
+  hsize = SIMPLE_NET_HSIZE
+  common = Chain(
+    Dense(indim, hsize, relu),
+    Dense(hsize, hsize, relu),
+    Dense(hsize, hsize, relu),
+    Dense(hsize, hsize, relu))
+  vbranch = Chain(
+    Dense(hsize, hsize, relu),
+    Dense(hsize, 1, tanh))
+  pbranch = Chain(
+    Dense(hsize, hsize, relu),
+    Dense(hsize, outdim),
+    softmax)
+  SimpleNet{G}(common, vbranch, pbranch)
+end
+
+# Flux.@treelike does not work do to Network being parametric
+Flux.children(nn::SimpleNet) = (nn.common, nn.vbranch, nn.pbranch)
+
+function Flux.mapchildren(f, nn::Net) where Net <: SimpleNet
+  Net(f(nn.common), f(nn.vbranch), f(nn.pbranch))
+end
 
 # Forward pass
 function (nn::SimpleNet)(board, actions_mask)
@@ -114,7 +119,8 @@ function convert_samples(Game, es::Vector{<:TrainingExample})
   A = Util.concat_columns((e[3] for e in ces))
   P = Util.concat_columns((e[4] for e in ces))
   V = Util.concat_columns((e[5] for e in ces))
-  return (W, X, A, P, V)
+  f32(arr) = convert(AbstractArray{Float32}, arr)
+  return f32.((W, X, A, P, V))
 end
 
 #####
@@ -138,8 +144,11 @@ function losses(nn, Wmean, Hp, (W, X, A, P, V))
 end
 
 # Does not mody the network it is given in place.
+# Works with Float32
+# Takes care of interfacing with the GPU
 struct Trainer
   network
+  examples
   samples
   Wmean
   Hp
@@ -148,12 +157,12 @@ struct Trainer
   function Trainer(
     network::Network{G},
     examples::Vector{<:TrainingExample},
-    params::LearningParams;
-    use_gpu=false
+    params::LearningParams
   ) where G
+    examples = merge_by_board(examples)
     samples = convert_samples(G, examples)
     network = copy(network)
-    if use_gpu
+    if params.use_gpu
       samples = gpu.(samples)
       network = gpu.(network)
     end
@@ -162,7 +171,7 @@ struct Trainer
     Hp = entropy_wmean(P, W)
     optimizer = Flux.ADAM(params.learning_rate)
     batch_size = params.batch_size
-    return new(network, samples, Wmean, Hp, optimizer, batch_size)
+    return new(network, examples, samples, Wmean, Hp, optimizer, batch_size)
   end
 end
 
@@ -178,15 +187,10 @@ end
 ##### Generating debugging reports
 #####
 
-function loss_report(network, samples)
-  W, X, A, P, V = samples
-  Wmean = mean(W)
-  Hp = entropy_wmean(P, W)
-  ltuple = Tracker.data.(losses(network, Wmean, Hp, samples))
+function loss_report(tr::Trainer)
+  ltuple = Tracker.data.(losses(tr.network, tr.Wmean, tr.Hp, tr.samples))
   return Report.Loss(ltuple...)
 end
-
-loss_report(tr::Trainer) = loss_report(tr.network, tr.samples)
 
 function learning_status(tr::Trainer)
   loss = loss_report(tr)
@@ -194,38 +198,41 @@ function learning_status(tr::Trainer)
   return Report.LearningStatus(loss, net)
 end
 
-# Note: this analysis has to be done on GPU.
-
-function analyze_samples(
-    examples::Vector{<:TrainingExample}, # assume not merged yet
-    network::Network{G}
-  ) :: Report.SamplesSub where G
-  examples = merge_per_board(examples)
-  samples = convert_samples(G, examples)
-  loss = loss_report(network, samples)
-  W, X, A, P, V = samples
-  P̂, V̂ = Tracker.data.(network.nn(X, A))
-  Hp = entropy_wmean(P, W)
-  Hp̂ = entropy_wmean(P̂, W)
-  Wtot = sum(W)
-  num_samples = sum(e.n for e in examples)
-  num_boards = length(examples)
-  return Report.SamplesSub(num_samples, num_boards, Wtot, loss, Hp, Hp̂)
+function network_output_entropy(tr::Trainer)
+  W, X, A, P, V = tr.samples
+  P̂, _ = tr.network(X, A)
+  return entropy_wmean(P̂, W) |> Tracker.data
 end
 
-function analyze_samples(mem::MemoryBuffer, nn::Network{G}, nstages) where G
-  latest_batch = analyze_samples(last_batch_raw(mem), nn)
-  all_samples = analyze_samples(get_raw(mem), nn)
+function samples_report(tr::Trainer)
+  loss = loss_report(tr)
+  Hp = tr.Hp
+  Hp̂ = network_output_entropy(tr)
+  num_examples = sum(e.n for e in tr.examples)
+  num_boards = length(tr.examples)
+  Wtot = num_boards * tr.Wmean
+  return Report.Samples(num_examples, num_boards, Wtot, loss, Hp, Hp̂)
+end
+
+function memory_report(
+    mem::MemoryBuffer,
+    nn::Network{G},
+    params::LearningParams,
+    nstages
+    ) where G
+  Tr(es) = Trainer(nn, es, params)
+  latest_batch = samples_report(Tr(last_batch(mem)))
+  all_samples = samples_report(Tr(get(mem)))
   per_game_stage = begin
-    es = get_raw(mem)
+    es = get(mem)
     sort!(es, by=(e->e.t))
     csize = ceil(Int, length(es) / nstages)
     stages = collect(Iterators.partition(es, csize))
     map(stages) do es
       t = mean(e.t for e in es)
-      stats = analyze_samples(es, nn)
+      stats = samples_report(Tr(es))
       (t, stats)
     end
   end
-  return Report.Samples(latest_batch, all_samples, per_game_stage)
+  return Report.Memory(latest_batch, all_samples, per_game_stage)
 end

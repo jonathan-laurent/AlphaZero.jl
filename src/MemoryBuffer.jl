@@ -35,7 +35,7 @@ function merge_samples(es::Vector{TrainingExample{B}}) where B
 end
 
 # Merge samples that correspond to identical boards
-function merge_per_board(es::Vector{TrainingExample{B}}) where B
+function merge_by_board(es::Vector{TrainingExample{B}}) where B
   dict = Dict{B, Vector{TrainingExample{B}}}()
   sizehint!(dict, length(es))
   for e in es
@@ -48,11 +48,9 @@ function merge_per_board(es::Vector{TrainingExample{B}}) where B
   return [merge_samples(es) for es in values(dict)]
 end
 
-get_raw(buf::MemoryBuffer) = buf.mem[:]
+get(buf::MemoryBuffer) = buf.mem[:]
 
-get(buf::MemoryBuffer) = merge_per_board(get_raw(buf))
-
-last_batch_raw(buf::MemoryBuffer) = buf.mem[end-buf.last_batch_size+1:end]
+last_batch(buf::MemoryBuffer) = buf.mem[end-buf.last_batch_size+1:end]
 
 function push_sample!(buf::MemoryBuffer, board, policy, white_playing, turn)
   player_code = white_playing ? 1. : -1.

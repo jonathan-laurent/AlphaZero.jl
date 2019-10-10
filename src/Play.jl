@@ -66,7 +66,7 @@ self_play!(G, player, memory) = play(G, player, player, memory)
 #   where does randomness come from?
 #   Answer: we leave a nonzero temperature
 function evaluate_oracle(
-    ::Type{G}, baseline::Oracle{G}, oracle::Oracle{G}, params::ArenaParams
+    baseline::MCTS.Oracle{G}, oracle::MCTS.Oracle{G}, params::ArenaParams
   ) :: Report.Evaluation where G
   τ = params.temperature
   n_mcts = params.num_mcts_iters_per_turn
