@@ -18,8 +18,19 @@ import .MCTS
 include("Log.jl")
 using .Log
 
-import Plots
+using CUDAapi
+if has_cuda()
+  try
+    using CuArrays
+  catch ex
+    @warn(
+      "CUDA is installed, but CuArrays.jl fails to load.",
+      exception=(ex,catch_backtrace()))
+  end
+end
+
 import Flux
+import Plots
 
 using Printf
 using Formatting
