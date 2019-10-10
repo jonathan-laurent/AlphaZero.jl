@@ -1,5 +1,9 @@
 import AlphaZero
 
+using CuArrays
+
+CuArrays.allowscalar(false)
+
 include("game.jl") ; import .TicTacToe
 
 using Serialization: serialize, deserialize
@@ -23,6 +27,7 @@ learning = AlphaZero.LearningParams()
 params = AlphaZero.Params(
   arena=arena,
   self_play=self_play,
+  learning=learning,
   num_iters=2,
   num_game_stages=9)
 

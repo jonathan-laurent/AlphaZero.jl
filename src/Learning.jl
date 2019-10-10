@@ -92,7 +92,7 @@ function network_report(nn::SimpleNet) :: Report.Network
   meanw = mean(mean(abs.(W)) for W in Ws)
   pbiases = nn.pbranch[end-1].b |> Tracker.data
   vbias = nn.vbranch[end].b |> Tracker.data
-  return Report.Network(maxw, meanw, pbiases, vbias[1])
+  return Report.Network(maxw, meanw, pbiases, sum(vbias))
 end
 
 num_parameters(nn::SimpleNet) = sum(length(p) for p in Flux.params(nn))
@@ -127,11 +127,13 @@ end
 ##### Learning procedure
 #####
 
-mse_wmean(ŷ, y, w) = sum((ŷ .- y).^2 .* w) ./ sum(w)
+# mse_wmean(ŷ, y, w) = sum((ŷ .- y).^2 .* w) / sum(w)
+# Surprisingly, Flux does not like the code above (scalar operations)
+mse_wmean(ŷ, y, w) = sum((ŷ .- y) .* (ŷ .- y) .* w) / sum(w)
 
-klloss_wmean(π̂, π, w) = -sum(π .* log.(π̂ .+ eps(eltype(π))) .* w) ./ sum(w)
+klloss_wmean(π̂, π, w) = -sum(π .* log.(π̂ .+ eps(eltype(π))) .* w) / sum(w)
 
-entropy_wmean(π, w) = -sum(π .* log.(π .+ eps(eltype(π))) .* w) ./ sum(w)
+entropy_wmean(π, w) = -sum(π .* log.(π .+ eps(eltype(π))) .* w) / sum(w)
 
 function losses(nn, Wmean, Hp, (W, X, A, P, V))
   P̂, V̂ = nn(X, A)
@@ -163,8 +165,9 @@ struct Trainer
     samples = convert_samples(G, examples)
     network = copy(network)
     if params.use_gpu
+      CuArrays.allowscalar(false) # Does not work if moved to AlphaZero.jl
       samples = gpu.(samples)
-      network = gpu.(network)
+      network = gpu(network)
     end
     W, X, A, P, V = samples
     Wmean = mean(W)
