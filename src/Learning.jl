@@ -36,31 +36,36 @@ end
 ##### A simple example network
 #####
 
-const SIMPLE_NET_HSIZE = 300
+@kwdef struct SimpleNetParams
+  width :: Int = 300
+  depth_common :: Int = 3
+  depth_pbranch :: Int = 1
+  depth_vbranch :: Int = 1
+end
 
-struct SimpleNet{G} <: Network{G}
+struct SimpleNet{G, params} <: Network{G}
   common
   vbranch
   pbranch
 end
 
-function SimpleNet{G}() where G
+function SimpleNet{G, params}() where {G, params}
+  @assert isa(params, SimpleNetParams)
   indim = GI.board_dim(G)
   outdim = GI.num_actions(G)
-  hsize = SIMPLE_NET_HSIZE
+  hsize = params.width
+  hlayers(depth) = [Dense(hsize, hsize, relu) for i in 1:depth]
   common = Chain(
     Dense(indim, hsize, relu),
-    Dense(hsize, hsize, relu),
-    Dense(hsize, hsize, relu),
-    Dense(hsize, hsize, relu))
+    hlayers(params.depth_common)...)
   vbranch = Chain(
-    Dense(hsize, hsize, relu),
+    hlayers(params.depth_vbranch)...,
     Dense(hsize, 1, tanh))
   pbranch = Chain(
-    Dense(hsize, hsize, relu),
+    hlayers(params.depth_pbranch)...,
     Dense(hsize, outdim),
     softmax)
-  SimpleNet{G}(common, vbranch, pbranch)
+  SimpleNet{G, params}(common, vbranch, pbranch)
 end
 
 # Flux.@treelike does not work do to Network being parametric

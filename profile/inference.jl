@@ -15,6 +15,10 @@ FIG_FILE = "inference-speedup.png"
 REP  = 100
 NMAX = 64
 
+netparams = AlphaZero.SimpleNetParams(
+  width=500,
+  depth_common=7)
+
 function measure(network, X, A)
   t = @elapsed begin
     for i in 1:REP
@@ -24,7 +28,7 @@ function measure(network, X, A)
   return t/REP
 end
 
-network = AlphaZero.SimpleNet{Game}()
+network = AlphaZero.SimpleNet{Game, netparams}()
 game = Game()
 board = GI.board(game)
 actions = GI.available_actions(game)

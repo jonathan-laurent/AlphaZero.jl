@@ -12,6 +12,9 @@ const ENV_DATA = "env.data"
 
 const CACHE = false
 
+netparams = AlphaZero.SimpleNetParams(
+  width=300)
+
 arena = AlphaZero.ArenaParams(
   reset_mcts=true,
   update_threshold=(2 * 0.55 - 1),
@@ -32,7 +35,7 @@ params = AlphaZero.Params(
   num_game_stages=9)
 
 if !CACHE || !isfile(ENV_DATA)
-  network = AlphaZero.SimpleNet{TicTacToe.Game}()
+  network = AlphaZero.SimpleNet{TicTacToe.Game, netparams}()
   env = AlphaZero.Env{TicTacToe.Game}(params, network)
   AlphaZero.train!(env)
   println("\n")
