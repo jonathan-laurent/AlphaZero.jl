@@ -13,7 +13,8 @@ const ENV_DATA = "env.data"
 const CACHE = false
 
 netparams = AlphaZero.SimpleNetParams(
-  width=300)
+  width=500,
+  depth_common=7)
 
 arena = AlphaZero.ArenaParams(
   reset_mcts=true,

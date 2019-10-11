@@ -71,6 +71,7 @@ end
 
 struct SelfPlay
   games :: Vector{Game}
+  inference_time_ratio :: Float64
 end
 
 struct Iteration
@@ -128,6 +129,11 @@ function print(logger::Logger, stats::Report.Memory)
     rem = fmt(".1f", t)
     print(logger, stats, ["$rem turns left"])
   end
+end
+
+function print(logger::Logger, stats::SelfPlay)
+  t = round(Int, 100 * stats.inference_time_ratio)
+  Log.print(logger, "Time spent on inference: $(t)%")
 end
 
 end

@@ -41,7 +41,6 @@ function evaluate(::RolloutOracle{G}, board, available_actions) where G
   return P, V
 end
 
-
 #####
 ##### MCTS Environment
 #####
@@ -66,15 +65,17 @@ mutable struct Env{Game, Board, Action}
   cpuct :: Float64
   # External oracle to evaluate positions
   oracle :: Oracle{Game}
-  function Env{G}(oracle, cpuct=1.0) where {G}
+  # Performance statistics
+  total_time :: Float64
+  inference_time :: Float64
+  function Env{G}(oracle, cpuct=1.) where {G}
     B = GI.Board(G)
     A = GI.Action(G)
     tree = Dict{B, BoardInfo{A}}()
     stack = Stack{Tuple{B, Bool, A}}()
-    new{G, B, A}(tree, stack, cpuct, oracle)
+    new{G, B, A}(tree, stack, cpuct, oracle, 0., 0.)
   end
 end
-
 
 #####
 ##### Initialize and update board information
@@ -94,7 +95,6 @@ function update_board_info!(info, action, reward)
   info.stats[aid] = ActionStats(stats.P, stats.W + reward, stats.N + 1)
 end
 
-
 #####
 ##### Update and access state information
 #####
@@ -112,12 +112,12 @@ function state_info(env, state)
     return (env.tree[b], false)
   else
     actions = GI.available_actions(state)
-    info = init_board_info(env.oracle, b, actions)
+    info, time = @timed init_board_info(env.oracle, b, actions)
+    env.inference_time += time
     env.tree[b] = info
     return (info, true)
   end
 end
-
 
 #####
 ##### Exploration utilities
@@ -132,7 +132,6 @@ function debug_tree(env::Env{Game}; k=10) where Game
     GI.print_state(Game(b))
   end
 end
-
 
 #####
 ##### Main algorithm
@@ -178,12 +177,15 @@ function backprop!(env, white_reward)
 end
 
 function explore!(env, state, nsims=1)
-  for i in 1:nsims
-    @assert isempty(env.stack)
-    white_reward = select!(env, state)
-    backprop!(env, white_reward)
-    @assert isempty(env.stack)
+  elapsed = @elapsed begin
+    for i in 1:nsims
+      @assert isempty(env.stack)
+      white_reward = select!(env, state)
+      backprop!(env, white_reward)
+      @assert isempty(env.stack)
+    end
   end
+  env.total_time += elapsed
 end
 
 # Returns (actions, distr)
@@ -196,6 +198,10 @@ end
 
 reset!(env) = empty!(env.tree)
 
+function inference_time_ratio(env)
+  T = env.total_time
+  iszero(T) ? 0. : env.inference_time / T
+end
 
 #####
 ##### MCTS AI (for illustration purposes)
@@ -222,6 +228,5 @@ function GI.select_move(ai::AI, state)
     return actions[argmax(distr)]
   end
 end
-
 
 end

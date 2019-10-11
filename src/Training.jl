@@ -77,7 +77,7 @@ function self_play!(env::Env{G}, params=env.params.self_play) where G
     grep = self_play!(G, player, env.memory)
     games[i] = grep
   end
-  return Report.SelfPlay(games)
+  return Report.SelfPlay(games, MCTS.inference_time_ratio(env.mcts))
 end
 
 function train!(
@@ -90,6 +90,7 @@ function train!(
     Log.section(env.logger, 1, "Starting iteration $i")
     Log.section(env.logger, 2, "Starting self-play")
     sprep, sptime = @timed self_play!(env, env.params.self_play)
+    Report.print(env.logger, sprep)
     Log.section(env.logger, 2, "Analyzing collected samples")
     nstages = env.params.num_game_stages
     mrep = memory_report(env.memory, env.bestnn, env.params.learning, nstages)
