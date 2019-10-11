@@ -36,14 +36,13 @@ end
 end
 
 @kwdef struct Params
-  arena :: ArenaParams = ArenaParams()
-  self_play :: SelfPlayParams = SelfPlayParams()
-  learning :: LearningParams = LearningParams()
+  arena :: ArenaParams
+  self_play :: SelfPlayParams
+  learning :: LearningParams
   num_iters :: Int = 100
   mem_buffer_size :: Int = 200_000
   num_game_stages :: Int = 8 # as featured in memory reports
 end
-
 
 #####
 ##### Parameters from the original AlphaZero paper
