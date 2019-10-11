@@ -170,7 +170,9 @@ struct Trainer
     samples = convert_samples(G, examples)
     network = copy(network)
     if params.use_gpu
-      CuArrays.allowscalar(false) # Does not work if moved to AlphaZero.jl
+      if CUARRAYS_IMPORTED
+        CuArrays.allowscalar(false) # Does not work if moved to AlphaZero.jl
+      end
       samples = gpu.(samples)
       network = gpu(network)
     end

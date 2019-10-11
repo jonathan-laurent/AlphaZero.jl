@@ -22,11 +22,15 @@ using CUDAapi
 if has_cuda()
   try
     using CuArrays
+    @eval const CUARRAYS_IMPORTED = true
   catch ex
     @warn(
       "CUDA is installed, but CuArrays.jl fails to load.",
       exception=(ex,catch_backtrace()))
+    @eval const CUARRAYS_IMPORTED = false
   end
+else
+  @eval const CUARRAYS_IMPORTED = false
 end
 
 import Flux
