@@ -73,11 +73,15 @@ function self_play!(env::Env{G}, params=env.params.self_play) where G
     ϵ = params.dirichlet_noise_ϵ)
   games = Vector{Report.Game}(undef, params.num_games)
   new_batch!(env.memory)
-  for i in 1:params.num_games
-    grep = self_play!(G, player, env.memory)
-    games[i] = grep
+  elapsed = @elapsed begin
+    for i in 1:params.num_games
+      grep = self_play!(G, player, env.memory)
+      games[i] = grep
+    end
   end
-  return Report.SelfPlay(games, MCTS.inference_time_ratio(env.mcts))
+  inft = MCTS.inference_time_ratio(env.mcts)
+  speed = last_batch_size(env.memory) / elapsed
+  return Report.SelfPlay(games, inft, speed)
 end
 
 function train!(

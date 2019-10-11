@@ -72,6 +72,7 @@ end
 struct SelfPlay
   games :: Vector{Game}
   inference_time_ratio :: Float64
+  samples_gen_speed :: Float64 # in samples/second
 end
 
 struct Iteration
@@ -134,6 +135,8 @@ end
 function print(logger::Logger, stats::SelfPlay)
   t = round(Int, 100 * stats.inference_time_ratio)
   Log.print(logger, "Time spent on inference: $(t)%")
+  sspeed = format(round(Int, stats.samples_gen_speed), commas=true)
+  Log.print(logger, "Generating $(sspeed) samples per second on average")
 end
 
 end
