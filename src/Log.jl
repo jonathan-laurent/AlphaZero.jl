@@ -31,7 +31,7 @@ mutable struct Logger
   style :: Crayon
   lastsep :: Bool
   lastrow :: Bool
-  Logger() = new(0, crayon"", false)
+  Logger() = new(0, crayon"", false, false)
 end
 
 indent!(l::Logger) = l.indent_level += 1
@@ -63,7 +63,7 @@ end
 #####
 
 struct ColType
-  width :: Int
+  width :: Union{Int, Nothing}
   format :: Function
 end
 
@@ -77,33 +77,39 @@ struct Table
   columns :: Vector{Column}
   header_style :: Crayon
   comments_style :: Crayon
-  function Table(cols...;
-      header_style=TABLE_HEADER_STYLE,
-      comments_style=TABLE_COMMENTS_STYLE)
-    cols = [Column(c...) for c in cols]
-    new(cols, header_style, comments_style)
-  end
 end
+
+function Table(cols...;
+    header_style=TABLE_HEADER_STYLE,
+    comments_style=TABLE_COMMENTS_STYLE)
+  cols = [Column(c...) for c in cols]
+  Table(cols, header_style, comments_style)
+end
+
+set_columns(tab, cols) = Table(cols, tab.header_style, tab.comments_style)
 
 fixed_width(str, width) = fmt(">$(width)s", first(str, width))
 
 intersperse(sep, words) = reduce((x, y) -> x * sep * y, words)
 
 function table_legend(l::Logger, tab::Table)
-  labels = map(tab.columns) do col
-    fixed_width(col.name, col.type.width + TABLE_COL_SEP)
+  labels = map(enumerate(tab.columns)) do (i, col)
+    w = col.type.width
+    i > 1 && (w += TABLE_COL_SEP)
+    fixed_width(col.name, w)
   end
-  sep(l)
   print(l, tab.header_style, labels...)
   return
 end
 
 function table_row(l::Logger, tab::Table, obj, comments=[]; style=nothing)
   l.lastrow || table_legend(l, tab)
-  args = map(tab.columns) do col
+  args = map(enumerate(tab.columns)) do (i, col)
     v = col.content(obj)
     vstr = col.type.format(v)
-    w = col.type.width + TABLE_COL_SEP
+    @assert !isnothing(col.type.width) "Column widths must be specified"
+    w = col.type.width
+    i > 1 && (w += TABLE_COL_SEP)
     fixed_width(vstr, w)
   end
   if isempty(comments)
@@ -117,6 +123,25 @@ function table_row(l::Logger, tab::Table, obj, comments=[]; style=nothing)
   print(l, args..., commargs...)
   l.lastrow = true
   return
+end
+
+# Add two features: automatic tuning of column width and
+# handling of nothing values
+function table(l::Logger, tab::Table, objs)
+  cols = map(tab.columns) do col
+    f = x -> isnothing(x) ? "" : col.type.format(x)
+    width = maximum(length(f(col.content(x))) for x in objs)
+    width = max(width, length(col.name))
+    coltype = ColType(width, f)
+    Column(col.name, coltype, col.content)
+  end
+  cols = filter(cols) do col
+    any(!isnothing(col.content(x)) for x in objs)
+  end
+  tab = set_columns(tab, cols)
+  for x in objs
+    table_row(l, tab, x)
+  end
 end
 
 end

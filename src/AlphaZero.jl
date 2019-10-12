@@ -7,6 +7,7 @@ module AlphaZero
 
 include("Util.jl")
 import .Util
+using .Util: Option
 
 include("GameInterface.jl")
 import .GameInterface

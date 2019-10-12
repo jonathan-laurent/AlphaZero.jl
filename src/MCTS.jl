@@ -196,7 +196,10 @@ function policy(env, state; τ=1.0)
   return info.actions, D ./ sum(D)
 end
 
-reset!(env) = empty!(env.tree)
+function reset!(env)
+  empty!(env.tree)
+  return
+end
 
 function inference_time_ratio(env)
   T = env.total_time

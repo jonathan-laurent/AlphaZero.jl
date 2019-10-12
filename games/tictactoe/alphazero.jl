@@ -1,13 +1,15 @@
+using Revise
+
 import AlphaZero
 
-include("game.jl") ; import .TicTacToe
-include("params.jl")
+Revise.includet("game.jl") ; import .TicTacToe
+Revise.includet("params.jl")
 
 using Serialization: serialize, deserialize
 
-const ENV_DATA = "env.data"
+ENV_DATA = "env.data"
 
-const CACHE = false
+CACHE = false
 
 if !CACHE || !isfile(ENV_DATA)
   network = AlphaZero.SimpleNet{TicTacToe.Game, netparams}()

@@ -110,7 +110,7 @@ end
 #####
 
 function GI.action_string(::Type{Game}, a)
-  Char(Int('A') + a - 1)
+  string(Char(Int('A') + a - 1))
 end
 
 function GI.parse_action(g::Game, str)

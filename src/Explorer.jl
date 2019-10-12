@@ -1,32 +1,129 @@
 #####
-##### Inspecting the experience buffer
+##### Computing board statistics
 #####
 
-function inspect_memory(env::Env{G}, state::G) where G
-  mem = merge_by_board(get(env.memory))
-  board = GI.canonical_board(state)
-  relevant = findall((ex -> ex.b == board), mem)
-  if isempty(relevant)
-    println("Not in memory\n")
-  else
-    @assert length(relevant) == 1
-    e = mem[relevant[1]]
-    @printf("N: %d, z: %.4f\n\n", e.n, e.z)
-    as = GI.available_actions(state)
-    for (i, p) in sort(collect(enumerate(e.π)), by=(((i,p),)->p), rev=true)
-      @printf("%1s %6.3f\n", GI.action_string(G, as[i]), p)
+@kwdef mutable struct BoardActionStats
+  Pmcts :: Option{Float64} = nothing
+  Qmcts :: Option{Float64} = nothing
+  UCT   :: Option{Float64} = nothing
+  Pmem  :: Option{Float64} = nothing
+  Pnet  :: Float64 = 0.
+  Qnet  :: Float64 = 0.
+end
+
+mutable struct BoardStats{Action}
+  Nmcts :: Int
+  Nmem  :: Int
+  Vnet  :: Float64
+  Vmem  :: Option{Float64}
+  # Sorted by Nmcts
+  actions :: Vector{Tuple{Action, BoardActionStats}}
+  function BoardStats(actions)
+    actions_stats = [(a, BoardActionStats()) for a in actions]
+    new{eltype(actions)}(0, 0, 0., nothing, actions_stats)
+  end
+end
+
+function evaluate_Qnet(oracle::MCTS.Oracle{G}, board, action) where G
+  state = G(board)
+  @assert isnothing(GI.white_reward(state))
+  GI.play!(state, action)
+  r = GI.white_reward(state)
+  isnothing(r) || (return r)
+  _, r = MCTS.evaluate(
+    oracle, GI.canonical_board(state), GI.available_actions(state))
+  GI.white_playing(state) || (r = MCTS.symmetric_reward(r))
+  return r
+end
+
+function board_statistics(env::Env{G}, board) where G
+  state = G(board)
+  @assert isnothing(GI.white_reward(state))
+  actions = GI.available_actions(state)
+  report = BoardStats(actions)
+  # Collect MCTS statistics
+  if haskey(env.mcts.tree, board)
+    info = env.mcts.tree[board]
+    ucts = MCTS.uct_scores(info, env.mcts.cpuct)
+    report.Nmcts = info.Ntot
+    @assert actions == info.actions
+    for (i, a) in enumerate(actions)
+      astats = info.stats[i]
+      arep = report.actions[i][2]
+      arep.Pmcts = astats.N / max(1, info.Ntot)
+      arep.Qmcts = astats.N > 0 ? astats.W / astats.N : 0.
+      arep.UCT = ucts[i]
     end
   end
-  println("")
+  # Collect memory statistics
+  mem = merge_by_board(get(env.memory))
+  relevant = findall((ex -> ex.b == board), mem)
+  if !isempty(relevant)
+    @assert length(relevant) == 1
+    e = mem[relevant[1]]
+    report.Nmem = e.n
+    report.Vmem = e.z
+    for i in eachindex(actions)
+      report.actions[i][2].Pmem = e.π[i]
+    end
+  end
+  # Evaluate the positions with the neural network
+  Pnet, Vnet = MCTS.evaluate(env.bestnn, board, actions)
+  report.Vnet = Vnet
+  for i in eachindex(actions)
+    arep = report.actions[i][2]
+    arep.Pnet = Pnet[i]
+    arep.Qnet = evaluate_Qnet(env.bestnn, board, actions[i])
+  end
+  # Sort the actions from best to worst
+  if report.Nmcts > 0
+    sortby = ((a, arep),) -> arep.Pmcts
+  else
+    sortby = ((a, arep),) -> arep.Pnet
+  end
+  sort!(report.actions, rev=true, by=sortby)
+  return report
 end
 
-function viz_memory(env)
-  mem = get(env.memory)
-  ns = [e.n for e in mem]
-  println("Number of distinct board configurations: $(length(ns))")
-  Plots.histogram(ns, weights=ns, legend=nothing)
+#####
+##### Displaying board statistics
+#####
+
+function print_board_statistics(::Type{G}, stats::BoardStats) where G
+  prob   = Log.ColType(nothing, x -> fmt(".2f", 100 * x) * "%")
+  val    = Log.ColType(nothing, x -> fmt("+.2f", x))
+  bigint = Log.ColType(nothing, n -> format(ceil(Int, n), commas=true))
+  alabel = Log.ColType(nothing, identity)
+  btable = Log.Table(
+    ("Nmcts", bigint, r -> r.Nmcts),
+    ("Nmem",  bigint, r -> r.Nmem),
+    ("Vmem",  val,    r -> r.Vmem),
+    ("Vnet",  val,    r -> r.Vnet),
+    header_style=Log.BOLD)
+  atable = Log.Table(
+    ("",      alabel, r -> GI.action_string(G, r[1])),
+    ("Pmcts", prob,   r -> r[2].Pmcts),
+    ("Pnet",  prob,   r -> r[2].Pnet),
+    ("UCT",   val,    r -> r[2].UCT),
+    ("Pmem",  prob,   r -> r[2].Pmem),
+    ("Qmcts", val,    r -> r[2].Qmcts),
+    ("Qnet",  val,    r -> r[2].Qnet),
+    header_style=Log.BOLD)
+  logger = Logger()
+  #Log.print(logger, "Board statistics")
+  #Log.sep(logger)
+  Log.table(logger, btable, [stats])
+  Log.sep(logger)
+  #Log.print(logger, "Action statistics")
+  #Log.sep(logger)
+  Log.table(logger, atable, stats.actions)
+  Log.sep(logger)
 end
 
+function print_state_statistics(env::Env{G}, state::G) where G
+  board = GI.canonical_board(state)
+  print_board_statistics(G, board_statistics(env, board))
+end
 
 #####
 ##### Interactive exploration of the environment
@@ -36,45 +133,13 @@ mutable struct Explorer{Game}
   env :: Env{Game}
   state :: Game
   history
-  mcts
-  oracle
-  function Explorer(env, state, mcts=env.mcts, oracle=env.bestnn)
-    new{typeof(state)}(env, state, Stack{Any}(), mcts, oracle)
+  function Explorer(env, state)
+    G = typeof(state)
+    new{G}(env, state, Stack{Any}())
   end
 end
 
 save_state!(exp::Explorer) = push!(exp.history, copy(exp.state))
-
-function print_state_statistics(exp::Explorer{G}) where G
-  board = GI.canonical_board(exp.state)
-  if haskey(exp.mcts.tree, board)
-    info = exp.mcts.tree[board]
-    if !isnothing(exp.oracle)
-      Pnet, Vnet = MCTS.evaluate(exp.oracle, board, info.actions)
-    end
-    @printf("N: %d, V: %.3f", info.Ntot, info.Vest)
-    isnothing(exp.oracle) || @printf(", Vnet: %.3f", Vnet)
-    @printf("\n\n")
-    actions = enumerate(info.actions) |> collect
-    actions = sort(actions, by=(((i,a),) -> info.stats[i].N), rev=true)
-    ucts = MCTS.uct_scores(info, exp.mcts.cpuct)
-    @printf("%1s %7s %8s %6s %8s ", "", "N (%)", "Q", "P", "UCT")
-    isnothing(exp.oracle) || @printf("%8s", "Pnet")
-    @printf("\n")
-    for (i, a) in actions
-      stats = info.stats[i]
-      Nr = 100 * stats.N / info.Ntot
-      Q = stats.N > 0 ? stats.W / stats.N : 0.
-      astr = GI.action_string(G, a)
-      @printf("%1s %7.2f %8.4f %6.2f %8.4f ", astr, Nr, Q, stats.P, ucts[i])
-      isnothing(exp.oracle) || @printf("%8.4f", Pnet[i])
-      @printf("\n")
-    end
-  else
-    print("Unexplored board.")
-  end
-  println("")
-end
 
 function interpret!(exp::Explorer{G}, cmd, args=[]) where G
   if cmd == "go"
@@ -97,9 +162,6 @@ function interpret!(exp::Explorer{G}, cmd, args=[]) where G
     save_state!(exp)
     GI.play!(exp.state, a)
     return true
-  elseif cmd == "mem"
-    inspect_memory(exp.env, exp.state)
-    return false
   elseif cmd == "explore"
     try
       if isempty(args)
@@ -107,9 +169,12 @@ function interpret!(exp::Explorer{G}, cmd, args=[]) where G
       else
         n = parse(Int, args[1])
       end
-      MCTS.explore!(exp.mcts, exp.state, n)
+      MCTS.explore!(exp.env.mcts, exp.state, n)
       return true
-    catch ArgumentError return false end
+    catch e
+      isa(e, ArgumentError) && (return false)
+      rethrow(e)
+    end
   end
   return false
 end
@@ -119,7 +184,7 @@ function launch(exp::Explorer)
     # Print the state
     println("")
     GI.print_state(exp.state)
-    print_state_statistics(exp)
+    print_state_statistics(exp.env, exp.state)
     # Interpret command
     while true
       print("> ")

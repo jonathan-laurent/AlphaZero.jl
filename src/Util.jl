@@ -1,6 +1,10 @@
 module Util
 
+export Option
+
 import Random
+
+const Option{T} = Union{T, Nothing}
 
 # concat_cols(cols) == hcat(cols...)
 function concat_columns(cols)
