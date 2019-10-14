@@ -11,7 +11,7 @@ mutable struct Env{Game, Network, Board, Mcts}
   function Env{Game}(params, network, experience=[], itc=0) where Game
     Board = GI.Board(Game)
     memory = MemoryBuffer{Board}(params.mem_buffer_size, experience)
-    mcts = MCTS.Env{Game}(network, params.self_play.cpuct)
+    mcts = MCTS.Env{Game}(network, params.self_play.mcts.cpuct)
     env = new{Game, Network, Board, typeof(mcts)}(
       params, network, memory, mcts, itc)
     update_network!(env, network)
@@ -80,7 +80,7 @@ function learning!(env::Env{G}, handler) where G
     # Decide whether or not to make a checkpoint
     if stable_loss || k % lp.epochs_per_checkpoint == 0
       cur_nn = get_trained_network(trainer)
-      eval_reward, dteval = @timed evaluate_oracle(env.bestnn, cur_nn, ap)
+      eval_reward, dteval = @timed evaluate_network(env.bestnn, cur_nn, ap)
       teval += dteval
       # If eval is good enough, replace network
       success = eval_reward >= best_eval_score
@@ -106,16 +106,12 @@ end
 
 function self_play!(env::Env{G}, handler) where G
   params = env.params.self_play
-  player = MctsPlayer(env.mcts,
-    params.num_mcts_iters_per_turn,
-    τ = params.temperature,
-    nα = params.dirichlet_noise_nα,
-    ϵ = params.dirichlet_noise_ϵ)
+  player = MctsPlayer(env.bestnn, params.mcts)
   new_batch!(env.memory)
   Handlers.self_play_started(handler)
   elapsed = @elapsed begin
     for i in 1:params.num_games
-      self_play!(G, player, env.memory)
+      self_play!(player, env.memory)
       Handlers.game_played(handler)
     end
   end

@@ -2,20 +2,36 @@
 ##### An MCTS-based player
 #####
 
-struct MctsPlayer{M}
+struct MctsPlayer{G, M}
   mcts :: M
   niters :: Int
   τ :: Float64 # Temperature
   nα :: Float64 # Dirichlet noise parameter
   ϵ :: Float64 # Dirichlet noise weight
-  function MctsPlayer(mcts, niters; τ=1., nα=10., ϵ=0.)
-    new{typeof(mcts)}(mcts, niters, τ, nα, ϵ)
+  function MctsPlayer(mcts::MCTS.Env{G}, niters; τ=1., nα=10., ϵ=0.) where G
+    new{G, typeof(mcts)}(mcts, niters, τ, nα, ϵ)
   end
 end
 
+# Alternative constructor
+function MctsPlayer(oracle::MCTS.Oracle{G}, params::MctsParams) where G
+  mcts = MCTS.Env{G}(oracle, params.cpuct)
+  return MctsPlayer(mcts, params.num_iters_per_turn,
+    τ=params.temperature,
+    nα=params.dirichlet_noise_nα,
+    ϵ=params.dirichlet_noise_ϵ)
+end
+
 function think(p::MctsPlayer, state)
-  MCTS.explore!(p.mcts, state, p.niters)
-  actions, π_mcts = MCTS.policy(p.mcts, state, τ=p.τ)
+  if iszero(p.niters)
+    # Special case: use the oracle directly instead of MCTS
+    actions = GI.available_actions(state)
+    board = GI.canonical_board(state)
+    π_mcts, _ = MCTS.evaluate(p.mcts.oracle, board, actions)
+  else
+    MCTS.explore!(p.mcts, state, p.niters)
+    actions, π_mcts = MCTS.policy(p.mcts, state, τ=p.τ)
+  end
   if iszero(p.ϵ)
     π_exp = π_mcts
   else
@@ -23,6 +39,9 @@ function think(p::MctsPlayer, state)
     noise = Dirichlet(n, p.nα / n)
     π_exp = (1 - p.ϵ) * π_mcts + p.ϵ * rand(noise)
   end
+  # The line below is necessary so that Distributions.isprob
+  # does not get too picky.
+  π_exp = convert(Vector{Float32}, π_exp)
   a = actions[rand(Categorical(π_exp))]
   return π_mcts, a
 end
@@ -33,7 +52,7 @@ end
 
 # Returns the reward and the game length
 function play(
-  ::Type{Game}, white::MctsPlayer, black::MctsPlayer, memory=nothing
+    white::MctsPlayer{Game}, black::MctsPlayer{Game}, memory=nothing
   ) :: Float64 where Game
   state = Game()
   nturns = 0
@@ -54,40 +73,30 @@ function play(
   end
 end
 
-self_play!(G, player, memory) = play(G, player, player, memory)
+self_play!(player, memory) = play(player, player, memory)
 
 #####
-##### Evaluating the latest NN
-##### by pitting it against the best one so far
+##### Evaluate two players against each other
 #####
 
-# Returns average reward for the evaluated player
-#   Question: when pitting network against each other,
-#   where does randomness come from?
-#   Answer: we leave a nonzero temperature
-function evaluate_oracle(
-    baseline::MCTS.Oracle{G}, oracle::MCTS.Oracle{G}, params::ArenaParams
-  ) :: Float64 where G
-  τ = params.temperature
-  n_mcts = params.num_mcts_iters_per_turn
-  n_episodes = params.num_games
-  best_mcts = MCTS.Env{G}(baseline, params.cpuct)
-  new_mcts = MCTS.Env{G}(oracle, params.cpuct)
-  best = MctsPlayer(best_mcts, n_mcts, τ=τ)
-  new = MctsPlayer(new_mcts, n_mcts, τ=τ)
+function evaluate_player(
+    baseline::MctsPlayer, contender::MctsPlayer, ngames)
   zsum = 0.
-  best_first = true
-  for i in 1:n_episodes
-    if params.reset_mcts
-      MCTS.reset!(best_mcts)
-      MCTS.reset!(new_mcts)
-    end
-    white = best_first ? best : new
-    black = best_first ? new : best
-    z = play(G, white, black)
-    best_first && (z = -z)
+  baseline_first = true
+  for i in 1:ngames
+    white = baseline_first ? baseline : contender
+    black = baseline_first ? contender : baseline
+    z = play(white, black)
+    baseline_first && (z = -z)
     zsum += z
-    best_first = !best_first
+    baseline_first = !baseline_first
   end
-  return zsum / n_episodes
+  return zsum / ngames
+end
+
+function evaluate_network(
+    baseline::Network, contender::Network, params::ArenaParams)
+  baseline = MctsPlayer(baseline, params.mcts)
+  contender = MctsPlayer(contender, params.mcts)
+  evaluate_player(baseline, contender, params.num_games)
 end

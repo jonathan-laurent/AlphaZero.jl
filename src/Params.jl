@@ -7,41 +7,42 @@
 # For dirichlet noise parameters, see:
 # https://medium.com/oracledevs/lessons-from-alphazero-part-3
 
-@kwdef struct ArenaParams
-  num_games :: Int = 40
-  num_mcts_iters_per_turn :: Int = 25
-  reset_mcts :: Bool = false # reset MCTS at each game
+@kwdef struct MctsParams
   cpuct :: Float64 = 1.
-  temperature :: Float64 = 0.4
-  update_threshold :: Float64 = 2 * 0.55 - 1
+  num_iters_per_turn :: Int
+  temperature :: Float64 = 1.
+  dirichlet_noise_nα :: Float64 = 10.
+  dirichlet_noise_ϵ :: Float64 = 0.
+end
+
+@kwdef struct ArenaParams
+  num_games :: Int
+  update_threshold :: Float64
+  mcts :: MctsParams
 end
 
 @kwdef struct SelfPlayParams
-  num_games :: Int = 50
-  num_mcts_iters_per_turn :: Int = 250
-  cpuct :: Float64 = 1.
-  temperature :: Float64 = 1.
-  dirichlet_noise_nα :: Float64 = 10.
-  dirichlet_noise_ϵ :: Float64 = 0.25
+  num_games :: Int
+  mcts :: MctsParams
 end
 
 @kwdef struct LearningParams
-  learning_rate :: Float64 = 1e-3
+  learning_rate :: Float64 = 5e-4
   batch_size :: Int = 32
   epochs_per_checkpoint :: Int = 4
   max_num_epochs :: Int = 20
   stop_loss_eps :: Float64 = 1e-4
   stop_after_first_winner :: Bool = false
-  use_gpu :: Bool = false
+  use_gpu :: Bool = true
 end
 
 @kwdef struct Params
   arena :: ArenaParams
   self_play :: SelfPlayParams
   learning :: LearningParams
-  num_iters :: Int = 100
+  num_iters :: Int
   mem_buffer_size :: Int = 200_000
-  num_game_stages :: Int = 8 # as featured in memory reports
+  num_game_stages :: Int # as featured in memory reports
 end
 
 #####
@@ -57,7 +58,7 @@ end
 # + First 30 moves, τ=1, then τ → 0 (not implemented here)
 # Alpha Zero final
 # + 29 million games, 31 million minibatches of 2048 positions
-
+#=
 const ALPHA_ZERO_PAPER_PARAMS = Params(
   arena = ArenaParams(
     num_games = 400,
@@ -76,3 +77,4 @@ const ALPHA_ZERO_PAPER_PARAMS = Params(
   num_iters = 200, # 5M / 25K
   mem_buffer_size = 500_000,
 )
+=#
