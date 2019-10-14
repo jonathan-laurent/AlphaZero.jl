@@ -21,6 +21,7 @@ const TABLE_COMMENTS_SEP = " / "
 
 # To be used externally
 const BOLD = crayon"bold"
+const RED = crayon"red"
 
 #####
 ##### Basic nested logging
@@ -38,9 +39,10 @@ indent!(l::Logger) = l.indent_level += 1
 
 deindent(l::Logger) = l.indent_level -= 1
 
+offset(l::Logger) = INDENT_STEP * l.indent_level
+
 function print(l::Logger, args...)
-  indent = INDENT_STEP * l.indent_level
-  println(repeat(" ", indent), l.style, args..., crayon"reset")
+  println(repeat(" ", offset(l)), l.style, args..., crayon"reset")
   l.lastsep = false
   l.lastrow = false
 end
@@ -56,6 +58,13 @@ function section(logger::Logger, level, args...)
   print(logger, HEADER_COLORS[level], args...)
   sep(logger)
   indent!(logger)
+end
+
+function reset!(logger::Logger)
+  logger.indent_level = 0
+  logger.style = crayon""
+  logger.lastsep = false
+  logger.lastrow = false
 end
 
 #####

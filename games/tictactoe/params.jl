@@ -1,4 +1,6 @@
-netparams = AlphaZero.SimpleNetParams(
+Network = AlphaZero.SimpleNet{Game}
+
+netparams = AlphaZero.SimpleNetHyperParams(
   width=300,
   depth_common=3)
 

@@ -182,7 +182,6 @@ end
 function launch(exp::Explorer)
   while true
     # Print the state
-    println("")
     GI.print_state(exp.state)
     print_state_statistics(exp.env, exp.state)
     # Interpret command
@@ -194,5 +193,6 @@ function launch(exp::Explorer)
       args = inp[2:end]
       interpret!(exp, cmd, args) && break
     end
+    println("")
   end
 end

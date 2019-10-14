@@ -36,12 +36,13 @@ end
 
 import Flux
 import Plots
+import JSON2
 
-using Printf
 using Formatting
 using Crayons
 using ProgressMeter
 using Base: @kwdef
+using Serialization: serialize, deserialize
 using DataStructures: Stack, CircularBuffer
 using Distributions: Categorical, Dirichlet
 using Flux: Tracker, Chain, Dense, relu, softmax, cpu, gpu
@@ -54,6 +55,7 @@ include("Learning.jl")
 include("Play.jl")
 include("Training.jl")
 include("Explorer.jl")
+include("Session.jl")
 
 end
 

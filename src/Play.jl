@@ -34,14 +34,14 @@ end
 # Returns the reward and the game length
 function play(
   ::Type{Game}, white::MctsPlayer, black::MctsPlayer, memory=nothing
-  ) :: Report.Game where Game
+  ) :: Float64 where Game
   state = Game()
   nturns = 0
   while true
     z = GI.white_reward(state)
     if !isnothing(z)
       isnothing(memory) || push_game!(memory, z, nturns)
-      return Report.Game(z, nturns)
+      return z
     end
     player = GI.white_playing(state) ? white : black
     π, a = think(player, state)
@@ -67,7 +67,7 @@ self_play!(G, player, memory) = play(G, player, player, memory)
 #   Answer: we leave a nonzero temperature
 function evaluate_oracle(
     baseline::MCTS.Oracle{G}, oracle::MCTS.Oracle{G}, params::ArenaParams
-  ) :: Report.Evaluation where G
+  ) :: Float64 where G
   τ = params.temperature
   n_mcts = params.num_mcts_iters_per_turn
   n_episodes = params.num_games
@@ -77,7 +77,6 @@ function evaluate_oracle(
   new = MctsPlayer(new_mcts, n_mcts, τ=τ)
   zsum = 0.
   best_first = true
-  games = Vector{Report.Game}(undef, n_episodes)
   for i in 1:n_episodes
     if params.reset_mcts
       MCTS.reset!(best_mcts)
@@ -85,13 +84,10 @@ function evaluate_oracle(
     end
     white = best_first ? best : new
     black = best_first ? new : best
-    grep = play(G, white, black)
-    if best_first
-      grep = Report.Game(-grep.reward, grep.length)
-    end
-    games[i] = grep
+    z = play(G, white, black)
+    best_first && (z = -z)
+    zsum += z
     best_first = !best_first
   end
-  avgz = mean(g.reward for g in games)
-  return Report.Evaluation(games, avgz)
+  return zsum / n_episodes
 end

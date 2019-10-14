@@ -2,111 +2,146 @@
 ##### High level training procedure
 #####
 
-mutable struct Env{Game, Board, Mcts, Network}
+mutable struct Env{Game, Network, Board, Mcts}
   params :: Params
-  memory :: MemoryBuffer{Board}
   bestnn :: Network
+  memory :: MemoryBuffer{Board}
   mcts   :: Mcts
-  logger :: Logger
-  function Env{Game}(params, network) where Game
+  itc    :: Int
+  function Env{Game}(params, network, experience=[], itc=0) where Game
     Board = GI.Board(Game)
-    memory = MemoryBuffer{Board}(params.mem_buffer_size)
+    memory = MemoryBuffer{Board}(params.mem_buffer_size, experience)
     mcts = MCTS.Env{Game}(network, params.self_play.cpuct)
-    logger = Logger()
-    new{Game, Board, typeof(mcts), typeof(network)}(
-      params, memory, network, mcts, logger)
+    env = new{Game, Network, Board, typeof(mcts)}(
+      params, network, memory, mcts, itc)
+    update_network!(env, network)
+    return env
   end
 end
 
-function learning!(env::Env{G}, lp::LearningParams) where G
+#####
+##### Training handlers
+#####
+
+module Handlers
+
+  function iteration_started(h)      return end
+  function self_play_started(h)      return end
+  function game_played(h)            return end
+  function self_play_finished(h, r)  return end
+  function memory_analyzed(h, r)     return end
+  function learning_started(h, r)    return end
+  function learning_epoch(h, r)      return end
+  function learning_checkpoint(h, r) return end
+  function learning_finished(h, r)   return end
+  function iteration_finished(h, r)  return end
+  function training_finished(h)      return end
+
+end
+
+import .Handlers
+
+#####
+##### Training loop
+#####
+
+function update_network!(env::Env, net)
+  env.bestnn = net
+  MCTS.reset!(env.mcts, net)
+end
+
+function learning!(env::Env{G}, handler) where G
   # Initialize the training process
   ap = env.params.arena
-  trainer, tconvert = @timed Trainer(env.bestnn, get(env.memory), lp)
+  lp = env.params.learning
   epochs = Report.Epoch[]
   checkpoints = Report.Checkpoint[]
+  tloss, teval, ttrain = 0., 0., 0.
+  trainer, tconvert = @timed Trainer(env.bestnn, get(env.memory), lp)
   init_status = learning_status(trainer)
-  Report.print(env.logger, init_status, style=Log.BOLD)
+  Handlers.learning_started(handler, init_status)
   # Loop state variables
   k = 1 # epoch number
   best_eval_score = ap.update_threshold
-  next_nn = env.bestnn
+  best_nn = env.bestnn
   nn_replaced = false
   last_loss = init_status.loss.L
   stable_loss = false
   # Loop over epochs
   while !stable_loss && k <= lp.max_num_epochs &&
         !(lp.stop_after_first_winner && nn_replaced)
-    ttrain = @elapsed training_epoch!(trainer)
-    status, tloss = @timed learning_status(trainer)
+    ttrain += @elapsed training_epoch!(trainer)
+    status, dtloss = @timed learning_status(trainer)
+    tloss += dtloss
     stable_loss = (last_loss - status.loss.L < lp.stop_loss_eps)
     last_loss = status.loss.L
-    push!(epochs, Report.Epoch(ttrain, tloss, status))
-    comments = String[]
+    epoch_report = Report.Epoch(status, stable_loss)
+    push!(epochs, epoch_report)
     # Decide whether or not to make a checkpoint
     if stable_loss || k % lp.epochs_per_checkpoint == 0
       cur_nn = get_trained_network(trainer)
-      eval, evaltime = @timed evaluate_oracle(env.bestnn, cur_nn, ap)
-      push!(checkpoints, Report.Checkpoint(k, evaltime, eval))
-      push!(comments, "Evaluation reward: $(eval.average_reward)")
+      eval_reward, dteval = @timed evaluate_oracle(env.bestnn, cur_nn, ap)
+      teval += dteval
       # If eval is good enough, replace network
-      if eval.average_reward >= best_eval_score
+      success = eval_reward >= best_eval_score
+      if success
         nn_replaced = true
-        next_nn = cur_nn
-        best_eval_score = eval.average_reward
-        push!(comments, "Networked replaced")
+        best_nn = cur_nn
+        best_eval_score = eval_reward
       end
+      checkpoint_report = Report.Checkpoint(k, eval_reward, success)
+      push!(checkpoints, checkpoint_report)
+      Handlers.learning_checkpoint(handler, checkpoint_report)
     end
-    stable_loss && push!(comments, "Loss stabilized")
-    Report.print(env.logger, status, comments)
+    Handlers.learning_epoch(handler, epoch_report)
     k += 1
   end
-  rep = Report.Learning(
-    tconvert, init_status, epochs, checkpoints, nn_replaced)
-  return next_nn, rep
+  nn_replaced && update_network!(env, best_nn)
+  report = Report.Learning(
+    tconvert, tloss, ttrain, teval,
+    init_status, epochs, checkpoints, nn_replaced)
+  Handlers.learning_finished(handler, report)
+  return report
 end
 
-function self_play!(env::Env{G}, params=env.params.self_play) where G
+function self_play!(env::Env{G}, handler) where G
+  params = env.params.self_play
   player = MctsPlayer(env.mcts,
     params.num_mcts_iters_per_turn,
     τ = params.temperature,
     nα = params.dirichlet_noise_nα,
     ϵ = params.dirichlet_noise_ϵ)
-  games = Vector{Report.Game}(undef, params.num_games)
   new_batch!(env.memory)
+  Handlers.self_play_started(handler)
   elapsed = @elapsed begin
     for i in 1:params.num_games
-      grep = self_play!(G, player, env.memory)
-      games[i] = grep
+      self_play!(G, player, env.memory)
+      Handlers.game_played(handler)
     end
   end
-  inft = MCTS.inference_time_ratio(env.mcts)
+  inference_tr = MCTS.inference_time_ratio(env.mcts)
   speed = last_batch_size(env.memory) / elapsed
-  return Report.SelfPlay(games, inft, speed)
+  report = Report.SelfPlay(inference_tr, speed)
+  Handlers.self_play_finished(handler, report)
+  return report
 end
 
-function train!(
-    env::Env{G},
-    num_iters=env.params.num_iters
-  ) where G
-  num_nn_params = num_parameters(env.bestnn)
-  iterations = Report.Iteration[]
-  for i in 1:num_iters
-    Log.section(env.logger, 1, "Starting iteration $i")
-    Log.section(env.logger, 2, "Starting self-play")
-    sprep, sptime = @timed self_play!(env, env.params.self_play)
-    Report.print(env.logger, sprep)
-    Log.section(env.logger, 2, "Analyzing collected samples")
-    nstages = env.params.num_game_stages
-    mrep = memory_report(env.memory, env.bestnn, env.params.learning, nstages)
-    Report.print(env.logger, mrep)
-    Log.section(env.logger, 2, "Starting learning")
-    (newnn, lrep), ltime = @timed learning!(env, env.params.learning)
-    iterrep = Report.Iteration(sptime, ltime, sprep, mrep, lrep)
-    push!(iterations, iterrep)
-    if lrep.nn_replaced
-      env.bestnn = newnn
-      env.mcts = MCTS.Env{G}(env.bestnn, env.params.self_play.cpuct)
-    end
+function memory_report(env::Env{G}, handler) where G
+  nstages = env.params.num_game_stages
+  report = memory_report(env.memory, env.bestnn, env.params.learning, nstages)
+  Handlers.memory_analyzed(handler, report)
+  return report
+end
+
+function train!(env::Env{G}, handler=nothing) where G
+  while env.itc < env.params.num_iters
+    Handlers.iteration_started(handler)
+    sprep, sptime = @timed self_play!(env, handler)
+    mrep, mtime = @timed memory_report(env, handler)
+    lrep, ltime = @timed learning!(env, handler)
+    rep = Report.Iteration(sptime, mtime, ltime, sprep, mrep, lrep)
+    env.itc += 1
+    Handlers.iteration_finished(handler, rep)
   end
-  return Report.Training(num_nn_params, iterations)
+  Handlers.training_finished(handler)
 end

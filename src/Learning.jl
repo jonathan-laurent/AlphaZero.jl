@@ -9,6 +9,8 @@ Abstract type for a neural network oracle for `Game`.
 It must implement the following interface
   - Flux.gpu(nn), Flux.cpu(nn)
   - Flux.params(nn), Flux.loadparams!(nn, p)
+  - hyperparams(nn)
+  - HyperParams(typeof(nn))
   - nn(boards, action_masks)
   - regularized_weights(nn)
   - num_parameters(nn)
@@ -17,7 +19,7 @@ It must implement the following interface
 abstract type Network{G} <: MCTS.Oracle{G} end
 
 function Base.copy(nn::Net) where Net <: Network
-  new = Net()
+  new = Net(hyperparams(nn))
   Flux.loadparams!(new, Flux.params(nn))
   return new
 end
@@ -36,43 +38,47 @@ end
 ##### A simple example network
 #####
 
-@kwdef struct SimpleNetParams
+@kwdef struct SimpleNetHyperParams
   width :: Int = 300
   depth_common :: Int = 3
   depth_pbranch :: Int = 1
   depth_vbranch :: Int = 1
 end
 
-struct SimpleNet{G, params} <: Network{G}
+struct SimpleNet{G} <: Network{G}
+  hyper
   common
   vbranch
   pbranch
 end
 
-function SimpleNet{G, params}() where {G, params}
-  @assert isa(params, SimpleNetParams)
+function SimpleNet{G}(hyper::SimpleNetHyperParams) where G
   indim = GI.board_dim(G)
   outdim = GI.num_actions(G)
-  hsize = params.width
+  hsize = hyper.width
   hlayers(depth) = [Dense(hsize, hsize, relu) for i in 1:depth]
   common = Chain(
     Dense(indim, hsize, relu),
-    hlayers(params.depth_common)...)
+    hlayers(hyper.depth_common)...)
   vbranch = Chain(
-    hlayers(params.depth_vbranch)...,
+    hlayers(hyper.depth_vbranch)...,
     Dense(hsize, 1, tanh))
   pbranch = Chain(
-    hlayers(params.depth_pbranch)...,
+    hlayers(hyper.depth_pbranch)...,
     Dense(hsize, outdim),
     softmax)
-  SimpleNet{G, params}(common, vbranch, pbranch)
+  SimpleNet{G}(hyper, common, vbranch, pbranch)
 end
+
+HyperParams(::Type{<:SimpleNet}) = SimpleNetHyperParams
+
+hyperparams(nn::SimpleNet) = nn.hyper
 
 # Flux.@treelike does not work do to Network being parametric
 Flux.children(nn::SimpleNet) = (nn.common, nn.vbranch, nn.pbranch)
 
 function Flux.mapchildren(f, nn::Net) where Net <: SimpleNet
-  Net(f(nn.common), f(nn.vbranch), f(nn.pbranch))
+  Net(nn.hyper, f(nn.common), f(nn.vbranch), f(nn.pbranch))
 end
 
 # Forward pass

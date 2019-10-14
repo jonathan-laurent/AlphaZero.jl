@@ -23,26 +23,26 @@ struct LearningStatus
   network :: Network
 end
 
-struct Game
-  reward :: Float64
-  length :: Int
-end
-
-struct Evaluation
-  games :: Vector{Game}
-  average_reward :: Float64 # redundant
-end
-
 struct Checkpoint
   epoch_id :: Int
-  time_eval :: Float64
-  eval :: Evaluation
+  reward :: Float64
+  nn_replaced :: Bool
 end
 
 struct Epoch
-  time_train :: Float64
-  time_loss :: Float64
   status_after :: LearningStatus
+  stable_loss :: Bool
+end
+
+struct Learning
+  time_convert :: Float64
+  time_loss :: Float64
+  time_train :: Float64
+  time_eval :: Float64
+  initial_status :: LearningStatus
+  epochs :: Vector{Epoch}
+  checkpoints :: Vector{Checkpoint}
+  nn_replaced :: Bool
 end
 
 struct Samples
@@ -61,31 +61,18 @@ struct Memory
   per_game_stage :: Vector{Tuple{Float64, Samples}}
 end
 
-struct Learning
-  time_convert :: Float64
-  initial_status :: LearningStatus
-  epochs :: Vector{Epoch}
-  checkpoints :: Vector{Checkpoint}
-  nn_replaced :: Bool
-end
-
 struct SelfPlay
-  games :: Vector{Game}
   inference_time_ratio :: Float64
   samples_gen_speed :: Float64 # in samples/second
 end
 
 struct Iteration
   time_self_play :: Float64
+  time_memory_analysis :: Float64
   time_learning :: Float64
   self_play :: SelfPlay
   memory :: Memory
   learning :: Learning
-end
-
-struct Training
-  num_nn_params :: Int
-  iterations :: Vector{Iteration}
 end
 
 #####

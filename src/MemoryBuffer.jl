@@ -18,8 +18,10 @@ mutable struct MemoryBuffer{Board}
   # Long-term memory
   mem :: CircularBuffer{TrainingExample{Board}}
   last_batch_size :: Int
-  function MemoryBuffer{B}(size) where B
-    new{B}([], CircularBuffer{TrainingExample{B}}(size), 0)
+  function MemoryBuffer{B}(size, experience=[]) where B
+    mem = CircularBuffer{TrainingExample{B}}(size)
+    append!(mem, experience)
+    new{B}([], mem, 0)
   end
 end
 
