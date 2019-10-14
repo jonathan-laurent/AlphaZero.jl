@@ -118,7 +118,10 @@ function Session(
     env = Env{Game}(params, network)
   end
   session = Session(env, dir, logger, autosave)
-  autosave && save(session)
+  if autosave
+    save(session)
+    save(session, iterdir(session, 0))
+  end
   return session
 end
 
