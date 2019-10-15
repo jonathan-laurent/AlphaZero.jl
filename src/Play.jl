@@ -79,24 +79,28 @@ self_play!(player, memory) = play(player, player, memory)
 ##### Evaluate two players against each other
 #####
 
-function evaluate_player(
-    baseline::MctsPlayer, contender::MctsPlayer, ngames)
-  zsum = 0.
+function pit(handler, baseline::MctsPlayer, contender::MctsPlayer, ngames)
   baseline_first = true
+  zsum = 0.
   for i in 1:ngames
     white = baseline_first ? baseline : contender
     black = baseline_first ? contender : baseline
     z = play(white, black)
     baseline_first && (z = -z)
     zsum += z
+    handler(i, z)
     baseline_first = !baseline_first
   end
   return zsum / ngames
+end
+
+function pit(baseline, contender, ngames)
+  return pit((i, z) -> nothing, baseline, contender, ngames)
 end
 
 function evaluate_network(
     baseline::Network, contender::Network, params::ArenaParams)
   baseline = MctsPlayer(baseline, params.mcts)
   contender = MctsPlayer(contender, params.mcts)
-  evaluate_player(baseline, contender, params.num_games)
+  return pit(baseline, contender, params.num_games)
 end

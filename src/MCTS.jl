@@ -58,22 +58,22 @@ mutable struct BoardInfo{Action}
   Vest    :: Float64
 end
 
-mutable struct Env{Game, Board, Action}
+mutable struct Env{Game, Board, Action, Oracle}
   # Store state statistics assuming player one is to play for nonterminal states
   tree  :: Dict{Board, BoardInfo{Action}}
   stack :: Stack{Tuple{Board, Bool, Action}}
   cpuct :: Float64
   # External oracle to evaluate positions
-  oracle :: Oracle{Game}
+  oracle :: Oracle
   # Performance statistics
   total_time :: Float64
   inference_time :: Float64
-  function Env{G}(oracle, cpuct=1.) where {G}
+  function Env{G}(oracle, cpuct=1.) where G
     B = GI.Board(G)
     A = GI.Action(G)
     tree = Dict{B, BoardInfo{A}}()
     stack = Stack{Tuple{B, Bool, A}}()
-    new{G, B, A}(tree, stack, cpuct, oracle, 0., 0.)
+    new{G, B, A, typeof(oracle)}(tree, stack, cpuct, oracle, 0., 0.)
   end
 end
 

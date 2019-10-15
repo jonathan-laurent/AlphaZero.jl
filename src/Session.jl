@@ -28,7 +28,7 @@ const REP_FILE         =  "report.json"
 const PARAMS_FILE      =  "params.json"
 const NET_PARAMS_FILE  =  "netparams.json"
 
-iterdir(session::Session, i) = joinpath(session.dir, "$i")
+iterdir(dir, i) = joinpath(dir, "$i")
 
 function save_env(env::Env, dir)
   isdir(dir) || mkpath(dir)
@@ -112,15 +112,16 @@ function Session(
   logger = Logger()
   if autoload && valid_session_dir(dir)
     env = load_env(Game, Network, logger, dir)
+    session = Session(env, dir, logger, autosave)
   else
     Log.section(logger, 1, "Initializing a new AlphaZero environment")
     network = Network(netparams)
     env = Env{Game}(params, network)
-  end
-  session = Session(env, dir, logger, autosave)
-  if autosave
-    save(session)
-    save(session, iterdir(session, 0))
+    session = Session(env, dir, logger, autosave)
+    if autosave
+      save(session)
+      save(session, iterdir(session.dir, 0))
+    end
   end
   return session
 end
@@ -192,7 +193,8 @@ function Handlers.learning_epoch(session::Session, report)
   comments = String[]
   checkpoint = session.learning_checkpoint
   if !isnothing(checkpoint)
-    push!(comments, "Evaluation reward: $(checkpoint.reward)")
+    z = fmt("+.2f", checkpoint.reward)
+    push!(comments, "Evaluation reward: $z")
     checkpoint.nn_replaced && push!(comments, "Networked replaced")
   end
   report.stable_loss && push!(comments, "Loss stabilized")
@@ -207,7 +209,7 @@ end
 function Handlers.iteration_finished(session::Session, report)
   if session.autosave
     save(session)
-    idir = iterdir(session, session.env.itc)
+    idir = iterdir(session.dir, session.env.itc)
     save(session, idir)
     open(joinpath(idir, REP_FILE), "w") do io
       JSON2.pretty(io, JSON2.write(report))
@@ -218,4 +220,31 @@ end
 
 function Handlers.training_finished(session::Session)
   Log.section(session.logger, 1, "Training completed")
+end
+
+#####
+##### Validation
+#####
+
+function walk_iterations(::Type{G}, ::Type{N}, dir::String) where {G, N}
+  n = 0
+  while valid_session_dir(iterdir(dir, n))
+    n += 1
+  end
+  return (load_env(G, N, Logger(devnull), iterdir(dir, i)) for i in 0:n-1)
+end
+
+function validate(::Type{G}, ::Type{N}, dir::String, v) where {G, N}
+  logger = Logger()
+  Log.section(logger, 1, "Running validation experiment")
+  for env in walk_iterations(G, N, dir)
+    Log.section(logger, 2, "Iteration $(env.itc)")
+    indent = repeat(" ", Log.offset(logger))
+    ngames = v.num_games
+    progress = Progress(ngames, desc=(indent * "Progress: "))
+    report = validation_score(env, v, progress)
+    Log.print(logger, "")
+    z = fmt("+.2f", report.z)
+    Log.print(logger, "Average reward: $z")
+  end
 end

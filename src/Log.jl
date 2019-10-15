@@ -28,11 +28,12 @@ const RED = crayon"red"
 #####
 
 mutable struct Logger
+  io :: IO
   indent_level :: Int
   style :: Crayon
   lastsep :: Bool
   lastrow :: Bool
-  Logger() = new(0, crayon"", false, false)
+  Logger(io=stdout) = new(io, 0, crayon"", false, false)
 end
 
 indent!(l::Logger) = l.indent_level += 1
@@ -42,7 +43,7 @@ deindent(l::Logger) = l.indent_level -= 1
 offset(l::Logger) = INDENT_STEP * l.indent_level
 
 function print(l::Logger, args...)
-  println(repeat(" ", offset(l)), l.style, args..., crayon"reset")
+  Base.println(l.io, repeat(" ", offset(l)), l.style, args..., crayon"reset")
   l.lastsep = false
   l.lastrow = false
 end

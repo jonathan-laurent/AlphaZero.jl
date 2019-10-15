@@ -55,6 +55,7 @@ include("Learning.jl")
 include("Play.jl")
 include("Training.jl")
 include("Explorer.jl")
+include("Validation.jl")
 include("Session.jl")
 
 end

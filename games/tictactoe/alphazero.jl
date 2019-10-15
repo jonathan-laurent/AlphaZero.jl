@@ -6,9 +6,14 @@ import .TicTacToe
 Game = TicTacToe.Game
 Revise.includet("params.jl")
 
+DIR = "session"
+
 session = AlphaZero.Session(
   Game, Network, params, netparams,
-  dir="session", autosave=true)
+  dir=DIR, autosave=true)
 
 AlphaZero.resume!(session)
+
+AlphaZero.validate(Game, Network, DIR, validation)
+
 AlphaZero.explore(session)
