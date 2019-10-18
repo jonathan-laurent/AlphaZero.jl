@@ -1,9 +1,9 @@
 using Revise
 import AlphaZero
 
-DIR = "session-tictactoe"
+DIR = "session-mancala"
 
-Revise.includet("game.jl") ; import .TicTacToe ; Game = TicTacToe.Game
+Revise.includet("game.jl") ; import .Mancala ; Game = Mancala.Game
 Revise.includet("params.jl")
 
 session = AlphaZero.Session(
