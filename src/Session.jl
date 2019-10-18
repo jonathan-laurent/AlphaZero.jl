@@ -7,13 +7,14 @@ mutable struct Session{Env}
   dir :: String
   logger :: Logger
   autosave :: Bool
+  validation :: Option{Validation}
   # Temporary state for logging
   progress :: Option{Progress}
   learning_checkpoint :: Option{Report.Checkpoint}
   
-  function Session(env, dir, logger, autosave)
+  function Session(env, dir, logger, autosave, validation=nothing)
     return new{typeof(env)}(
-      env, dir, logger, autosave, nothing, nothing)
+      env, dir, logger, autosave, validation, nothing, nothing)
   end
 end
 
@@ -24,9 +25,11 @@ end
 const NET_FILE         =  "net.data"
 const MEM_FILE         =  "mem.data"
 const ITC_FILE         =  "iter.txt"
-const REP_FILE         =  "report.json"
+const REPORT_FILE      =  "report.json"
 const PARAMS_FILE      =  "params.json"
 const NET_PARAMS_FILE  =  "netparams.json"
+const VALIDATION_FILE  =  "validation.json"
+const PLOTS_DIR        =  "plots"
 
 iterdir(dir, i) = joinpath(dir, "$i")
 
@@ -100,6 +103,24 @@ function valid_session_dir(dir)
   isfile(joinpath(dir, ITC_FILE))
 end
 
+function run_validation_experiment(session, idir)
+  if !isnothing(session.validation)
+    v = session.validation
+    Log.section(session.logger, 2, "Running validation experiment")
+    progress = Log.Progress(session.logger, length(v))
+    report = validation_score(session.env, v, progress)
+    Log.sep(session.logger, force=true)
+    z = fmt("+.2f", report.z)
+    Log.print(session.logger, "Average reward: $z")
+    if session.autosave
+      isdir(idir) || mkpath(idir)
+      open(joinpath(idir, VALIDATION_FILE), "w") do io
+        JSON2.pretty(io, JSON2.write(report))
+      end
+    end
+  end
+end
+
 #####
 ##### Create and resume sessions
 #####
@@ -107,17 +128,18 @@ end
 # Start a new session
 function Session(
     ::Type{Game}, ::Type{Network}, params, netparams;
-    dir="session", autosave=true, autoload=true
+    dir="session", autosave=true, autoload=true, validation=nothing
   ) where {Game, Network}
   logger = Logger()
   if autoload && valid_session_dir(dir)
     env = load_env(Game, Network, logger, dir)
-    session = Session(env, dir, logger, autosave)
+    session = Session(env, dir, logger, autosave, validation)
   else
     Log.section(logger, 1, "Initializing a new AlphaZero environment")
     network = Network(netparams)
     env = Env{Game}(params, network)
-    session = Session(env, dir, logger, autosave)
+    session = Session(env, dir, logger, autosave, validation)
+    run_validation_experiment(session, iterdir(session.dir, 0))
     if autosave
       save(session)
       save(session, iterdir(session.dir, 0))
@@ -128,10 +150,11 @@ end
 
 # Load an existing session from a directory
 function Session(
-  ::Type{Game}, ::Type{Network}, dir; autosave=true) where {Game, Network}
+    ::Type{Game}, ::Type{Network}, dir; autosave=true, validation=nothing
+  ) where {Game, Network}
   env = load_env(Game, Network, session.logger, dir)
   logger = Logger()
-  return Session(env, dir, logger, autosave)
+  return Session(env, dir, logger, autosave, validation)
 end
 
 function resume!(session::Session)
@@ -161,8 +184,7 @@ end
 function Handlers.self_play_started(session::Session)
   ngames = session.env.params.self_play.num_games
   Log.section(session.logger, 2, "Starting self-play")
-  indent = repeat(" ", Log.offset(session.logger))
-  session.progress = Progress(ngames, desc=(indent * "Progress: "))
+  session.progress = Log.Progress(session.logger, ngames)
 end
 
 function Handlers.game_played(session::Session)
@@ -170,7 +192,7 @@ function Handlers.game_played(session::Session)
 end
 
 function Handlers.self_play_finished(session::Session, report)
-  Log.print(session.logger, "")
+  Log.sep(session.logger, force=true)
   Report.print(session.logger, report)
   session.progress = nothing
 end
@@ -207,11 +229,12 @@ function Handlers.learning_finished(session::Session, report)
 end
 
 function Handlers.iteration_finished(session::Session, report)
+  idir = iterdir(session.dir, session.env.itc)
+  run_validation_experiment(session, idir)
   if session.autosave
     save(session)
-    idir = iterdir(session.dir, session.env.itc)
     save(session, idir)
-    open(joinpath(idir, REP_FILE), "w") do io
+    open(joinpath(idir, REPORT_FILE), "w") do io
       JSON2.pretty(io, JSON2.write(report))
     end
     Log.section(session.logger, 2, "Environment saved in: $(session.dir)")
@@ -239,12 +262,46 @@ function validate(::Type{G}, ::Type{N}, dir::String, v) where {G, N}
   Log.section(logger, 1, "Running validation experiment")
   for env in walk_iterations(G, N, dir)
     Log.section(logger, 2, "Iteration $(env.itc)")
-    indent = repeat(" ", Log.offset(logger))
-    ngames = v.num_games
-    progress = Progress(ngames, desc=(indent * "Progress: "))
+    progress = Log.Progress(logger, v.num_games)
     report = validation_score(env, v, progress)
-    Log.print(logger, "")
+    Log.sep(logger, force=true)
     z = fmt("+.2f", report.z)
     Log.print(logger, "Average reward: $z")
   end
+end
+
+function get_reports(dir::String)
+  n = 0
+  ireps = Report.Iteration[]
+  vreps = ValidationReport[]
+  while valid_session_dir(iterdir(dir, n))
+    idir = iterdir(dir, n)
+    rep_file = joinpath(idir, REPORT_FILE)
+    val_file = joinpath(idir, VALIDATION_FILE)
+    if isfile(rep_file)
+      open(rep_file, "r") do io
+        push!(ireps, JSON2.read(io, Report.Iteration))
+      end
+    end
+    if isfile(val_file)
+      open(val_file, "r") do io
+        push!(vreps, JSON2.read(io, ValidationReport))
+      end
+    end
+    n += 1
+  end
+  length(ireps) == n - 1 || (ireps = nothing)
+  length(vreps) == n || (vreps = nothing)
+  # Load params file
+  params_file = joinpath(dir, PARAMS_FILE)
+  params = open(params_file, "r") do io
+    JSON2.read(io, Params)
+  end
+  return params, ireps, vreps
+end
+
+function plot_report(dir::String)
+  params, ireps, vreps = get_reports(dir)
+  isnothing(ireps) && return
+  plot_report(params, ireps, vreps, joinpath(dir, PLOTS_DIR))
 end

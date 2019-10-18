@@ -247,7 +247,7 @@ function memory_report(
     map(stages) do es
       t = mean(e.t for e in es)
       stats = samples_report(Tr(es))
-      (t, stats)
+      Report.StageSamples(t, stats)
     end
   end
   return Report.Memory(latest_batch, all_samples, per_game_stage)

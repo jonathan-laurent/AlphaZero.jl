@@ -115,7 +115,7 @@ function self_play!(env::Env{G}, handler) where G
       Handlers.game_played(handler)
     end
   end
-  inference_tr = MCTS.inference_time_ratio(env.mcts)
+  inference_tr = MCTS.inference_time_ratio(player.mcts)
   speed = last_batch_size(env.memory) / elapsed
   report = Report.SelfPlay(inference_tr, speed)
   Handlers.self_play_finished(handler, report)

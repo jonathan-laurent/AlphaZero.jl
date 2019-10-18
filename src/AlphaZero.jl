@@ -36,10 +36,12 @@ end
 
 import Flux
 import Plots
+import Colors
 import JSON2
 
 using Formatting
 using Crayons
+using Colors: @colorant_str
 using ProgressMeter
 using Base: @kwdef
 using Serialization: serialize, deserialize
@@ -56,6 +58,7 @@ include("Play.jl")
 include("Training.jl")
 include("Explorer.jl")
 include("Validation.jl")
+include("Plots.jl")
 include("Session.jl")
 
 end

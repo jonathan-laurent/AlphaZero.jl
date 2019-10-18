@@ -74,6 +74,12 @@ git-tree-sha1 = "05916673a2627dd91b4969ff8ba6941bc85a960e"
 uuid = "944b1d66-785c-5afd-91f1-9de20f533193"
 version = "0.6.0"
 
+[[ColorSchemes]]
+deps = ["ColorTypes", "Colors", "FixedPointNumbers", "Random", "Test"]
+git-tree-sha1 = "f876ee572cea8d066b3dd5b903efacdea4072f6b"
+uuid = "35d6a980-a343-548e-a6ea-1d62b119f2f4"
+version = "3.5.0"
+
 [[ColorTypes]]
 deps = ["FixedPointNumbers", "Random"]
 git-tree-sha1 = "10050a24b09e8e41b951e9976b109871ce98d965"

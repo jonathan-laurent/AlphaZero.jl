@@ -54,11 +54,15 @@ struct Samples
   Hp̂ :: Float64
 end
 
+struct StageSamples
+  mean_remaining_length :: Float64
+  samples_stats :: Samples
+end
+
 struct Memory
   latest_batch :: Samples
   all_samples :: Samples
-  # Average remaining turns, stats
-  per_game_stage :: Vector{Tuple{Float64, Samples}}
+  per_game_stage :: Vector{StageSamples}
 end
 
 struct SelfPlay
@@ -113,9 +117,9 @@ end
 function print(logger::Logger, stats::Report.Memory)
   print(logger, stats.all_samples, ["all samples"], style=Log.BOLD)
   print(logger, stats.latest_batch, ["latest batch"], style=Log.BOLD)
-  for (t, stats) in stats.per_game_stage
-    rem = fmt(".1f", t)
-    print(logger, stats, ["$rem turns left"])
+  for stage in stats.per_game_stage
+    rem = fmt(".1f", stage.mean_remaining_length)
+    print(logger, stage.samples_stats, ["$rem turns left"])
   end
 end
 

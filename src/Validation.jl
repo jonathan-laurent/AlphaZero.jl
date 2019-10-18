@@ -2,16 +2,20 @@
 ##### Validate against rollouts
 #####
 
-@kwdef struct RolloutsValidation
+struct ValidationReport
+  z :: Float64
+  games :: Vector{Float64}
+end
+
+abstract type Validation end
+
+@kwdef struct RolloutsValidation <: Validation
   num_games :: Int
   baseline :: MctsParams
   contender :: MctsParams
 end
 
-struct ValidationReport
-  z :: Float64
-  games :: Vector{Float64}
-end
+Base.length(v::RolloutsValidation) = v.num_games
 
 function validation_score(env::Env{G}, v::RolloutsValidation, progress) where G
   baseline = MctsPlayer(MCTS.RolloutOracle{G}(), v.baseline)

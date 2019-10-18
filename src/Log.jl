@@ -9,6 +9,7 @@ export Logger
 
 using Crayons
 using Formatting
+import ProgressMeter
 
 const INDENT_STEP = 2
 const HEADER_COLORS = [crayon"bold yellow", crayon"bold"]
@@ -48,8 +49,8 @@ function print(l::Logger, args...)
   l.lastrow = false
 end
 
-function sep(l::Logger)
-  l.lastsep || print(l, "")
+function sep(l::Logger; force=false)
+  (!l.lastsep || force) && print(l, "")
   l.lastsep = true
 end
 
@@ -66,6 +67,12 @@ function reset!(logger::Logger)
   logger.style = crayon""
   logger.lastsep = false
   logger.lastrow = false
+end
+
+function Progress(logger::Logger, nsteps)
+  indent = repeat(" ", offset(logger))
+  desc = indent * "Progress: "
+  return ProgressMeter.Progress(nsteps, desc=desc)
 end
 
 #####
