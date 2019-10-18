@@ -10,6 +10,7 @@ arena = AlphaZero.ArenaParams(
   num_games=3000,
   update_threshold=(2 * 0.51 - 1),
   mcts = AlphaZero.MctsParams(
+    dirichlet_noise_ϵ=0.1,
     num_iters_per_turn=0))
 
 self_play = AlphaZero.SelfPlayParams(
@@ -18,7 +19,8 @@ self_play = AlphaZero.SelfPlayParams(
     num_iters_per_turn=200,
     dirichlet_noise_ϵ=0.15))
 
-learning = AlphaZero.LearningParams()
+learning = AlphaZero.LearningParams(
+  stop_loss_eps=-1.0) # practically equivalent to -Inf
 
 params = AlphaZero.Params(
   arena=arena,

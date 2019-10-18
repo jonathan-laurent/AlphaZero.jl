@@ -165,7 +165,7 @@ function interpret!(exp::Explorer{G}, cmd, args=[]) where G
   elseif cmd == "explore"
     try
       if isempty(args)
-        n = exp.env.params.self_play.num_mcts_iters_per_turn
+        n = exp.env.params.self_play.mcts.num_iters_per_turn
       else
         n = parse(Int, args[1])
       end

@@ -1,12 +1,10 @@
 using Revise
 import AlphaZero
 
-Revise.includet("game.jl")
-import .TicTacToe
-Game = TicTacToe.Game
-Revise.includet("params_debug.jl")
-
 DIR = "session"
+
+Revise.includet("game.jl") ; import .TicTacToe ; Game = TicTacToe.Game
+Revise.includet("params.jl")
 
 session = AlphaZero.Session(
   Game, Network, params, netparams,
@@ -14,10 +12,4 @@ session = AlphaZero.Session(
 
 AlphaZero.resume!(session)
 
-AlphaZero.plot_report(DIR)
-
-# AlphaZero.resume!(session)
-
-# AlphaZero.validate(Game, Network, DIR, validation)
-
-# AlphaZero.explore(session)
+AlphaZero.explore(session)

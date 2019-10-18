@@ -17,9 +17,9 @@ function plot_report(
     vbars = Plots.plot(0:n,
       [v.z for v in validation],
       title="Validation Score",
-      #ylabel="Average reward",
-      # ylims=(-1.0, 1.0),
+      ylims=(-1.0, 1.0),
       legend=nothing)
+    Plots.hline!(vbars, [0])
     push!(plots, vbars)
     push!(files, "validation")
   end
@@ -39,6 +39,7 @@ function plot_report(
       maximum(c.reward for c in it.learning.checkpoints)
       for it in iterations]),
     title="Arena Results",
+    ylims=(-1, 1),
     t=:bar,
     legend=:none)
   Plots.hline!(arena, [0, params.arena.update_threshold])
@@ -93,12 +94,38 @@ function plot_report(
   Plots.plot!(net, 0:n,
     duplast([it.learning.initial_status.network.vbias for it in iterations]),
     label="Value bias")
+  # Performance reports
+  perfs_global_labels = ["Self Play", "Memory Analysis", "Learning"]
+  perfs_global_content = [
+    sum(it.time_self_play for it in iterations),
+    sum(it.time_memory_analysis for it in iterations),
+    sum(it.time_learning for it in iterations)]
+  if !isnothing(validation)
+    push!(perfs_global_labels, "Validation")
+    push!(perfs_global_content, sum(rep.time for rep in validation))
+  end
+  perfs_global = Plots.pie(
+    perfs_global_labels, perfs_global_content, title="Global")
+  perfs_self_play =
+    let itratio = mean(it.self_play.inference_time_ratio for it in iterations)
+      Plots.pie(
+        ["Inference", "MCTS"], [itratio, 1-itratio],
+        title="Self Play") end
+  perfs_learning = Plots.pie(
+    ["Samples Conversion", "Loss computation", "Optimization", "Evaluation"], [
+      sum(it.learning.time_convert for it in iterations),
+      sum(it.learning.time_loss for it in iterations),
+      sum(it.learning.time_train for it in iterations),
+      sum(it.learning.time_eval for it in iterations)],
+    title="Learning")
+  perfs = Plots.plot(
+    perfs_global, perfs_self_play, perfs_learning)
   # Assembling everything together
   append!(plots, [
-    arena, nepochs, pslosses, losses, entropies, net, nsamples])
+    arena, nepochs, pslosses, losses, entropies, net, nsamples, perfs])
   append!(files, [
     "arena", "nepochs", "loss_per_stage",
-    "loss", "entropies", "net", "nsamples"])
+    "loss", "entropies", "net", "nsamples", "perfs"])
   for (file, plot) in zip(files, plots)
     #Plots.plot!(plot, dpi=200, size=(600, 200))
     Plots.savefig(plot, joinpath(dir, file))

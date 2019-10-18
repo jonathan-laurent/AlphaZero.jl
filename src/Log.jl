@@ -16,11 +16,12 @@ const HEADER_COLORS = [crayon"bold yellow", crayon"bold"]
 
 const TABLE_HEADER_STYLE = crayon"negative"
 const TABLE_COMMENTS_STYLE = crayon"italics cyan"
-const TABLE_COMMENTS_MARGIN = 4
+const TABLE_COMMENTS_MARGIN = 2
 const TABLE_COL_SEP = 2
 const TABLE_COMMENTS_SEP = " / "
 
 # To be used externally
+const NO_STYLE = crayon""
 const BOLD = crayon"bold"
 const RED = crayon"red"
 
@@ -29,12 +30,16 @@ const RED = crayon"red"
 #####
 
 mutable struct Logger
-  io :: IO
+  console :: IO
+  logfile :: IO
   indent_level :: Int
   style :: Crayon
   lastsep :: Bool
   lastrow :: Bool
-  Logger(io=stdout) = new(io, 0, crayon"", false, false)
+  console_only :: Bool
+  function Logger(console=stdout; logfile=devnull)
+    new(console, logfile, 0, crayon"", false, false, false)
+  end
 end
 
 indent!(l::Logger) = l.indent_level += 1
@@ -43,8 +48,24 @@ deindent(l::Logger) = l.indent_level -= 1
 
 offset(l::Logger) = INDENT_STEP * l.indent_level
 
+console_only!(l::Logger, v=true) = l.console_only = v
+
+function console_only(f, l::Logger)
+  v = l.console_only
+  console_only!(l, true)
+  f()
+  console_only!(l, v)
+end
+
 function print(l::Logger, args...)
-  Base.println(l.io, repeat(" ", offset(l)), l.style, args..., crayon"reset")
+  args = [repeat(" ", offset(l)), l.style, args..., crayon"reset"]
+  Base.println(l.console, args...)
+  if !l.console_only
+    args_nostyle = filter(args) do x
+      !isa(x, Crayon)
+    end
+    Base.println(l.logfile, args_nostyle...)
+  end
   l.lastsep = false
   l.lastrow = false
 end
@@ -144,7 +165,7 @@ end
 
 # Add two features: automatic tuning of column width and
 # handling of nothing values
-function table(l::Logger, tab::Table, objs)
+function table(l::Logger, tab::Table, objs; comments=nothing, styles=nothing)
   cols = map(tab.columns) do col
     f = x -> isnothing(x) ? "" : col.type.format(x)
     width = maximum(length(f(col.content(x))) for x in objs)
@@ -156,8 +177,10 @@ function table(l::Logger, tab::Table, objs)
     any(!isnothing(col.content(x)) for x in objs)
   end
   tab = set_columns(tab, cols)
-  for x in objs
-    table_row(l, tab, x)
+  for (i, x) in enumerate(objs)
+    c = isnothing(comments) ? [] : comments[i]
+    s = isnothing(styles) ? nothing : styles[i]
+    table_row(l, tab, x, c, style=s)
   end
 end
 

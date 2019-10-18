@@ -5,16 +5,17 @@
 mutable struct Session{Env}
   env :: Env
   dir :: String
+  logfile :: IO
   logger :: Logger
   autosave :: Bool
   validation :: Option{Validation}
   # Temporary state for logging
   progress :: Option{Progress}
   learning_checkpoint :: Option{Report.Checkpoint}
-  
-  function Session(env, dir, logger, autosave, validation=nothing)
+
+  function Session(env, dir, logfile, logger, autosave, validation=nothing)
     return new{typeof(env)}(
-      env, dir, logger, autosave, validation, nothing, nothing)
+      env, dir, logfile, logger, autosave, validation, nothing, nothing)
   end
 end
 
@@ -29,6 +30,7 @@ const REPORT_FILE      =  "report.json"
 const PARAMS_FILE      =  "params.json"
 const NET_PARAMS_FILE  =  "netparams.json"
 const VALIDATION_FILE  =  "validation.json"
+const LOG_FILE         =  "log.txt"
 const PLOTS_DIR        =  "plots"
 
 iterdir(dir, i) = joinpath(dir, "$i")
@@ -109,7 +111,7 @@ function run_validation_experiment(session, idir)
     Log.section(session.logger, 2, "Running validation experiment")
     progress = Log.Progress(session.logger, length(v))
     report = validation_score(session.env, v, progress)
-    Log.sep(session.logger, force=true)
+    show_space_after_progress_bar(session)
     z = fmt("+.2f", report.z)
     Log.print(session.logger, "Average reward: $z")
     if session.autosave
@@ -118,6 +120,12 @@ function run_validation_experiment(session, idir)
         JSON2.pretty(io, JSON2.write(report))
       end
     end
+  end
+end
+
+function show_space_after_progress_bar(session)
+  Log.console_only(session.logger) do
+    Log.sep(session.logger, force=true)
   end
 end
 
@@ -130,15 +138,17 @@ function Session(
     ::Type{Game}, ::Type{Network}, params, netparams;
     dir="session", autosave=true, autoload=true, validation=nothing
   ) where {Game, Network}
-  logger = Logger()
+  autosave && (isdir(dir) || mkpath(dir))
+  logfile = autosave ? open(joinpath(dir, LOG_FILE), "a") : devnull
+  logger = Logger(logfile=logfile)
   if autoload && valid_session_dir(dir)
     env = load_env(Game, Network, logger, dir)
-    session = Session(env, dir, logger, autosave, validation)
+    session = Session(env, dir, logfile, logger, autosave, validation)
   else
     Log.section(logger, 1, "Initializing a new AlphaZero environment")
     network = Network(netparams)
     env = Env{Game}(params, network)
-    session = Session(env, dir, logger, autosave, validation)
+    session = Session(env, dir, logfile, logger, autosave, validation)
     run_validation_experiment(session, iterdir(session.dir, 0))
     if autosave
       save(session)
@@ -153,8 +163,9 @@ function Session(
     ::Type{Game}, ::Type{Network}, dir; autosave=true, validation=nothing
   ) where {Game, Network}
   env = load_env(Game, Network, session.logger, dir)
-  logger = Logger()
-  return Session(env, dir, logger, autosave, validation)
+  logfile = open(joinpath(dir, LOG_FILE), "a")
+  logger = Logger(logfile=logfile)
+  return Session(env, dir, logfile, logger, autosave, validation)
 end
 
 function resume!(session::Session)
@@ -192,7 +203,7 @@ function Handlers.game_played(session::Session)
 end
 
 function Handlers.self_play_finished(session::Session, report)
-  Log.sep(session.logger, force=true)
+  show_space_after_progress_bar(session)
   Report.print(session.logger, report)
   session.progress = nothing
 end
@@ -237,12 +248,15 @@ function Handlers.iteration_finished(session::Session, report)
     open(joinpath(idir, REPORT_FILE), "w") do io
       JSON2.pretty(io, JSON2.write(report))
     end
+    plot_report(session.dir)
     Log.section(session.logger, 2, "Environment saved in: $(session.dir)")
   end
+  flush(session.logfile)
 end
 
 function Handlers.training_finished(session::Session)
   Log.section(session.logger, 1, "Training completed")
+  close(session.logfile)
 end
 
 #####
@@ -264,7 +278,7 @@ function validate(::Type{G}, ::Type{N}, dir::String, v) where {G, N}
     Log.section(logger, 2, "Iteration $(env.itc)")
     progress = Log.Progress(logger, v.num_games)
     report = validation_score(env, v, progress)
-    Log.sep(logger, force=true)
+    show_space_after_progress_bar(session)
     z = fmt("+.2f", report.z)
     Log.print(logger, "Average reward: $z")
   end

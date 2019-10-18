@@ -31,7 +31,7 @@ end
   batch_size :: Int = 32
   epochs_per_checkpoint :: Int = 4
   max_num_epochs :: Int = 20
-  stop_loss_eps :: Float64 = 1e-4
+  stop_loss_eps :: Float64 = -1. # equivalent to -Inf in practice
   stop_after_first_winner :: Bool = false
   use_gpu :: Bool = true
 end

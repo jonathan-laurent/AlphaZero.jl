@@ -110,17 +110,25 @@ function print(logger::Logger, status::Report.LearningStatus, args...; kw...)
   Log.table_row(logger, LEARNING_STATUS_TABLE, status, args...; kw...)
 end
 
-function print(logger::Logger, stats::Report.Samples, args...; kw...)
-  Log.table_row(logger, SAMPLES_STATS_TABLE, stats, args...; kw...)
-end
-
 function print(logger::Logger, stats::Report.Memory)
-  print(logger, stats.all_samples, ["all samples"], style=Log.BOLD)
-  print(logger, stats.latest_batch, ["latest batch"], style=Log.BOLD)
+  content, styles, comments = [], [], []
+  # All samples
+  push!(content, stats.all_samples)
+  push!(styles, Log.BOLD)
+  push!(comments, ["all samples"])
+  # Latest batch
+  push!(content, stats.latest_batch)
+  push!(styles, Log.BOLD)
+  push!(comments, ["latest batch"])
+  # Per game stage
   for stage in stats.per_game_stage
     rem = fmt(".1f", stage.mean_remaining_length)
-    print(logger, stage.samples_stats, ["$rem turns left"])
+    push!(content, stage.samples_stats)
+    push!(styles, Log.NO_STYLE)
+    push!(comments, ["$rem turns left"])
   end
+  Log.table(
+    logger, SAMPLES_STATS_TABLE, content, styles=styles, comments=comments)
 end
 
 function print(logger::Logger, stats::SelfPlay)
