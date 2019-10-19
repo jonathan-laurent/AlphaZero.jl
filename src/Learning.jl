@@ -29,9 +29,7 @@ function MCTS.evaluate(nn::Network{G}, board, available_actions) where G
   input = GI.vectorize_board(G, board)
   P, V = nn(input, mask)
   P = P[mask]
-  # The Float64 conversion is important in ase inference is done on a GPU
-  # (therefore using Float32 numbers)
-  return Vector{Float64}(Tracker.data(P)), Float64(Tracker.data(V)[1])
+  return Tracker.data(P), Tracker.data(V)[1]
 end
 
 #####

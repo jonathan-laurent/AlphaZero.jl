@@ -45,12 +45,11 @@ function board_statistics(env::Env{G}, board) where G
   if haskey(env.mcts.tree, board)
     info = env.mcts.tree[board]
     ucts = MCTS.uct_scores(info, env.mcts.cpuct)
-    report.Nmcts = info.Ntot
-    @assert actions == info.actions
+    report.Nmcts = MCTS.Ntot(info)
     for (i, a) in enumerate(actions)
       astats = info.stats[i]
       arep = report.actions[i][2]
-      arep.Pmcts = astats.N / max(1, info.Ntot)
+      arep.Pmcts = astats.N / max(1, report.Nmcts)
       arep.Qmcts = astats.N > 0 ? astats.W / astats.N : 0.
       arep.UCT = ucts[i]
     end

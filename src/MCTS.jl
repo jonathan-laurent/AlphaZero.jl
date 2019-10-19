@@ -46,22 +46,22 @@ end
 #####
 
 struct ActionStats
-  P :: Float64
+  P :: Float32
   W :: Float64
   N :: Int
 end
 
-mutable struct BoardInfo{Action}
-  actions :: Vector{Action}
-  stats   :: Vector{ActionStats}
-  Ntot    :: Int
-  Vest    :: Float64
+mutable struct BoardInfo
+  stats :: Vector{ActionStats}
+  Vest  :: Float32
 end
 
-mutable struct Env{Game, Board, Action, Oracle}
+Ntot(b::BoardInfo) = sum(s.N for s in b.stats)
+
+mutable struct Env{Game, Board, Oracle}
   # Store state statistics assuming player one is to play for nonterminal states
-  tree  :: Dict{Board, BoardInfo{Action}}
-  stack :: Stack{Tuple{Board, Bool, Action}}
+  tree  :: Dict{Board, BoardInfo}
+  stack :: Stack{Tuple{Board, Bool, Int}} # board, white_playing, action_number
   cpuct :: Float64
   # External oracle to evaluate positions
   oracle :: Oracle
@@ -70,10 +70,9 @@ mutable struct Env{Game, Board, Action, Oracle}
   inference_time :: Float64
   function Env{G}(oracle, cpuct=1.) where G
     B = GI.Board(G)
-    A = GI.Action(G)
-    tree = Dict{B, BoardInfo{A}}()
-    stack = Stack{Tuple{B, Bool, A}}()
-    new{G, B, A, typeof(oracle)}(tree, stack, cpuct, oracle, 0., 0.)
+    tree = Dict{B, BoardInfo}()
+    stack = Stack{Tuple{B, Bool, Int}}()
+    new{G, B, typeof(oracle)}(tree, stack, cpuct, oracle, 0., 0.)
   end
 end
 
@@ -85,13 +84,11 @@ end
 function init_board_info(oracle, board, actions)
   P, V = evaluate(oracle, board, actions)
   stats = [ActionStats(p, 0, 0) for p in P]
-  BoardInfo(actions, stats, 0, V)
+  BoardInfo(stats, V)
 end
 
-function update_board_info!(info, action, reward)
-  aid = findfirst(==(action), info.actions)
+function update_board_info!(info, aid, reward)
   stats = info.stats[aid]
-  info.Ntot += 1
   info.stats[aid] = ActionStats(stats.P, stats.W + reward, stats.N + 1)
 end
 
@@ -106,12 +103,11 @@ symmetric(s::ActionStats) = ActionStats(s.P, symmetric_reward(s.W), s.N)
 symmetric(s::BoardInfo) = StateInfo(s.actions, map(symmetric, s.stats))
 
 # Returns statistics for the current player, true if new node
-function state_info(env, state)
+function state_info(env, state, actions)
   b = GI.canonical_board(state)
   if haskey(env.tree, b)
     return (env.tree[b], false)
   else
-    actions = GI.available_actions(state)
     info, time = @timed init_board_info(env.oracle, b, actions)
     env.inference_time += time
     env.tree[b] = info
@@ -126,9 +122,9 @@ end
 function debug_tree(env::Env{Game}; k=10) where Game
   pairs = collect(env.tree)
   k = min(k, length(pairs))
-  most_visited = sort(pairs, by=(x->x.second.Ntot), rev=true)[1:k]
+  most_visited = sort(pairs, by=(x->Ntot(x.second)), rev=true)[1:k]
   for (b, info) in most_visited
-    println("N: ", info.Ntot)
+    println("N: ", Ntot(info))
     GI.print_state(Game(b))
   end
 end
@@ -138,17 +134,17 @@ end
 #####
 
 function uct_scores(info::BoardInfo, cpuct)
-  sqrtNtot = sqrt(info.Ntot)
+  sqrtNtot = sqrt(Ntot(info))
   return map(info.stats) do a
     Q = a.N > 0 ? a.W / a.N : 0.
     Q + cpuct * a.P * sqrtNtot / (a.N + 1)
   end
 end
 
-function push_state_action!(env, state, a)
+function push_state_action!(env, state, aid)
   b = GI.canonical_board(state)
   wp = GI.white_playing(state)
-  push!(env.stack, (b, wp, a))
+  push!(env.stack, (b, wp, aid))
 end
 
 function select!(env, state)
@@ -156,11 +152,13 @@ function select!(env, state)
   while true
     wr = GI.white_reward(state)
     isnothing(wr) || (return wr)
-    let (info, new_node) = state_info(env, state)
+    actions = GI.available_actions(state)
+    let (info, new_node) = state_info(env, state, actions)
       new_node && (return info.Vest)
       scores = uct_scores(info, env.cpuct)
-      best_action = info.actions[argmax(scores)]
-      push_state_action!(env, state, best_action)
+      best_action_id = argmax(scores)
+      best_action = actions[best_action_id]
+      push_state_action!(env, state, best_action_id)
       GI.play!(state, best_action)
     end
   end
@@ -168,11 +166,11 @@ end
 
 function backprop!(env, white_reward)
   while !isempty(env.stack)
-    board, white_playing, action = pop!(env.stack)
+    board, white_playing, action_id = pop!(env.stack)
     reward = white_playing ?
       white_reward :
       symmetric_reward(white_reward)
-    update_board_info!(env.tree[board], action, reward)
+    update_board_info!(env.tree[board], action_id, reward)
   end
 end
 
@@ -190,10 +188,11 @@ end
 
 # Returns (actions, distr)
 function policy(env, state; τ=1.0)
-  info, _ = state_info(env, state)
+  actions = GI.available_actions(state)
+  info, _ = state_info(env, state, actions)
   τinv = 1 / τ
   D = [a.N ^ τinv for a in info.stats]
-  return info.actions, D ./ sum(D)
+  return actions, D ./ sum(D)
 end
 
 function reset!(env)

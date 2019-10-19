@@ -23,8 +23,8 @@ const BLACK = 2
 other(p::Player) = 3 - p
 
 struct Board
-  stores :: SVector{2, Int}
-  houses :: SMatrix{2, NUM_HOUSES_PER_PLAYER, Int, NUM_HOUSES}
+  stores :: SVector{2, UInt8}
+  houses :: SMatrix{2, NUM_HOUSES_PER_PLAYER, UInt8, NUM_HOUSES}
 end
 
 const INITIAL_BOARD =
