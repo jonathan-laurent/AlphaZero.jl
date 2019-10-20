@@ -53,6 +53,7 @@ using Statistics: mean
 include("Params.jl")
 include("Report.jl")
 include("MemoryBuffer.jl")
+include("Network.jl")
 include("Learning.jl")
 include("Play.jl")
 include("Training.jl")
