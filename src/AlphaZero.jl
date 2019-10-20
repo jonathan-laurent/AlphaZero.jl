@@ -13,7 +13,7 @@ include("GameInterface.jl")
 import .GameInterface
 const GI = GameInterface
 
-include("MCTS_old.jl")
+include("MCTS.jl")
 import .MCTS
 
 include("Log.jl")

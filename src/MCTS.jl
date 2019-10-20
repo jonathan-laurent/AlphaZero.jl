@@ -1,8 +1,8 @@
 """
     MCTS
 
-A generic implementation of Monte Carlo Tree Search (with an external oracle).
-Relies on `AlphaZero.GameInterface`.
+A generic implementation of Asynchronous Monte Carlo Tree Search
+with an external oracle. Relies on `AlphaZero.GameInterface`.
 
 """
 module MCTS
@@ -20,6 +20,11 @@ import ..GI
 abstract type Oracle{Game} end
 
 function evaluate end
+
+# Default implementation (inefficient)
+function evaluate_batch(oracle::Oracle, requests)
+  return [evaluate(oracle, b, a) for (b, a) in requests]
+end
 
 # The simplest way to evaluate a position is to perform rollouts
 # Alternatively, the user can provide a NN-based oracle
@@ -42,11 +47,6 @@ function evaluate(::RolloutOracle{G}, board, available_actions) where G
   return P, V
 end
 
-# Default implementation (inefficient)
-function evaluate_batch(oracle::Oracle, requests)
-  return [evaluate(oracle, b, a) for (b, a) in requests]
-end
-
 #####
 ##### MCTS Environment
 #####
@@ -55,7 +55,7 @@ struct ActionStats
   P :: Float32
   W :: Float64
   N :: Int
-  nworkers :: UInt8 # Number of workers currently exploring this branch
+  nworkers :: UInt16 # Number of workers currently exploring this branch
 end
 
 struct BoardInfo
@@ -63,87 +63,107 @@ struct BoardInfo
   Vest  :: Float32
 end
 
-set_nworkers(a::ActionStats, n) = ActionStats(a.P, a.W, a.N, n)
-
 Ntot(b::BoardInfo) = sum(s.N for s in b.stats)
 
-symmetric_reward(r) = -r
+symmetric_reward(r::Real) = -r
 
 const InferenceRequest{B, A} = Union{Nothing, Tuple{B, Vector{A}}}
 
 const InferenceResult{R} = Tuple{Vector{R}, R}
 
-mutable struct Worker{Game, Board, Action}
-  id    :: Int
-  tree  :: Dict{Board, BoardInfo} # Shared reference to the tree
+mutable struct Worker{Board, Action}
+  id    :: Int # Useful for debugging purposes
   stack :: Stack{Tuple{Board, Bool, Int}} # board, white_playing, action_number
-  cpuct :: Float64
   send  :: Channel{InferenceRequest{Board, Action}}
   recv  :: Channel{InferenceResult{Float32}}
-  global_lock :: ReentrantLock
   
-  function Worker{G, B, A}(id, tree, lock, cpuct) where {G, B, A}
+  function Worker{B, A}(id) where {B, A}
     stack = Stack{Tuple{B, Bool, Int}}()
     send = Channel{InferenceRequest{B, A}}(1)
     recv = Channel{InferenceResult{Float32}}(1)
-    new{G, B, A}(id, tree, stack, cpuct, send, recv, lock)
+    new{B, A}(id, stack, send, recv)
   end
 end
 
 mutable struct Env{Game, Board, Action, Oracle}
-  # Store state statistics assuming player one is to play for nonterminal states
+  # Store (nonterminal) state statistics assuming player one is to play
   tree :: Dict{Board, BoardInfo}
   # External oracle to evaluate positions
   oracle :: Oracle
+  # Workers
+  workers :: Vector{Worker{Board, Action}}
+  global_lock :: ReentrantLock
+  # Parameters
+  cpuct :: Float64
   # Performance statistics
   total_time :: Float64
   inference_time :: Float64
-  # Workers
-  workers :: Vector{Worker{Game, Board, Action}}
   
   function Env{G}(oracle, nworkers, cpuct=1.) where G
     B = GI.Board(G)
     A = GI.Action(G)
     tree = Dict{B, BoardInfo}()
-    total_time, inference_time = 0., 0.
-    glock= ReentrantLock()
-    workers = [Worker{G, B, A}(i, tree, glock, cpuct) for i in 1:nworkers]
+    total_time = 0.
+    inference_time = 0.
+    lock = ReentrantLock()
+    workers = [Worker{B, A}(i) for i in 1:nworkers]
     new{G, B, A, typeof(oracle)}(
-      tree, oracle, total_time, inference_time, workers)
+      tree, oracle, workers, lock, cpuct, total_time, inference_time)
   end
 end
+
+asynchronous(env::Env) = length(env.workers) > 1
 
 #####
 ##### Access and initialize state information
 #####
 
+function init_board_info(P, V)
+  stats = [ActionStats(p, 0, 0, 0) for p in P]
+  return BoardInfo(stats, V)
+end
+
 # Returns statistics for the current player, true if new node
-function board_info(worker, board, actions)
-  #@info "Worker $(worker.id) sees a tree of size $(length(worker.tree))"
-  if haskey(worker.tree, board)
-    return (worker.tree[board], false)
+# Synchronous version
+function board_info_sync(env, worker, board, actions)
+  if haskey(env.tree, board)
+    return (env.tree[board], false)
   else
-    #@info "Worker $(worker.id) launches a query for $(hash(board)%100)."
+    (P, V), time = @timed evaluate(env.oracle, board, actions)
+    env.inference_time += time
+    info = init_board_info(P, V)
+    env.tree[board] = info
+    return (info, true)
+  end
+end
+
+function board_info_async(env, worker, board, actions)
+  if haskey(env.tree, board)
+    return (env.tree[board], false)
+  else
     # Send a request to the inference server
     put!(worker.send, (board, actions))
-    unlock(worker.global_lock)
+    unlock(env.global_lock)
     P, V = take!(worker.recv)
-    lock(worker.global_lock)
+    lock(env.global_lock)
     # Another worker may have sent the same request and initialized
     # the node before. Therefore, we have to test membership again.
-    if !haskey(worker.tree, board)
-      #@info "Worker $(worker.id) initializes node for $(hash(board)%100)."
-      stats = [ActionStats(p, 0, 0, 0) for p in P]
-      info = BoardInfo(stats, V)
-      worker.tree[board] = info
+    if !haskey(env.tree, board)
+      info = init_board_info(P, V)
+      env.tree[board] = info
       return (info, true)
     else
       # The inference result is ignored and we proceed as if
       # the node was already in the tree.
-      #@info "Worker $(worker.id) ignores query result for board $(hash(board)%100)."
-      return (worker.tree[board], false)
+      return (env.tree[board], false)
     end
   end
+end
+
+function board_info(env, worker, board, actions)
+  asynchronous(env) ?
+    board_info_async(env, worker, board, actions) :
+    board_info_sync(env, worker, board, actions)
 end
 
 #####
@@ -172,15 +192,15 @@ function uct_scores(info::BoardInfo, cpuct)
   end
 end
 
-function push_board_action!(worker, (b, wp, aid))
+function push_board_action!(env, worker, (b, wp, aid))
   push!(worker.stack, (b, wp, aid))
-  #@info "Worker $(worker.id) increments vloss for board $(hash(b)%100), action $(aid)"
-  stats = worker.tree[b].stats
-  stats[aid] = set_nworkers(stats[aid], stats[aid].nworkers + 1)
+  stats = env.tree[b].stats
+  astats = stats[aid]
+  stats[aid] = ActionStats(
+    astats.P, astats.W, astats.N + 1, astats.nworkers + 1)
 end
 
-function select!(worker, state)
-  #@info "Worker $(worker.id) starts selection process"
+function select!(env, worker, state)
   state = copy(state)
   while true
     wr = GI.white_reward(state)
@@ -188,51 +208,43 @@ function select!(worker, state)
     wp = GI.white_playing(state)
     board = GI.canonical_board(state)
     actions = GI.available_actions(state)
-    let (info, new_node) = board_info(worker, board, actions)
+    let (info, new_node) = board_info(env, worker, board, actions)
       new_node && (return info.Vest)
-      scores = uct_scores(info, worker.cpuct)
-      #@info "Worker $(worker.id) sees ws: $([a.W for a in info.stats])"
-      #@info "Worker $(worker.id) sees nworkers: $([a.nworkers for a in info.stats])"
-      #@info "Worker $(worker.id) sees uct scores: $(scores)"
+      scores = uct_scores(info, env.cpuct)
       best_action_id = argmax(scores)
       best_action = actions[best_action_id]
-      push_board_action!(worker, (board, wp, best_action_id))
+      push_board_action!(env, worker, (board, wp, best_action_id))
       GI.play!(state, best_action)
     end
   end
 end
 
-function backprop!(worker, white_reward)
+function backprop!(env, worker, white_reward)
   while !isempty(worker.stack)
     board, white_playing, action_id = pop!(worker.stack)
     reward = white_playing ?
       white_reward :
       symmetric_reward(white_reward)
-    stats = worker.tree[board].stats
+    stats = env.tree[board].stats
     astats = stats[action_id]
-    #@info "Worker $(worker.id) decrements vloss for board $(hash(board)%100) (action $(action_id))"
     stats[action_id] = ActionStats(
-      astats.P, astats.W + reward, astats.N + 1, astats.nworkers - 1)
+      astats.P, astats.W + reward, astats.N, astats.nworkers - 1)
   end
 end
 
-function explore!(worker::Worker, state, nsims)
-  lock(worker.global_lock)
+function worker_explore!(env::Env, worker::Worker, state, nsims)
   for i in 1:nsims
     @assert isempty(worker.stack)
-    white_reward = select!(worker, state)
-    backprop!(worker, white_reward)
+    white_reward = select!(env, worker, state)
+    backprop!(env, worker, white_reward)
     @assert isempty(worker.stack)
   end
-  put!(worker.send, nothing) # send termination message to the server
-  unlock(worker.global_lock)
 end
 
 # Does not evaluate finite number of batches
 function inference_server(env::Env{G, B, A}) where {G, B, A}
   to_watch = env.workers
   while true
-    #@info "Server waiting for requests..."
     requests = [take!(w.send) for w in to_watch]
     active = [!isnothing(r) for r in requests]
     any(active) || break
@@ -242,28 +254,41 @@ function inference_server(env::Env{G, B, A}) where {G, B, A}
     answers, time = @timed evaluate_batch(env.oracle, batch)
     env.inference_time += time
     for i in eachindex(batch)
-      #@info "Sending answer to worker $(to_watch[i].id)"
       put!(to_watch[i].recv, answers[i])
     end
   end
 end
 
-function explore!(env::Env, state, nsims=1)
+function explore_sync!(env::Env, state, nsims)
+  elapsed = @elapsed worker_explore!(env, env.workers[1], state, nsims)
+  env.total_time += elapsed
+end
+
+function explore_async!(env::Env, state, nsims)
   # Amount of work per worker
   # (rounding nsims to the upper multiple of nworkers)
   pw = ceil(Int, nsims / length(env.workers))
   elapsed = @elapsed begin
     @sync begin
-      #@info "Launching server"
       @async @printing_errors inference_server(env)
       for w in env.workers
-        #@info "Launching worker $(w.id)"
-        @async @printing_errors explore!(w, state, pw)
+        @async @printing_errors begin
+          lock(env.global_lock)
+          worker_explore!(env, w, state, pw)
+          put!(w.send, nothing) # send termination message to the server
+          unlock(env.global_lock)
+        end
       end
     end
   end
   env.total_time += elapsed
   return
+end
+
+function explore!(env::Env, state, nsims)
+  asynchronous(env) ?
+    explore_async!(env, state, nsims) :
+    explore_sync!(env, state, nsims)
 end
 
 # Returns (actions, distr)
@@ -286,6 +311,8 @@ end
 
 function reset!(env)
   empty!(env.tree)
+  env.total_time = 0.
+  env.inference_time = 0.
   return
 end
 
