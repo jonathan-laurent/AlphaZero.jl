@@ -11,7 +11,9 @@ mutable struct Env{Game, Network, Board, Mcts}
   function Env{Game}(params, network, experience=[], itc=0) where Game
     Board = GI.Board(Game)
     memory = MemoryBuffer{Board}(params.mem_buffer_size, experience)
-    mcts = MCTS.Env{Game}(network, params.self_play.mcts.cpuct)
+    mcts = MCTS.Env{Game}(network,
+      params.self_play.mcts.num_workers,
+      params.self_play.mcts.cpuct)
     env = new{Game, typeof(network), Board, typeof(mcts)}(
       params, network, memory, mcts, itc)
     update_network!(env, network)

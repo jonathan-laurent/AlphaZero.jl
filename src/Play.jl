@@ -15,7 +15,7 @@ end
 
 # Alternative constructor
 function MctsPlayer(oracle::MCTS.Oracle{G}, params::MctsParams) where G
-  mcts = MCTS.Env{G}(oracle, params.cpuct)
+  mcts = MCTS.Env{G}(oracle, params.num_workers, params.cpuct)
   return MctsPlayer(mcts, params.num_iters_per_turn,
     τ=params.temperature,
     nα=params.dirichlet_noise_nα,

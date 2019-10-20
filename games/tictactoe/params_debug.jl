@@ -15,6 +15,7 @@ arena = AlphaZero.ArenaParams(
 self_play = AlphaZero.SelfPlayParams(
   num_games=100,
   mcts = AlphaZero.MctsParams(
+    num_workers=2,
     num_iters_per_turn=20,
     dirichlet_noise_ϵ=0.15))
 

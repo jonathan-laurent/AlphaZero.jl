@@ -32,6 +32,13 @@ function MCTS.evaluate(nn::Network{G}, board, available_actions) where G
   return Tracker.data(P), Tracker.data(V)[1]
 end
 
+function MCTS.evaluate_batch(nn::Network{G}, batch) where G
+  X = Util.concat_columns((GI.vectorize_board(G, b) for (b, as) in batch))
+  A = Util.concat_columns((GI.actions_mask(G, as) for (b, as) in batch))
+  P, V = Tracker.data.(nn(X, A))
+  return [(P[A[:,i],i], V[1,i]) for i in eachindex(batch)]
+end
+
 #####
 ##### A simple example network
 #####

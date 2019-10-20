@@ -38,4 +38,16 @@ function random_batches(xs::Tuple, batchsize)
   end end
 end
 
+# Print uncaught exceptions
+# In response to: https://github.com/JuliaLang/julia/issues/10405
+macro printing_errors(expr)
+  return quote
+    try
+      $(esc(expr))
+    catch e
+      showerror(stderr, e, catch_backtrace())
+    end
+  end
+end
+
 end
