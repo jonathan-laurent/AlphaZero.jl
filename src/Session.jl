@@ -233,7 +233,6 @@ function Handlers.learning_epoch(session::Session, report)
     push!(comments, "Evaluation reward: $z")
     checkpoint.nn_replaced && push!(comments, "Networked replaced")
   end
-  report.stable_loss && push!(comments, "Loss stabilized")
   Report.print(session.logger, report.status_after, comments)
   session.learning_checkpoint = nothing
 end

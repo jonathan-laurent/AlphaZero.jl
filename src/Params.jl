@@ -19,25 +19,29 @@ end
 
 @kwdef struct ArenaParams
   num_games :: Int
-  update_threshold :: Float64
+  reset_mcts_every :: Int
   mcts :: MctsParams
+  update_threshold :: Float64
 end
 
 @kwdef struct SelfPlayParams
   num_games :: Int
+  reset_mcts_every :: Int
   mcts :: MctsParams
 end
 
 @kwdef struct LearningParams
+  use_gpu :: Bool = true
+  # Optimization parameters
   learning_rate :: Float32 = 1e-3
   l2_regularization :: Float32 = 0.
   nonvalidity_penalty :: Float32 = 1.
   batch_size :: Int = 32
-  epochs_per_checkpoint :: Int = 4
-  max_num_epochs :: Int = 20
-  stop_loss_eps :: Float32 = -1. # equivalent to -Inf in practice
-  stop_after_first_winner :: Bool = false
-  use_gpu :: Bool = true
+  # Checkpoint parameters
+  max_num_epochs :: Int
+  first_checkpoint :: Int
+  stable_loss_ϵ :: Float64
+  stable_loss_n :: Int
 end
 
 @kwdef struct Params

@@ -59,6 +59,16 @@ function make_initial_report(env::Env)
   return Report.Initial(num_network_parameters, mcts_footprint_per_node)
 end
 
+function stable_loss(epochs, n, ϵ)
+  k = length(epochs)
+  if k < n
+    return false
+  else
+    loss_history = [epochs[i].status_after.loss.L for i in (k-n+1):k]
+    return (maximum(loss_history) - minimum(loss_history) < ϵ)
+  end
+end
+
 function learning!(env::Env{G}, handler) where G
   # Initialize the training process
   ap = env.params.arena
@@ -70,24 +80,21 @@ function learning!(env::Env{G}, handler) where G
   init_status = learning_status(trainer)
   Handlers.learning_started(handler, init_status)
   # Loop state variables
-  k = 1 # epoch number
   best_eval_score = ap.update_threshold
   best_nn = env.bestnn
   nn_replaced = false
-  last_loss = init_status.loss.L
-  stable_loss = false
   # Loop over epochs
-  while !stable_loss && k <= lp.max_num_epochs &&
-        !(lp.stop_after_first_winner && nn_replaced)
+  for k in 1:lp.max_num_epochs
+    # Execute learning epoch
     ttrain += @elapsed training_epoch!(trainer)
     status, dtloss = @timed learning_status(trainer)
     tloss += dtloss
-    stable_loss = (last_loss - status.loss.L < lp.stop_loss_eps)
-    last_loss = status.loss.L
-    epoch_report = Report.Epoch(status, stable_loss)
+    epoch_report = Report.Epoch(status)
     push!(epochs, epoch_report)
-    # Decide whether or not to make a checkpoint
-    if stable_loss || k % lp.epochs_per_checkpoint == 0
+    # We make one checkpoint after a fixed number of epochs
+    # and an otherone when the loss stabilizes (or after nmax epochs)
+    stable = stable_loss(epochs, lp.stable_loss_n, lp.stable_loss_ϵ)
+    if stable || k == lp.first_checkpoint
       cur_nn = get_trained_network(trainer)
       eval_reward, dteval = @timed evaluate_network(env.bestnn, cur_nn, ap)
       teval += dteval
@@ -103,7 +110,7 @@ function learning!(env::Env{G}, handler) where G
       Handlers.learning_checkpoint(handler, checkpoint_report)
     end
     Handlers.learning_epoch(handler, epoch_report)
-    k += 1
+    stable && break
   end
   nn_replaced && update_network!(env, best_nn)
   report = Report.Learning(
@@ -122,12 +129,14 @@ function self_play!(env::Env{G}, handler) where G
     for i in 1:params.num_games
       self_play!(player, env.memory)
       Handlers.game_played(handler)
+      i % params.reset_mcts_every == 0 && MCTS.reset!(env.mcts)
     end
+    MCTS.reset!(env.mcts)
   end
   MCTS.memory_footprint(player.mcts)
   inference_tr = MCTS.inference_time_ratio(player.mcts)
   speed = last_batch_size(env.memory) / elapsed
-  mem_footprint = MCTS.memory_footprint(player.mcts)
+  mem_footprint = MCTS.approximate_memory_footprint(player.mcts)
   report = Report.SelfPlay(inference_tr, speed, mem_footprint)
   Handlers.self_play_finished(handler, report)
   return report

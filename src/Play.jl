@@ -82,7 +82,8 @@ self_play!(player, memory) = play(player, player, memory)
 ##### Evaluate two players against each other
 #####
 
-function pit(handler, baseline::MctsPlayer, contender::MctsPlayer, ngames)
+function pit(
+    handler, baseline::MctsPlayer, contender::MctsPlayer, ngames, reset_period)
   baseline_first = true
   zsum = 0.
   for i in 1:ngames
@@ -93,6 +94,10 @@ function pit(handler, baseline::MctsPlayer, contender::MctsPlayer, ngames)
     zsum += z
     handler(i, z)
     baseline_first = !baseline_first
+    if i % reset_period == 0 || i == ngames
+      MCTS.reset!(baseline.mcts)
+      MCTS.reset!(contender.mcts)
+    end
   end
   return zsum / ngames
 end

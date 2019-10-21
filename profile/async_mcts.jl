@@ -57,7 +57,7 @@ plot(0:MAX_LOG_NWORKERS, ts[1] ./ ts,
   ylims=(0, Inf),
   legend=:none,
   xticks=xticks)
-  
+
 hline!([1])
 
 savefig(TIME_FIG)

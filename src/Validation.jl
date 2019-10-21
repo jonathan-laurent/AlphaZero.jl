@@ -12,6 +12,7 @@ abstract type Validation end
 
 @kwdef struct RolloutsValidation <: Validation
   num_games :: Int
+  reset_every :: Int
   baseline :: MctsParams
   contender :: MctsParams
 end

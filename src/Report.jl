@@ -37,7 +37,6 @@ end
 
 struct Epoch
   status_after :: LearningStatus
-  stable_loss :: Bool
 end
 
 struct Learning

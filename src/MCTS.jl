@@ -122,7 +122,12 @@ function memory_footprint_per_node(env::Env{G}) where G
   return size_key + size_stats
 end
 
+# Possibly very slow for large trees
 memory_footprint(env::Env) = Base.summarysize(env.tree)
+
+function approximate_memory_footprint(env::Env)
+  return memory_footprint_per_node(env) * length(env.tree)
+end
 
 asynchronous(env::Env) = length(env.workers) > 1
 
