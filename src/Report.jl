@@ -9,6 +9,7 @@ struct Loss
   Lp :: Float64
   Lv :: Float64
   Lreg :: Float64
+  Linv :: Float64
 end
 
 struct Network
@@ -94,6 +95,7 @@ const LEARNING_STATUS_TABLE = Log.Table(
   ("Lv",     NUM_COL,     s -> s.loss.Lv),
   ("Lp",     NUM_COL,     s -> s.loss.Lp),
   ("Lreg",   NUM_COL,     s -> s.loss.Lreg),
+  ("Linv",   NUM_COL,     s -> s.loss.Linv),
   ("MaxW",   NUM_COL,     s -> s.network.maxw),
   ("MeanW",  NUM_COL,     s -> s.network.meanw))
 
@@ -102,6 +104,7 @@ const SAMPLES_STATS_TABLE = Log.Table(
   ("Lv",     NUM_COL,     s -> s.loss.Lv),
   ("Lp",     NUM_COL,     s -> s.loss.Lp),
   ("Lreg",   NUM_COL,     s -> s.loss.Lreg),
+  ("Linv",   NUM_COL,     s -> s.loss.Linv),
   ("Hp",     NUM_COL,     s -> s.Hp),
   ("Hpnet",  NUM_COL,     s -> s.Hp̂),
   ("Λtot",   BIGINT_COL,  s -> s.Wtot),

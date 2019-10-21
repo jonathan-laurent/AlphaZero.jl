@@ -36,15 +36,22 @@ klloss_wmean(π̂, π, w) = -sum(π .* log.(π̂ .+ eps(eltype(π))) .* w) / sum
 
 entropy_wmean(π, w) = -sum(π .* log.(π .+ eps(eltype(π))) .* w) / sum(w)
 
-function losses(nn, Wmean, Hp, creg, (W, X, A, P, V))
-  P̂, V̂ = nn(X, A)
+wmean(x, w) = sum(x .* w) / sum(w)
+
+function losses(nn, params, Wmean, Hp, (W, X, A, P, V))
+  creg = params.l2_regularization
+  cinv = params.nonvalidity_penalty
+  P̂, V̂, p_invalid = nn(X, A)
   Lp = klloss_wmean(P̂, P, W) - Hp
   Lv = mse_wmean(V̂, V, W)
   Lreg = iszero(creg) ?
     zero(Lv) :
     creg * sum(sum(w .* w) for w in regularized_weights(nn))
-  L = (mean(W) / Wmean) * (Lp + Lv + Lreg)
-  return (L, Lp, Lv, Lreg)
+  Linv = iszero(cinv) ?
+    zero(Lv) :
+    cinv * wmean(p_invalid, W)
+  L = (mean(W) / Wmean) * (Lp + Lv + Lreg + Linv)
+  return (L, Lp, Lv, Lreg, Linv)
 end
 
 # Does not mody the network it is given in place.
@@ -85,7 +92,7 @@ get_trained_network(tr::Trainer) = tr.network |> copy |> cpu
 
 function training_epoch!(tr::Trainer)
   loss(batch...) = losses(
-    tr.network, tr.Wmean, tr.Hp, tr.params.l2_regularization, batch)[1]
+    tr.network, tr.params, tr.Wmean, tr.Hp, batch)[1]
   data = Util.random_batches(tr.samples, tr.params.batch_size)
   Flux.train!(loss, Flux.params(tr.network), data, tr.optimizer)
 end
@@ -95,8 +102,8 @@ end
 #####
 
 function loss_report(tr::Trainer)
-  ltuple = Tracker.data.(losses(
-    tr.network, tr.Wmean, tr.Hp, tr.params.l2_regularization, tr.samples))
+  ltuple = Tracker.data.(
+    losses(tr.network, tr.params, tr.Wmean, tr.Hp, tr.samples))
   return Report.Loss(ltuple...)
 end
 

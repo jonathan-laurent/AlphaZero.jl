@@ -28,7 +28,8 @@ function MCTS.evaluate(nn::Network{G}, board, available_actions) where G
   x = GI.vectorize_board(G, board)
   a = GI.actions_mask(G, available_actions)
   xnet, anet = on_gpu(nn) ? gpu.((x, a)) : (x, a)
-  p, v = cpu.(nn(xnet, anet))
+  p, v, _ = nn(xnet, anet)
+  p, v = cpu.((p, v))
   p = p[a]
   return Tracker.data(p), Tracker.data(v)[1]
 end
@@ -37,7 +38,8 @@ function MCTS.evaluate_batch(nn::Network{G}, batch) where G
   X = Util.concat_columns((GI.vectorize_board(G, b) for (b, as) in batch))
   A = Util.concat_columns((GI.actions_mask(G, as) for (b, as) in batch))
   Xnet, Anet = on_gpu(nn) ? gpu.((X, A)) : (X, A)
-  P, V = Tracker.data.(cpu.(nn(Xnet, Anet)))
+  P, V, _ = nn(Xnet, Anet)
+  P, V = Tracker.data.(cpu.((P, V)))
   return [(P[A[:,i],i], V[1,i]) for i in eachindex(batch)]
 end
 
@@ -94,9 +96,9 @@ function (nn::SimpleNet)(board, actions_mask)
   v = nn.vbranch(c)
   p = nn.pbranch(c) .* actions_mask
   sp = sum(p, dims=1)
-  @assert all(sp .> 0)
-  p = p ./ sp
-  return (p, v)
+  p = p ./ (sp .+ eps(eltype(p)))
+  p_invalid = 1 .- sp
+  return (p, v, p_invalid)
 end
 
 function regularized_weights(nn::SimpleNet)

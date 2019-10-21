@@ -60,6 +60,9 @@ function plot_report(
     Plots.plot!(losses, 0:n,
       duplast([getlosses(it).Lreg for it in iterations]),
       label="Lreg")
+    Plots.plot!(losses, 0:n,
+      duplast([getlosses(it).Linv for it in iterations]),
+      label="Linv")
     return losses
   end
   losses_last = plot_losses("Loss on last batch") do it
