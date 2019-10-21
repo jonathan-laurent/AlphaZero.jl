@@ -35,6 +35,19 @@ else
 end
 
 import Flux
+
+if CUARRAYS_IMPORTED
+  @eval begin
+    on_gpu(::Type{<:Array}) = false
+    on_gpu(::Type{<:CuArray}) = true
+    on_gpu(::Type{<:Flux.TrackedArray{R,N,A}}) where {R, N, A} = on_gpu(A)
+  end
+else
+  @eval begin
+    on_gpu(x) = false
+  end
+end
+
 import Plots
 import Colors
 import JSON2

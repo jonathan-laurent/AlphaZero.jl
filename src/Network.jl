@@ -25,17 +25,19 @@ function Base.copy(nn::Net) where Net <: Network
 end
 
 function MCTS.evaluate(nn::Network{G}, board, available_actions) where G
-  mask = GI.actions_mask(G, available_actions)
-  input = GI.vectorize_board(G, board)
-  P, V = nn(input, mask)
-  P = P[mask]
-  return Tracker.data(P), Tracker.data(V)[1]
+  x = GI.vectorize_board(G, board)
+  a = GI.actions_mask(G, available_actions)
+  xnet, anet = on_gpu(nn) ? gpu.((x, a)) : (x, a)
+  p, v = cpu.(nn(xnet, anet))
+  p = p[a]
+  return Tracker.data(p), Tracker.data(v)[1]
 end
 
 function MCTS.evaluate_batch(nn::Network{G}, batch) where G
   X = Util.concat_columns((GI.vectorize_board(G, b) for (b, as) in batch))
   A = Util.concat_columns((GI.actions_mask(G, as) for (b, as) in batch))
-  P, V = Tracker.data.(nn(X, A))
+  Xnet, Anet = on_gpu(nn) ? gpu.((X, A)) : (X, A)
+  P, V = Tracker.data.(cpu.(nn(Xnet, Anet)))
   return [(P[A[:,i],i], V[1,i]) for i in eachindex(batch)]
 end
 
@@ -112,3 +114,5 @@ function network_report(nn::SimpleNet) :: Report.Network
 end
 
 num_parameters(nn::SimpleNet) = sum(length(p) for p in Flux.params(nn))
+
+on_gpu(nn::SimpleNet) = on_gpu(typeof(nn.vbranch[end].b))

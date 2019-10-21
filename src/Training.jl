@@ -49,7 +49,8 @@ import .Handlers
 
 function update_network!(env::Env, net)
   env.bestnn = net
-  MCTS.reset!(env.mcts, net)
+  mcts_net = env.params.self_play.mcts.use_gpu ? gpu(net) : cpu(net)
+  MCTS.reset!(env.mcts, mcts_net)
 end
 
 function learning!(env::Env{G}, handler) where G

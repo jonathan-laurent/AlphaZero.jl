@@ -9,6 +9,7 @@
 
 @kwdef struct MctsParams
   num_workers :: Int = 1
+  use_gpu :: Bool = false
   cpuct :: Float64 = 1.
   num_iters_per_turn :: Int
   temperature :: Float64 = 1.
