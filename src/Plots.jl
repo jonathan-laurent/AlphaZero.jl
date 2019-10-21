@@ -44,21 +44,30 @@ function plot_report(
     legend=:none)
   Plots.hline!(arena, [0, params.arena.update_threshold])
   # Loss on last batch
-  losses = Plots.plot(0:n,
-    duplast([it.memory.latest_batch.loss.L for it in iterations]),
-    title="Loss on Last Batch",
-    legend=:topright,
-    ylims=(0, Inf),
-    label="L")
-  Plots.plot!(losses, 0:n,
-    duplast([it.memory.latest_batch.loss.Lv for it in iterations]),
-    label="Lv")
-  Plots.plot!(losses, 0:n,
-    duplast([it.memory.latest_batch.loss.Lp for it in iterations]),
-    label="Lp")
-  Plots.plot!(losses, 0:n,
-    duplast([it.memory.latest_batch.loss.Lreg for it in iterations]),
-    label="Lreg")
+  function plot_losses(getlosses, title)
+    losses = Plots.plot(0:n,
+      duplast([getlosses(it).L for it in iterations]),
+      title=title,
+      legend=:topright,
+      ylims=(0, Inf),
+      label="L")
+    Plots.plot!(losses, 0:n,
+      duplast([getlosses(it).Lv for it in iterations]),
+      label="Lv")
+    Plots.plot!(losses, 0:n,
+      duplast([getlosses(it).Lp for it in iterations]),
+      label="Lp")
+    Plots.plot!(losses, 0:n,
+      duplast([getlosses(it).Lreg for it in iterations]),
+      label="Lreg")
+    return losses
+  end
+  losses_last = plot_losses("Loss on last batch") do it
+    it.memory.latest_batch.loss
+  end
+  losses_fullmem = plot_losses("Loss on full memory") do it
+    it.memory.all_samples.loss
+  end
   # Loss per game stage
   nstages = params.num_game_stages
   colors = range(colorant"blue", stop=colorant"red", length=nstages)
@@ -125,10 +134,10 @@ function plot_report(
     perfs_global, perfs_self_play, perfs_learning)
   # Assembling everything together
   append!(plots, [
-    arena, nepochs, pslosses, losses, entropies, net, nsamples, perfs])
+    arena, nepochs, pslosses, losses_fullmem, losses_last, entropies, net, nsamples, perfs])
   append!(files, [
-    "arena", "nepochs", "loss_per_stage",
-    "loss", "entropies", "net", "nsamples", "perfs"])
+    "arena", "nepochs", "loss_per_stage", "loss_fullmem",
+    "loss_last_batch", "entropies", "net", "nsamples", "perfs"])
   for (file, plot) in zip(files, plots)
     #Plots.plot!(plot, dpi=200, size=(600, 200))
     Plots.savefig(plot, joinpath(dir, file))
