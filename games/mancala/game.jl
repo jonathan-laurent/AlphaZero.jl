@@ -48,7 +48,6 @@ GI.Action(::Type{Game}) = Int
 
 Base.copy(g::Game) = Game(g.board, g.curplayer == WHITE)
 
-
 #####
 ##### Position system to ease board manipulation
 #####
@@ -101,7 +100,6 @@ function write_pos(b::Board, pos, v)
   end
 end
 
-
 #####
 ##### Defining game rules
 #####
@@ -147,7 +145,6 @@ GI.white_playing(g::Game) = g.curplayer == WHITE
 
 game_terminated(g::Game) = all(==(0), g.board.houses)
 
-
 #####
 ##### Reward shaping
 #####
@@ -163,12 +160,11 @@ linear_reward(nw, nb) = (nw - nb) / NUM_SEEDS
 function GI.white_reward(g::Game)
   if game_terminated(g)
     nw, nb = g.board.stores
-    return zero_one_reward(nw, nb) + linear_reward(nw, nb)
+    return zero_one_reward(nw, nb) # + linear_reward(nw, nb)
   else
     return nothing
   end
 end
-
 
 #####
 ##### ML interface
@@ -187,7 +183,6 @@ function GI.vectorize_board(::Type{Game}, board)
     board.houses[1,:]; board.stores[1];
     board.houses[2,:]; board.stores[2]]
 end
-
 
 #####
 ##### User interface
