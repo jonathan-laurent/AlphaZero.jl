@@ -52,7 +52,7 @@ function print_state end
 ##### Derived functions
 #####
 
-function actions_mask(G, available_actions)
+function actions_mask(::Type{G}, available_actions) where G
   nactions = num_actions(G)
   mask = falses(nactions)
   for a in available_actions
@@ -63,6 +63,10 @@ end
 
 function canonical_board(state)
   white_playing(state) ? board(state) : board_symmetric(state)
+end
+
+function board_memsize(::Type{G}) where G
+  return Base.summarysize(board(G()))
 end
 
 

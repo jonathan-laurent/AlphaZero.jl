@@ -4,6 +4,11 @@
 
 module Report
 
+struct Initial
+  num_network_parameters :: Int
+  mcts_footprint_per_node :: Int
+end
+
 struct Loss
   L :: Float64
   Lp :: Float64
@@ -69,6 +74,7 @@ end
 struct SelfPlay
   inference_time_ratio :: Float64
   samples_gen_speed :: Float64 # in samples/second
+  mcts_memory_footprint :: Int
 end
 
 struct Iteration
@@ -136,11 +142,20 @@ function print(logger::Logger, stats::Report.Memory)
     logger, SAMPLES_STATS_TABLE, content, styles=styles, comments=comments)
 end
 
-function print(logger::Logger, stats::SelfPlay)
-  t = round(Int, 100 * stats.inference_time_ratio)
+function print(logger::Logger, report::SelfPlay)
+  t = round(Int, 100 * report.inference_time_ratio)
   Log.print(logger, "Time spent on inference: $(t)%")
-  sspeed = format(round(Int, stats.samples_gen_speed), commas=true)
+  sspeed = format(round(Int, report.samples_gen_speed), commas=true)
   Log.print(logger, "Generating $(sspeed) samples per second on average")
+  memf = format(report.mcts_memory_footprint, autoscale=:metric, precision=2)
+  Log.print(logger, "MCTS memory footprint: $(memf)B")
+end
+
+function print(logger::Logger, report::Initial)
+  nnparams = format(report.num_network_parameters, commas=true)
+  Log.print(logger, "Number of network parameters: $nnparams")
+  mfpn = report.mcts_footprint_per_node
+  Log.print(logger, "Memory footprint per MCTS node: $(mfpn) bytes")
 end
 
 end

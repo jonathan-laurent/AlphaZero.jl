@@ -76,7 +76,7 @@ mutable struct Worker{Board, Action}
   stack :: Stack{Tuple{Board, Bool, Int}} # board, white_playing, action_number
   send  :: Channel{InferenceRequest{Board, Action}}
   recv  :: Channel{InferenceResult{Float32}}
-  
+
   function Worker{B, A}(id) where {B, A}
     stack = Stack{Tuple{B, Bool, Int}}()
     send = Channel{InferenceRequest{B, A}}(1)
@@ -98,7 +98,7 @@ mutable struct Env{Game, Board, Action, Oracle}
   # Performance statistics
   total_time :: Float64
   inference_time :: Float64
-  
+
   function Env{G}(oracle, nworkers, cpuct=1.) where G
     B = GI.Board(G)
     A = GI.Action(G)
@@ -111,6 +111,18 @@ mutable struct Env{Game, Board, Action, Oracle}
       tree, oracle, workers, lock, cpuct, total_time, inference_time)
   end
 end
+
+function memory_footprint_per_node(env::Env{G}) where G
+  # The hashtable is at most twice the number of stored elements
+  # For every element, a board and a pointer are stored
+  size_key = 2 * (GI.board_memsize(G) + sizeof(Int))
+  dummy_stats = BoardInfo([
+    ActionStats(0, 0, 0, 0) for i in 1:GI.num_actions(G)], 0)
+  size_stats = Base.summarysize(dummy_stats)
+  return size_key + size_stats
+end
+
+memory_footprint(env::Env) = Base.summarysize(env.tree)
 
 asynchronous(env::Env) = length(env.workers) > 1
 

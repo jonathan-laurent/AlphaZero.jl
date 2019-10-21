@@ -31,7 +31,7 @@ end
 @kwdef struct LearningParams
   learning_rate :: Float32 = 1e-3
   l2_regularization :: Float32 = 0.
-  nonvalidity_penalty :: Float32 = 0.
+  nonvalidity_penalty :: Float32 = 1.
   batch_size :: Int = 32
   epochs_per_checkpoint :: Int = 4
   max_num_epochs :: Int = 20

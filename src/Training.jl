@@ -53,6 +53,12 @@ function update_network!(env::Env, net)
   MCTS.reset!(env.mcts, mcts_net)
 end
 
+function make_initial_report(env::Env)
+  num_network_parameters = num_parameters(env.bestnn)
+  mcts_footprint_per_node = MCTS.memory_footprint_per_node(env.mcts)
+  return Report.Initial(num_network_parameters, mcts_footprint_per_node)
+end
+
 function learning!(env::Env{G}, handler) where G
   # Initialize the training process
   ap = env.params.arena
@@ -118,9 +124,11 @@ function self_play!(env::Env{G}, handler) where G
       Handlers.game_played(handler)
     end
   end
+  MCTS.memory_footprint(player.mcts)
   inference_tr = MCTS.inference_time_ratio(player.mcts)
   speed = last_batch_size(env.memory) / elapsed
-  report = Report.SelfPlay(inference_tr, speed)
+  mem_footprint = MCTS.memory_footprint(player.mcts)
+  report = Report.SelfPlay(inference_tr, speed, mem_footprint)
   Handlers.self_play_finished(handler, report)
   return report
 end
