@@ -28,11 +28,12 @@ end
 end
 
 @kwdef struct LearningParams
-  learning_rate :: Float64 = 5e-4
+  learning_rate :: Float32 = 1e-3
+  l2_regularization :: Float32 = 0.
   batch_size :: Int = 32
   epochs_per_checkpoint :: Int = 4
   max_num_epochs :: Int = 20
-  stop_loss_eps :: Float64 = -1. # equivalent to -Inf in practice
+  stop_loss_eps :: Float32 = -1. # equivalent to -Inf in practice
   stop_after_first_winner :: Bool = false
   use_gpu :: Bool = true
 end

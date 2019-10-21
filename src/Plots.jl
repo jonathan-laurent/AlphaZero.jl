@@ -56,6 +56,9 @@ function plot_report(
   Plots.plot!(losses, 0:n,
     duplast([it.memory.latest_batch.loss.Lp for it in iterations]),
     label="Lp")
+  Plots.plot!(losses, 0:n,
+    duplast([it.memory.latest_batch.loss.Lreg for it in iterations]),
+    label="Lreg")
   # Loss per game stage
   nstages = params.num_game_stages
   colors = range(colorant"blue", stop=colorant"red", length=nstages)

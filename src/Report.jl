@@ -93,6 +93,7 @@ const LEARNING_STATUS_TABLE = Log.Table(
   ("Loss",   NUM_COL,     s -> s.loss.L),
   ("Lv",     NUM_COL,     s -> s.loss.Lv),
   ("Lp",     NUM_COL,     s -> s.loss.Lp),
+  ("Lreg",   NUM_COL,     s -> s.loss.Lreg),
   ("MaxW",   NUM_COL,     s -> s.network.maxw),
   ("MeanW",  NUM_COL,     s -> s.network.meanw))
 
@@ -100,6 +101,7 @@ const SAMPLES_STATS_TABLE = Log.Table(
   ("Loss",   NUM_COL,     s -> s.loss.L),
   ("Lv",     NUM_COL,     s -> s.loss.Lv),
   ("Lp",     NUM_COL,     s -> s.loss.Lp),
+  ("Lreg",   NUM_COL,     s -> s.loss.Lreg),
   ("Hp",     NUM_COL,     s -> s.Hp),
   ("Hpnet",  NUM_COL,     s -> s.Hp̂),
   ("Λtot",   BIGINT_COL,  s -> s.Wtot),
