@@ -9,7 +9,7 @@ netparams = AlphaZero.SimpleNetHyperParams(
 mcts = AlphaZero.MctsParams(
   num_workers=64,
   num_iters_per_turn=640,
-  dirichlet_noise_epsilon=0)
+  dirichlet_noise_ϵ=0)
 
 self_play = AlphaZero.SelfPlayParams(
   num_games=200,
@@ -24,6 +24,7 @@ arena = AlphaZero.ArenaParams(
 
 learning = AlphaZero.LearningParams(
   learning_rate=1e-3,
+  l2_regularization=1e-4,
   epochs_per_checkpoint=10,
   max_num_epochs=50,
   stop_loss_eps=-1.0) # practically equivalent to -Inf
