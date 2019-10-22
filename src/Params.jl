@@ -32,16 +32,11 @@ end
 
 @kwdef struct LearningParams
   use_gpu :: Bool = true
-  # Optimization parameters
   learning_rate :: Float32 = 1e-3
   l2_regularization :: Float32 = 0.
   nonvalidity_penalty :: Float32 = 1.
   batch_size :: Int = 32
-  # Checkpoint parameters
-  max_num_epochs :: Int
-  first_checkpoint :: Int
-  stable_loss_ϵ :: Float64
-  stable_loss_n :: Int
+  checkpoints :: Vector{Int}
 end
 
 @kwdef struct Params

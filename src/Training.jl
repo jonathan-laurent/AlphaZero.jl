@@ -51,13 +51,6 @@ function initial_report(env::Env)
   return Report.Initial(num_network_parameters, mcts_footprint_per_node)
 end
 
-function stable_loss(epochs, n, ϵ)
-  k = length(epochs)
-  k < n && (return false)
-  loss_history = [epochs[i].status_after.loss.L for i in (k-n+1):k]
-  return (maximum(loss_history) - minimum(loss_history) < ϵ)
-end
-
 function evaluate_network(baseline, contender, params, handler)
   baseline = MctsPlayer(baseline, params.mcts)
   contender = MctsPlayer(contender, params.mcts)
@@ -82,7 +75,7 @@ function learning!(env::Env{G}, handler) where G
   best_evalz = ap.update_threshold
   nn_replaced = false
   # Loop over epochs
-  for k in 1:lp.max_num_epochs
+  for k in 1:maximum(lp.checkpoints)
     # Execute learning epoch
     ttrain += @elapsed training_epoch!(trainer)
     status, dtloss = @timed learning_status(trainer)
@@ -90,10 +83,8 @@ function learning!(env::Env{G}, handler) where G
     epoch_report = Report.Epoch(status)
     push!(epochs, epoch_report)
     Handlers.learning_epoch(handler, epoch_report)
-    # We make one checkpoint after a fixed number of epochs
-    # and an otherone when the loss stabilizes (or after nmax epochs)
-    stable = stable_loss(epochs, lp.stable_loss_n, lp.stable_loss_ϵ)
-    if stable || k == lp.first_checkpoint || k == lp.max_num_epochs
+    # Make checkpoints at fixed times
+    if k ∈ lp.checkpoints
       Handlers.checkpoint_started(handler)
       cur_nn = get_trained_network(trainer)
       evalz, dteval = @timed evaluate_network(env.bestnn, cur_nn, ap, handler)
@@ -109,7 +100,6 @@ function learning!(env::Env{G}, handler) where G
       push!(checkpoints, checkpoint_report)
       Handlers.checkpoint_finished(handler, checkpoint_report)
     end
-    stable && break
   end
   report = Report.Learning(
     tconvert, tloss, ttrain, teval,
