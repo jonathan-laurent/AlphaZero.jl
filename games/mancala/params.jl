@@ -29,10 +29,7 @@ learning = AlphaZero.LearningParams(
   learning_rate=1e-3,
   l2_regularization=1e-5,
   nonvalidity_penalty=1.,
-  max_num_epochs=80,
-  first_checkpoint=8,
-  stable_loss_n=15,
-  stable_loss_ϵ=0.1)
+  checkpoints=[2, 5, 20, 60])
 
 params = AlphaZero.Params(
   arena=arena,

@@ -27,10 +27,7 @@ self_play = AlphaZero.SelfPlayParams(
 learning = AlphaZero.LearningParams(
   l2_regularization=0.,
   nonvalidity_penalty=1.,
-  max_num_epochs=40,
-  first_checkpoint=8,
-  stable_loss_n=15,
-  stable_loss_ϵ=0.05)
+  checkpoints=[10, 20])
 
 params = AlphaZero.Params(
   arena=arena,
