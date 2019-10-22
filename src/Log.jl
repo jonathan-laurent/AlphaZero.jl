@@ -12,7 +12,7 @@ using Formatting
 import ProgressMeter
 
 const INDENT_STEP = 2
-const HEADER_COLORS = [crayon"bold yellow", crayon"bold"]
+const HEADER_COLORS = [crayon"bold yellow", crayon"bold", crayon"underline"]
 
 const TABLE_HEADER_STYLE = crayon"negative"
 const TABLE_COMMENTS_STYLE = crayon"italics cyan"

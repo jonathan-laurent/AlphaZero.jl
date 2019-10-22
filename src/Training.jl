@@ -58,6 +58,16 @@ function stable_loss(epochs, n, ϵ)
   return (maximum(loss_history) - minimum(loss_history) < ϵ)
 end
 
+function evaluate_network(baseline, contender, params, handler)
+  baseline = MctsPlayer(baseline, params.mcts)
+  contender = MctsPlayer(contender, params.mcts)
+  ngames = params.num_games
+  reset_period = params.reset_mcts_every
+  return pit(baseline, contender, ngames, reset_period) do i, z
+    Handlers.checkpoint_game_played(handler)
+  end
+end
+
 function learning!(env::Env{G}, handler) where G
   # Initialize the training process
   ap = env.params.arena
@@ -69,7 +79,7 @@ function learning!(env::Env{G}, handler) where G
   init_status = learning_status(trainer)
   Handlers.learning_started(handler, init_status)
   # Loop state variables
-  best_eval_score = ap.update_threshold
+  best_evalz = ap.update_threshold
   nn_replaced = false
   # Loop over epochs
   for k in 1:lp.max_num_epochs
@@ -86,16 +96,16 @@ function learning!(env::Env{G}, handler) where G
     if stable || k == lp.first_checkpoint || k == lp.max_num_epochs
       Handlers.checkpoint_started(handler)
       cur_nn = get_trained_network(trainer)
-      eval_reward, dteval = @timed evaluate_network(env.bestnn, cur_nn, ap)
+      evalz, dteval = @timed evaluate_network(env.bestnn, cur_nn, ap, handler)
       teval += dteval
       # If eval is good enough, replace network
-      success = eval_reward >= best_eval_score
+      success = evalz >= best_evalz
       if success
         nn_replaced = true
         env.bestnn = cur_nn
-        best_eval_score = eval_reward
+        best_evalz = evalz
       end
-      checkpoint_report = Report.Checkpoint(k, eval_reward, success)
+      checkpoint_report = Report.Checkpoint(k, evalz, success)
       push!(checkpoints, checkpoint_report)
       Handlers.checkpoint_finished(handler, checkpoint_report)
     end

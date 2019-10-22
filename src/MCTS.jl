@@ -328,9 +328,6 @@ end
 
 function reset!(env)
   empty!(env.tree)
-  env.total_time = 0.
-  env.inference_time = 0.
-  return
 end
 
 function inference_time_ratio(env)

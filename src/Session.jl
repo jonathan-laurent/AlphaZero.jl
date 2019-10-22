@@ -217,6 +217,7 @@ end
 
 function Handlers.learning_started(session::Session, initial_status)
   Log.section(session.logger, 2, "Starting learning")
+  Log.section(session.logger, 3, "Optimizing the loss")
   Report.print(session.logger, initial_status, style=Log.BOLD)
 end
 
@@ -225,8 +226,7 @@ function Handlers.learning_epoch(session::Session, report)
 end
 
 function Handlers.checkpoint_started(session::Session)
-  Log.sep(session.logger)
-  Log.print(session.logger, Log.BOLD, "Launching a checkpoint evaluation")
+  Log.section(session.logger, 3, "Launching a checkpoint evaluation")
   num_games = session.env.params.arena.num_games
   session.progress = Log.Progress(session.logger, num_games)
 end
@@ -236,13 +236,12 @@ function Handlers.checkpoint_game_played(session::Session)
 end
 
 function Handlers.checkpoint_finished(session::Session, report)
+  show_space_after_progress_bar(session)
   avgz = fmt("+.2f", report.reward)
   wr = round(Int, 100 * (report.reward + 1) / 2)
-  Log.print(session.logger, "Average reward: $avgz (win rate: $wr%)")
-  if report.nn_replaced
-    Log.print(session.logger, "Neural network replaced")
-  end
-  Log.sep(session.logger)
+  nnr = report.nn_replaced ? ", network replaced" : ""
+  Log.print(session.logger, "Average reward: $avgz (win rate of $wr%$nnr)")
+  Log.section(session.logger, 3, "Optimizing the loss")
 end
 
 function Handlers.learning_finished(session::Session, report)

@@ -9,8 +9,8 @@ netparams = AlphaZero.SimpleNetHyperParams(
 # Evaluate with 0 MCTS iterations
 # Exploration is induced by MCTS and by the temperature τ=1
 arena = AlphaZero.ArenaParams(
-  num_games=30,
-  reset_mcts_every=30,
+  num_games=400,
+  reset_mcts_every=50,
   update_threshold=(2 * 0.51 - 1),
   mcts = AlphaZero.MctsParams(
     num_iters_per_turn=0))
