@@ -116,8 +116,8 @@ const SAMPLES_STATS_TABLE = Log.Table(
   ("Nb",     BIGINT_COL,  s -> s.num_boards),
   ("Ns",     BIGINT_COL,  s -> s.num_samples))
 
-function print(logger::Logger, status::Report.LearningStatus, args...; kw...)
-  Log.table_row(logger, LEARNING_STATUS_TABLE, status, args...; kw...)
+function print(logger::Logger, status::Report.LearningStatus; kw...)
+  Log.table_row(logger, LEARNING_STATUS_TABLE, status; kw...)
 end
 
 function print(logger::Logger, stats::Report.Memory)

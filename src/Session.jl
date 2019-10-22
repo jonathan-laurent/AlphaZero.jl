@@ -11,11 +11,10 @@ mutable struct Session{Env}
   validation :: Option{Validation}
   # Temporary state for logging
   progress :: Option{Progress}
-  learning_checkpoint :: Option{Report.Checkpoint}
 
   function Session(env, dir, logfile, logger, autosave, validation=nothing)
     return new{typeof(env)}(
-      env, dir, logfile, logger, autosave, validation, nothing, nothing)
+      env, dir, logfile, logger, autosave, validation, nothing)
   end
 end
 
@@ -221,20 +220,29 @@ function Handlers.learning_started(session::Session, initial_status)
   Report.print(session.logger, initial_status, style=Log.BOLD)
 end
 
-function Handlers.learning_checkpoint(session::Session, report)
-  session.learning_checkpoint = report
+function Handlers.learning_epoch(session::Session, report)
+  Report.print(session.logger, report.status_after)
 end
 
-function Handlers.learning_epoch(session::Session, report)
-  comments = String[]
-  checkpoint = session.learning_checkpoint
-  if !isnothing(checkpoint)
-    z = fmt("+.2f", checkpoint.reward)
-    push!(comments, "Evaluation reward: $z")
-    checkpoint.nn_replaced && push!(comments, "Networked replaced")
+function Handlers.checkpoint_started(session::Session)
+  Log.sep(session.logger)
+  Log.print(session.logger, Log.BOLD, "Launching a checkpoint evaluation")
+  num_games = session.env.params.arena.num_games
+  session.progress = Log.Progress(session.logger, num_games)
+end
+
+function Handlers.checkpoint_game_played(session::Session)
+  next!(session.progress)
+end
+
+function Handlers.checkpoint_finished(session::Session, report)
+  avgz = fmt("+.2f", report.reward)
+  wr = round(Int, 100 * (report.reward + 1) / 2)
+  Log.print(session.logger, "Average reward: $avgz (win rate: $wr%)")
+  if report.nn_replaced
+    Log.print(session.logger, "Neural network replaced")
   end
-  Report.print(session.logger, report.status_after, comments)
-  session.learning_checkpoint = nothing
+  Log.sep(session.logger)
 end
 
 function Handlers.learning_finished(session::Session, report)

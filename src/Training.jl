@@ -29,7 +29,9 @@ module Handlers
   function memory_analyzed(h, r)     return end
   function learning_started(h, r)    return end
   function learning_epoch(h, r)      return end
-  function learning_checkpoint(h, r) return end
+  function checkpoint_started(h)     return end
+  function checkpoint_game_played(h) return end
+  function checkpoint_finished(h, r) return end
   function learning_finished(h, r)   return end
   function iteration_finished(h, r)  return end
   function training_finished(h)      return end
@@ -77,10 +79,12 @@ function learning!(env::Env{G}, handler) where G
     tloss += dtloss
     epoch_report = Report.Epoch(status)
     push!(epochs, epoch_report)
+    Handlers.learning_epoch(handler, epoch_report)
     # We make one checkpoint after a fixed number of epochs
     # and an otherone when the loss stabilizes (or after nmax epochs)
     stable = stable_loss(epochs, lp.stable_loss_n, lp.stable_loss_ϵ)
     if stable || k == lp.first_checkpoint || k == lp.max_num_epochs
+      Handlers.checkpoint_started(handler)
       cur_nn = get_trained_network(trainer)
       eval_reward, dteval = @timed evaluate_network(env.bestnn, cur_nn, ap)
       teval += dteval
@@ -93,9 +97,8 @@ function learning!(env::Env{G}, handler) where G
       end
       checkpoint_report = Report.Checkpoint(k, eval_reward, success)
       push!(checkpoints, checkpoint_report)
-      Handlers.learning_checkpoint(handler, checkpoint_report)
+      Handlers.checkpoint_finished(handler, checkpoint_report)
     end
-    Handlers.learning_epoch(handler, epoch_report)
     stable && break
   end
   report = Report.Learning(
