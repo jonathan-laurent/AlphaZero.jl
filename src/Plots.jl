@@ -137,10 +137,11 @@ function plot_report(
     perfs_global, perfs_self_play, perfs_learning)
   # Assembling everything together
   append!(plots, [
-    arena, nepochs, pslosses, losses_fullmem, losses_last, entropies, net, nsamples, perfs])
+    arena, nepochs, pslosses, losses_fullmem, losses_last,
+    entropies, net, nsamples, perfs])
   append!(files, [
-    "arena", "nepochs", "loss_per_stage", "loss_fullmem",
-    "loss_last_batch", "entropies", "net", "nsamples", "perfs"])
+    "arena", "nepochs", "loss_per_stage", "loss_fullmem", "loss_last_batch",
+    "entropies", "net", "nsamples", "perfs"])
   for (file, plot) in zip(files, plots)
     #Plots.plot!(plot, dpi=200, size=(600, 200))
     Plots.savefig(plot, joinpath(dir, file))

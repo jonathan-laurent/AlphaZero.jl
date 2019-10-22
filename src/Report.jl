@@ -4,11 +4,6 @@
 
 module Report
 
-struct Initial
-  num_network_parameters :: Int
-  mcts_footprint_per_node :: Int
-end
-
 struct Loss
   L :: Float64
   Lp :: Float64
@@ -83,6 +78,11 @@ struct Iteration
   self_play :: SelfPlay
   memory :: Memory
   learning :: Learning
+end
+
+struct Initial
+  num_network_parameters :: Int
+  mcts_footprint_per_node :: Int
 end
 
 #####

@@ -8,7 +8,8 @@ netparams = AlphaZero.SimpleNetHyperParams(
 # Exploration is induced by MCTS and by the temperature τ=1
 arena = AlphaZero.ArenaParams(
   num_games=3000,
-  update_threshold=(2 * 0.51 - 1),
+  reset_mcts_every=3000,
+  update_threshold=0.01,
   mcts = AlphaZero.MctsParams(
     num_workers=1,
     num_iters_per_turn=0,
@@ -16,23 +17,30 @@ arena = AlphaZero.ArenaParams(
 
 self_play = AlphaZero.SelfPlayParams(
   num_games=2000,
+  reset_mcts_every=2000,
   mcts = AlphaZero.MctsParams(
-    num_workers=32,
+    num_workers=1,
     num_iters_per_turn=320,
     dirichlet_noise_ϵ=0.15))
 
 learning = AlphaZero.LearningParams(
-  stop_loss_eps=-1.0) # practically equivalent to -Inf
+  l2_regularization=0.,
+  nonvalidity_penalty=1.,
+  max_num_epochs=40,
+  first_checkpoint=8,
+  stable_loss_n=15,
+  stable_loss_ϵ=0.05)
 
 params = AlphaZero.Params(
   arena=arena,
   self_play=self_play,
   learning=learning,
-  num_iters=4,
+  num_iters=3,
   num_game_stages=9)
 
 validation = AlphaZero.RolloutsValidation(
   num_games = 1000,
+  reset_mcts_every = 1000,
   baseline = AlphaZero.MctsParams(
     num_workers=1,
     num_iters_per_turn=1000,

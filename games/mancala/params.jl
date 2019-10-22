@@ -14,24 +14,25 @@ mcts = AlphaZero.MctsParams(
 
 self_play = AlphaZero.SelfPlayParams(
   num_games=600,
-  mcts = mcts)
+  reset_mcts_every=200,
+  mcts=mcts)
 
 # Exploration is induced by MCTS and by the temperature τ=1
 # TODO: change arena: simpler MCTS, less iterations
 arena = AlphaZero.ArenaParams(
   num_games=200,
+  reset_mcts_every=40,
   update_threshold=(2 * 0.52 - 1),
-  mcts = mcts)
+  mcts=mcts)
 
 learning = AlphaZero.LearningParams(
   learning_rate=1e-3,
   l2_regularization=1e-5,
   nonvalidity_penalty=1.,
-  max_num_epochs=100,
-  first_checkpoint=5,
-  stable_loss_n=10,
-  stable_loss_ϵ=0.05)
-
+  max_num_epochs=80,
+  first_checkpoint=8,
+  stable_loss_n=15,
+  stable_loss_ϵ=0.1)
 
 params = AlphaZero.Params(
   arena=arena,
@@ -41,8 +42,9 @@ params = AlphaZero.Params(
   num_game_stages=5)
 
 validation = AlphaZero.RolloutsValidation(
-  num_games = 100,
-  baseline = AlphaZero.MctsParams(
+  num_games=100,
+  reset_mcts_every=20,
+  baseline=AlphaZero.MctsParams(
     num_iters_per_turn=1000,
     dirichlet_noise_ϵ=0),
-  contender = mcts)
+  contender=mcts)

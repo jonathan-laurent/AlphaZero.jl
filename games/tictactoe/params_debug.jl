@@ -1,3 +1,5 @@
+# Does not work very well as MCTS is reset at every step...
+
 Network = AlphaZero.SimpleNet{Game}
 
 netparams = AlphaZero.SimpleNetHyperParams(
@@ -8,7 +10,7 @@ netparams = AlphaZero.SimpleNetHyperParams(
 # Exploration is induced by MCTS and by the temperature τ=1
 arena = AlphaZero.ArenaParams(
   num_games=30,
-  reset_mcts_every=15,
+  reset_mcts_every=30,
   update_threshold=(2 * 0.51 - 1),
   mcts = AlphaZero.MctsParams(
     num_iters_per_turn=0))
@@ -25,9 +27,9 @@ self_play = AlphaZero.SelfPlayParams(
 learning = AlphaZero.LearningParams(
   l2_regularization=0.,
   nonvalidity_penalty=1.,
-  max_num_epochs=100,
-  first_checkpoint=5,
-  stable_loss_n=10,
+  max_num_epochs=40,
+  first_checkpoint=8,
+  stable_loss_n=15,
   stable_loss_ϵ=0.05)
 
 params = AlphaZero.Params(
@@ -39,6 +41,7 @@ params = AlphaZero.Params(
 
 validation = AlphaZero.RolloutsValidation(
   num_games = 100,
+  reset_mcts_every=100,
   baseline = AlphaZero.MctsParams(
     num_iters_per_turn=100,
     dirichlet_noise_ϵ=0.1),
