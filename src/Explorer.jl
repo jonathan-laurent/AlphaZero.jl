@@ -36,15 +36,15 @@ function evaluate_Qnet(oracle::MCTS.Oracle{G}, board, action) where G
   return r
 end
 
-function board_statistics(env::Env{G}, board) where G
+function board_statistics(env::Env{G}, mcts, board) where G
   state = G(board)
   @assert isnothing(GI.white_reward(state))
   actions = GI.available_actions(state)
   report = BoardStats(actions)
   # Collect MCTS statistics
-  if haskey(env.mcts.tree, board)
-    info = env.mcts.tree[board]
-    ucts = MCTS.uct_scores(info, env.mcts.cpuct)
+  if haskey(mcts.tree, board)
+    info = mcts.tree[board]
+    ucts = MCTS.uct_scores(info, mcts.cpuct)
     report.Nmcts = MCTS.Ntot(info)
     for (i, a) in enumerate(actions)
       astats = info.stats[i]
@@ -109,19 +109,17 @@ function print_board_statistics(::Type{G}, stats::BoardStats) where G
     ("Qnet",  val,    r -> r[2].Qnet),
     header_style=Log.BOLD)
   logger = Logger()
-  #Log.print(logger, "Board statistics")
-  #Log.sep(logger)
   Log.table(logger, btable, [stats])
   Log.sep(logger)
-  #Log.print(logger, "Action statistics")
-  #Log.sep(logger)
   Log.table(logger, atable, stats.actions)
   Log.sep(logger)
 end
 
-function print_state_statistics(env::Env{G}, state::G) where G
+function print_state_statistics(env::Env{G}, mcts, state::G) where G
   board = GI.canonical_board(state)
-  print_board_statistics(G, board_statistics(env, board))
+  if isnothing(GI.white_reward(state))
+    print_board_statistics(G, board_statistics(env, mcts, board))
+  end
 end
 
 #####
@@ -131,10 +129,12 @@ end
 mutable struct Explorer{Game}
   env :: Env{Game}
   state :: Game
-  history
+  player :: MctsPlayer{Game}
+  history :: Stack
   function Explorer(env, state)
     G = typeof(state)
-    new{G}(env, state, Stack{Any}())
+    player = MctsPlayer(env.bestnn, env.params.self_play.mcts)
+    new{G}(env, state, player, Stack{Any}())
   end
 end
 
@@ -164,11 +164,11 @@ function interpret!(exp::Explorer{G}, cmd, args=[]) where G
   elseif cmd == "explore"
     try
       if isempty(args)
-        n = exp.env.params.self_play.mcts.num_iters_per_turn
+        n = exp.player.niters
       else
         n = parse(Int, args[1])
       end
-      MCTS.explore!(exp.env.mcts, exp.state, n)
+      MCTS.explore!(exp.player.mcts, exp.state, n)
       return true
     catch e
       isa(e, ArgumentError) && (return false)
@@ -182,7 +182,7 @@ function launch(exp::Explorer)
   while true
     # Print the state
     GI.print_state(exp.state)
-    print_state_statistics(exp.env, exp.state)
+    print_state_statistics(exp.env, exp.player.mcts, exp.state)
     # Interpret command
     while true
       print("> ")

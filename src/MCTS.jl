@@ -333,12 +333,6 @@ function reset!(env)
   return
 end
 
-function reset!(env, oracle)
-  reset!(env)
-  env.oracle = oracle
-  return
-end
-
 function inference_time_ratio(env)
   T = env.total_time
   iszero(T) ? 0. : env.inference_time / T

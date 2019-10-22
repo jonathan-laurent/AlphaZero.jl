@@ -102,13 +102,13 @@ function pit(
   return zsum / ngames
 end
 
-function pit(baseline, contender, ngames)
-  return pit((i, z) -> nothing, baseline, contender, ngames)
+function pit(baseline, contender, ngames, reset_period)
+  return pit((i, z) -> nothing, baseline, contender, ngames, reset_period)
 end
 
 function evaluate_network(
     baseline::Network, contender::Network, params::ArenaParams)
   baseline = MctsPlayer(baseline, params.mcts)
   contender = MctsPlayer(contender, params.mcts)
-  return pit(baseline, contender, params.num_games)
+  return pit(baseline, contender, params.num_games, params.reset_mcts_every)
 end

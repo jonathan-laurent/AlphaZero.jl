@@ -151,7 +151,7 @@ function Session(
     session = Session(env, dir, logfile, logger, autosave, validation)
     # Show initial report
     Log.section(logger, 2, "Initial report")
-    Report.print(logger, make_initial_report(env))
+    Report.print(logger, initial_report(env))
     run_validation_experiment(session, iterdir(session.dir, 0))
     if autosave
       save(session)
