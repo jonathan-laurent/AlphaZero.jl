@@ -6,7 +6,8 @@ function plot_losses(getlosses, range, title)
   fields = fieldnames(Report.Loss)
   labels = [string(f) for f in fields]
   data = [[getfield(getlosses(i), f) for i in range] for f in fields]
-  return Plots.plot(range, data, label=labels, title=title, ylim=(0,Inf))
+  return Plots.plot(range, data,
+    label=labels, title=title, ylims=(0, Inf))
 end
 
 #####
@@ -15,17 +16,28 @@ end
 
 function plot_iteration(
     report::Report.Iteration,
+    params::Params,
     dir::String)
   isdir(dir) || mkpath(dir)
   epochs = report.learning.epochs
-  losses = plot_losses(0:length(epochs), "Losses") do i
+  losses_plot = plot_losses(0:length(epochs), "Losses") do i
     if i == 0
       report.learning.initial_status.loss
     else
       epochs[i].status_after.loss
     end
   end
-  Plots.savefig(losses, joinpath(dir, "loss"))
+  checkpoints = report.learning.checkpoints
+  checkpoints_plot = Plots.hline(
+    [0, params.arena.update_threshold],
+    title="Checkpoints")
+  Plots.plot!(checkpoints_plot,
+    [c.epoch_id for c in checkpoints],
+    [c.reward for c in checkpoints],
+    t=:scatter,
+    legend=:none)
+  plot = Plots.plot(losses_plot, checkpoints_plot, layout=(2, 1))
+  Plots.savefig(plot, joinpath(dir, "summary"))
 end
 
 #####
