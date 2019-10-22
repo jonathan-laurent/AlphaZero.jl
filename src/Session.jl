@@ -250,7 +250,8 @@ function Handlers.iteration_finished(session::Session, report)
     open(joinpath(idir, REPORT_FILE), "w") do io
       JSON2.pretty(io, JSON2.write(report))
     end
-    plot_report(session.dir)
+    plot_iteration(report, idir)
+    plot_training(session.dir)
     Log.section(session.logger, 2, "Environment saved in: $(session.dir)")
   end
   flush(session.logfile)
@@ -316,8 +317,8 @@ function get_reports(dir::String)
   return params, ireps, vreps
 end
 
-function plot_report(dir::String)
+function plot_training(dir::String)
   params, ireps, vreps = get_reports(dir)
   isnothing(ireps) && return
-  plot_report(params, ireps, vreps, joinpath(dir, PLOTS_DIR))
+  plot_training(params, ireps, vreps, joinpath(dir, PLOTS_DIR))
 end
