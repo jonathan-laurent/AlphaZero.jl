@@ -2,6 +2,11 @@
 ##### Session management
 #####
 
+"""
+    Session{Env}
+    
+A basic user interface for AlphaZero environments.
+"""
 mutable struct Session{Env}
   env :: Env
   dir :: String
@@ -132,7 +137,12 @@ end
 ##### Create and resume sessions
 #####
 
-# Start a new session
+"""
+    Session(Game, Network, params, netparams;
+      dir="session", autosave=true, validation=nothing)
+    
+Create a new session.
+"""
 function Session(
     ::Type{Game}, ::Type{Network}, params, netparams;
     dir="session", autosave=true, autoload=true, validation=nothing
@@ -160,7 +170,11 @@ function Session(
   return session
 end
 
-# Load an existing session from a directory
+"""
+    Session(Game, Network, dir; autosave=true, validation=nothing)
+    
+Load an existing session from a directory.
+"""
 function Session(
     ::Type{Game}, ::Type{Network}, dir; autosave=true, validation=nothing
   ) where {Game, Network}

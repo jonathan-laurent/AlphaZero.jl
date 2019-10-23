@@ -5,6 +5,8 @@
 
 module AlphaZero
 
+export Session
+
 include("Util.jl")
 import .Util
 using .Util: Option

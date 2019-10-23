@@ -6,7 +6,7 @@ A generic interface for zero-sum, symmetric games.
 # Assumptions
 
 The `Action` type must be "symmetric" in the following sense
-```
+```julia
 available_actions(s) ==
   available_actions(State(board_symmetric(s), !white_playing(s)))
 ```

@@ -3,13 +3,13 @@
 #####
 
 """
-  Network{Game}
+     Network{Game} <: MCTS.Oracle{Game}
 
 Abstract type for a neural network oracle for `Game`.
 It must implement the following interface
   - Flux.gpu(nn), Flux.cpu(nn)
   - Flux.params(nn), Flux.loadparams!(nn, p)
-  - hyperparams(nn)
+  - [`hyperparams(net)`](@ref AlphaZero.hyperparams(::SimpleNet))
   - HyperParams(typeof(nn))
   - nn(boards, action_masks)
   - regularized_weights(nn)
@@ -81,7 +81,13 @@ end
 
 HyperParams(::Type{<:SimpleNet}) = SimpleNetHyperParams
 
+"""
+    hyperparams(nn::SimpleNet)
+    
+Return the hyperparameters of a network.
+"""
 hyperparams(nn::SimpleNet) = nn.hyper
+
 
 # Flux.@treelike does not work do to Network being parametric
 Flux.children(nn::SimpleNet) = (nn.common, nn.vbranch, nn.pbranch)
