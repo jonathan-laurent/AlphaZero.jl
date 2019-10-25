@@ -1,11 +1,11 @@
-# Networks
+# Network Interface
 
 ```@meta
-CurrentModule = AlphaZero.Networks
+CurrentModule = AlphaZero.Network
 ```
 
 ```@docs
-Network
+AbstractNetwork
 HyperParams
 hyperparams
 forward

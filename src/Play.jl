@@ -15,10 +15,10 @@ end
 
 # Alternative constructor
 function MctsPlayer(oracle::MCTS.Oracle{G}, params::MctsParams) where G
-  if isa(oracle, Network)
+  if isa(oracle, AbstractNetwork)
     oracle = params.use_gpu ?
-      Networks.to_gpu(oracle) :
-      Networks.to_cpu(oracle)
+      Network.to_gpu(oracle) :
+      Network.to_cpu(oracle)
   end
   mcts = MCTS.Env{G}(oracle, params.num_workers, params.cpuct)
   return MctsPlayer(mcts, params.num_iters_per_turn,

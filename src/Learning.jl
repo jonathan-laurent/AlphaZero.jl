@@ -41,7 +41,7 @@ wmean(x, w) = sum(x .* w) / sum(w)
 function losses(nn, params, Wmean, Hp, (W, X, A, P, V))
   creg = params.l2_regularization
   cinv = params.nonvalidity_penalty
-  P̂, V̂, p_invalid = Networks.evaluate(nn, X, A)
+  P̂, V̂, p_invalid = Network.evaluate(nn, X, A)
   Lp = klloss_wmean(P̂, P, W) - Hp
   Lv = mse_wmean(V̂, V, W)
   Lreg = iszero(creg) ?
@@ -65,7 +65,7 @@ struct Trainer
   Wmean
   Hp
   function Trainer(
-    network::Network{G},
+    network::AbstractNetwork{G},
     examples::Vector{<:TrainingExample},
     params::LearningParams
   ) where G
@@ -73,8 +73,8 @@ struct Trainer
     samples = convert_samples(G, examples)
     network = copy(network)
     network = params.use_gpu ?
-      Networks.to_gpu(network) : Networks.to_cpu(network)
-    samples = Networks.convert_input_tuple(network, samples)
+      Network.to_gpu(network) : Network.to_cpu(network)
+    samples = Network.convert_input_tuple(network, samples)
     W, X, A, P, V = samples
     Wmean = mean(W)
     Hp = entropy_wmean(P, W)
@@ -82,13 +82,13 @@ struct Trainer
   end
 end
 
-get_trained_network(tr::Trainer) = tr.network |> copy |> Networks.to_cpu
+get_trained_network(tr::Trainer) = tr.network |> copy |> Network.to_cpu
 
 function training_epoch!(tr::Trainer)
   loss(batch...) = losses(
     tr.network, tr.params, tr.Wmean, tr.Hp, batch)[1]
   data = Util.random_batches(tr.samples, tr.params.batch_size)
-  Networks.train!(tr.network, loss, data, tr.params.learning_rate)
+  Network.train!(tr.network, loss, data, tr.params.learning_rate)
 end
 
 #####
@@ -96,21 +96,21 @@ end
 #####
 
 function loss_report(tr::Trainer)
-  ltuple = Networks.convert_output_tuple(tr.network,
+  ltuple = Network.convert_output_tuple(tr.network,
     losses(tr.network, tr.params, tr.Wmean, tr.Hp, tr.samples))
   return Report.Loss(ltuple...)
 end
 
 function learning_status(tr::Trainer)
   loss = loss_report(tr)
-  net = Networks.network_report(tr.network)
+  net = Network.network_report(tr.network)
   return Report.LearningStatus(loss, net)
 end
 
 function network_output_entropy(tr::Trainer)
   W, X, A, P, V = tr.samples
-  P̂, _ = Networks.evaluate(tr.network, X, A)
-  return Networks.convert_output(tr.network, entropy_wmean(P̂, W))
+  P̂, _ = Network.evaluate(tr.network, X, A)
+  return Network.convert_output(tr.network, entropy_wmean(P̂, W))
 end
 
 function samples_report(tr::Trainer)
@@ -125,7 +125,7 @@ end
 
 function memory_report(
     mem::MemoryBuffer,
-    nn::Network{G},
+    nn::AbstractNetwork{G},
     params::LearningParams,
     nstages
     ) where G

@@ -1,9 +1,9 @@
 """
 A generic, framework agnostic interface for neural networks.
 """
-module Networks
+module Network
 
-export Network
+export AbstractNetwork
 
 import ..MCTS
 import ..GameInterface
@@ -12,115 +12,115 @@ import ..Report
 using ..Util: @unimplemented
 
 """
-    Network{Game} <: MCTS.Oracle{Game}
+    AbstractNetwork{Game} <: MCTS.Oracle{Game}
 
 Abstract base type for a neural network.
   
 ---
   
-Any subtype `MyNet` must implement the following constructor:
+Any subtype `Network` must implement the following constructor:
 
-    MyNet(hyperparams)
+    Network(hyperparams)
     
 where the expected type of `hyperparams` is given by
-[`HyperParams(MyNet)`](@ref HyperParams).
+[`HyperParams(Network)`](@ref HyperParams).
 """
-abstract type Network{G} <: MCTS.Oracle{G} end
+abstract type AbstractNetwork{G} <: MCTS.Oracle{G} end
 
 #####
 ##### Interface
 #####
 
 """
-    HyperParams(::Type{<:Network})
+    HyperParams(::Type{<:AbstractNetwork})
     
 Return the hyperparameter type associated with a given network type.
 """
-function HyperParams(::Type{<:Network})
+function HyperParams(::Type{<:AbstractNetwork})
   @unimplemented
 end
 
 """
-    hyperparams(::Network)
+    hyperparams(::AbstractNetwork)
     
 Return the hyperparameters of a network.
 """
-function hyperparams(::Network)
+function hyperparams(::AbstractNetwork)
   @unimplemented
 end
 
 """
-    Base.copy(::Network)
+    Base.copy(::AbstractNetwork)
     
 Return a copy of the given network.
 """
-function Base.copy(::Network)
+function Base.copy(::AbstractNetwork)
   @unimplemented
 end
 
 """
-    to_gpu(::Network)
+    to_gpu(::AbstractNetwork)
     
 Return a copy of the given network that has been transferred to the GPU
 if one is available. Otherwise, return the given network untouched.
 """
-function to_gpu(::Network)
+function to_gpu(::AbstractNetwork)
   @unimplemented
 end
 
 """
-    to_cpu(::Network)
+    to_cpu(::AbstractNetwork)
     
 Return a copy of the given network that has been transferred to the CPU
 or return the given network untouched if it is already on CPU.
 """
-function to_cpu(::Network)
+function to_cpu(::AbstractNetwork)
   @unimplemented
 end
 
 """
-    on_gpu(::Network)
+    on_gpu(::AbstractNetwork)
     
 Test if a network is located on GPU.
 """
-function on_gpu(::Network)
+function on_gpu(::AbstractNetwork)
   @unimplemented
 end
 
 """
-    convert_input(::Network, input)
+    convert_input(::AbstractNetwork, input)
     
 Convert an array (or number) to the right format so that it can be used
 as an input by a given network.
 """
-function convert_input(::Network, input)
+function convert_input(::AbstractNetwork, input)
   @unimplemented
 end
 
-function convert_input_tuple(nn::Network, input::Tuple)
+function convert_input_tuple(nn::AbstractNetwork, input::Tuple)
   return map(input) do arr
     convert_input(nn, arr)
   end
 end
 
 """
-    convert_output(::Network, output)
+    convert_output(::AbstractNetwork, output)
     
 Convert an array (or number) produced by a neural network
 to a standard CPU array (or number) type.
 """
-function convert_output(::Network, output)
+function convert_output(::AbstractNetwork, output)
   @unimplemented
 end
 
-function convert_output_tuple(nn::Network, output::Tuple)
+function convert_output_tuple(nn::AbstractNetwork, output::Tuple)
   return map(output) do arr
     convert_output(nn, arr)
   end
 end
 
 """
-    forward(::Network, board)
+    forward(::AbstractNetwork, board)
     
 Compute the forward pass of the network on a single input
 or on a batch of inputs (in which case the batch dimension is the last one).
@@ -128,44 +128,44 @@ or on a batch of inputs (in which case the batch dimension is the last one).
 Return a `(P, V)` triple. The probability vector `P` is allowed to put
 some weight on disallowed actions.
 """
-function forward(::Network, board)
+function forward(::AbstractNetwork, board)
   @unimplemented
 end
 
 """
-    train!(::Network, loss, data, learning_rate)
+    train!(::AbstractNetwork, loss, data, learning_rate)
     
 Train a given network on data.
 """
-function train!(::Network, loss, data, learning_rate)
+function train!(::AbstractNetwork, loss, data, learning_rate)
   @unimplemented
 end
 
 """
-    regularized_weights(::Network)
+    regularized_weights(::AbstractNetwork)
     
 Return the collection of regularized weights of a network.
 This usually excludes neuron's biases.
 """
-function regularized_weights(::Network)
+function regularized_weights(::AbstractNetwork)
   @unimplemented
 end
 
 """
-    num_parameters(::Network)
+    num_parameters(::AbstractNetwork)
 
 Return the total number of parameters of a network.
 """
-function num_parameters(::Network)
+function num_parameters(::AbstractNetwork)
   @unimplemented
 end
 
 """
-    network_report(::Network) :: Report.Network
+    network_report(::AbstractNetwork) :: Report.Network
 
 Return debugging informations on the network.
 """
-function network_report(::Network) :: Report.Network
+function network_report(::AbstractNetwork) :: Report.Network
   @unimplemented
 end
 
@@ -173,7 +173,7 @@ end
 ##### Derived functions
 #####
 
-function evaluate(nn::Network, board, actions_mask)
+function evaluate(nn::AbstractNetwork, board, actions_mask)
   p, v = forward(nn, board)
   p = p .* actions_mask
   sp = sum(p, dims=1)
@@ -182,7 +182,7 @@ function evaluate(nn::Network, board, actions_mask)
   return (p, v, p_invalid)
 end
 
-function MCTS.evaluate(nn::Network{G}, board, available_actions) where G
+function MCTS.evaluate(nn::AbstractNetwork{G}, board, available_actions) where G
   x = GameInterface.vectorize_board(G, board)
   a = GameInterface.actions_mask(G, available_actions)
   xnet, anet = convert_input_tuple(nn, (x, a))
@@ -190,7 +190,7 @@ function MCTS.evaluate(nn::Network{G}, board, available_actions) where G
   return (p[a], v[1])
 end
 
-function MCTS.evaluate_batch(nn::Network{G}, batch) where G
+function MCTS.evaluate_batch(nn::AbstractNetwork{G}, batch) where G
   X = Util.concat_columns((
     GameInterface.vectorize_board(G, b)
     for (b, as) in batch))

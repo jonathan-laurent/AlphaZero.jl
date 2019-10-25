@@ -46,7 +46,7 @@ function save_env(env::Env, dir)
     JSON2.pretty(io, JSON2.write(env.params))
   end
   open(joinpath(dir, NET_PARAMS_FILE), "w") do io
-    JSON2.pretty(io, JSON2.write(Networks.hyperparams(env.bestnn)))
+    JSON2.pretty(io, JSON2.write(Network.hyperparams(env.bestnn)))
   end
   # Saving state
   serialize(joinpath(dir, NET_FILE), env.bestnn)

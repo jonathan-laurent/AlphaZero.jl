@@ -24,7 +24,7 @@ using .Log
 include("Report.jl")
 
 include("Network.jl")
-using .Networks
+using .Network
 
 import Plots
 import Colors

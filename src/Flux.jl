@@ -40,27 +40,27 @@ on_gpu(x) = on_gpu(typeof(x))
 ##### Flux Networks
 #####
 
-abstract type FluxNetwork{Game} <: Network{Game} end
+abstract type FluxNetwork{Game} <: AbstractNetwork{Game} end
 
 function Base.copy(nn::Net) where Net <: FluxNetwork
-  new = Net(Networks.hyperparams(nn))
+  new = Net(Network.hyperparams(nn))
   Flux.loadparams!(new, Flux.params(nn))
   return new
 end
 
-Networks.to_cpu(nn::FluxNetwork) = Flux.cpu(nn)
+Network.to_cpu(nn::FluxNetwork) = Flux.cpu(nn)
 
-Networks.to_gpu(nn::FluxNetwork) = Flux.gpu(nn)
+Network.to_gpu(nn::FluxNetwork) = Flux.gpu(nn)
 
-function Networks.convert_input(nn::FluxNetwork, x)
-  return Networks.on_gpu(nn) ? Flux.gpu(x) : x
+function Network.convert_input(nn::FluxNetwork, x)
+  return Network.on_gpu(nn) ? Flux.gpu(x) : x
 end
 
-function Networks.convert_output(nn::FluxNetwork, x)
+function Network.convert_output(nn::FluxNetwork, x)
   return Tracker.data(Flux.cpu(x))
 end
 
-function Networks.train!(nn::FluxNetwork, loss, data, lr)
+function Network.train!(nn::FluxNetwork, loss, data, lr)
   optimizer = Flux.ADAM(lr)
   Flux.train!(loss, Flux.params(nn), data, optimizer)
 end
@@ -101,11 +101,11 @@ function SimpleNet{G}(hyper::SimpleNetHyperParams) where G
   SimpleNet{G}(hyper, common, vbranch, pbranch)
 end
 
-Networks.HyperParams(::Type{<:SimpleNet}) = SimpleNetHyperParams
+Network.HyperParams(::Type{<:SimpleNet}) = SimpleNetHyperParams
 
-Networks.hyperparams(nn::SimpleNet) = nn.hyper
+Network.hyperparams(nn::SimpleNet) = nn.hyper
 
-function Networks.forward(nn::SimpleNet, board)
+function Network.forward(nn::SimpleNet, board)
   c = nn.common(board)
   v = nn.vbranch(c)
   p = nn.pbranch(c)
@@ -119,13 +119,13 @@ function Flux.mapchildren(f, nn::Net) where Net <: SimpleNet
   Net(nn.hyper, f(nn.common), f(nn.vbranch), f(nn.pbranch))
 end
 
-function Networks.regularized_weights(nn::SimpleNet)
+function Network.regularized_weights(nn::SimpleNet)
   W(mlp) = [l.W for l in mlp if isa(l, Dense)]
   return [W(nn.common); W(nn.vbranch); W(nn.pbranch)]
 end
 
-function Networks.network_report(nn::SimpleNet) :: Report.Network
-  Ws = Tracker.data.(Networks.regularized_weights(nn))
+function Network.network_report(nn::SimpleNet) :: Report.Network
+  Ws = Tracker.data.(Network.regularized_weights(nn))
   maxw = maximum(maximum(abs.(W)) for W in Ws)
   meanw = mean(mean(abs.(W)) for W in Ws)
   pbiases = nn.pbranch[end-1].b |> Tracker.data
@@ -133,9 +133,9 @@ function Networks.network_report(nn::SimpleNet) :: Report.Network
   return Report.Network(maxw, meanw, pbiases, sum(vbias))
 end
 
-Networks.num_parameters(nn::SimpleNet) = sum(length(p) for p in Flux.params(nn))
+Network.num_parameters(nn::SimpleNet) = sum(length(p) for p in Flux.params(nn))
 
-Networks.on_gpu(nn::SimpleNet) = on_gpu(nn.vbranch[end].b)
+Network.on_gpu(nn::SimpleNet) = on_gpu(nn.vbranch[end].b)
 
 #####
 ##### Dense Resnet
