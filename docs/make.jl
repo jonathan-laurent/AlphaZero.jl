@@ -4,12 +4,11 @@ using AlphaZero
 makedocs(
     sitename = "AlphaZero",
     format = Documenter.HTML(prettyurls = false),
-    modules = [AlphaZero]
+    modules = [AlphaZero],
+    pages = [
+        "index.md",
+        "game_interface.md",
+        "mcts.md",
+        "misc.md"
+    ]
 )
-
-# Documenter can also automatically deploy documentation to gh-pages.
-# See "Hosting Documentation" and deploydocs() in the Documenter manual
-# for more information.
-#=deploydocs(
-    repo = "<repository url>"
-)=#

@@ -89,8 +89,6 @@ end
 ##### Machine Learning API
 #####
 
-GI.board_dim(::Type{Game}) = 3 * NUM_POSITIONS
-
 GI.num_actions(::Type{Game}) = NUM_POSITIONS
 
 GI.action(::Type{Game}, id) = id
@@ -98,7 +96,7 @@ GI.action(::Type{Game}, id) = id
 GI.action_id(::Type{Game}, pos) = pos
 
 function GI.vectorize_board(::Type{Game}, board)
-  Float64[
+  Float32[
     board[i] == c
     for c in [nothing, WHITE, BLACK]
     for i in 1:NUM_POSITIONS]

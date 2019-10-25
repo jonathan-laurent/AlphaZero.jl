@@ -57,3 +57,6 @@ validation = AlphaZero.RolloutsValidation(
     cpuct=4,
     temperature=0.3,
     dirichlet_noise_ϵ=0))
+
+
+# Diminish cpuct in arena

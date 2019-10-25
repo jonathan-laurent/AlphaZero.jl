@@ -170,8 +170,6 @@ end
 ##### ML interface
 #####
 
-GI.board_dim(::Type{Game}) = NUM_HOUSES + 2
-
 GI.num_actions(::Type{Game}) = NUM_HOUSES_PER_PLAYER
 
 GI.action_id(::Type{Game}, a) = a
@@ -179,7 +177,7 @@ GI.action_id(::Type{Game}, a) = a
 GI.action(::Type{Game}, id) = id
 
 function GI.vectorize_board(::Type{Game}, board)
-  Float64[
+  Float32[
     board.houses[1,:]; board.stores[1];
     board.houses[2,:]; board.stores[2]]
 end

@@ -1,9 +1,7 @@
 """
-    MCTS
-
-A generic implementation of asynchronous Monte Carlo Tree Search
-with an external oracle.
-Relies on [`GameInterface`](@ref Main.AlphaZero.GameInterface).
+A generic, standalone implementation of asynchronous Monte Carlo Tree Search.
+It can be used on any game that implements the [`GameInterface`](@ref
+Main.AlphaZero.GameInterface) interface and with any external oracle.
 """
 module MCTS
 
@@ -18,26 +16,47 @@ import ..GI
 #####
 
 """
-    Oracle{Game}
+    MCTS.Oracle{Game}
     
-See [`MCTS.evaluate`](@ref)
+Abstract base type for an oracle. Oracles must implement
+[`MCTS.evaluate`](@ref) and [`MCTS.evaluate_batch`](@ref).
 """
 abstract type Oracle{Game} end
 
 """
     MCTS.evaluate(oracle::Oracle, board, available_actions)
-    
-Evaluate a single board position using an oracle.
+
+Evaluate a single board position (assuming white is playing).
+
+Return a pair `(P, V)` where:
+
+  - `P` is a probability vector on available actions
+  - `V` is a scalar estimating the value or win probability for white.
 """
 function evaluate end
 
-# Default implementation (inefficient)
-function evaluate_batch(oracle::Oracle, requests)
+"""
+    MCTS.evaluate_batch(oracle::Oracle, batch)
+    
+Evaluate a batch of board positions.
+
+Expect a vector of `(board, available_actions)` pairs and
+return a vector of `(P, V)` pairs.
+
+A default implementation is provided that calls [`MCTS.evaluate`](@ref)
+sequentially on each position.
+"""
+function evaluate_batch(oracle::Oracle, batch)
   return [evaluate(oracle, b, a) for (b, a) in requests]
 end
 
-# The simplest way to evaluate a position is to perform rollouts
-# Alternatively, the user can provide a NN-based oracle
+"""
+    MCTS.RolloutOracle{Game} <: MCTS.Oracle{Game}
+    
+This oracle estimates the value of a position by simulating a random game
+from it (a rollout). Moreover, it puts a uniform prior on available actions.
+Therefore, it can be used to implement the "vanilla" MCTS algorithm.
+"""
 struct RolloutOracle{Game} <: Oracle{Game} end
 
 function rollout(::Type{Game}, board) where Game
@@ -95,6 +114,27 @@ mutable struct Worker{Board, Action}
   end
 end
 
+"""
+    MCTS.Env{Game}(oracle, nworkers=1, cpuct=1.) where Game
+
+Create and initialize an MCTS environment.
+
+## Arguments
+
+  - `oracle`: external oracle
+  - `nworkers`: numbers of asynchronous workers (see below).
+  - `cpuct`: exploration constant (in the UCT formula)
+  
+## Asynchronous MCTS
+
+  - If `nworkers == 1`, MCTS is run in a synchronous fashion and the oracle is
+    invoked through [`MCTS.evaluate`](@ref).
+
+  - If `nworkers > 1`, `nworkers` asynchronous workers are spawned,
+    along with an additional task to serve board evaluation requests.
+    Such requests are processed by batches of
+    size `nworkers` using [`MCTS.evaluate_batch`](@ref).
+"""
 mutable struct Env{Game, Board, Action, Oracle}
   # Store (nonterminal) state statistics assuming player one is to play
   tree :: Dict{Board, BoardInfo}
@@ -109,7 +149,7 @@ mutable struct Env{Game, Board, Action, Oracle}
   total_time :: Float64
   inference_time :: Float64
 
-  function Env{G}(oracle, nworkers, cpuct=1.) where G
+  function Env{G}(oracle, nworkers=1, cpuct=1.) where G
     B = GI.Board(G)
     A = GI.Action(G)
     tree = Dict{B, BoardInfo}()
@@ -122,6 +162,12 @@ mutable struct Env{Game, Board, Action, Oracle}
   end
 end
 
+"""
+    MCTS.memory_footprint_per_node(env)
+    
+Return an estimate of the memory footprint of a single node
+of the MCTS tree (in bytes).
+"""
 function memory_footprint_per_node(env::Env{G}) where G
   # The hashtable is at most twice the number of stored elements
   # For every element, a board and a pointer are stored
@@ -135,6 +181,11 @@ end
 # Possibly very slow for large trees
 memory_footprint(env::Env) = Base.summarysize(env.tree)
 
+"""
+    MCTS.approximate_memory_footprint(env)
+  
+Return an estimate of the memory footprint of the MCTS tree (in bytes).
+"""
 function approximate_memory_footprint(env::Env)
   return memory_footprint_per_node(env) * length(env.tree)
 end
@@ -312,13 +363,29 @@ function explore_async!(env::Env, state, nsims)
   return
 end
 
+"""
+    MCTS.explore!(env, state, nsims)
+    
+Run `nsims` MCTS iterations from `state`.
+
+In case there are multiple workers, `nsims` is rounded up to the nearest
+integer multiple of the number of workers.
+"""
 function explore!(env::Env, state, nsims)
   asynchronous(env) ?
     explore_async!(env, state, nsims) :
     explore_sync!(env, state, nsims)
 end
 
-# Returns (actions, distr)
+"""
+    MCTS.policy(env, state; τ=1.)
+    
+Return the recommended stochastic policy on `state`,
+with temperature parameter equal to `τ`.
+
+A call to this function must always be preceded by
+a call to [`MCTS.explore!`](@ref).
+"""
 function policy(env::Env, state; τ=1.0)
   actions = GI.available_actions(state)
   board = GI.canonical_board(state)
@@ -336,10 +403,22 @@ function policy(env::Env, state; τ=1.0)
   return actions, D ./ sum(D)
 end
 
+"""
+    MCTS.reset!(env)
+  
+Empty the MCTS tree.
+"""
 function reset!(env)
   empty!(env.tree)
 end
 
+"""
+    MCTS.inference_time_ratio(env)
+    
+Return the ratio of time spent by [`MCTS.explore!`](@ref)
+on position evaluation (through functions [`MCTS.evaluate`](@ref) or
+[`MCTS.evaluate_batch`](@ref)) since the environment's creation.
+"""
 function inference_time_ratio(env)
   T = env.total_time
   iszero(T) ? 0. : env.inference_time / T

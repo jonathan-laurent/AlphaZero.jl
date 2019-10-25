@@ -1,10 +1,18 @@
 module Util
 
-export Option
+export Option, @unimplemented
 
 import Random
 
 const Option{T} = Union{T, Nothing}
+
+struct Unimplemented <: Exception end
+
+macro unimplemented()
+  return quote
+    throw(Unimplemented())
+  end
+end
 
 # concat_cols(cols) == hcat(cols...)
 function concat_columns(cols)

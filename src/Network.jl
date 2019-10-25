@@ -5,8 +5,20 @@
 """
      Network{Game} <: MCTS.Oracle{Game}
 
-Abstract type for a neural network oracle for `Game`.
-It must implement the following interface
+Abstract type for a neural network oracle.
+
+Any subtype `MyNet` of `Network` must implement the following interface.
+
+# Forward evaluation
+
+    (network::MyNet)(board, action_mask)
+    
+Evaluate
+
+# Flux Interface
+
+# Debugging and profiling
+  -
   - Flux.gpu(nn), Flux.cpu(nn)
   - Flux.params(nn), Flux.loadparams!(nn, p)
   - [`hyperparams(net)`](@ref AlphaZero.hyperparams(::SimpleNet))
