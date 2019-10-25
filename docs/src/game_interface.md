@@ -7,10 +7,11 @@ CurrentModule = AlphaZero.GameInterface
 The [`GameInterface`](@ref Main.AlphaZero.GameInterface) module provides a
 generic interface to two-players, zero-sum, symmetric board games.
 
-  * Types and constructors
+  * Types, traits and constructors
     - [`Game()`](@ref AbstractGame)
     - [`Game(board)`](@ref AbstractGame)
     - [`Game(board, white_playing)`](@ref AbstractGame)
+    - [`Base.copy(game)`](@ref Base.copy(::AbstractGame))
     - [`Board(Game)`](@ref Board)
     - [`Action(Game)`](@ref Action)
   * Game functions
@@ -31,9 +32,7 @@ generic interface to two-players, zero-sum, symmetric board games.
     - [`read_state(Game)`](@ref read_state)
     - [`print_state(state)`](@ref print_state)
 
-## Complete Interface Description
-
-### Types
+## Types
 
 ```@docs
 AbstractGame
@@ -42,7 +41,7 @@ Board
 Action
 ```
 
-### Game Functions
+## Game Functions
 
 ```@docs
 white_playing
@@ -53,7 +52,7 @@ available_actions
 play!
 ```
 
-### Machine Learning Interface
+## Machine Learning Interface
 
 ```@docs
 vectorize_board
@@ -62,7 +61,7 @@ action_id
 action
 ```
 
-### Interface for Interactive Tools
+## Interface for Interactive Tools
 
 ```@docs
 action_string

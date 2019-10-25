@@ -9,4 +9,5 @@ CurrentModule = AlphaZero
 ```@docs
 MCTS
 GameInterface
+Networks
 ```

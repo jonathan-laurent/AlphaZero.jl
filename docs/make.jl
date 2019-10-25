@@ -8,6 +8,7 @@ makedocs(
     pages = [
         "index.md",
         "game_interface.md",
+        "networks.md",
         "mcts.md",
         "misc.md"
     ]

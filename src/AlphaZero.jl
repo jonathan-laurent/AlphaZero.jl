@@ -21,34 +21,10 @@ import .MCTS
 include("Log.jl")
 using .Log
 
-using CUDAapi
-if has_cuda()
-  try
-    using CuArrays
-    @eval const CUARRAYS_IMPORTED = true
-  catch ex
-    @warn(
-      "CUDA is installed, but CuArrays.jl fails to load.",
-      exception=(ex,catch_backtrace()))
-    @eval const CUARRAYS_IMPORTED = false
-  end
-else
-  @eval const CUARRAYS_IMPORTED = false
-end
+include("Report.jl")
 
-import Flux
-
-if CUARRAYS_IMPORTED
-  @eval begin
-    on_gpu(::Type{<:Array}) = false
-    on_gpu(::Type{<:CuArray}) = true
-    on_gpu(::Type{<:Flux.TrackedArray{R,N,A}}) where {R, N, A} = on_gpu(A)
-  end
-else
-  @eval begin
-    on_gpu(x) = false
-  end
-end
+include("Network.jl")
+using .Networks
 
 import Plots
 import Colors
@@ -62,13 +38,10 @@ using Base: @kwdef
 using Serialization: serialize, deserialize
 using DataStructures: Stack, CircularBuffer
 using Distributions: Categorical, Dirichlet
-using Flux: Tracker, Chain, Dense, relu, softmax, cpu, gpu
 using Statistics: mean
 
 include("Params.jl")
-include("Report.jl")
 include("MemoryBuffer.jl")
-include("Network.jl")
 include("Learning.jl")
 include("Play.jl")
 include("Training.jl")
@@ -76,6 +49,9 @@ include("Explorer.jl")
 include("Validation.jl")
 include("Plots.jl")
 include("Session.jl")
+
+# We add default support for the Flux.jl framework
+include("Flux.jl")
 
 end
 

@@ -41,7 +41,7 @@ wmean(x, w) = sum(x .* w) / sum(w)
 function losses(nn, params, Wmean, Hp, (W, X, A, P, V))
   creg = params.l2_regularization
   cinv = params.nonvalidity_penalty
-  P̂, V̂, p_invalid = nn(X, A)
+  P̂, V̂, p_invalid = Networks.evaluate(nn, X, A)
   Lp = klloss_wmean(P̂, P, W) - Hp
   Lv = mse_wmean(V̂, V, W)
   Lreg = iszero(creg) ?
@@ -64,7 +64,6 @@ struct Trainer
   samples
   Wmean
   Hp
-  optimizer
   function Trainer(
     network::Network{G},
     examples::Vector{<:TrainingExample},
@@ -73,28 +72,23 @@ struct Trainer
     examples = merge_by_board(examples)
     samples = convert_samples(G, examples)
     network = copy(network)
-    if params.use_gpu
-      if CUARRAYS_IMPORTED
-        CuArrays.allowscalar(false) # Does not work if moved to AlphaZero.jl
-      end
-      samples = gpu.(samples)
-      network = gpu(network)
-    end
+    network = params.use_gpu ?
+      Networks.to_gpu(network) : Networks.to_cpu(network)
+    samples = Networks.convert_input_tuple(network, samples)
     W, X, A, P, V = samples
     Wmean = mean(W)
     Hp = entropy_wmean(P, W)
-    optimizer = Flux.ADAM(params.learning_rate)
-    return new(network, examples, params, samples, Wmean, Hp, optimizer)
+    return new(network, examples, params, samples, Wmean, Hp)
   end
 end
 
-get_trained_network(tr::Trainer) = tr.network |> copy |> cpu
+get_trained_network(tr::Trainer) = tr.network |> copy |> Networks.to_cpu
 
 function training_epoch!(tr::Trainer)
   loss(batch...) = losses(
     tr.network, tr.params, tr.Wmean, tr.Hp, batch)[1]
   data = Util.random_batches(tr.samples, tr.params.batch_size)
-  Flux.train!(loss, Flux.params(tr.network), data, tr.optimizer)
+  Networks.train!(tr.network, loss, data, tr.params.learning_rate)
 end
 
 #####
@@ -102,21 +96,21 @@ end
 #####
 
 function loss_report(tr::Trainer)
-  ltuple = Tracker.data.(
+  ltuple = Networks.convert_output_tuple(tr.network,
     losses(tr.network, tr.params, tr.Wmean, tr.Hp, tr.samples))
   return Report.Loss(ltuple...)
 end
 
 function learning_status(tr::Trainer)
   loss = loss_report(tr)
-  net = network_report(tr.network)
+  net = Networks.network_report(tr.network)
   return Report.LearningStatus(loss, net)
 end
 
 function network_output_entropy(tr::Trainer)
   W, X, A, P, V = tr.samples
-  P̂, _ = tr.network(X, A)
-  return entropy_wmean(P̂, W) |> Tracker.data
+  P̂, _ = Networks.evaluate(tr.network, X, A)
+  return Networks.convert_output(tr.network, entropy_wmean(P̂, W))
 end
 
 function samples_report(tr::Trainer)

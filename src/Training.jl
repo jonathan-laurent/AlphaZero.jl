@@ -45,7 +45,7 @@ import .Handlers
 #####
 
 function initial_report(env::Env)
-  num_network_parameters = num_parameters(env.bestnn)
+  num_network_parameters = Networks.num_parameters(env.bestnn)
   player = MctsPlayer(env.bestnn, env.params.self_play.mcts)
   mcts_footprint_per_node = MCTS.memory_footprint_per_node(player.mcts)
   return Report.Initial(num_network_parameters, mcts_footprint_per_node)
