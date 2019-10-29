@@ -15,11 +15,11 @@ end
 
 function convert_samples(Game, es::Vector{<:TrainingExample})
   ces = [convert_sample(Game, e) for e in es]
-  W = Util.concat_columns((e[1] for e in ces))
-  X = Util.concat_columns((e[2] for e in ces))
-  A = Util.concat_columns((e[3] for e in ces))
-  P = Util.concat_columns((e[4] for e in ces))
-  V = Util.concat_columns((e[5] for e in ces))
+  W = Util.superpose((e[1] for e in ces))
+  X = Util.superpose((e[2] for e in ces))
+  A = Util.superpose((e[3] for e in ces))
+  P = Util.superpose((e[4] for e in ces))
+  V = Util.superpose((e[5] for e in ces))
   f32(arr) = convert(AbstractArray{Float32}, arr)
   return f32.((W, X, A, P, V))
 end
@@ -46,7 +46,7 @@ function losses(nn, params, Wmean, Hp, (W, X, A, P, V))
   Lv = mse_wmean(V̂, V, W)
   Lreg = iszero(creg) ?
     zero(Lv) :
-    creg * sum(sum(w .* w) for w in regularized_weights(nn))
+    creg * sum(sum(w .* w) for w in Network.regularized_params(nn))
   Linv = iszero(cinv) ?
     zero(Lv) :
     cinv * wmean(p_invalid, W)
@@ -54,7 +54,6 @@ function losses(nn, params, Wmean, Hp, (W, X, A, P, V))
   return (L, Lp, Lv, Lreg, Linv)
 end
 
-# Does not mody the network it is given in place.
 # Works with Float32
 # Takes care of interfacing with the GPU
 struct Trainer
@@ -71,9 +70,7 @@ struct Trainer
   ) where G
     examples = merge_by_board(examples)
     samples = convert_samples(G, examples)
-    network = copy(network)
-    network = params.use_gpu ?
-      Network.to_gpu(network) : Network.to_cpu(network)
+    network = Network.copy(network, on_gpu=params.use_gpu, test_mode=false)
     samples = Network.convert_input_tuple(network, samples)
     W, X, A, P, V = samples
     Wmean = mean(W)
@@ -82,7 +79,9 @@ struct Trainer
   end
 end
 
-get_trained_network(tr::Trainer) = tr.network |> copy |> Network.to_cpu
+function get_trained_network(tr::Trainer)
+  Network.copy(tr.network, on_gpu=true, test_mode=true)
+end
 
 function training_epoch!(tr::Trainer)
   loss(batch...) = losses(
@@ -101,26 +100,24 @@ function loss_report(tr::Trainer)
   return Report.Loss(ltuple...)
 end
 
-function learning_status(tr::Trainer)
-  loss = loss_report(tr)
-  net = Network.network_report(tr.network)
-  return Report.LearningStatus(loss, net)
-end
-
 function network_output_entropy(tr::Trainer)
   W, X, A, P, V = tr.samples
   P̂, _ = Network.evaluate(tr.network, X, A)
   return Network.convert_output(tr.network, entropy_wmean(P̂, W))
 end
 
-function samples_report(tr::Trainer)
+function learning_status(tr::Trainer)
   loss = loss_report(tr)
-  Hp = tr.Hp
-  Hp̂ = network_output_entropy(tr)
+  Hpnet = network_output_entropy(tr)
+  return Report.LearningStatus(loss, Hpnet)
+end
+
+function samples_report(tr::Trainer)
+  status = learning_status(tr)
   num_examples = sum(e.n for e in tr.examples)
   num_boards = length(tr.examples)
   Wtot = num_boards * tr.Wmean
-  return Report.Samples(num_examples, num_boards, Wtot, loss, Hp, Hp̂)
+  return Report.Samples(num_examples, num_boards, Wtot, tr.Hp, status)
 end
 
 function memory_report(

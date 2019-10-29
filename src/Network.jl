@@ -7,7 +7,6 @@ export AbstractNetwork
 
 import ..MCTS
 import ..GameInterface
-import ..Report
 
 using ..Util: @unimplemented
 
@@ -88,6 +87,17 @@ function on_gpu(::AbstractNetwork)
 end
 
 """
+    set_test_mode!(mode=true)
+    
+Put a network in test mode or in training mode.
+This is relevant for networks featuring layers such as
+batch normalization layers.
+"""
+function set_test_mode!(mode=true)
+  @unimplemented
+end
+
+"""
     convert_input(::AbstractNetwork, input)
     
 Convert an array (or number) to the right format so that it can be used
@@ -122,8 +132,8 @@ end
 """
     forward(::AbstractNetwork, board)
     
-Compute the forward pass of the network on a single input
-or on a batch of inputs (in which case the batch dimension is the last one).
+Compute the forward pass of the network on a batch of inputs
+(the batch dimension being the last one).
 
 Return a `(P, V)` triple. The probability vector `P` is allowed to put
 some weight on disallowed actions.
@@ -142,12 +152,12 @@ function train!(::AbstractNetwork, loss, data, learning_rate)
 end
 
 """
-    regularized_weights(::AbstractNetwork)
+    regularized_params(::AbstractNetwork)
     
-Return the collection of regularized weights of a network.
+Return the collection of regularized parameters of a network.
 This usually excludes neuron's biases.
 """
-function regularized_weights(::AbstractNetwork)
+function regularized_params(::AbstractNetwork)
   @unimplemented
 end
 
@@ -157,15 +167,6 @@ end
 Return the total number of parameters of a network.
 """
 function num_parameters(::AbstractNetwork)
-  @unimplemented
-end
-
-"""
-    network_report(::AbstractNetwork) :: Report.Network
-
-Return debugging informations on the network.
-"""
-function network_report(::AbstractNetwork) :: Report.Network
   @unimplemented
 end
 
@@ -182,11 +183,15 @@ function evaluate(nn::AbstractNetwork, board, actions_mask)
   return (p, v, p_invalid)
 end
 
+to_singleton_batch(x) = reshape(x, size(x)..., 1)
+from_singleton_batch(x) = reshape(x, size(x)[1:end-1])
+
 function MCTS.evaluate(nn::AbstractNetwork{G}, board, available_actions) where G
   x = GameInterface.vectorize_board(G, board)
   a = GameInterface.actions_mask(G, available_actions)
-  xnet, anet = convert_input_tuple(nn, (x, a))
-  p, v, _ = convert_output_tuple(nn, evaluate(nn, xnet, anet))
+  xnet, anet = to_singleton_batch.(convert_input_tuple(nn, (x, a)))
+  p, v, _ = from_singleton_batch.(
+    convert_output_tuple(nn, evaluate(nn, xnet, anet)))
   return (p[a], v[1])
 end
 
@@ -200,6 +205,13 @@ function MCTS.evaluate_batch(nn::AbstractNetwork{G}, batch) where G
   Xnet, Anet = convert_input_tuple(nn, (X, A))
   P, V, _ = convert_output_tuple(nn, evaluate(nn, Xnet, Anet))
   return [(P[A[:,i],i], V[1,i]) for i in eachindex(batch)]
+end
+
+function copy(network; on_gpu, test_mode)
+  network = Base.copy(network)
+  network = on_gpu ? to_gpu(network) : to_cpu(network)
+  set_test_mode!(network, test_mode)
+  return network
 end
 
 end

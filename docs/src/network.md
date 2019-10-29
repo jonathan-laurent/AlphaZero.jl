@@ -10,7 +10,8 @@ HyperParams
 hyperparams
 forward
 train!
-regularized_weights
+set_test_mode!
+regularized_params
 ```
 
 ## Conversion and Copy
@@ -28,5 +29,4 @@ convert_output
 
 ```@docs
 num_parameters
-network_report
 ```

@@ -2,9 +2,7 @@ Network = AlphaZero.SimpleNet{Game}
 
 netparams = AlphaZero.SimpleNetHyperParams(
   width=600,
-  depth_common=3,
-  depth_vbranch=2,
-  depth_pbranch=2)
+  depth_common=4)
 
 self_play = AlphaZero.SelfPlayParams(
   num_games=600,

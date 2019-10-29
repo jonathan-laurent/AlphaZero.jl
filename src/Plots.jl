@@ -84,10 +84,10 @@ function plot_training(
   Plots.hline!(arena, [0, params.arena.update_threshold])
   # Loss on last batch
   losses_last = plot_losses(1:n, "Loss on last batch") do i
-    iterations[i].memory.latest_batch.loss
+    iterations[i].memory.latest_batch.status.loss
   end
   losses_fullmem = plot_losses(1:n, "Loss on full memory") do i
-    iterations[i].memory.all_samples.loss
+    iterations[i].memory.all_samples.status.loss
   end
   # Loss per game stage
   nstages = params.num_game_stages
@@ -95,7 +95,7 @@ function plot_training(
   pslosses = Plots.plot(title="Loss per Game Stage", ylims=(0, Inf))
   for s in 1:nstages
     Plots.plot!(pslosses, 1:n, [
-        it.memory.per_game_stage[s].samples_stats.loss.L
+        it.memory.per_game_stage[s].samples_stats.status.loss.L
         for it in iterations],
       label="$s",
       color=colors[s])
@@ -113,19 +113,8 @@ function plot_training(
     title="Policy Entropy",
     label="MCTS")
   Plots.plot!(entropies, 1:n,
-    [it.memory.latest_batch.Hp̂ for it in iterations],
+    [it.memory.latest_batch.status.Hpnet for it in iterations],
     label="Network")
-  # Network statistics
-  net = Plots.plot(1:n,
-    [it.learning.initial_status.network.maxw for it in iterations],
-    title="Neural Network Statistics",
-    label="Max W")
-  Plots.plot!(net, 1:n,
-    [it.learning.initial_status.network.meanw for it in iterations],
-    label="Mean W")
-  Plots.plot!(net, 1:n,
-    [it.learning.initial_status.network.vbias for it in iterations],
-    label="Value bias")
   # Performance reports
   perfs_global_labels = ["Self Play", "Memory Analysis", "Learning"]
   perfs_global_content = [
@@ -155,10 +144,10 @@ function plot_training(
   # Assembling everything together
   append!(plots, [
     arena, nepochs, pslosses, losses_fullmem, losses_last,
-    entropies, net, nsamples, perfs])
+    entropies, nsamples, perfs])
   append!(files, [
     "arena", "nepochs", "loss_per_stage", "loss_fullmem", "loss_last_batch",
-    "entropies", "net", "nsamples", "perfs"])
+    "entropies", "nsamples", "perfs"])
   for (file, plot) in zip(files, plots)
     #Plots.plot!(plot, dpi=200, size=(600, 200))
     Plots.savefig(plot, joinpath(dir, file))

@@ -27,20 +27,36 @@ function concat_columns(cols)
   return arr
 end
 
+# superpose(xs) == cat(xs..., dims=ndims(first(xs))+1)
+function superpose(arrays)
+  n = length(arrays)
+  @assert n > 0
+  ex = first(arrays)
+  dest = similar(ex, size(ex)..., n)
+  i = 1
+  for src in arrays
+    for j in eachindex(src)
+      dest[i] = src[j]
+      i += 1
+    end
+  end
+  return dest
+end
+
 infinity(::Type{R}) where R <: Real = one(R) / zero(R)
 
 function batches(X, batchsize)
-  n = size(X, 2)
+  n = size(X)[end]
   b = batchsize
   nbatches = n ÷ b
-  return (X[:,(1+b*(i-1)):(b*i)] for i in 1:nbatches)
+  return (selectdim(X, ndims(X), (1+b*(i-1)):(b*i)) for i in 1:nbatches)
 end
 
 function random_batches(xs::Tuple, batchsize)
-  let n = size(xs[1], 2)
+  let n = size(xs[1])[end]
   let perm = Random.randperm(n)
   bxs = map(xs) do x
-    batches(x[:,perm], batchsize)
+    batches(selectdim(x, ndims(x), perm), batchsize)
   end
   zip(bxs...)
   end end

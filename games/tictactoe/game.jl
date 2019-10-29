@@ -26,7 +26,6 @@ GI.Board(::Type{Game}) = Board
 
 GI.Action(::Type{Game}) = Int
 
-
 #####
 ##### Defining winning conditions
 #####
@@ -52,7 +51,6 @@ function has_won(g::Game, player)
     end
   end
 end
-
 
 #####
 ##### Game API
@@ -84,7 +82,6 @@ function GI.play!(g::Game, pos)
   g.curplayer = !g.curplayer
 end
 
-
 #####
 ##### Machine Learning API
 #####
@@ -95,13 +92,15 @@ GI.action(::Type{Game}, id) = id
 
 GI.action_id(::Type{Game}, pos) = pos
 
+# Vectorized representation: 3x3x3 array
+# Channels: free, white, black
 function GI.vectorize_board(::Type{Game}, board)
   Float32[
-    board[i] == c
-    for c in [nothing, WHITE, BLACK]
-    for i in 1:NUM_POSITIONS]
+    board[pos_of_xy((x, y))] == c
+    for x in 1:BOARD_SIDE,
+        y in 1:BOARD_SIDE,
+        c in [nothing, WHITE, BLACK]]
 end
-
 
 #####
 ##### Interaction API

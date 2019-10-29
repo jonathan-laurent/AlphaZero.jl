@@ -21,8 +21,6 @@ import .MCTS
 include("Log.jl")
 using .Log
 
-include("Report.jl")
-
 include("Network.jl")
 using .Network
 
@@ -41,6 +39,7 @@ using Distributions: Categorical, Dirichlet
 using Statistics: mean
 
 include("Params.jl")
+include("Report.jl")
 include("MemoryBuffer.jl")
 include("Learning.jl")
 include("Play.jl")

@@ -5,23 +5,16 @@
 module Report
 
 struct Loss
-  L :: Float64
-  Lp :: Float64
-  Lv :: Float64
-  Lreg :: Float64
-  Linv :: Float64
-end
-
-struct Network
-  maxw  :: Float64
-  meanw :: Float64
-  pbiases :: Vector{Float64}
-  vbias :: Float64
+  L :: Float32
+  Lp :: Float32
+  Lv :: Float32
+  Lreg :: Float32
+  Linv :: Float32
 end
 
 struct LearningStatus
   loss :: Loss
-  network :: Network
+  Hpnet :: Float32
 end
 
 struct Checkpoint
@@ -48,10 +41,9 @@ end
 struct Samples
   num_samples :: Int
   num_boards :: Int
-  Wtot :: Float64
-  loss :: Loss
-  Hp :: Float64
-  Hp̂ :: Float64
+  Wtot :: Float32
+  Hp :: Float32
+  status :: LearningStatus
 end
 
 struct StageSamples
@@ -101,18 +93,17 @@ const LEARNING_STATUS_TABLE = Log.Table(
   ("Lp",     NUM_COL,     s -> s.loss.Lp),
   ("Lreg",   NUM_COL,     s -> s.loss.Lreg),
   ("Linv",   NUM_COL,     s -> s.loss.Linv),
-  ("MaxW",   NUM_COL,     s -> s.network.maxw),
-  ("MeanW",  NUM_COL,     s -> s.network.meanw))
+  ("Hpnet",  NUM_COL,     s -> s.Hpnet))
 
 const SAMPLES_STATS_TABLE = Log.Table(
-  ("Loss",   NUM_COL,     s -> s.loss.L),
-  ("Lv",     NUM_COL,     s -> s.loss.Lv),
-  ("Lp",     NUM_COL,     s -> s.loss.Lp),
-  ("Lreg",   NUM_COL,     s -> s.loss.Lreg),
-  ("Linv",   NUM_COL,     s -> s.loss.Linv),
+  ("Loss",   NUM_COL,     s -> s.status.loss.L),
+  ("Lv",     NUM_COL,     s -> s.status.loss.Lv),
+  ("Lp",     NUM_COL,     s -> s.status.loss.Lp),
+  ("Lreg",   NUM_COL,     s -> s.status.loss.Lreg),
+  ("Linv",   NUM_COL,     s -> s.status.loss.Linv),
+  ("Hpnet",  NUM_COL,     s -> s.status.Hpnet),
   ("Hp",     NUM_COL,     s -> s.Hp),
-  ("Hpnet",  NUM_COL,     s -> s.Hp̂),
-  ("Λtot",   BIGINT_COL,  s -> s.Wtot),
+  ("Wtot",   BIGINT_COL,  s -> s.Wtot),
   ("Nb",     BIGINT_COL,  s -> s.num_boards),
   ("Ns",     BIGINT_COL,  s -> s.num_samples))
 
