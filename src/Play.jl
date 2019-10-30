@@ -45,6 +45,13 @@ function think(p::MctsPlayer, state)
   # The line below is necessary so that Distributions.isprob
   # does not get too picky.
   π_exp = convert(Vector{Float32}, π_exp)
+  if !(sum(π_exp) ≈ 1)
+    if iszero(sum(π_exp))
+      π_exp = [1f0 for _ in π_exp] ./ length(π_exp)
+    else
+      π_exp ./= sum(π_exp)
+    end
+  end
   a = actions[rand(Categorical(π_exp))]
   return π_mcts, a
 end

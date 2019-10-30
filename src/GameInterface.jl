@@ -217,7 +217,7 @@ end
 ##### Derived functions
 #####
 
-board_dim(::Type{G}) where G = length(vectorize_board(G, board(G())))
+board_dim(::Type{G}) where G = size(vectorize_board(G, board(G())))
 
 function actions_mask(::Type{G}, available_actions) where G
   nactions = num_actions(G)

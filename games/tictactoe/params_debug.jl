@@ -1,17 +1,20 @@
 # Does not work very well as MCTS is reset at every step...
 
-#=
+
 Network = AlphaZero.ResNet{Game}
 
-netparams = AlphaZero.ResNetHyperParams(
-  width=256,
-  num_blocks=5)
-=#
+netparams = AlphaZero.ResNetHP(
+  num_filters=64,
+  num_blocks=5,
+  num_policy_head_filters = 32,
+  num_value_head_filters = 32)
 
+#=
 Network = AlphaZero.SimpleNet{Game}
-netparams = AlphaZero.SimpleNetHyperParams(
+netparams = AlphaZero.SimpleNetHP(
   width=600,
   depth_common=4)
+=#
 
 # Evaluate with 0 MCTS iterations
 # Exploration is induced by MCTS and by the temperature τ=1
@@ -32,7 +35,7 @@ self_play = AlphaZero.SelfPlayParams(
     dirichlet_noise_ϵ=0.15))
 
 learning = AlphaZero.LearningParams(
-  l2_regularization=1e-5,
+  l2_regularization=1e-4,
   nonvalidity_penalty=1.,
   checkpoints=[10, 20])
 

@@ -50,7 +50,8 @@ include("Plots.jl")
 include("Session.jl")
 
 # We add default support for the Flux.jl framework
-include("Flux.jl")
+include("Flux/FluxNets.jl")
+using .FluxNets
 
 end
 

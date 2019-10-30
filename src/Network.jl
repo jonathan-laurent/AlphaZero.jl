@@ -7,6 +7,7 @@ export AbstractNetwork
 
 import ..MCTS
 import ..GameInterface
+import ..Util
 
 using ..Util: @unimplemented
 
@@ -178,7 +179,7 @@ function evaluate(nn::AbstractNetwork, board, actions_mask)
   p, v = forward(nn, board)
   p = p .* actions_mask
   sp = sum(p, dims=1)
-  p  = p ./ (sp .+ eps(eltype(p)))
+  p = p ./ (sp .+ eps(eltype(p)))
   p_invalid = 1 .- sp
   return (p, v, p_invalid)
 end
@@ -196,10 +197,10 @@ function MCTS.evaluate(nn::AbstractNetwork{G}, board, available_actions) where G
 end
 
 function MCTS.evaluate_batch(nn::AbstractNetwork{G}, batch) where G
-  X = Util.concat_columns((
+  X = Util.superpose((
     GameInterface.vectorize_board(G, b)
     for (b, as) in batch))
-  A = Util.concat_columns((
+  A = Util.superpose((
     GameInterface.actions_mask(G, as)
     for (b, as) in batch))
   Xnet, Anet = convert_input_tuple(nn, (X, A))
