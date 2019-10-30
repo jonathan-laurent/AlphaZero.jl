@@ -4,7 +4,7 @@
 
 """
     Session{Env}
-    
+
 A basic user interface for AlphaZero environments.
 """
 mutable struct Session{Env}
@@ -140,7 +140,7 @@ end
 """
     Session(Game, Network, params, netparams;
       dir="session", autosave=true, validation=nothing)
-    
+
 Create a new session.
 """
 function Session(
@@ -161,9 +161,9 @@ function Session(
     # Show initial report
     Log.section(logger, 2, "Initial report")
     Report.print(logger, initial_report(env))
-    run_validation_experiment(session, iterdir(session.dir, 0))
     if autosave
       save(session)
+      run_validation_experiment(session, iterdir(session.dir, 0))
       save(session, iterdir(session.dir, 0))
     end
   end
@@ -172,15 +172,23 @@ end
 
 """
     Session(Game, Network, dir; autosave=true, validation=nothing)
-    
+
 Load an existing session from a directory.
 """
 function Session(
     ::Type{Game}, ::Type{Network}, dir; autosave=true, validation=nothing
   ) where {Game, Network}
-  env = load_env(Game, Network, session.logger, dir)
   logfile = open(joinpath(dir, LOG_FILE), "a")
   logger = Logger(logfile=logfile)
+  env = load_env(Game, Network, logger, dir)
+  return Session(env, dir, logfile, logger, autosave, validation)
+end
+
+function Session(env::Env, dir)
+  logfile = open(joinpath(dir, LOG_FILE), "a")
+  logger = Logger(logfile=logfile)
+  autosave = false
+  validation = nothing
   return Session(env, dir, logfile, logger, autosave, validation)
 end
 
@@ -271,7 +279,7 @@ function Handlers.iteration_finished(session::Session, report)
     open(joinpath(idir, REPORT_FILE), "w") do io
       JSON2.pretty(io, JSON2.write(report))
     end
-    plot_iteration(report, session.env.params, idir)
+    plot_learning(report.learning, session.env.params, idir)
     plot_training(session.dir)
     Log.section(session.logger, 2, "Environment saved in: $(session.dir)")
   end

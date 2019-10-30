@@ -1,13 +1,18 @@
-# Does not work very well as MCTS is reset at every step...
+const RESNET = false
 
-
-Network = AlphaZero.ResNet{Game}
-
-netparams = AlphaZero.ResNetHP(
-  num_filters=64,
-  num_blocks=5,
-  num_policy_head_filters = 32,
-  num_value_head_filters = 32)
+if RESNET
+  Network = AlphaZero.ResNet{Game}
+  netparams = AlphaZero.ResNetHP(
+    num_filters=64,
+    num_blocks=5,
+    num_policy_head_filters=32,
+    num_value_head_filters=32)
+else
+  Network = AlphaZero.SimpleNet{Game}
+  netparams = AlphaZero.SimpleNetHP(
+    width=300,
+    depth_common=3)
+end
 
 #=
 Network = AlphaZero.SimpleNet{Game}

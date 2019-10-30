@@ -48,6 +48,10 @@ end
   num_game_stages :: Int # as featured in memory reports
 end
 
+for T in [MctsParams, ArenaParams, SelfPlayParams, LearningParams, Params]
+  Util.generate_update_constructor(T) |> eval
+end
+
 #####
 ##### Parameters from the original AlphaZero paper
 #####

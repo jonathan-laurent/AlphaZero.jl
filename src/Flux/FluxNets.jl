@@ -9,6 +9,7 @@ export SimpleNet, SimpleNetHP, ResNet, ResNetHP
 using ..Network
 using Base: @kwdef
 import ..GameInterface
+import ..Util
 
 using CUDAapi
 
@@ -59,7 +60,10 @@ end
 
 Network.to_cpu(nn::FluxNetwork) = Flux.cpu(nn)
 
-Network.to_gpu(nn::FluxNetwork) = Flux.gpu(nn)
+function Network.to_gpu(nn::FluxNetwork)
+  CUARRAYS_IMPORTED && CuArrays.allowscalar(false)
+  return Flux.gpu(nn)
+end
 
 Network.set_test_mode!(nn::FluxNetwork, mode) = Flux.testmode!(nn, mode)
 
@@ -70,7 +74,7 @@ Network.convert_output(nn::FluxNetwork, x) = Tracker.data(Flux.cpu(x))
 
 Network.num_parameters(nn::FluxNetwork) =
   sum(length(p) for p in Flux.params(nn))
-  
+
 function Network.train!(nn::FluxNetwork, loss, data, lr)
   optimizer = Flux.ADAM(lr)
   Flux.train!(loss, Flux.params(nn), data, optimizer)
@@ -113,6 +117,12 @@ end
 Network.hyperparams(nn::TwoHeadNetwork) = nn.hyper
 
 Network.on_gpu(nn::TwoHeadNetwork) = on_gpu(nn.vbranch[end].b)
+
+#####
+##### Utilities for the networks library
+#####
+
+linearize(x) = reshape(x, :, size(x)[end])
 
 #####
 ##### Include networks library

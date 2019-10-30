@@ -5,7 +5,11 @@
 
 module AlphaZero
 
-export Session
+export MCTS, GameInterface, GI, Report, Network, FluxNets
+export Session, Env
+export Params, SelfPlayParams, ArenaParams, MctsParams, LearningParams
+export train!, learning!, self_play!, memory_report, get_experience
+export save, plot_learning
 
 include("Util.jl")
 import .Util

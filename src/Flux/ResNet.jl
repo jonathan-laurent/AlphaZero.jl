@@ -10,10 +10,12 @@
   num_value_head_filters :: Int = 1
 end
 
+Util.generate_update_constructor(ResNetHP) |> eval
+
 const BASIC_RESNET_HP = ResNetHP(
   num_blocks = 5,
   num_filters = 64)
-  
+
 const ALPHAZERO_RESNET_HP = ResNetHP(
   num_blocks = 20,
   num_filters = 256)

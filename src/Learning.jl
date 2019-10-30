@@ -127,8 +127,10 @@ function memory_report(
     nstages
     ) where G
   Tr(es) = Trainer(nn, es, params)
-  latest_batch = samples_report(Tr(last_batch(mem)))
   all_samples = samples_report(Tr(get(mem)))
+  latest_batch = isempty(last_batch(mem)) ?
+    all_samples :
+    samples_report(Tr(last_batch(mem)))
   per_game_stage = begin
     es = get(mem)
     sort!(es, by=(e->e.t))

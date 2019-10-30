@@ -44,6 +44,8 @@ import .Handlers
 ##### Training loop
 #####
 
+get_experience(env::Env) = get(env.memory)
+
 function initial_report(env::Env)
   num_network_parameters = Network.num_parameters(env.bestnn)
   player = MctsPlayer(env.bestnn, env.params.self_play.mcts)

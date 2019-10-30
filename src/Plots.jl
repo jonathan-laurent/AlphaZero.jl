@@ -14,20 +14,20 @@ end
 ##### Iteration summary plots
 #####
 
-function plot_iteration(
-    report::Report.Iteration,
+function plot_learning(
+    report::Report.Learning,
     params::Params,
     dir::String)
   isdir(dir) || mkpath(dir)
-  epochs = report.learning.epochs
+  epochs = report.epochs
   losses_plot = plot_losses(0:length(epochs), "Losses") do i
     if i == 0
-      report.learning.initial_status.loss
+      report.initial_status.loss
     else
       epochs[i].status_after.loss
     end
   end
-  checkpoints = report.learning.checkpoints
+  checkpoints = report.checkpoints
   checkpoints_plot = Plots.hline(
     [0, params.arena.update_threshold],
     title="Checkpoints")

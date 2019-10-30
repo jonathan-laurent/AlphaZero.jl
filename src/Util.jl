@@ -49,7 +49,9 @@ function batches(X, batchsize)
   n = size(X)[end]
   b = batchsize
   nbatches = n ÷ b
-  return (selectdim(X, ndims(X), (1+b*(i-1)):(b*i)) for i in 1:nbatches)
+  # The call to `copy` after selectdim is important because Flux does not
+  # deal well with views.
+  return (copy(selectdim(X, ndims(X), (1+b*(i-1)):(b*i))) for i in 1:nbatches)
 end
 
 function random_batches(xs::Tuple, batchsize)
@@ -71,6 +73,18 @@ macro printing_errors(expr)
     catch e
       showerror(stderr, e, catch_backtrace())
     end
+  end
+end
+
+function generate_update_constructor(T)
+  fields = fieldnames(T)
+  Tname = Symbol(split(string(T), ".")[end])
+  base = :_old_
+  @assert base ∉ fields
+  fields_withdef = [Expr(:kw, f, :($base.$f)) for f in fields]
+  quote
+    #$Tname(;$(fields...)) = $Tname($(fields...))
+    $Tname($base::$Tname; $(fields_withdef...)) = $Tname($(fields...))
   end
 end
 

@@ -7,7 +7,10 @@
   depth_common :: Int
   depth_pbranch :: Int = 1
   depth_vbranch :: Int = 1
+  use_batch_norm :: Bool = false
 end
+
+Util.generate_update_constructor(SimpleNetHP) |> eval
 
 struct SimpleNet{Game} <: TwoHeadNetwork{Game}
   hyper
@@ -16,19 +19,18 @@ struct SimpleNet{Game} <: TwoHeadNetwork{Game}
   pbranch
 end
 
-function linearize(x)
-  s = size(x)
-  return reshape(x, prod(s[1:end-1]), s[end])
-end
-
 function SimpleNet{G}(hyper::SimpleNetHP) where G
+  make_dense(indim, outdim) =
+    hyper.use_batch_norm ?
+      Chain(Dense(indim, outdim), Flux.BatchNorm(outdim, relu)) :
+      Dense(indim, outdim, relu)
   indim = prod(GameInterface.board_dim(G))
   outdim = GameInterface.num_actions(G)
   hsize = hyper.width
-  hlayers(depth) = [Dense(hsize, hsize, relu) for i in 1:depth]
+  hlayers(depth) = [make_dense(hsize, hsize) for i in 1:depth]
   common = Chain(
     linearize,
-    Dense(indim, hsize, relu),
+    make_dense(indim, hsize),
     hlayers(hyper.depth_common)...)
   vbranch = Chain(
     hlayers(hyper.depth_vbranch)...,
