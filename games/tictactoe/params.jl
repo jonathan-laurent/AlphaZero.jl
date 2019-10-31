@@ -1,4 +1,4 @@
-const RESNET = false
+const RESNET = true
 
 if RESNET
   Network = AlphaZero.ResNet{Game}
@@ -15,8 +15,8 @@ else
 end
 
 self_play = AlphaZero.SelfPlayParams(
-  num_games=6000,
-  reset_mcts_every=3000,
+  num_games=4000,
+  reset_mcts_every=4000,
   mcts = AlphaZero.MctsParams(
     num_workers=1,
     num_iters_per_turn=320,
@@ -25,26 +25,27 @@ self_play = AlphaZero.SelfPlayParams(
 # Evaluate with 0 MCTS iterations
 # Exploration is induced by MCTS and by the temperature τ=1
 arena = AlphaZero.ArenaParams(
-  num_games=500,
-  reset_mcts_every=500,
-  update_threshold=0.01,
+  num_games=1000,
+  reset_mcts_every=1,
+  update_threshold=(2*0.55 - 1),
   mcts = AlphaZero.MctsParams(
     num_workers=1,
     num_iters_per_turn=0,
     dirichlet_noise_ϵ=0.1))
 
 learning = AlphaZero.LearningParams(
-  l2_regularization=1e-5,
+  l2_regularization=1e-6,
   batch_size=256,
   nonvalidity_penalty=1.,
-  checkpoints=[5, 10, 15, 20, 25, 30, 35, 40, 45, 50])
+  checkpoints=[1, 2, 5, 10, 20])
 
 params = AlphaZero.Params(
   arena=arena,
   self_play=self_play,
   learning=learning,
-  num_iters=3,
-  num_game_stages=9)
+  num_iters=4,
+  num_game_stages=9,
+  mem_buffer_size=PLSchedule{Int}([0, 4], [20_000, 60_000]))
 
 validation = AlphaZero.RolloutsValidation(
   num_games = 500,

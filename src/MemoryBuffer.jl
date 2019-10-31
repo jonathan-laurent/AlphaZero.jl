@@ -25,6 +25,12 @@ mutable struct MemoryBuffer{Board}
   end
 end
 
+function Base.empty!(b::MemoryBuffer)
+  empty!(b.cur)
+  empty!(b.mem)
+  b.last_batch_size = 0
+end
+
 Base.length(b::MemoryBuffer) = length(b.mem)
 
 function merge_samples(es::Vector{TrainingExample{B}}) where B
@@ -52,9 +58,9 @@ end
 
 get(buf::MemoryBuffer) = buf.mem[:]
 
-last_batch(buf::MemoryBuffer) = buf.mem[end-buf.last_batch_size+1:end]
+last_batch(buf::MemoryBuffer) = buf.mem[end-last_batch_size(buf)+1:end]
 
-last_batch_size(buf::MemoryBuffer) = buf.last_batch_size
+last_batch_size(buf::MemoryBuffer) = min(buf.last_batch_size, length(buf))
 
 function push_sample!(buf::MemoryBuffer, board, policy, white_playing, turn)
   player_code = white_playing ? 1. : -1.

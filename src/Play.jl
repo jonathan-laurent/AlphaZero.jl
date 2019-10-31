@@ -29,8 +29,21 @@ struct RandomPlayer{Game} <: AbstractPlayer{Game} end
 function think(player::RandomPlayer, state)
   actions = GI.available_actions(state)
   n = length(actions)
-  π = ones(Float32, n) ./ length(actions)
+  π = ones(n) ./ length(actions)
   return π, rand(actions)
+end
+
+#####
+##### MCTS with random oracle
+#####
+
+function RandomMctsPlayer(::Type{G}, params::MctsParams) where G
+  oracle = MCTS.RandomOracle{G}()
+  mcts = MCTS.Env{G}(oracle, 1, params.cpuct)
+  return MctsPlayer(mcts, params.num_iters_per_turn,
+    τ=params.temperature,
+    nα=params.dirichlet_noise_nα,
+    ϵ=params.dirichlet_noise_ϵ)
 end
 
 #####

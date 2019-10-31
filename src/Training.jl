@@ -9,7 +9,7 @@ mutable struct Env{Game, Network, Board}
   itc    :: Int
   function Env{Game}(params, network, experience=[], itc=0) where Game
     Board = GI.Board(Game)
-    memory = MemoryBuffer{Board}(params.mem_buffer_size, experience)
+    memory = MemoryBuffer{Board}(length(experience), experience)
     env = new{Game, typeof(network), Board}(
       params, network, memory, itc)
     return env
@@ -45,6 +45,11 @@ import .Handlers
 #####
 
 get_experience(env::Env) = get(env.memory)
+
+function resize_memory!(env::Env{G,N,B}, n) where {G,N,B}
+  exp = get(env.memory)
+  env.memory = MemoryBuffer{B}(n, exp)
+end
 
 function initial_report(env::Env)
   num_network_parameters = Network.num_parameters(env.bestnn)
@@ -112,7 +117,9 @@ end
 
 function self_play!(env::Env{G}, handler) where G
   params = env.params.self_play
-  player = MctsPlayer(env.bestnn, params.mcts)
+  player = env.itc > 0 ?
+    MctsPlayer(env.bestnn, params.mcts) :
+    RandomMctsPlayer(G, params.mcts)
   new_batch!(env.memory)
   Handlers.self_play_started(handler)
   mem_footprint = 0
@@ -145,6 +152,7 @@ end
 function train!(env::Env{G}, handler=nothing) where G
   while env.itc < env.params.num_iters
     Handlers.iteration_started(handler)
+    resize_memory!(env, get(env.params.mem_buffer_size, env.itc))
     sprep, sptime = @timed self_play!(env, handler)
     mrep, mtime = @timed memory_report(env, handler)
     lrep, ltime = @timed learning!(env, handler)
@@ -153,8 +161,4 @@ function train!(env::Env{G}, handler=nothing) where G
     Handlers.iteration_finished(handler, rep)
   end
   Handlers.training_finished(handler)
-end
-
-function warmup_network(env::Env{Game}) where Game
-  # Collect experience
 end

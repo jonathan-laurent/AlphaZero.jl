@@ -17,7 +17,7 @@ import ..GI
 
 """
     MCTS.Oracle{Game}
-    
+
 Abstract base type for an oracle. Oracles must implement
 [`MCTS.evaluate`](@ref) and [`MCTS.evaluate_batch`](@ref).
 """
@@ -37,7 +37,7 @@ function evaluate end
 
 """
     MCTS.evaluate_batch(oracle::Oracle, batch)
-    
+
 Evaluate a batch of board positions.
 
 Expect a vector of `(board, available_actions)` pairs and
@@ -52,7 +52,7 @@ end
 
 """
     MCTS.RolloutOracle{Game} <: MCTS.Oracle{Game}
-    
+
 This oracle estimates the value of a position by simulating a random game
 from it (a rollout). Moreover, it puts a uniform prior on available actions.
 Therefore, it can be used to implement the "vanilla" MCTS algorithm.
@@ -73,6 +73,15 @@ function evaluate(::RolloutOracle{G}, board, available_actions) where G
   V = rollout(G, board)
   n = length(available_actions)
   P = [1 / n for a in available_actions]
+  return P, V
+end
+
+struct RandomOracle{Game} <: Oracle{Game} end
+
+function evaluate(::RandomOracle, board, actions)
+  n = length(actions)
+  P = ones(n) ./ n
+  V = 0.
   return P, V
 end
 
@@ -124,7 +133,7 @@ Create and initialize an MCTS environment.
   - `oracle`: external oracle
   - `nworkers`: numbers of asynchronous workers (see below).
   - `cpuct`: exploration constant (in the UCT formula)
-  
+
 ## Asynchronous MCTS
 
   - If `nworkers == 1`, MCTS is run in a synchronous fashion and the oracle is
@@ -164,7 +173,7 @@ end
 
 """
     MCTS.memory_footprint_per_node(env)
-    
+
 Return an estimate of the memory footprint of a single node
 of the MCTS tree (in bytes).
 """
@@ -183,7 +192,7 @@ memory_footprint(env::Env) = Base.summarysize(env.tree)
 
 """
     MCTS.approximate_memory_footprint(env)
-  
+
 Return an estimate of the memory footprint of the MCTS tree (in bytes).
 """
 function approximate_memory_footprint(env::Env)
@@ -365,7 +374,7 @@ end
 
 """
     MCTS.explore!(env, state, nsims)
-    
+
 Run `nsims` MCTS iterations from `state`.
 
 In case there are multiple workers, `nsims` is rounded up to the nearest
@@ -379,7 +388,7 @@ end
 
 """
     MCTS.policy(env, state; τ=1.)
-    
+
 Return the recommended stochastic policy on `state`,
 with temperature parameter equal to `τ`.
 
@@ -405,7 +414,7 @@ end
 
 """
     MCTS.reset!(env)
-  
+
 Empty the MCTS tree.
 """
 function reset!(env)
@@ -414,7 +423,7 @@ end
 
 """
     MCTS.inference_time_ratio(env)
-    
+
 Return the ratio of time spent by [`MCTS.explore!`](@ref)
 on position evaluation (through functions [`MCTS.evaluate`](@ref) or
 [`MCTS.evaluate_batch`](@ref)) since the environment's creation.

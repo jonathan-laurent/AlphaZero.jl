@@ -44,8 +44,8 @@ end
   self_play :: SelfPlayParams
   learning :: LearningParams
   num_iters :: Int
-  mem_buffer_size :: Int = 200_000
-  num_game_stages :: Int # as featured in memory reports
+  mem_buffer_size :: PLSchedule{Int}
+  num_game_stages :: Int # as featured in memory reports)
 end
 
 for T in [MctsParams, ArenaParams, SelfPlayParams, LearningParams, Params]

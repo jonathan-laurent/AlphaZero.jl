@@ -100,12 +100,6 @@ function plot_training(
       label="$s",
       color=colors[s])
   end
-  # Number of epochs
-  nepochs = Plots.plot(1:n,
-    [length(it.learning.epochs) for it in iterations],
-    title="Number of learning epochs",
-    legend=:false,
-    t=:bar)
   # Policies entropy
   entropies = Plots.plot(1:n,
     [it.memory.latest_batch.Hp for it in iterations],
@@ -143,10 +137,10 @@ function plot_training(
     perfs_global, perfs_self_play, perfs_learning)
   # Assembling everything together
   append!(plots, [
-    arena, nepochs, pslosses, losses_fullmem, losses_last,
+    arena, pslosses, losses_fullmem, losses_last,
     entropies, nsamples, perfs])
   append!(files, [
-    "arena", "nepochs", "loss_per_stage", "loss_fullmem", "loss_last_batch",
+    "arena", "loss_per_stage", "loss_fullmem", "loss_last_batch",
     "entropies", "nsamples", "perfs"])
   for (file, plot) in zip(files, plots)
     #Plots.plot!(plot, dpi=200, size=(600, 200))

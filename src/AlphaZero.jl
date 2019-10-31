@@ -6,10 +6,11 @@
 module AlphaZero
 
 export MCTS, GameInterface, GI, Report, Network, FluxNets
-export Session, Env
+export RolloutsValidation
+export AbstractSchedule, PLSchedule
 export Params, SelfPlayParams, ArenaParams, MctsParams, LearningParams
-export train!, learning!, self_play!, memory_report, get_experience
-export save, plot_learning
+export Env, train!, learning!, self_play!, memory_report, get_experience
+export Session, resume!, save, plot_learning
 
 include("Util.jl")
 import .Util
@@ -42,6 +43,7 @@ using DataStructures: Stack, CircularBuffer
 using Distributions: Categorical, Dirichlet
 using Statistics: mean
 
+include("Schedule.jl")
 include("Params.jl")
 include("Report.jl")
 include("MemoryBuffer.jl")
