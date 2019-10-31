@@ -53,6 +53,16 @@ for T in [MctsParams, ArenaParams, SelfPlayParams, LearningParams, Params]
 end
 
 #####
+##### Helpers
+#####
+
+# Let X ~ Ber(p).
+# We wonder: does p > 1/2 + ϵ
+# Returns the number of samples necessary so that if X̄> 1/2 + ϵ
+# then the hypothesis is true with probability >= 1-β
+necessary_samples(ϵ, β) = log(1 / β) / (2 * ϵ^2)
+
+#####
 ##### Parameters from the original AlphaZero paper
 #####
 

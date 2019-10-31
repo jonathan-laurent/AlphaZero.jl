@@ -25,8 +25,8 @@ self_play = AlphaZero.SelfPlayParams(
 # Evaluate with 0 MCTS iterations
 # Exploration is induced by MCTS and by the temperature τ=1
 arena = AlphaZero.ArenaParams(
-  num_games=2000,
-  reset_mcts_every=1000,
+  num_games=500,
+  reset_mcts_every=500,
   update_threshold=0.01,
   mcts = AlphaZero.MctsParams(
     num_workers=1,
