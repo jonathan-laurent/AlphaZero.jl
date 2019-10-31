@@ -154,3 +154,7 @@ function train!(env::Env{G}, handler=nothing) where G
   end
   Handlers.training_finished(handler)
 end
+
+function warmup_network(env::Env{Game}) where Game
+  # Collect experience
+end

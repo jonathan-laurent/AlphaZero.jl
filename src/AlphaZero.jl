@@ -13,7 +13,7 @@ export save, plot_learning
 
 include("Util.jl")
 import .Util
-using .Util: Option
+using .Util: Option, @unimplemented
 
 include("GameInterface.jl")
 import .GameInterface

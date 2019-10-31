@@ -2,7 +2,42 @@
 ##### An MCTS-based player
 #####
 
-struct MctsPlayer{G, M}
+abstract type AbstractPlayer{Game} end
+
+"""
+    think(::AbstractPlayer, state)
+
+Return an `(action, π)` pair where `action` is the chosen action and
+`π` a probability distribution over available actions.
+
+Note that `a` does not have to be drawn from `π`.
+"""
+function think(player::AbstractPlayer, state)
+  @unimplemented
+end
+
+function reset!(player::AbstractPlayer)
+  return
+end
+
+#####
+##### Random Player
+#####
+
+struct RandomPlayer{Game} <: AbstractPlayer{Game} end
+
+function think(player::RandomPlayer, state)
+  actions = GI.available_actions(state)
+  n = length(actions)
+  π = ones(Float32, n) ./ length(actions)
+  return π, rand(actions)
+end
+
+#####
+##### MCTS Player
+#####
+
+struct MctsPlayer{G, M} <: AbstractPlayer{G}
   mcts :: M
   niters :: Int
   τ :: Float64 # Temperature
@@ -25,6 +60,20 @@ function MctsPlayer(oracle::MCTS.Oracle{G}, params::MctsParams) where G
     ϵ=params.dirichlet_noise_ϵ)
 end
 
+function fix_probvec(π)
+  π = convert(Vector{Float32}, π)
+  s = sum(π)
+  if !(s ≈ 1)
+    if iszero(s)
+      n = length(π)
+      π = ones(Float32, n) ./ n
+    else
+      π ./= s
+    end
+  end
+  return π
+end
+
 function think(p::MctsPlayer, state)
   if iszero(p.niters)
     # Special case: use the oracle directly instead of MCTS
@@ -42,18 +91,12 @@ function think(p::MctsPlayer, state)
     noise = Dirichlet(n, p.nα / n)
     π_exp = (1 - p.ϵ) * π_mcts + p.ϵ * rand(noise)
   end
-  # The line below is necessary so that Distributions.isprob
-  # does not get too picky.
-  π_exp = convert(Vector{Float32}, π_exp)
-  if !(sum(π_exp) ≈ 1)
-    if iszero(sum(π_exp))
-      π_exp = [1f0 for _ in π_exp] ./ length(π_exp)
-    else
-      π_exp ./= sum(π_exp)
-    end
-  end
-  a = actions[rand(Categorical(π_exp))]
+  a = actions[rand(Categorical(fix_probvec(π_exp)))]
   return π_mcts, a
+end
+
+function reset!(player::MctsPlayer)
+  MCTS.reset!(player.mcts)
 end
 
 #####
@@ -62,7 +105,7 @@ end
 
 # Returns the reward and the game length
 function play(
-    white::MctsPlayer{Game}, black::MctsPlayer{Game}, memory=nothing
+    white::AbstractPlayer{Game}, black::AbstractPlayer{Game}, memory=nothing
   ) :: Float64 where Game
   state = Game()
   nturns = 0
@@ -89,8 +132,24 @@ self_play!(player, memory) = play(player, player, memory)
 ##### Evaluate two players against each other
 #####
 
+"""
+    pit(handler, baseline, contender, ngames [, reset_period])
+
+Evaluate two players against each other on a series of games,
+alternating colors.
+
+# Arguments
+
+  - `handler`: this function is called after each simulated
+     game with two arguments: the game number `i` and the collected reward `z`
+     for the contender player
+  - `baseline, contender :: AbstractPlayer`
+  - `ngames`: number of games to play
+  - `reset_period`: if set, players are reset every `reset_period` games
+"""
 function pit(
-    handler, baseline::MctsPlayer, contender::MctsPlayer, ngames, reset_period)
+    handler, baseline::AbstractPlayer, contender::AbstractPlayer,
+    ngames, reset_period=0)
   baseline_first = true
   zsum = 0.
   for i in 1:ngames
@@ -100,15 +159,11 @@ function pit(
     baseline_first && (z = -z)
     zsum += z
     handler(i, z)
-    baseline_first = !baseline_first
-    if i % reset_period == 0 || i == ngames
-      MCTS.reset!(baseline.mcts)
-      MCTS.reset!(contender.mcts)
+    if reset_period > 0 && (i % reset_period == 0 || i == ngames)
+      reset!(baseline)
+      reset!(contender)
     end
+    baseline_first = !baseline_first
   end
   return zsum / ngames
-end
-
-function pit(baseline, contender, ngames, reset_period)
-  return pit((i, z) -> nothing, baseline, contender, ngames, reset_period)
 end
