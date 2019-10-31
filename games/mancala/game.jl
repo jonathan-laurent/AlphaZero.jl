@@ -177,9 +177,30 @@ GI.action_id(::Type{Game}, a) = a
 GI.action(::Type{Game}, id) = id
 
 function GI.vectorize_board(::Type{Game}, board)
-  Float32[
-    board.houses[1,:]; board.stores[1];
-    board.houses[2,:]; board.stores[2]]
+  function cell(pos, chan)
+    if chan == :nstones
+      return read_pos(board, pos)
+    elseif chan == :whouse
+      return isa(pos, HousePos) && pos.player == WHITE
+    elseif chan == :wstore
+      return isa(pos, StorePos) && pos.player == WHITE
+    elseif chan == :bhouse
+      return isa(pos, HousePos) && pos.player == BLACK
+    elseif chan == :bstore
+      return isa(pos, StorePos) && pos.player == BLACK
+    end
+    @assert false
+  end
+  positions = [
+    [HousePos(WHITE, i) for i in NUM_HOUSES_PER_PLAYER:-1:1];
+    [StorePos(WHITE)];
+    [HousePos(BLACK, i) for i in NUM_HOUSES_PER_PLAYER:-1:1];
+    [StorePos(BLACK)]]
+  return Float32[
+    cell(p, c)
+    for p in positions,
+        y in 1:1,
+        c in [:nstones, :whouse, :wstore, :bhouse, :bstore]]
 end
 
 #####

@@ -1,15 +1,17 @@
 using Revise
-import AlphaZero
+using AlphaZero
+using AlphaZero.FluxNets
+
+Revise.includet("game.jl")
+using .Mancala
+Revise.includet("params.jl")
 
 DIR = "session-mancala"
 
-Revise.includet("game.jl") ; import .Mancala ; Game = Mancala.Game
-Revise.includet("params.jl")
-
-session = AlphaZero.Session(
+session = Session(
   Game, Network, params, netparams,
   dir=DIR, autosave=true, validation=validation)
 
-AlphaZero.resume!(session)
+resume!(session)
 
-AlphaZero.explore(session)
+explore(session)

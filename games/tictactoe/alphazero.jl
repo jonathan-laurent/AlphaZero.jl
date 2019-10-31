@@ -2,10 +2,11 @@ using Revise
 using AlphaZero
 using AlphaZero.FluxNets
 
-DIR = "session-tictactoe"
+Revise.includet("game.jl")
+using .TicTacToe
+Revise.includet("params_debug.jl")
 
-Revise.includet("game.jl") ; import .TicTacToe ; Game = TicTacToe.Game
-Revise.includet("params.jl")
+DIR = "session-tictactoe"
 
 session = Session(
   Game, Network, params, netparams,

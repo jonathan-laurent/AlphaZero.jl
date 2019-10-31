@@ -10,7 +10,7 @@ export RolloutsValidation
 export AbstractSchedule, PLSchedule
 export Params, SelfPlayParams, ArenaParams, MctsParams, LearningParams
 export Env, train!, learning!, self_play!, memory_report, get_experience
-export Session, resume!, save, plot_learning
+export Session, resume!, save, explore, plot_learning
 
 include("Util.jl")
 import .Util

@@ -16,14 +16,16 @@ end
 struct PLSchedule{R}
   xs :: Vector{Int}
   ys :: Vector{R}
-  function PLSchedule{R}(xs::Vector, ys::Vector) where R
+  function PLSchedule{R}(xs, ys) where R
     @assert !isempty(xs)
     @assert length(xs) == length(ys)
     new{R}(xs, ys)
   end
 end
 
-PLSchedule{R}(cst::R) where R = PLSchedule{R}([0], [cst])
+PLSchedule(xs, ys) = PLSchedule{eltype(ys)}(xs, ys)
+
+PLSchedule(cst) = PLSchedule([0], [cst])
 
 function get(s::PLSchedule{R}, i) where R
   ptidx = findlast(x -> x <= i, s.xs)
@@ -44,7 +46,7 @@ function get(s::PLSchedule{R}, i) where R
 end
 
 function test()
-  s = PLSchedule{Int}([0, 10, 20], [0, 10, 30])
+  s = PLSchedule([0, 10, 20], [0, 10, 30])
   xs = [-1, 0, 2, 10, 11, 20, 25]
   ys = [0,  0, 2, 10, 12, 30, 30]
   @assert [get(s, x) for x in xs] == ys

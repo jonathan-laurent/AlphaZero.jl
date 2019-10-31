@@ -5,6 +5,7 @@ if RESNET
   netparams = AlphaZero.ResNetHP(
     num_filters=64,
     num_blocks=5,
+    conv_kernel_size=(3,3),
     num_policy_head_filters=32,
     num_value_head_filters=32)
 else
@@ -34,7 +35,7 @@ arena = AlphaZero.ArenaParams(
     dirichlet_noise_ϵ=0.1))
 
 learning = AlphaZero.LearningParams(
-  l2_regularization=1e-6,
+  l2_regularization=1e-5,
   batch_size=256,
   nonvalidity_penalty=1.,
   checkpoints=[1, 2, 5, 10, 20])
@@ -45,7 +46,9 @@ params = AlphaZero.Params(
   learning=learning,
   num_iters=4,
   num_game_stages=9,
-  mem_buffer_size=PLSchedule{Int}([0, 4], [20_000, 60_000]))
+  mem_buffer_size=PLSchedule(
+    [     0,      4],
+    [20_000, 60_000]))
 
 validation = AlphaZero.RolloutsValidation(
   num_games = 500,

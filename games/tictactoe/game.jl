@@ -1,5 +1,7 @@
 module TicTacToe
 
+export Game, Board
+
 import AlphaZero.GI
 using StaticArrays
 

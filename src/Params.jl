@@ -33,9 +33,9 @@ end
 @kwdef struct LearningParams
   use_gpu :: Bool = true
   learning_rate :: Float32 = 1e-3
-  l2_regularization :: Float32 = 0.
-  nonvalidity_penalty :: Float32 = 1.
-  batch_size :: Int = 32
+  l2_regularization :: Float32
+  nonvalidity_penalty :: Float32 = 1
+  batch_size :: Int
   checkpoints :: Vector{Int}
 end
 

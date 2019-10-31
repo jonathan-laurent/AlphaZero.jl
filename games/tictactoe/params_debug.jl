@@ -5,6 +5,7 @@ if RESNET
   netparams = ResNetHP(
     num_filters=64,
     num_blocks=5,
+    conv_kernel_size=(3,3),
     num_policy_head_filters=32,
     num_value_head_filters=32)
 else
@@ -13,13 +14,6 @@ else
     width=300,
     depth_common=3)
 end
-
-#=
-Network = SimpleNet{Game}
-netparams = SimpleNetHP(
-  width=600,
-  depth_common=4)
-=#
 
 # Evaluate with 0 MCTS iterations
 # Exploration is induced by MCTS and by the temperature τ=1
@@ -42,6 +36,7 @@ self_play = SelfPlayParams(
 learning = LearningParams(
   l2_regularization=1e-4,
   nonvalidity_penalty=1.,
+  batch_size=32,
   checkpoints=[10, 20])
 
 params = Params(
@@ -50,7 +45,9 @@ params = Params(
   learning=learning,
   num_iters=8,
   num_game_stages=9,
-  mem_buffer_size=PLSchedule{Int}([0, 4], [500, 2500]))
+  mem_buffer_size=PLSchedule(
+    [  0,    4],
+    [500, 2500]))
 
 validation = RolloutsValidation(
   num_games = 100,

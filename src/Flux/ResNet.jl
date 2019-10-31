@@ -2,23 +2,19 @@
 ##### Dense Resnet
 #####
 
+# Recommended configuration:
+# AlphaZero: 20 blocks (40 in final version), 256 filters
+# Oracle basic: 5 blocks, 64 filters
+# Oracle final: 20 blocks, 128 filters
 @kwdef struct ResNetHP
   num_blocks :: Int
   num_filters :: Int
-  conv_kernel_size :: Tuple{Int, Int} = (3, 3)
+  conv_kernel_size :: Tuple{Int, Int}
   num_policy_head_filters :: Int = 2
   num_value_head_filters :: Int = 1
 end
 
 Util.generate_update_constructor(ResNetHP) |> eval
-
-const BASIC_RESNET_HP = ResNetHP(
-  num_blocks = 5,
-  num_filters = 64)
-
-const ALPHAZERO_RESNET_HP = ResNetHP(
-  num_blocks = 20,
-  num_filters = 256)
 
 struct ResNet{Game} <: TwoHeadNetwork{Game}
   hyper
