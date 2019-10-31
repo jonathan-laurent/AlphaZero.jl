@@ -53,9 +53,10 @@ using Flux: Tracker, Chain, Dense, relu, softmax
 abstract type FluxNetwork{Game} <: AbstractNetwork{Game} end
 
 function Base.copy(nn::Net) where Net <: FluxNetwork
-  new = Net(Network.hyperparams(nn))
-  Flux.loadparams!(new, Flux.params(nn))
-  return new
+  #new = Net(Network.hyperparams(nn))
+  #Flux.loadparams!(new, Flux.params(nn))
+  #return new
+  return Base.deepcopy(nn)
 end
 
 Network.to_cpu(nn::FluxNetwork) = Flux.cpu(nn)
@@ -82,6 +83,7 @@ end
 
 regularized_child_leaves(l) = []
 regularized_child_leaves(l::Flux.Dense) = [l.W]
+regularized_child_leaves(l::Flux.Conv) = [l.weight]
 
 # Inspired by the implementation of Flux.params
 function Network.regularized_params(net::FluxNetwork)

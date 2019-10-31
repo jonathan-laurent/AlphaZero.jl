@@ -31,9 +31,9 @@ function ResNetBlock(size, n)
   pad = size .÷ 2
   layers = Flux.Chain(
     Flux.Conv(size, n=>n, pad=pad),
-    Flux.BatchNorm(n, relu),
+    Flux.BatchNorm(n, relu, momentum=1f0),
     Flux.Conv(size, n=>n, pad=pad),
-    Flux.BatchNorm(n))
+    Flux.BatchNorm(n, momentum=1f0))
   return Flux.Chain(
     Flux.SkipConnection(layers, +),
     x -> Flux.relu.(x))
@@ -50,17 +50,17 @@ function ResNet{G}(hyper::ResNetHP) where G
   nvf = hyper.num_value_head_filters
   common = Flux.Chain(
     Flux.Conv(ksize, bsize[3]=>nf, pad=pad),
-    Flux.BatchNorm(nf, relu),
+    Flux.BatchNorm(nf, relu, momentum=1f0),
     [ResNetBlock(ksize, nf) for i in 1:hyper.num_blocks]...)
   pbranch = Flux.Chain(
     Flux.Conv((1, 1), nf=>npf),
-    Flux.BatchNorm(npf, relu),
+    Flux.BatchNorm(npf, relu, momentum=1f0),
     linearize,
     Dense(bsize[1] * bsize[2] * npf, outdim),
     softmax)
   vbranch = Flux.Chain(
     Flux.Conv((1, 1), nf=>nvf),
-    Flux.BatchNorm(nvf, relu),
+    Flux.BatchNorm(nvf, relu, momentum=1f0),
     linearize,
     Dense(bsize[1] * bsize[2] * nvf, nf, relu),
     Dense(nf, 1, tanh))

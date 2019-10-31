@@ -22,7 +22,7 @@ end
 function SimpleNet{G}(hyper::SimpleNetHP) where G
   make_dense(indim, outdim) =
     hyper.use_batch_norm ?
-      Chain(Dense(indim, outdim), Flux.BatchNorm(outdim, relu)) :
+      Chain(Dense(indim, outdim), Flux.BatchNorm(outdim, relu, momentum=1f0)) :
       Dense(indim, outdim, relu)
   indim = prod(GameInterface.board_dim(G))
   outdim = GameInterface.num_actions(G)
