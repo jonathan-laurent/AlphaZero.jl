@@ -1,11 +1,12 @@
 Network = ResNet{Game}
 
 netparams = ResNetHP(
-  num_filters=128,
+  num_filters=64,
   num_blocks=7,
   conv_kernel_size=(3,1),
   num_policy_head_filters=4,
-  num_value_head_filters=32)
+  num_value_head_filters=32,
+  batch_norm_momentum=0.5)
 
 self_play = SelfPlayParams(
   num_games=600,
@@ -30,6 +31,7 @@ arena = ArenaParams(
 
 learning = LearningParams(
   batch_size=256,
+  loss_computation_batch_size=2048,
   learning_rate=1e-3,
   l2_regularization=1e-4,
   nonvalidity_penalty=1.,

@@ -94,22 +94,35 @@ end
 ##### Generating debugging reports
 #####
 
-function loss_report(tr::Trainer)
-  ltuple = Network.convert_output_tuple(tr.network,
-    losses(tr.network, tr.params, tr.Wmean, tr.Hp, tr.samples))
-  return Report.Loss(ltuple...)
+function mean_learning_status(reports::Vector{Report.LearningStatus})
+  L     = mean(r.loss.L     for r in reports)
+  Lp    = mean(r.loss.Lp    for r in reports)
+  Lv    = mean(r.loss.Lv    for r in reports)
+  Lreg  = mean(r.loss.Lreg  for r in reports)
+  Linv  = mean(r.loss.Linv  for r in reports)
+  Hpnet = mean(r.Hpnet      for r in reports)
+  return Report.LearningStatus(Report.Loss(L, Lp, Lv, Lreg, Linv), Hpnet)
 end
 
-function network_output_entropy(tr::Trainer)
-  W, X, A, P, V = tr.samples
-  P̂, _ = Network.evaluate(tr.network, X, A)
-  return Network.convert_output(tr.network, entropy_wmean(P̂, W))
+function learning_status(tr::Trainer, samples)
+  # As done now, this isslighly inefficient as we solve the
+  # same neural network inference problem twice
+  W, X, A, P, V = samples
+  Ls = losses(tr.network, tr.params, tr.Wmean, tr.Hp, samples)
+  Ls = Network.convert_output_tuple(tr.network, Ls)
+  Pnet, _ = Network.evaluate(tr.network, X, A)
+  Hpnet = entropy_wmean(Pnet, W)
+  Hpnet = Network.convert_output(tr.network, Hpnet)
+  return Report.LearningStatus(Report.Loss(Ls...), Hpnet)
 end
 
 function learning_status(tr::Trainer)
-  loss = loss_report(tr)
-  Hpnet = network_output_entropy(tr)
-  return Report.LearningStatus(loss, Hpnet)
+  batch_size = tr.params.loss_computation_batch_size
+  # If there are less samples
+  withrem = size(tr.samples[1])[end] < batch_size
+  batches = Util.random_batches(tr.samples, batch_size, add_remainder=withrem)
+  reports = [learning_status(tr, batch) for batch in batches]
+  return mean_learning_status(reports)
 end
 
 function samples_report(tr::Trainer)

@@ -36,6 +36,7 @@ end
   l2_regularization :: Float32
   nonvalidity_penalty :: Float32 = 1
   batch_size :: Int
+  loss_computation_batch_size :: Int
   checkpoints :: Vector{Int}
 end
 
