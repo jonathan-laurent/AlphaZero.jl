@@ -60,6 +60,7 @@ end
 struct SelfPlay
   inference_time_ratio :: Float64
   samples_gen_speed :: Float64 # in samples/second
+  average_exploration_depth :: Float64
   mcts_memory_footprint :: Int
 end
 
@@ -137,6 +138,8 @@ function print(logger::Logger, report::SelfPlay)
   Log.print(logger, "Time spent on inference: $(t)%")
   sspeed = format(round(Int, report.samples_gen_speed), commas=true)
   Log.print(logger, "Generating $(sspeed) samples per second on average")
+  avgdepth = fmt(".1f", report.average_exploration_depth)
+  Log.print(logger, "Average exploration depth: $avgdepth")
   memf = format(report.mcts_memory_footprint, autoscale=:metric, precision=2)
   Log.print(logger, "MCTS memory footprint: $(memf)B")
 end

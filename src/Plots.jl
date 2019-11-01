@@ -65,6 +65,12 @@ function plot_training(
     push!(plots, vbars)
     push!(files, "validation")
   end
+  # Exploration depth
+  expdepth = Plots.plot(1:n,
+    [it.self_play.average_exploration_depth for it in iterations],
+    title="Average Exploration Depth",
+    ylims=(0, Inf),
+    legend=:none)
   # Number of samples
   nsamples = Plots.plot(0:n,
     [0;[it.memory.all_samples.num_samples for it in iterations]],
@@ -138,10 +144,10 @@ function plot_training(
   # Assembling everything together
   append!(plots, [
     arena, pslosses, losses_fullmem, losses_last,
-    entropies, nsamples, perfs])
+    entropies, nsamples, perfs, expdepth])
   append!(files, [
     "arena", "loss_per_stage", "loss_fullmem", "loss_last_batch",
-    "entropies", "nsamples", "perfs"])
+    "entropies", "nsamples", "perfs", "exploration_depth"])
   for (file, plot) in zip(files, plots)
     #Plots.plot!(plot, dpi=200, size=(600, 200))
     Plots.savefig(plot, joinpath(dir, file))

@@ -157,6 +157,8 @@ mutable struct Env{Game, Board, Action, Oracle}
   # Performance statistics
   total_time :: Float64
   inference_time :: Float64
+  total_iterations :: Int64
+  total_nodes_traversed :: Int64
 
   function Env{G}(oracle, nworkers=1, cpuct=1.) where G
     B = GI.Board(G)
@@ -164,10 +166,13 @@ mutable struct Env{Game, Board, Action, Oracle}
     tree = Dict{B, BoardInfo}()
     total_time = 0.
     inference_time = 0.
+    total_iterations = 0
+    total_nodes_traversed = 0
     lock = ReentrantLock()
     workers = [Worker{B, A}(i) for i in 1:nworkers]
     new{G, B, A, typeof(oracle)}(
-      tree, oracle, workers, lock, cpuct, total_time, inference_time)
+      tree, oracle, workers, lock, cpuct,
+      total_time, inference_time, total_iterations, total_nodes_traversed)
   end
 end
 
@@ -289,6 +294,7 @@ end
 
 function select!(env, worker, state)
   state = copy(state)
+  env.total_iterations += 1
   while true
     wr = GI.white_reward(state)
     isnothing(wr) || (return wr)
@@ -302,6 +308,7 @@ function select!(env, worker, state)
       best_action = actions[best_action_id]
       push_board_action!(env, worker, (board, wp, best_action_id))
       GI.play!(state, best_action)
+      env.total_nodes_traversed += 1
     end
   end
 end
@@ -431,6 +438,16 @@ on position evaluation (through functions [`MCTS.evaluate`](@ref) or
 function inference_time_ratio(env)
   T = env.total_time
   iszero(T) ? 0. : env.inference_time / T
+end
+
+"""
+    MCTS.average_exploration_depth(env)
+    
+Return the average number of nodes that are traversed during an
+MCTS iteration, not counting the root.
+"""
+function average_exploration_depth(env)
+  return env.total_nodes_traversed / env.total_iterations
 end
 
 #####

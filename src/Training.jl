@@ -137,7 +137,8 @@ function self_play!(env::Env{G}, handler) where G
   MCTS.memory_footprint(player.mcts)
   inference_tr = MCTS.inference_time_ratio(player.mcts)
   speed = last_batch_size(env.memory) / elapsed
-  report = Report.SelfPlay(inference_tr, speed, mem_footprint)
+  expdepth = MCTS.average_exploration_depth(player.mcts)
+  report = Report.SelfPlay(inference_tr, speed, expdepth, mem_footprint)
   Handlers.self_play_finished(handler, report)
   return report
 end
