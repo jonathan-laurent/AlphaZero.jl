@@ -12,6 +12,7 @@
   conv_kernel_size :: Tuple{Int, Int}
   num_policy_head_filters :: Int = 2
   num_value_head_filters :: Int = 1
+  batch_norm_momentum :: Float32 = 1f0
 end
 
 Util.generate_update_constructor(ResNetHP) |> eval
@@ -23,13 +24,13 @@ struct ResNet{Game} <: TwoHeadNetwork{Game}
   pbranch
 end
 
-function ResNetBlock(size, n)
+function ResNetBlock(size, n, bnmom)
   pad = size .÷ 2
   layers = Flux.Chain(
     Flux.Conv(size, n=>n, pad=pad),
-    Flux.BatchNorm(n, relu, momentum=1f0),
+    Flux.BatchNorm(n, relu, momentum=bnmom),
     Flux.Conv(size, n=>n, pad=pad),
-    Flux.BatchNorm(n, momentum=1f0))
+    Flux.BatchNorm(n, momentum=bnmom))
   return Flux.Chain(
     Flux.SkipConnection(layers, +),
     x -> Flux.relu.(x))
@@ -44,19 +45,20 @@ function ResNet{G}(hyper::ResNetHP) where G
   nf = hyper.num_filters
   npf = hyper.num_policy_head_filters
   nvf = hyper.num_value_head_filters
+  bnmom = hyper.batch_norm_momentum
   common = Flux.Chain(
     Flux.Conv(ksize, bsize[3]=>nf, pad=pad),
-    Flux.BatchNorm(nf, relu, momentum=1f0),
-    [ResNetBlock(ksize, nf) for i in 1:hyper.num_blocks]...)
+    Flux.BatchNorm(nf, relu, momentum=bnmom),
+    [ResNetBlock(ksize, nf, bnmom) for i in 1:hyper.num_blocks]...)
   pbranch = Flux.Chain(
     Flux.Conv((1, 1), nf=>npf),
-    Flux.BatchNorm(npf, relu, momentum=1f0),
+    Flux.BatchNorm(npf, relu, momentum=bnmom),
     linearize,
     Dense(bsize[1] * bsize[2] * npf, outdim),
     softmax)
   vbranch = Flux.Chain(
     Flux.Conv((1, 1), nf=>nvf),
-    Flux.BatchNorm(nvf, relu, momentum=1f0),
+    Flux.BatchNorm(nvf, relu, momentum=bnmom),
     linearize,
     Dense(bsize[1] * bsize[2] * nvf, nf, relu),
     Dense(nf, 1, tanh))

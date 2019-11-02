@@ -7,7 +7,8 @@ if RESNET
     num_blocks=5,
     conv_kernel_size=(3,3),
     num_policy_head_filters=32,
-    num_value_head_filters=32)
+    num_value_head_filters=32,
+    batch_norm_momentum=0.5)
 else
   Network = SimpleNet{Game}
   netparams = SimpleNetHP(
@@ -37,6 +38,7 @@ learning = LearningParams(
   l2_regularization=1e-4,
   nonvalidity_penalty=1.,
   batch_size=32,
+  loss_computation_batch_size=512,
   checkpoints=[10, 20])
 
 params = Params(

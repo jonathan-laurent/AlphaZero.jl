@@ -45,20 +45,31 @@ end
 
 infinity(::Type{R}) where R <: Real = one(R) / zero(R)
 
-function batches(X, batchsize)
+function batches(X, batchsize; add_remainder=false)
   n = size(X)[end]
   b = batchsize
   nbatches = n ÷ b
   # The call to `copy` after selectdim is important because Flux does not
   # deal well with views.
-  return (copy(selectdim(X, ndims(X), (1+b*(i-1)):(b*i))) for i in 1:nbatches)
+  select(a, b) = copy(selectdim(X, ndims(X), a:b))
+  batches = [select(1+b*(i-1), b*i) for i in 1:nbatches]
+  if add_remainder && n % b > 0
+    # If the number of samples is not a multiple of the batch size
+    push!(batches, select(b*nbatches+1, n))
+  end
+  return batches
 end
 
-function random_batches(xs::Tuple, batchsize)
+function batches_tests()
+  @assert batches(collect(1:5), 2, add_remainder=true) == [[1, 2], [3, 4], [5]]
+end
+
+function random_batches(xs::Tuple, batchsize; add_remainder=false)
   let n = size(xs[1])[end]
   let perm = Random.randperm(n)
   bxs = map(xs) do x
-    batches(selectdim(x, ndims(x), perm), batchsize)
+    batches(
+      selectdim(x, ndims(x), perm), batchsize, add_remainder=add_remainder)
   end
   zip(bxs...)
   end end

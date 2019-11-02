@@ -7,7 +7,8 @@ if RESNET
     num_blocks=5,
     conv_kernel_size=(3,3),
     num_policy_head_filters=32,
-    num_value_head_filters=32)
+    num_value_head_filters=32,
+    batch_norm_momentum=0.5)
 else
   Network = AlphaZero.SimpleNet{Game}
   netparams = AlphaZero.SimpleNetHP(
@@ -36,7 +37,8 @@ arena = AlphaZero.ArenaParams(
 
 learning = AlphaZero.LearningParams(
   l2_regularization=1e-5,
-  batch_size=256,
+  batch_size=128,
+  loss_computation_batch_size=2048,
   nonvalidity_penalty=1.,
   checkpoints=[1, 2, 5, 10, 20])
 
