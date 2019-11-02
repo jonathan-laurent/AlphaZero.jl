@@ -54,6 +54,7 @@ include("Explorer.jl")
 include("Validation.jl")
 include("Plots.jl")
 include("Session.jl")
+include("Profile.jl")
 
 # We add default support for the Flux.jl framework
 include("Flux/FluxNets.jl")

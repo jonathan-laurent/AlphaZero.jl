@@ -1,8 +1,8 @@
 Network = ResNet{Game}
 
 netparams = ResNetHP(
-  num_filters=128,
-  num_blocks=7,
+  num_filters=64,
+  num_blocks=5,
   conv_kernel_size=(3,1),
   num_policy_head_filters=4,
   num_value_head_filters=32)
@@ -13,15 +13,15 @@ self_play = SelfPlayParams(
   mcts=MctsParams(
     use_gpu=true,
     num_workers=32,
-    num_iters_per_turn=640,
+    num_iters_per_turn=320,
     cpuct=4,
     temperature=1,
     dirichlet_noise_ϵ=0))
 
 arena = ArenaParams(
-  num_games=800,
-  reset_mcts_every=20,
-  update_threshold=(2 * 0.53 - 1),
+  num_games=100,
+  reset_mcts_every=100,
+  update_threshold=(2 * 0.58 - 1),
   mcts=MctsParams(self_play.mcts,
     num_workers=16,
     num_iters_per_turn=160,
@@ -33,7 +33,7 @@ learning = LearningParams(
   learning_rate=1e-3,
   l2_regularization=1e-4,
   nonvalidity_penalty=1.,
-  checkpoints=[2, 4, 6, 12])
+  checkpoints=[1, 2, 4])
 
 params = Params(
   arena=arena,
