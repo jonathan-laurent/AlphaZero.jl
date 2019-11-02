@@ -115,12 +115,13 @@ struct Table
   columns :: Vector{Column}
   header_style :: Crayon
   comments_style :: Crayon
-  function Table(cols...;
-      header_style=TABLE_HEADER_STYLE,
-      comments_style=TABLE_COMMENTS_STYLE)
-    cols = [Column(c...) for c in cols]
-    new(cols, header_style, comments_style)
-  end
+end
+
+function Table(cols;
+    header_style=TABLE_HEADER_STYLE,
+    comments_style=TABLE_COMMENTS_STYLE)
+  cols = [Column(c...) for c in cols]
+  Table(cols, header_style, comments_style)
 end
 
 set_columns(tab, cols) = Table(cols, tab.header_style, tab.comments_style)

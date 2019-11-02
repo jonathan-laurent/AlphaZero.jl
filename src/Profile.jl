@@ -17,10 +17,10 @@ function profile_self_play(configs::Vector)
   time = Log.ColType(10, x -> format("{:.1f} min", x * 100 / 60))
   itr  = Log.ColType(5,  x -> format("{}%", round(Int, x * 100)))
   expd = Log.ColType(5,  x -> format("{:.1f}", x))
-  tab  = Log.Table(
+  tab  = Log.Table([
     ("T100", time, s -> s[1]),
     ("ITR",  itr,  s -> s[2]),
-    ("EXPD", expd, s -> s[3]))
+    ("EXPD", expd, s -> s[3])])
   for (title, net, params) in configs
     profile_self_play(net, params, 1) # Compilation
     rep = profile_self_play(net, params, 10)

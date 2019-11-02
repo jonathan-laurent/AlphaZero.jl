@@ -88,15 +88,15 @@ using ..Log
 const NUM_COL = Log.ColType(7, x -> fmt(".4f", x))
 const BIGINT_COL = Log.ColType(10, n -> format(ceil(Int, n), commas=true))
 
-const LEARNING_STATUS_TABLE = Log.Table(
+const LEARNING_STATUS_TABLE = Log.Table([
   ("Loss",   NUM_COL,     s -> s.loss.L),
   ("Lv",     NUM_COL,     s -> s.loss.Lv),
   ("Lp",     NUM_COL,     s -> s.loss.Lp),
   ("Lreg",   NUM_COL,     s -> s.loss.Lreg),
   ("Linv",   NUM_COL,     s -> s.loss.Linv),
-  ("Hpnet",  NUM_COL,     s -> s.Hpnet))
+  ("Hpnet",  NUM_COL,     s -> s.Hpnet)])
 
-const SAMPLES_STATS_TABLE = Log.Table(
+const SAMPLES_STATS_TABLE = Log.Table([
   ("Loss",   NUM_COL,     s -> s.status.loss.L),
   ("Lv",     NUM_COL,     s -> s.status.loss.Lv),
   ("Lp",     NUM_COL,     s -> s.status.loss.Lp),
@@ -106,7 +106,7 @@ const SAMPLES_STATS_TABLE = Log.Table(
   ("Hp",     NUM_COL,     s -> s.Hp),
   ("Wtot",   BIGINT_COL,  s -> s.Wtot),
   ("Nb",     BIGINT_COL,  s -> s.num_boards),
-  ("Ns",     BIGINT_COL,  s -> s.num_samples))
+  ("Ns",     BIGINT_COL,  s -> s.num_samples)])
 
 function print(logger::Logger, status::Report.LearningStatus; kw...)
   Log.table_row(logger, LEARNING_STATUS_TABLE, status; kw...)

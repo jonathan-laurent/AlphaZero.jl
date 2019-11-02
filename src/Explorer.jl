@@ -93,20 +93,20 @@ function print_board_statistics(::Type{G}, stats::BoardStats) where G
   val    = Log.ColType(nothing, x -> fmt("+.2f", x))
   bigint = Log.ColType(nothing, n -> format(ceil(Int, n), commas=true))
   alabel = Log.ColType(nothing, identity)
-  btable = Log.Table(
+  btable = Log.Table([
     ("Nmcts", bigint, r -> r.Nmcts),
     ("Nmem",  bigint, r -> r.Nmem),
     ("Vmem",  val,    r -> r.Vmem),
-    ("Vnet",  val,    r -> r.Vnet),
+    ("Vnet",  val,    r -> r.Vnet)],
     header_style=Log.BOLD)
-  atable = Log.Table(
+  atable = Log.Table([
     ("",      alabel, r -> GI.action_string(G, r[1])),
     ("Pmcts", prob,   r -> r[2].Pmcts),
     ("Pnet",  prob,   r -> r[2].Pnet),
     ("UCT",   val,    r -> r[2].UCT),
     ("Pmem",  prob,   r -> r[2].Pmem),
     ("Qmcts", val,    r -> r[2].Qmcts),
-    ("Qnet",  val,    r -> r[2].Qnet),
+    ("Qnet",  val,    r -> r[2].Qnet)],
     header_style=Log.BOLD)
   logger = Logger()
   Log.table(logger, btable, [stats])
