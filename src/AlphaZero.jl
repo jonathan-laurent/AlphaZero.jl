@@ -5,12 +5,13 @@
 
 module AlphaZero
 
-export MCTS, GameInterface, GI, Report, Network, FluxNets
+export MCTS, GameInterface, GI, Report, Network
 export RolloutsValidation
 export AbstractSchedule, PLSchedule
 export Params, SelfPlayParams, ArenaParams, MctsParams, LearningParams
 export Env, train!, learning!, self_play!, memory_report, get_experience
 export Session, resume!, save, explore, plot_learning
+export SimpleNet, SimpleNetHP, ResNet, ResNetHP
 
 include("Util.jl")
 import .Util
@@ -56,9 +57,11 @@ include("Plots.jl")
 include("Session.jl")
 include("Profile.jl")
 
-# We add default support for the Flux.jl framework
-include("Flux/FluxNets.jl")
-using .FluxNets
+# We support Flux and Knet
+#include("Flux/FluxNets.jl")
+#using .FluxNets
+include("Knet/KNets.jl")
+using .KNets
 
 end
 

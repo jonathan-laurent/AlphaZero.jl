@@ -26,7 +26,7 @@ function SimpleNet{G}(hyper::SimpleNetHP) where G
     if hyper.use_batch_norm
       Chain(
         Dense(indim, outdim),
-        Flux.BatchNorm(outdim, relu, momentum=bnmom))
+        BatchNorm(outdim, relu, momentum=bnmom))
     else
       Dense(indim, outdim, relu)
     end

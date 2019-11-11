@@ -44,7 +44,8 @@ else
   end
 end
 
-using Flux: Tracker, Chain, Dense, relu, softmax
+using Flux: Tracker, relu, softmax
+using Flux: Chain, Dense, Conv, BatchNorm, SkipConnection
 
 #####
 ##### Flux Networks
@@ -73,8 +74,7 @@ Network.convert_input(nn::FluxNetwork, x) =
 
 Network.convert_output(nn::FluxNetwork, x) = Tracker.data(Flux.cpu(x))
 
-Network.num_parameters(nn::FluxNetwork) =
-  sum(length(p) for p in Flux.params(nn))
+Network.params(nn::FluxNetwork) = Flux.params(nn)
 
 function Network.train!(nn::FluxNetwork, loss, data, lr)
   optimizer = Flux.ADAM(lr)
@@ -94,6 +94,12 @@ function Network.regularized_params(net::FluxNetwork)
     end
   end
   return ps
+end
+
+function gc(::FluxNetwork)
+  CUARRAYS_IMPORTED || return
+  GC.gc()
+  CuArrays.clearpool()
 end
 
 #####

@@ -26,14 +26,14 @@ end
 
 function ResNetBlock(size, n, bnmom)
   pad = size .÷ 2
-  layers = Flux.Chain(
-    Flux.Conv(size, n=>n, pad=pad),
-    Flux.BatchNorm(n, relu, momentum=bnmom),
-    Flux.Conv(size, n=>n, pad=pad),
-    Flux.BatchNorm(n, momentum=bnmom))
-  return Flux.Chain(
-    Flux.SkipConnection(layers, +),
-    x -> Flux.relu.(x))
+  layers = Chain(
+    Conv(size, n=>n, pad=pad),
+    BatchNorm(n, relu, momentum=bnmom),
+    Conv(size, n=>n, pad=pad),
+    BatchNorm(n, momentum=bnmom))
+  return Chain(
+    SkipConnection(layers, +),
+    x -> relu.(x))
 end
 
 function ResNet{G}(hyper::ResNetHP) where G
@@ -46,19 +46,19 @@ function ResNet{G}(hyper::ResNetHP) where G
   npf = hyper.num_policy_head_filters
   nvf = hyper.num_value_head_filters
   bnmom = hyper.batch_norm_momentum
-  common = Flux.Chain(
-    Flux.Conv(ksize, bsize[3]=>nf, pad=pad),
-    Flux.BatchNorm(nf, relu, momentum=bnmom),
+  common = Chain(
+    Conv(ksize, bsize[3]=>nf, pad=pad),
+    BatchNorm(nf, relu, momentum=bnmom),
     [ResNetBlock(ksize, nf, bnmom) for i in 1:hyper.num_blocks]...)
-  pbranch = Flux.Chain(
-    Flux.Conv((1, 1), nf=>npf),
-    Flux.BatchNorm(npf, relu, momentum=bnmom),
+  pbranch = Chain(
+    Conv((1, 1), nf=>npf),
+    BatchNorm(npf, relu, momentum=bnmom),
     linearize,
     Dense(bsize[1] * bsize[2] * npf, outdim),
     softmax)
-  vbranch = Flux.Chain(
-    Flux.Conv((1, 1), nf=>nvf),
-    Flux.BatchNorm(nvf, relu, momentum=bnmom),
+  vbranch = Chain(
+    Conv((1, 1), nf=>nvf),
+    BatchNorm(nvf, relu, momentum=bnmom),
     linearize,
     Dense(bsize[1] * bsize[2] * nvf, nf, relu),
     Dense(nf, 1, tanh))
