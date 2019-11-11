@@ -1,8 +1,8 @@
 const RESNET = true
 
 if RESNET
-  Network = AlphaZero.ResNet{Game}
-  netparams = AlphaZero.ResNetHP(
+  Network = ResNet{Game}
+  netparams = ResNetHP(
     num_filters=64,
     num_blocks=5,
     conv_kernel_size=(3,3),
@@ -10,39 +10,39 @@ if RESNET
     num_value_head_filters=32,
     batch_norm_momentum=0.5)
 else
-  Network = AlphaZero.SimpleNet{Game}
-  netparams = AlphaZero.SimpleNetHP(
+  Network = SimpleNet{Game}
+  netparams = SimpleNetHP(
     width=500,
     depth_common=4)
 end
 
-self_play = AlphaZero.SelfPlayParams(
+self_play = SelfPlayParams(
   num_games=4000,
   reset_mcts_every=4000,
-  mcts = AlphaZero.MctsParams(
+  mcts = MctsParams(
     num_workers=1,
     num_iters_per_turn=320,
     dirichlet_noise_ϵ=0.15))
 
 # Evaluate with 0 MCTS iterations
 # Exploration is induced by MCTS and by the temperature τ=1
-arena = AlphaZero.ArenaParams(
+arena = ArenaParams(
   num_games=1000,
   reset_mcts_every=1,
   update_threshold=(2*0.55 - 1),
-  mcts = AlphaZero.MctsParams(
+  mcts = MctsParams(
     num_workers=1,
     num_iters_per_turn=0,
     dirichlet_noise_ϵ=0.1))
 
-learning = AlphaZero.LearningParams(
-  l2_regularization=1e-5,
-  batch_size=128,
+learning = LearningParams(
+  l2_regularization=1e-4,
+  batch_size=256,
   loss_computation_batch_size=2048,
   nonvalidity_penalty=1.,
   checkpoints=[1, 2, 5, 10, 20])
 
-params = AlphaZero.Params(
+params = Params(
   arena=arena,
   self_play=self_play,
   learning=learning,
@@ -52,14 +52,14 @@ params = AlphaZero.Params(
     [     0,      4],
     [20_000, 60_000]))
 
-validation = AlphaZero.RolloutsValidation(
+validation = RolloutsValidation(
   num_games = 500,
   reset_mcts_every = 500,
-  baseline = AlphaZero.MctsParams(
+  baseline = MctsParams(
     num_workers=1,
     num_iters_per_turn=1000,
     dirichlet_noise_ϵ=0.1),
-  contender = AlphaZero.MctsParams(
+  contender = MctsParams(
     num_workers=1,
     num_iters_per_turn=0,
     dirichlet_noise_ϵ=0.1))

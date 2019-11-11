@@ -8,12 +8,14 @@ if RESNET
     conv_kernel_size=(3,3),
     num_policy_head_filters=32,
     num_value_head_filters=32,
-    batch_norm_momentum=0.5)
+    batch_norm_momentum=1)
 else
   Network = SimpleNet{Game}
   netparams = SimpleNetHP(
     width=300,
-    depth_common=3)
+    depth_common=3,
+    use_batch_norm=true,
+    batch_norm_momentum=1)
 end
 
 # Evaluate with 0 MCTS iterations

@@ -1,6 +1,5 @@
 using Revise
 using AlphaZero
-using AlphaZero.FluxNets
 
 Revise.includet("game.jl")
 using .TicTacToe
