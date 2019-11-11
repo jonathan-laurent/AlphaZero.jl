@@ -45,7 +45,7 @@ end
 
 infinity(::Type{R}) where R <: Real = one(R) / zero(R)
 
-function batches(X, batchsize; add_remainder=false)
+function batches(X, batchsize; partial=false)
   n = size(X)[end]
   b = batchsize
   nbatches = n ÷ b
@@ -53,7 +53,7 @@ function batches(X, batchsize; add_remainder=false)
   # deal well with views.
   select(a, b) = copy(selectdim(X, ndims(X), a:b))
   batches = [select(1+b*(i-1), b*i) for i in 1:nbatches]
-  if add_remainder && n % b > 0
+  if partial && n % b > 0
     # If the number of samples is not a multiple of the batch size
     push!(batches, select(b*nbatches+1, n))
   end
@@ -61,18 +61,32 @@ function batches(X, batchsize; add_remainder=false)
 end
 
 function batches_tests()
-  @assert batches(collect(1:5), 2, add_remainder=true) == [[1, 2], [3, 4], [5]]
+  @assert batches(collect(1:5), 2, partial=true) == [[1, 2], [3, 4], [5]]
 end
 
-function random_batches(xs::Tuple, batchsize; add_remainder=false)
-  let n = size(xs[1])[end]
-  let perm = Random.randperm(n)
-  bxs = map(xs) do x
-    batches(
-      selectdim(x, ndims(x), perm), batchsize, add_remainder=add_remainder)
+function random_batches(
+  convert, data::Tuple, batchsize; partial=false)
+  n = size(data[1])[end]
+  perm = Random.randperm(n)
+  batchs = map(data) do x
+    batches(selectdim(x, ndims(x), perm), batchsize, partial=partial)
   end
-  zip(bxs...)
-  end end
+  batchs = collect(zip(batchs...))
+  return (convert.(b) for b in batchs)
+end
+
+function periodic_gc(gc, batchs, period)
+  n = 0
+  function process(b)
+    n += size(b[1])[end]
+    if period > 0 && n >= period
+      n = 0
+      gc()
+    end
+    return b
+  end
+  period > 0 && gc()
+  return (process(b) for b in batchs)
 end
 
 # Print uncaught exceptions
