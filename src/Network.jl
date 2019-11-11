@@ -10,18 +10,19 @@ import ..GameInterface
 import ..Util
 
 using ..Util: @unimplemented
+using Statistics: mean
 
 """
     AbstractNetwork{Game} <: MCTS.Oracle{Game}
 
 Abstract base type for a neural network.
-  
+
 ---
-  
+
 Any subtype `Network` must implement the following constructor:
 
     Network(hyperparams)
-    
+
 where the expected type of `hyperparams` is given by
 [`HyperParams(Network)`](@ref HyperParams).
 """
@@ -33,7 +34,7 @@ abstract type AbstractNetwork{G} <: MCTS.Oracle{G} end
 
 """
     HyperParams(::Type{<:AbstractNetwork})
-    
+
 Return the hyperparameter type associated with a given network type.
 """
 function HyperParams(::Type{<:AbstractNetwork})
@@ -42,7 +43,7 @@ end
 
 """
     hyperparams(::AbstractNetwork)
-    
+
 Return the hyperparameters of a network.
 """
 function hyperparams(::AbstractNetwork)
@@ -51,7 +52,7 @@ end
 
 """
     Base.copy(::AbstractNetwork)
-    
+
 Return a copy of the given network.
 """
 function Base.copy(::AbstractNetwork)
@@ -60,7 +61,7 @@ end
 
 """
     to_gpu(::AbstractNetwork)
-    
+
 Return a copy of the given network that has been transferred to the GPU
 if one is available. Otherwise, return the given network untouched.
 """
@@ -70,7 +71,7 @@ end
 
 """
     to_cpu(::AbstractNetwork)
-    
+
 Return a copy of the given network that has been transferred to the CPU
 or return the given network untouched if it is already on CPU.
 """
@@ -80,7 +81,7 @@ end
 
 """
     on_gpu(::AbstractNetwork)
-    
+
 Test if a network is located on GPU.
 """
 function on_gpu(::AbstractNetwork)
@@ -89,7 +90,7 @@ end
 
 """
     set_test_mode!(mode=true)
-    
+
 Put a network in test mode or in training mode.
 This is relevant for networks featuring layers such as
 batch normalization layers.
@@ -100,7 +101,7 @@ end
 
 """
     convert_input(::AbstractNetwork, input)
-    
+
 Convert an array (or number) to the right format so that it can be used
 as an input by a given network.
 """
@@ -116,7 +117,7 @@ end
 
 """
     convert_output(::AbstractNetwork, output)
-    
+
 Convert an array (or number) produced by a neural network
 to a standard CPU array (or number) type.
 """
@@ -132,7 +133,7 @@ end
 
 """
     forward(::AbstractNetwork, board)
-    
+
 Compute the forward pass of the network on a batch of inputs
 (the batch dimension being the last one).
 
@@ -145,7 +146,7 @@ end
 
 """
     train!(::AbstractNetwork, loss, data, learning_rate)
-    
+
 Train a given network on data.
 """
 function train!(::AbstractNetwork, loss, data, learning_rate)
@@ -154,7 +155,7 @@ end
 
 """
     regularized_params(::AbstractNetwork)
-    
+
 Return the collection of regularized parameters of a network.
 This usually excludes neuron's biases.
 """
@@ -163,17 +164,45 @@ function regularized_params(::AbstractNetwork)
 end
 
 """
-    num_parameters(::AbstractNetwork)
+    params(::AbstractNetwork)
 
-Return the total number of parameters of a network.
+Return the collection of trainable parameters of the network.
 """
-function num_parameters(::AbstractNetwork)
+function params(::AbstractNetwork)
+  @unimplemented
+end
+
+"""
+    gc(::AbstractNetwork)
+
+Perform full garbage collection.
+"""
+function gc(::AbstractNetwork)
   @unimplemented
 end
 
 #####
 ##### Derived functions
 #####
+
+"""
+    num_parameters(::AbstractNetwork)
+
+Return the total number of parameters of a network.
+"""
+function num_parameters(nn::AbstractNetwork)
+  return sum(length(p) for p in params(nn))
+end
+
+function num_regularized_parameters(nn::AbstractNetwork)
+  return sum(length(p) for p in regularized_params(nn))
+end
+
+function mean_weight(nn::AbstractNetwork)
+  sw = sum(sum(abs.(p)) for p in regularized_params(nn))
+  sw = convert_output(nn, sw)
+  return sw / num_regularized_parameters(nn)
+end
 
 function evaluate(nn::AbstractNetwork, board, actions_mask)
   p, v = forward(nn, board)
@@ -190,7 +219,7 @@ from_singleton_batch(x) = reshape(x, size(x)[1:end-1])
 function MCTS.evaluate(nn::AbstractNetwork{G}, board, available_actions) where G
   x = GameInterface.vectorize_board(G, board)
   a = GameInterface.actions_mask(G, available_actions)
-  xnet, anet = to_singleton_batch.(convert_input_tuple(nn, (x, a)))
+  xnet, anet = to_singleton_batch.(convert_input_tuple(nn, (x, Float32.(a))))
   p, v, _ = from_singleton_batch.(
     convert_output_tuple(nn, evaluate(nn, xnet, anet)))
   return (p[a], v[1])
@@ -203,7 +232,7 @@ function MCTS.evaluate_batch(nn::AbstractNetwork{G}, batch) where G
   A = Util.superpose((
     GameInterface.actions_mask(G, as)
     for (b, as) in batch))
-  Xnet, Anet = convert_input_tuple(nn, (X, A))
+  Xnet, Anet = convert_input_tuple(nn, (X, Float32.(A)))
   P, V, _ = convert_output_tuple(nn, evaluate(nn, Xnet, Anet))
   return [(P[A[:,i],i], V[1,i]) for i in eachindex(batch)]
 end

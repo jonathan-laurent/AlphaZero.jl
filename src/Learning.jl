@@ -71,7 +71,7 @@ struct Trainer
     examples = merge_by_board(examples)
     samples = convert_samples(G, examples)
     network = Network.copy(network, on_gpu=params.use_gpu, test_mode=false)
-    samples = Network.convert_input_tuple(network, samples)
+    #samples = Network.convert_input_tuple(network, samples)
     W, X, A, P, V = samples
     Wmean = mean(W)
     Hp = entropy_wmean(P, W)
@@ -80,13 +80,18 @@ struct Trainer
 end
 
 function get_trained_network(tr::Trainer)
-  Network.copy(tr.network, on_gpu=true, test_mode=true)
+  Network.copy(tr.network, on_gpu=false, test_mode=true)
 end
 
 function training_epoch!(tr::Trainer)
   loss(batch...) = losses(
     tr.network, tr.params, tr.Wmean, tr.Hp, batch)[1]
-  data = Util.random_batches(tr.samples, tr.params.batch_size)
+  data = Util.random_batches(tr.samples, tr.params.batch_size) do x
+    Network.convert_input(tr.network, x)
+  end
+  data = Util.periodic_gc(data, tr.params.gc_every) do
+    Network.gc(tr.network)
+  end
   Network.train!(tr.network, loss, data, tr.params.learning_rate)
 end
 
@@ -119,8 +124,13 @@ end
 function learning_status(tr::Trainer)
   batch_size = tr.params.loss_computation_batch_size
   # If there are less samples
-  withrem = size(tr.samples[1])[end] < batch_size
-  batches = Util.random_batches(tr.samples, batch_size, add_remainder=withrem)
+  partial = size(tr.samples[1])[end] < batch_size
+  batches = Util.random_batches(tr.samples, batch_size, partial=partial) do x
+    Network.convert_input(tr.network, x)
+  end
+  batches = Util.periodic_gc(batches, tr.params.gc_every) do
+    Network.gc(tr.network)
+  end
   reports = [learning_status(tr, batch) for batch in batches]
   return mean_learning_status(reports)
 end

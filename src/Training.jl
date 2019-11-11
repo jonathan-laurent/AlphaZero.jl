@@ -9,10 +9,10 @@ mutable struct Env{Game, Network, Board}
   itc    :: Int
   function Env{Game}(params, network, experience=[], itc=0) where Game
     Board = GI.Board(Game)
-    memory = MemoryBuffer{Board}(length(experience), experience)
-    env = new{Game, typeof(network), Board}(
+    msize = max(get(params.mem_buffer_size, itc), length(experience))
+    memory = MemoryBuffer{Board}(msize, experience)
+    return new{Game, typeof(network), Board}(
       params, network, memory, itc)
-    return env
   end
 end
 
@@ -53,9 +53,11 @@ end
 
 function initial_report(env::Env)
   num_network_parameters = Network.num_parameters(env.bestnn)
+  num_reg_params = Network.num_regularized_parameters(env.bestnn)
   player = MctsPlayer(env.bestnn, env.params.self_play.mcts)
   mcts_footprint_per_node = MCTS.memory_footprint_per_node(player.mcts)
-  return Report.Initial(num_network_parameters, mcts_footprint_per_node)
+  return Report.Initial(
+    num_network_parameters, num_reg_params, mcts_footprint_per_node)
 end
 
 function evaluate_network(baseline, contender, params, handler)

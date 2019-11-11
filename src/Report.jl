@@ -75,6 +75,7 @@ end
 
 struct Initial
   num_network_parameters :: Int
+  num_network_regularized_parameters :: Int
   mcts_footprint_per_node :: Int
 end
 
@@ -147,6 +148,8 @@ end
 function print(logger::Logger, report::Initial)
   nnparams = format(report.num_network_parameters, commas=true)
   Log.print(logger, "Number of network parameters: $nnparams")
+  nnregparams = format(report.num_network_regularized_parameters, commas=true)
+  Log.print(logger, "Number of regularized network parameters: $nnregparams")
   mfpn = report.mcts_footprint_per_node
   Log.print(logger, "Memory footprint per MCTS node: $(mfpn) bytes")
 end

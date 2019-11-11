@@ -37,6 +37,7 @@ end
   nonvalidity_penalty :: Float32 = 1
   batch_size :: Int
   loss_computation_batch_size :: Int
+  gc_every :: Int = 0 # in samples, 0 if never
   checkpoints :: Vector{Int}
 end
 
