@@ -117,7 +117,8 @@ function run_validation_experiment(session, idir)
     report = validation_score(session.env, v, progress)
     show_space_after_progress_bar(session)
     z = fmt("+.2f", report.z)
-    Log.print(session.logger, "Average reward: $z")
+    wr = win_rate(report.z)
+    Log.print(session.logger, "Average reward: $z (win rate of $wr%)")
     if session.autosave
       isdir(idir) || mkpath(idir)
       open(joinpath(idir, VALIDATION_FILE), "w") do io
@@ -257,10 +258,12 @@ function Handlers.checkpoint_game_played(session::Session)
   next!(session.progress)
 end
 
+win_rate(z) = round(Int, 100 * (z + 1) / 2)
+
 function Handlers.checkpoint_finished(session::Session, report)
   show_space_after_progress_bar(session)
   avgz = fmt("+.2f", report.reward)
-  wr = round(Int, 100 * (report.reward + 1) / 2)
+  wr = win_rate(report.reward)
   nnr = report.nn_replaced ? ", network replaced" : ""
   Log.print(session.logger, "Average reward: $avgz (win rate of $wr%$nnr)")
   Log.section(session.logger, 3, "Optimizing the loss")
