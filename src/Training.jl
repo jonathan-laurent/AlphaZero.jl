@@ -7,12 +7,14 @@ mutable struct Env{Game, Network, Board}
   bestnn :: Network
   memory :: MemoryBuffer{Board}
   itc    :: Int
+  randnn :: Bool # true if `bestnn` has random weights
   function Env{Game}(params, network, experience=[], itc=0) where Game
     Board = GI.Board(Game)
     msize = max(get(params.mem_buffer_size, itc), length(experience))
     memory = MemoryBuffer{Board}(msize, experience)
+    randnn = itc == 0
     return new{Game, typeof(network), Board}(
-      params, network, memory, itc)
+      params, network, memory, itc, randnn)
   end
 end
 
@@ -103,6 +105,7 @@ function learning!(env::Env{G}, handler) where G
       if success
         nn_replaced = true
         env.bestnn = cur_nn
+        env.randnn = false
         best_evalz = evalz
       end
       checkpoint_report = Report.Checkpoint(k, evalz, success)
@@ -119,9 +122,9 @@ end
 
 function self_play!(env::Env{G}, handler) where G
   params = env.params.self_play
-  player = env.itc > 0 ?
-    MctsPlayer(env.bestnn, params.mcts) :
-    RandomMctsPlayer(G, params.mcts)
+  player = env.randnn ?
+    RandomMctsPlayer(G, params.mcts) :
+    MctsPlayer(env.bestnn, params.mcts)
   new_batch!(env.memory)
   Handlers.self_play_started(handler)
   mem_footprint = 0
