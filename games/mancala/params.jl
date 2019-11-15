@@ -1,18 +1,13 @@
 Network = ResNet{Game}
 
 netparams = ResNetHP(
-  num_filters=128,
+  num_filters=64,
   num_blocks=5,
   conv_kernel_size=(3,1),
   num_policy_head_filters=4,
   num_value_head_filters=32,
   batch_norm_momentum=0.3)
-#=
-Network = SimpleNet{Game}
-netparams = SimpleNetHP(
-  width=500,
-  depth_common=4)
-=#
+
 self_play = SelfPlayParams(
   num_games=2_000,
   reset_mcts_every=400,
@@ -21,7 +16,7 @@ self_play = SelfPlayParams(
     num_workers=64,
     num_iters_per_turn=320,
     cpuct=4,
-    temperature=1,
+    temperature=StepSchedule(1.),
     dirichlet_noise_ϵ=0))
 
 arena = ArenaParams(
@@ -29,7 +24,7 @@ arena = ArenaParams(
   reset_mcts_every=100,
   update_threshold=(2 * 0.58 - 1),
   mcts=MctsParams(self_play.mcts,
-    temperature=0.3,
+    temperature=StepSchedule(0.3),
     dirichlet_noise_ϵ=0.05))
 
 learning = LearningParams(
@@ -58,5 +53,5 @@ validation = RolloutsValidation(
     num_iters_per_turn=1000,
     dirichlet_noise_ϵ=0),
   contender=MctsParams(self_play.mcts,
-    temperature=0.3,
+    temperature=StepSchedule(0.3),
     dirichlet_noise_ϵ=0))

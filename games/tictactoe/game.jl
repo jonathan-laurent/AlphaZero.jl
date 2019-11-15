@@ -1,4 +1,4 @@
-module TicTacToe
+module Tictactoe
 
 export Game, Board
 

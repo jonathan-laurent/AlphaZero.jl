@@ -274,7 +274,7 @@ function GI.print_state(g::Game, with_position_names=true)
 end
 
 function GI.read_state(::Type{Game})
-  #try
+  try
     function read_houses(player)
       print("Player $(player) houses: ")
       houses = [parse(Int, s) for s in split(readline())]
@@ -302,9 +302,9 @@ function GI.read_state(::Type{Game})
     curplayer = parse(Int, readline())
     @assert 1 <= curplayer <= 2
     return Game(board, curplayer == WHITE)
-  #catch
-  #  return nothing
-  #end
+  catch
+    return nothing
+  end
 end
 
 # Example of creating game objects manually:

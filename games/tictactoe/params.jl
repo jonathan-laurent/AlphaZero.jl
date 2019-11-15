@@ -1,6 +1,58 @@
-const RESNET = true
+#####
+##### Training regimes
+#####
 
-if RESNET
+const FAST_TRAINING = true
+
+const USE_RESNET = true
+
+if FAST_TRAINING
+
+  NUM_ITERS = 8
+
+  SP_NUM_GAMES   = 100
+  SP_NUM_MCTS_ITERS = 20
+
+  ARENA_NUM_GAMES = 100
+  ARENA_WIN_RATE_THRESH = 0.51
+
+  LEARNING_BATCH_SIZE = 32
+  LEARNING_CHECKPOINTS = [10, 20]
+
+  MEM_BUFFER_SIZE = PLSchedule(
+    [  0,    4],
+    [500, 2500])
+
+  VALIDATION_NUM_GAMES = 100
+  VALIDATION_BASELINE_NUM_MCTS_ITERS = 100
+
+else # Long training
+
+  NUM_ITERS = 4
+
+  SP_NUM_GAMES   = 4000
+  NUM_MCTS_ITERS = 320
+
+  ARENA_NUM_GAMES = 1000
+  ARENA_WIN_RATE_THRESH = 0.55
+
+  LEARNING_BATCH_SIZE = 256
+  LEARNING_CHECKPOINTS = [1, 2, 5, 10, 20]
+
+  MEM_BUFFER_SIZE = PLSchedule(
+    [     0,      4],
+    [20_000, 60_000])
+
+  VALIDATION_NUM_GAMES = 500
+  VALIDATION_BASELINE_NUM_MCTS_ITERS = 1000
+
+end
+
+#####
+##### Network parameters
+#####
+
+if USE_RESNET
   Network = ResNet{Game}
   netparams = ResNetHP(
     num_filters=64,
@@ -16,20 +68,24 @@ else
     depth_common=4)
 end
 
+#####
+##### Training parameters
+#####
+
 self_play = SelfPlayParams(
-  num_games=4000,
-  reset_mcts_every=4000,
+  num_games=SP_NUM_GAMES,
+  reset_mcts_every=SP_NUM_GAMES,
   mcts = MctsParams(
     num_workers=1,
-    num_iters_per_turn=320,
+    num_iters_per_turn=SP_NUM_MCTS_ITERS,
     dirichlet_noise_ϵ=0.15))
 
 # Evaluate with 0 MCTS iterations
 # Exploration is induced by MCTS and by the temperature τ=1
 arena = ArenaParams(
-  num_games=1000,
+  num_games=ARENA_NUM_GAMES,
   reset_mcts_every=1,
-  update_threshold=(2*0.55 - 1),
+  update_threshold=(2*ARENA_WIN_RATE_THRESH - 1),
   mcts = MctsParams(
     num_workers=1,
     num_iters_per_turn=0,
@@ -40,26 +96,24 @@ learning = LearningParams(
   batch_size=256,
   loss_computation_batch_size=2048,
   nonvalidity_penalty=1.,
-  checkpoints=[1, 2, 5, 10, 20])
+  checkpoints=LEARNING_CHECKPOINTS)
 
 params = Params(
   arena=arena,
   self_play=self_play,
   learning=learning,
-  num_iters=4,
+  num_iters=NUM_ITERS,
   num_game_stages=9,
-  mem_buffer_size=PLSchedule(
-    [     0,      4],
-    [20_000, 60_000]))
+  mem_buffer_size=MEM_BUFFER_SIZE)
 
 validation = RolloutsValidation(
-  num_games = 500,
-  reset_mcts_every = 500,
-  baseline = MctsParams(
+  num_games=VALIDATION_NUM_GAMES,
+  reset_mcts_every=VALIDATION_NUM_GAMES,
+  baseline=MctsParams(
     num_workers=1,
-    num_iters_per_turn=1000,
+    num_iters_per_turn=VALIDATION_BASELINE_NUM_MCTS_ITERS,
     dirichlet_noise_ϵ=0.1),
-  contender = MctsParams(
+  contender=MctsParams(
     num_workers=1,
     num_iters_per_turn=0,
     dirichlet_noise_ϵ=0.1))

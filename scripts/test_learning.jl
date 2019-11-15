@@ -6,11 +6,10 @@
 using Revise
 using AlphaZero
 
-Revise.includet("game.jl")
-using .Mancala
-Revise.includet("params.jl")
+include("using_game.jl")
+@using_default_game
 
-DIR = "session-mancala-bug"
+DIR = "session-test"
 MEMFILE = joinpath(DIR, "mem.data")
 using Serialization: serialize, deserialize
 

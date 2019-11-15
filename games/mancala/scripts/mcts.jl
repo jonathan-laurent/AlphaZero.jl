@@ -1,7 +1,7 @@
 import AlphaZero.GI
 import AlphaZero.MCTS
 
-include("game.jl")
+include("../game.jl")
 using .Mancala
 
 # Late game (for debug purposes)

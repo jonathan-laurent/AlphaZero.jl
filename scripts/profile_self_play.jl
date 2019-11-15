@@ -1,9 +1,8 @@
 using Revise
 using AlphaZero
 
-Revise.includet("game.jl")
-using .Mancala
-Revise.includet("params.jl")
+include("using_game.jl")
+@using_default_game
 
 function config(nblocks, nfilters, niters, nworkers)
   title = "$nblocks blocks, $nfilters filters, $niters iters, $nworkers workers"
@@ -17,10 +16,7 @@ end
 
 # We want 3000 games per iteration?
 # Iteration: self-play=30minutes
-# So we want to generate
-# We want to simulate 100 games per minute
-
-# 2000 games, then iterate
+# Therefore, we want to simulate 100 games per minute
 
 nblocks = 10
 nfilters = 128
