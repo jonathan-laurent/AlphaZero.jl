@@ -273,4 +273,6 @@ function interactive!(game, white::Player, black::Player)
   end
 end
 
+interactive!(game) = interactive!(game, Human(), Human())
+
 end
