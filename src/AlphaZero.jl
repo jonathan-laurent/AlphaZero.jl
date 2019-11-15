@@ -7,7 +7,7 @@ module AlphaZero
 
 export MCTS, GameInterface, GI, Report, Network
 export RolloutsValidation
-export AbstractSchedule, PLSchedule
+export AbstractSchedule, PLSchedule, StepSchedule
 export Params, SelfPlayParams, ArenaParams, MctsParams, LearningParams
 export Env, train!, learning!, self_play!, memory_report, get_experience
 export Session, resume!, save, explore, plot_learning

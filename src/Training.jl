@@ -10,7 +10,7 @@ mutable struct Env{Game, Network, Board}
   randnn :: Bool # true if `bestnn` has random weights
   function Env{Game}(params, network, experience=[], itc=0) where Game
     Board = GI.Board(Game)
-    msize = max(get(params.mem_buffer_size, itc), length(experience))
+    msize = max(params.mem_buffer_size[itc], length(experience))
     memory = MemoryBuffer{Board}(msize, experience)
     randnn = itc == 0
     return new{Game, typeof(network), Board}(
@@ -137,6 +137,7 @@ function self_play!(env::Env{G}, handler) where G
           MCTS.approximate_memory_footprint(player.mcts))
         MCTS.reset!(player.mcts)
       end
+      env.randnn || Network.gc(env.bestnn)
     end
   end
   MCTS.memory_footprint(player.mcts)
@@ -158,7 +159,7 @@ end
 function train!(env::Env{G}, handler=nothing) where G
   while env.itc < env.params.num_iters
     Handlers.iteration_started(handler)
-    resize_memory!(env, get(env.params.mem_buffer_size, env.itc))
+    resize_memory!(env, env.params.mem_buffer_size[env.itc])
     sprep, sptime = @timed self_play!(env, handler)
     mrep, mtime = @timed memory_report(env, handler)
     lrep, ltime = @timed learning!(env, handler)

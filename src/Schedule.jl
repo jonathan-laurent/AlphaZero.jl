@@ -4,8 +4,8 @@
 
 abstract type AbstractSchedule{R} end
 
-function get(s::AbstractSchedule, i)
-  #@unimplemented
+function Base.getindex(s::AbstractSchedule, i::Int)
+  @unimplemented
 end
 
 #####
@@ -27,7 +27,7 @@ PLSchedule(xs, ys) = PLSchedule{eltype(ys)}(xs, ys)
 
 PLSchedule(cst) = PLSchedule([0], [cst])
 
-function get(s::PLSchedule{R}, i) where R
+function Base.getindex(s::PLSchedule{R}, i::Int) where R
   ptidx = findlast(x -> x <= i, s.xs)
   if isnothing(ptidx)
     # We are before the first point
@@ -49,7 +49,32 @@ function test()
   s = PLSchedule([0, 10, 20], [0, 10, 30])
   xs = [-1, 0, 2, 10, 11, 20, 25]
   ys = [0,  0, 2, 10, 12, 30, 30]
-  @assert [get(s, x) for x in xs] == ys
+  @assert [s[x] for x in xs] == ys
 end
 
-test()
+#test()
+
+#####
+##### Step function
+#####
+
+struct StepSchedule{R} <: AbstractSchedule{R}
+  start :: R
+  xs :: Vector{Int}
+  ys :: Vector{R}
+  function StepSchedule{R}(start, xs, ys) where R
+    @assert length(xs) == length(ys)
+    return new{R}(start, xs, ys)
+  end
+end
+
+StepSchedule(; start, change_at, values) =
+  StepSchedule{typeof(start)}(start, change_at, values)
+
+StepSchedule(cst) = StepSchedule{typeof(cst)}(cst, [], [])
+
+function Base.getindex(s::StepSchedule, i::Int)
+   idx = findlast(x -> x <= i, s.xs)
+   isnothing(idx) && (return s.start)
+   return s.ys[idx]
+end

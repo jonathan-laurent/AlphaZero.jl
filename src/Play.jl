@@ -5,14 +5,14 @@
 abstract type AbstractPlayer{Game} end
 
 """
-    think(::AbstractPlayer, state)
+    think(::AbstractPlayer, state, turn_number::Int)
 
 Return an `(action, π)` pair where `action` is the chosen action and
 `π` a probability distribution over available actions.
 
 Note that `a` does not have to be drawn from `π`.
 """
-function think(player::AbstractPlayer, state)
+function think(player::AbstractPlayer, state, turn)
   @unimplemented
 end
 
@@ -26,7 +26,7 @@ end
 
 struct RandomPlayer{Game} <: AbstractPlayer{Game} end
 
-function think(player::RandomPlayer, state)
+function think(player::RandomPlayer, state, turn)
   actions = GI.available_actions(state)
   n = length(actions)
   π = ones(n) ./ length(actions)
@@ -53,10 +53,10 @@ end
 struct MctsPlayer{G, M} <: AbstractPlayer{G}
   mcts :: M
   niters :: Int
-  τ :: Float64 # Temperature
+  τ :: StepSchedule{Float64} # Temperature
   nα :: Float64 # Dirichlet noise parameter
   ϵ :: Float64 # Dirichlet noise weight
-  function MctsPlayer(mcts::MCTS.Env{G}, niters; τ=1., nα=10., ϵ=0.) where G
+  function MctsPlayer(mcts::MCTS.Env{G}, niters; τ, nα, ϵ) where G
     new{G, typeof(mcts)}(mcts, niters, τ, nα, ϵ)
   end
 end
@@ -87,7 +87,7 @@ function fix_probvec(π)
   return π
 end
 
-function think(p::MctsPlayer, state)
+function think(p::MctsPlayer, state, turn)
   if iszero(p.niters)
     # Special case: use the oracle directly instead of MCTS
     actions = GI.available_actions(state)
@@ -95,7 +95,7 @@ function think(p::MctsPlayer, state)
     π_mcts, _ = MCTS.evaluate(p.mcts.oracle, board, actions)
   else
     MCTS.explore!(p.mcts, state, p.niters)
-    actions, π_mcts = MCTS.policy(p.mcts, state, τ=p.τ)
+    actions, π_mcts = MCTS.policy(p.mcts, state, τ=p.τ[turn])
   end
   if iszero(p.ϵ)
     π_exp = π_mcts
@@ -129,7 +129,7 @@ function play(
       return z
     end
     player = GI.white_playing(state) ? white : black
-    π, a = think(player, state)
+    π, a = think(player, state, nturns)
     if !isnothing(memory)
       cboard = GI.canonical_board(state)
       push_sample!(memory, cboard, π, GI.white_playing(state), nturns)
