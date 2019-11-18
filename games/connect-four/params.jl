@@ -11,7 +11,7 @@ netparams = ResNetHP(
   batch_norm_momentum=0.3)
 
 self_play = SelfPlayParams(
-  num_games=100,
+  num_games=3_000,
   reset_mcts_every=600,
   mcts=MctsParams(
     use_gpu=true,
@@ -22,7 +22,7 @@ self_play = SelfPlayParams(
       start=1.0,
       change_at=[10],
       values=[cold_temperature]),
-    dirichlet_noise_ϵ=0))
+    dirichlet_noise_ϵ=0.05))
 
 arena = ArenaParams(
   num_games=150,
