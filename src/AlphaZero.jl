@@ -58,10 +58,19 @@ include("Session.jl")
 include("Profile.jl")
 
 # We support Flux and Knet
-#include("Flux/FluxNets.jl")
-#using .FluxNets
-include("Knet/KNets.jl")
-using .KNets
+const USE_KNET = false
+
+if USE_KNET
+  @eval begin
+    include("Knet/KNets.jl")
+    using .KNets
+  end
+else
+  @eval begin
+    include("Flux/FluxNets.jl")
+    using .FluxNets
+  end
+end
 
 end
 
