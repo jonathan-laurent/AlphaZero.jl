@@ -137,7 +137,6 @@ function self_play!(env::Env{G}, handler) where G
           MCTS.approximate_memory_footprint(player.mcts))
         MCTS.reset!(player.mcts)
       end
-      env.randnn || Network.gc(env.bestnn)
     end
   end
   MCTS.memory_footprint(player.mcts)

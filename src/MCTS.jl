@@ -124,14 +124,16 @@ mutable struct Worker{Board, Action}
 end
 
 """
-    MCTS.Env{Game}(oracle, nworkers=1, cpuct=1.) where Game
+    MCTS.Env{Game}(oracle; nworkers=1, fill_batches=false, cpuct=1.) where Game
 
 Create and initialize an MCTS environment.
 
 ## Arguments
 
   - `oracle`: external oracle
-  - `nworkers`: numbers of asynchronous workers (see below).
+  - `nworkers`: numbers of asynchronous workers (see below)
+  - `fill_batches`: if true, a constant batch size is enforced for evaluation
+     requests, by completing batches with dummy entries if necessary
   - `cpuct`: exploration constant (in the UCT formula)
 
 ## Asynchronous MCTS
@@ -153,6 +155,7 @@ mutable struct Env{Game, Board, Action, Oracle}
   workers :: Vector{Worker{Board, Action}}
   global_lock :: ReentrantLock
   # Parameters
+  fill_batches :: Bool
   cpuct :: Float64
   # Performance statistics
   total_time :: Float64
@@ -160,7 +163,7 @@ mutable struct Env{Game, Board, Action, Oracle}
   total_iterations :: Int64
   total_nodes_traversed :: Int64
 
-  function Env{G}(oracle, nworkers=1, cpuct=1.) where G
+  function Env{G}(oracle; nworkers=1, fill_batches=false, cpuct=1.) where G
     B = GI.Board(G)
     A = GI.Action(G)
     tree = Dict{B, BoardInfo}()
@@ -171,7 +174,7 @@ mutable struct Env{Game, Board, Action, Oracle}
     lock = ReentrantLock()
     workers = [Worker{B, A}(i) for i in 1:nworkers]
     new{G, B, A, typeof(oracle)}(
-      tree, oracle, workers, lock, cpuct,
+      tree, oracle, workers, lock, fill_batches, cpuct,
       total_time, inference_time, total_iterations, total_nodes_traversed)
   end
 end
@@ -341,13 +344,21 @@ function inference_server(env::Env{G, B, A}) where {G, B, A}
   while true
     requests = [take!(w.send) for w in to_watch]
     active = [!isnothing(r) for r in requests]
-    any(active) || break
+    n_active = count(active)
+    n_active > 0 || break
     batch = convert(Vector{Tuple{B, Vector{A}}}, requests[active])
     to_watch = to_watch[active]
     @assert !isempty(batch)
+    if env.fill_batches
+      nmissing = length(env.workers) - length(batch)
+      if nmissing > 0
+        append!(batch, [batch[1] for i in 1:nmissing])
+      end
+      @assert length(batch) == length(env.workers)
+    end
     answers, time = @timed evaluate_batch(env.oracle, batch)
     env.inference_time += time
-    for i in eachindex(batch)
+    for i in 1:n_active
       put!(to_watch[i].recv, answers[i])
     end
   end
@@ -442,7 +453,7 @@ end
 
 """
     MCTS.average_exploration_depth(env)
-    
+
 Return the average number of nodes that are traversed during an
 MCTS iteration, not counting the root.
 """

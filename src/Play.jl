@@ -39,7 +39,7 @@ end
 
 function RandomMctsPlayer(::Type{G}, params::MctsParams) where G
   oracle = MCTS.RandomOracle{G}()
-  mcts = MCTS.Env{G}(oracle, 1, params.cpuct)
+  mcts = MCTS.Env{G}(oracle, nworkers=1, cpuct=params.cpuct)
   return MctsPlayer(mcts, params.num_iters_per_turn,
     τ=params.temperature,
     nα=params.dirichlet_noise_nα,
@@ -63,10 +63,15 @@ end
 
 # Alternative constructor
 function MctsPlayer(oracle::MCTS.Oracle{G}, params::MctsParams) where G
+  fill_batches = false
   if isa(oracle, AbstractNetwork)
     oracle = Network.copy(oracle, on_gpu=params.use_gpu, test_mode=true)
+    params.use_gpu && (fill_batches = true)
   end
-  mcts = MCTS.Env{G}(oracle, params.num_workers, params.cpuct)
+  mcts = MCTS.Env{G}(oracle,
+    nworkers=params.num_workers,
+    fill_batches=fill_batches,
+    cpuct=params.cpuct)
   return MctsPlayer(mcts, params.num_iters_per_turn,
     τ=params.temperature,
     nα=params.dirichlet_noise_nα,
