@@ -61,4 +61,4 @@ validation = RolloutsValidation(
     temperature=StepSchedule(cold_temperature),
     dirichlet_noise_ϵ=0))
 
-validation = nothing
+# validation = nothing
