@@ -55,7 +55,6 @@ include("Explorer.jl")
 include("Validation.jl")
 include("Plots.jl")
 include("Session.jl")
-include("Profile.jl")
 
 # We support Flux and Knet
 const USE_KNET = false
