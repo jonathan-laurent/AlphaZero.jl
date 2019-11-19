@@ -93,6 +93,7 @@ function training_epoch!(tr::Trainer)
     Network.gc(tr.network)
   end
   Network.train!(tr.network, loss, data, tr.params.learning_rate)
+  Network.gc(tr.network)
 end
 
 #####
@@ -110,7 +111,7 @@ function mean_learning_status(reports::Vector{Report.LearningStatus})
 end
 
 function learning_status(tr::Trainer, samples)
-  # As done now, this isslighly inefficient as we solve the
+  # As done now, this is slighly inefficient as we solve the
   # same neural network inference problem twice
   W, X, A, P, V = samples
   Ls = losses(tr.network, tr.params, tr.Wmean, tr.Hp, samples)
@@ -132,6 +133,7 @@ function learning_status(tr::Trainer)
     Network.gc(tr.network)
   end
   reports = [learning_status(tr, batch) for batch in batches]
+  Network.gc(tr.network)
   return mean_learning_status(reports)
 end
 

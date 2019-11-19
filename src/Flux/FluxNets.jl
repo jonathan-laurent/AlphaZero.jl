@@ -17,6 +17,7 @@ using CUDAapi
 if has_cuda()
   try
     using CuArrays
+    @show CuArrays.usage_limit[]
     @eval const CUARRAYS_IMPORTED = true
   catch ex
     @warn(
@@ -96,10 +97,10 @@ function Network.regularized_params(net::FluxNetwork)
   return ps
 end
 
-function gc(::FluxNetwork)
+function Network.gc(::FluxNetwork)
   CUARRAYS_IMPORTED || return
   GC.gc()
-  CuArrays.clearpool()
+  #CuArrays.clearpool() # Not available any more
 end
 
 #####
