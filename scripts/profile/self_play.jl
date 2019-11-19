@@ -28,7 +28,7 @@ function profile_self_play(configs::Vector)
     ("EXPD", expd, s -> s[3])])
   for (title, net, params) in configs
     profile_self_play(net, params, 1) # Compilation
-    rep = profile_self_play(net, params, 10)
+    rep = profile_self_play(net, params, 20)
     Log.table_row(log, tab, rep, [title])
   end
 end
@@ -37,7 +37,7 @@ end
 ##### Main
 #####
 
-include("using_game.jl")
+include("../using_game.jl")
 @using_default_game
 
 function config(nblocks, nfilters, niters, nworkers)
@@ -60,9 +60,8 @@ nfilters = 128
 profile_self_play([
   config(7, 128, 320, 64),
   config(5, 128, 320, 64),
-  config(5, 100, 320, 64),
+  config(7, 64, 320, 64),
   config(5, 64, 320, 64),
   config(10, 128, 1024, 256),
-  config(5, 64, 1024, 256),
-  config(5, 64, 160, 32),
+  config(7, 100, 320, 64),
 ])

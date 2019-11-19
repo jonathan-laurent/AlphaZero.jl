@@ -4,7 +4,7 @@ cold_temperature = 0.2
 
 netparams = ResNetHP(
   num_filters=64,
-  num_blocks=7,
+  num_blocks=5,
   conv_kernel_size=(3, 3),
   num_policy_head_filters=4,
   num_value_head_filters=32,

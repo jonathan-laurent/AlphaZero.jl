@@ -3,13 +3,15 @@
 ##### To watch GPU memory consumption, use `nvidia-smi -l 1`
 #####
 
+ENV["CUARRAYS_MEMORY_LIMIT"] = 7_500_000_000
+
 using Revise
 using AlphaZero
 
 include("using_game.jl")
 @using_default_game
 
-DIR = "session-test"
+DIR = joinpath("sessions", "test-learning", GAME)
 MEMFILE = joinpath(DIR, "mem.data")
 using Serialization: serialize, deserialize
 
@@ -30,5 +32,5 @@ env = Env{Game}(params, network, experience)
 dir = joinpath(DIR, "session")
 mkpath(dir)
 session = Session(env, dir)
-memory_report(session.env, session)
+#memory_report(session.env, session)
 report = learning!(session.env, session)

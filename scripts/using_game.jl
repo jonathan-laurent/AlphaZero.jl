@@ -17,12 +17,23 @@ function snake(str)
   return String(ret)
 end
 
+function find_game_dir(name)
+  game_dir = joinpath("games", name)
+  for i in 0:5
+    game_dir = joinpath(
+      pwd(), [".." for j in 1:i]..., "games", name)
+    isdir(game_dir) && break
+  end
+  isdir(game_dir) || error("Game directory not found")
+  return game_dir
+end
+
 macro using_game(name)
   mod = Symbol(snake(name))
-  game_dir = joinpath("..", "games", name)
+  game_dir = find_game_dir(name)
   game_file = joinpath(game_dir, "game.jl")
   params_file = joinpath(game_dir, "params.jl")
-  session_dir = "session-$name"
+  session_dir = joinpath("sessions", name)
   @eval begin
     include($game_file)
     using .$mod
