@@ -120,6 +120,13 @@ function learning!(env::Env{G}, handler) where G
   return report
 end
 
+function simple_memory_stats(env)
+  mem = get_experience(env)
+  nsamples = length(mem)
+  ndistinct = length(merge_by_board(mem))
+  return nsamples, ndistinct
+end
+
 function self_play!(env::Env{G}, handler) where G
   params = env.params.self_play
   player = env.randnn ?
@@ -143,26 +150,32 @@ function self_play!(env::Env{G}, handler) where G
   inference_tr = MCTS.inference_time_ratio(player.mcts)
   speed = last_batch_size(env.memory) / elapsed
   expdepth = MCTS.average_exploration_depth(player.mcts)
-  report = Report.SelfPlay(inference_tr, speed, expdepth, mem_footprint)
+  memsize, memdistinct = simple_memory_stats(env)
+  report = Report.SelfPlay(
+    inference_tr, speed, expdepth, mem_footprint, memsize, memdistinct)
   Handlers.self_play_finished(handler, report)
   return report
 end
 
 function memory_report(env::Env{G}, handler) where G
-  nstages = env.params.num_game_stages
-  report = memory_report(env.memory, env.bestnn, env.params.learning, nstages)
-  Handlers.memory_analyzed(handler, report)
-  return report
+  if env.params.perform_memory_analysis
+    nstages = env.params.num_game_stages
+    report = memory_report(env.memory, env.bestnn, env.params.learning, nstages)
+    Handlers.memory_analyzed(handler, report)
+    return report
+  else
+    return nothing
+  end
 end
 
 function train!(env::Env{G}, handler=nothing) where G
   while env.itc < env.params.num_iters
     Handlers.iteration_started(handler)
     resize_memory!(env, env.params.mem_buffer_size[env.itc])
-    sprep, sptime = @timed self_play!(env, handler)
-    mrep, mtime = @timed memory_report(env, handler)
-    lrep, ltime = @timed learning!(env, handler)
-    rep = Report.Iteration(sptime, mtime, ltime, sprep, mrep, lrep)
+    sprep, spperfs = Report.@timed self_play!(env, handler)
+    mrep, mperfs = Report.@timed memory_report(env, handler)
+    lrep, lperfs = Report.@timed learning!(env, handler)
+    rep = Report.Iteration(spperfs, mperfs, lperfs, sprep, mrep, lrep)
     env.itc += 1
     Handlers.iteration_finished(handler, rep)
   end

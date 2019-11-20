@@ -48,6 +48,7 @@ end
   num_iters :: Int
   mem_buffer_size :: PLSchedule{Int}
   num_game_stages :: Int # as featured in memory reports)
+  perform_memory_analysis :: Bool = true
 end
 
 for T in [MctsParams, ArenaParams, SelfPlayParams, LearningParams, Params]

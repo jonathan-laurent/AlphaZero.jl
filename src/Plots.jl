@@ -14,31 +14,73 @@ end
 ##### Iteration summary plots
 #####
 
-function plot_learning(
-    report::Report.Learning,
-    params::Params,
-    dir::String)
-  isdir(dir) || mkpath(dir)
-  epochs = report.epochs
-  losses_plot = plot_losses(0:length(epochs), "Losses") do i
+function learning_iter_plot(rep::Report.Learning, params::Params)
+  losses_plot = plot_losses(0:length(rep.epochs), "Losses") do i
     if i == 0
-      report.initial_status.loss
+      rep.initial_status.loss
     else
-      epochs[i].status_after.loss
+      rep.epochs[i].status_after.loss
     end
   end
-  checkpoints = report.checkpoints
   checkpoints_plot = Plots.hline(
     [0, params.arena.update_threshold],
     title="Checkpoints")
   Plots.plot!(checkpoints_plot,
-    [c.epoch_id for c in checkpoints],
-    [c.reward for c in checkpoints],
+    [c.epoch_id for c in rep.checkpoints],
+    [c.reward for c in rep.checkpoints],
     t=:scatter,
     legend=:none)
-  plot = Plots.plot(losses_plot, checkpoints_plot, layout=(2, 1))
-  Plots.savefig(plot, joinpath(dir, "summary"))
+  return Plots.plot(losses_plot, checkpoints_plot, layout=(2, 1))
 end
+
+function performances_plot(rep::Report.Iteration)
+  # Global
+  global_labels = []
+  global_content = []
+  push!(global_labels, "Self Play")
+  push!(global_content, rep.perfs_self_play.time)
+  if !isnothing(rep.memory)
+    push!(global_labels, "Memory Analysis")
+    push!(global_content, rep.perfs_memory_analysis.time)
+  end
+  push!(global_labels, "Learning")
+  push!(global_content, rep.perfs_learning.time)
+  glob = Plots.pie(global_labels, global_content, title="Global")
+  # Self-play details
+  self_play =
+    let gcratio =
+      rep.perfs_self_play.gc_time / rep.perfs_self_play.time
+    let itratio = rep.self_play.inference_time_ratio
+      Plots.pie(
+        ["Inference", "MCTS", "GC"],
+        [(1 - gcratio) * itratio, (1 - gcratio) * (1 - itratio), gcratio],
+        title="Self Play") end end
+  # Learning details
+  learning = Plots.pie(
+    ["Samples Conversion", "Loss computation", "Optimization", "Evaluation"],
+    [ rep.learning.time_convert,
+      rep.learning.time_loss,
+      rep.learning.time_train,
+      rep.learning.time_eval],
+    title="Learning")
+  return Plots.plot(glob, self_play, learning)
+end
+
+function plot_iteration(
+    report::Report.Iteration,
+    params::Params,
+    dir::String)
+  isdir(dir) || mkpath(dir)
+  # Learning plot
+  lplot = learning_iter_plot(report.learning, params)
+  Plots.savefig(lplot, joinpath(dir, "summary"))
+  # Performances plot
+  pplot = performances_plot(report)
+  Plots.savefig(pplot, joinpath(dir, "performances"))
+end
+# To test:
+# params, ireps, vreps = AlphaZero.get_reports("sessions/connect-four")
+# AlphaZero.plot_iteration(ireps[end], params, "TEST")
 
 #####
 ##### Training summary plots
@@ -73,11 +115,11 @@ function plot_training(
     legend=:none)
   # Number of samples
   nsamples = Plots.plot(0:n,
-    [0;[it.memory.all_samples.num_samples for it in iterations]],
+    [0;[it.self_play.memory_size for it in iterations]],
     title="Experience Buffer Size",
     label="Number of samples")
   Plots.plot!(nsamples, 0:n,
-    [0;[it.memory.all_samples.num_boards for it in iterations]],
+    [0;[it.self_play.memory_num_distinct_boards for it in iterations]],
     label="Number of distinct boards")
   # Performances during evaluation
   arena = Plots.plot(1:n, [
@@ -88,68 +130,45 @@ function plot_training(
     t=:bar,
     legend=:none)
   Plots.hline!(arena, [0, params.arena.update_threshold])
-  # Loss on last batch
-  losses_last = plot_losses(1:n, "Loss on last batch") do i
-    iterations[i].memory.latest_batch.status.loss
-  end
-  losses_fullmem = plot_losses(1:n, "Loss on full memory") do i
-    iterations[i].memory.all_samples.status.loss
-  end
-  # Loss per game stage
-  nstages = params.num_game_stages
-  colors = range(colorant"blue", stop=colorant"red", length=nstages)
-  pslosses = Plots.plot(title="Loss per Game Stage", ylims=(0, Inf))
-  for s in 1:nstages
-    Plots.plot!(pslosses, 1:n, [
-        it.memory.per_game_stage[s].samples_stats.status.loss.L
-        for it in iterations],
-      label="$s",
-      color=colors[s])
+  # Plots related to the memory analysis
+  if !any(it -> isnothing(it.memory), iterations)
+    # Loss on last batch
+    losses_last = plot_losses(1:n, "Loss on last batch") do i
+      iterations[i].memory.latest_batch.status.loss
+    end
+    losses_fullmem = plot_losses(1:n, "Loss on full memory") do i
+      iterations[i].memory.all_samples.status.loss
+    end
+    # Loss per game stage
+    nstages = params.num_game_stages
+    colors = range(colorant"blue", stop=colorant"red", length=nstages)
+    losses_ps = Plots.plot(title="Loss per Game Stage", ylims=(0, Inf))
+    for s in 1:nstages
+      Plots.plot!(losses_ps, 1:n, [
+          it.memory.per_game_stage[s].samples_stats.status.loss.L
+          for it in iterations],
+        label="$s",
+        color=colors[s])
+    end
+    append!(plots, [losses_last, losses_fullmem, losses_ps])
+    append!(files, ["loss_last_batch", "loss_fullmem", "loss_per_stage"])
   end
   # Policies entropy
   entropies = Plots.plot(1:n,
-    [it.memory.latest_batch.Hp for it in iterations],
+    [it.learning.initial_status.Hp for it in iterations],
     ylims=(0, Inf),
     title="Policy Entropy",
     label="MCTS")
   Plots.plot!(entropies, 1:n,
-    [it.memory.latest_batch.status.Hpnet for it in iterations],
+    [it.learning.initial_status.Hpnet for it in iterations],
     label="Network")
-  # Performance reports
-  perfs_global_labels = ["Self Play", "Memory Analysis", "Learning"]
-  perfs_global_content = [
-    sum(it.time_self_play for it in iterations),
-    sum(it.time_memory_analysis for it in iterations),
-    sum(it.time_learning for it in iterations)]
-  if !isnothing(validation)
-    push!(perfs_global_labels, "Validation")
-    push!(perfs_global_content, sum(rep.time for rep in validation))
-  end
-  perfs_global = Plots.pie(
-    perfs_global_labels, perfs_global_content, title="Global")
-  perfs_self_play =
-    let itratio = mean(it.self_play.inference_time_ratio for it in iterations)
-      Plots.pie(
-        ["Inference", "MCTS"], [itratio, 1-itratio],
-        title="Self Play") end
-  perfs_learning = Plots.pie(
-    ["Samples Conversion", "Loss computation", "Optimization", "Evaluation"], [
-      sum(it.learning.time_convert for it in iterations),
-      sum(it.learning.time_loss for it in iterations),
-      sum(it.learning.time_train for it in iterations),
-      sum(it.learning.time_eval for it in iterations)],
-    title="Learning")
-  perfs = Plots.plot(
-    perfs_global, perfs_self_play, perfs_learning)
   # Assembling everything together
-  append!(plots, [
-    arena, pslosses, losses_fullmem, losses_last,
-    entropies, nsamples, perfs, expdepth])
-  append!(files, [
-    "arena", "loss_per_stage", "loss_fullmem", "loss_last_batch",
-    "entropies", "nsamples", "perfs", "exploration_depth"])
+  append!(plots, [arena, entropies, nsamples, expdepth])
+  append!(files, ["arena", "entropies", "nsamples", "exploration_depth"])
   for (file, plot) in zip(files, plots)
     #Plots.plot!(plot, dpi=200, size=(600, 200))
     Plots.savefig(plot, joinpath(dir, file))
   end
 end
+# To test:
+# AlphaZero.plot_training("sessions/connect-four")

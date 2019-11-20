@@ -107,7 +107,8 @@ function mean_learning_status(reports::Vector{Report.LearningStatus})
   Lreg  = mean(r.loss.Lreg  for r in reports)
   Linv  = mean(r.loss.Linv  for r in reports)
   Hpnet = mean(r.Hpnet      for r in reports)
-  return Report.LearningStatus(Report.Loss(L, Lp, Lv, Lreg, Linv), Hpnet)
+  Hp    = mean(r.Hp         for r in reports)
+  return Report.LearningStatus(Report.Loss(L, Lp, Lv, Lreg, Linv), Hp, Hpnet)
 end
 
 function learning_status(tr::Trainer, samples)
@@ -119,7 +120,7 @@ function learning_status(tr::Trainer, samples)
   Pnet, _ = Network.evaluate(tr.network, X, A)
   Hpnet = entropy_wmean(Pnet, W)
   Hpnet = Network.convert_output(tr.network, Hpnet)
-  return Report.LearningStatus(Report.Loss(Ls...), Hpnet)
+  return Report.LearningStatus(Report.Loss(Ls...), tr.Hp, Hpnet)
 end
 
 function learning_status(tr::Trainer)

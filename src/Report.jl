@@ -14,6 +14,7 @@ end
 
 struct LearningStatus
   loss :: Loss
+  Hp :: Float32 # property of the memory, constant during a learning iteration
   Hpnet :: Float32
 end
 
@@ -62,14 +63,23 @@ struct SelfPlay
   samples_gen_speed :: Float64 # in samples/second
   average_exploration_depth :: Float64
   mcts_memory_footprint :: Int
+  # Basic memory statistics
+  memory_size :: Int
+  memory_num_distinct_boards :: Int
+end
+
+struct Perfs
+  time :: Float64
+  allocated :: Int64
+  gc_time :: Float64
 end
 
 struct Iteration
-  time_self_play :: Float64
-  time_memory_analysis :: Float64
-  time_learning :: Float64
+  perfs_self_play :: Perfs
+  perfs_memory_analysis :: Perfs
+  perfs_learning :: Perfs
   self_play :: SelfPlay
-  memory :: Memory
+  memory :: Union{Memory, Nothing}
   learning :: Learning
 end
 
@@ -77,6 +87,17 @@ struct Initial
   num_network_parameters :: Int
   num_network_regularized_parameters :: Int
   mcts_footprint_per_node :: Int
+end
+
+#####
+##### Profiling utilities
+#####
+
+macro timed(e)
+  quote
+    local v, t, mem, gct = Base.@timed $(esc(e))
+    v, Perfs(t, mem, gct)
+  end
 end
 
 #####
@@ -95,6 +116,7 @@ const LEARNING_STATUS_TABLE = Log.Table([
   ("Lp",     NUM_COL,     s -> s.loss.Lp),
   ("Lreg",   NUM_COL,     s -> s.loss.Lreg),
   ("Linv",   NUM_COL,     s -> s.loss.Linv),
+  ("Hp",     NUM_COL,     s -> s.Hp),
   ("Hpnet",  NUM_COL,     s -> s.Hpnet)])
 
 const SAMPLES_STATS_TABLE = Log.Table([
@@ -143,6 +165,9 @@ function print(logger::Logger, report::SelfPlay)
   Log.print(logger, "Average exploration depth: $avgdepth")
   memf = format(report.mcts_memory_footprint, autoscale=:metric, precision=2)
   Log.print(logger, "MCTS memory footprint: $(memf)B")
+  mems = format(report.memory_size, commas=true)
+  memd = format(report.memory_num_distinct_boards, commas=true)
+  Log.print(logger, "Experience buffer size: $(mems) ($(memd) distinct boards)")
 end
 
 function print(logger::Logger, report::Initial)

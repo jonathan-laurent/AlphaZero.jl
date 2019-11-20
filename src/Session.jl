@@ -282,7 +282,7 @@ function Handlers.iteration_finished(session::Session, report)
     open(joinpath(idir, REPORT_FILE), "w") do io
       JSON2.pretty(io, JSON2.write(report))
     end
-    plot_learning(report.learning, session.env.params, idir)
+    plot_iteration(report, session.env.params, idir)
     plot_training(session.dir)
     Log.section(session.logger, 2, "Environment saved in: $(session.dir)")
   end
