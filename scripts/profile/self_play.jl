@@ -62,6 +62,7 @@ profile_self_play([
   config(5, 128, 320, 64),
   config(7, 64, 320, 64),
   config(5, 64, 320, 64),
+  config(5, 64, 640, 128),
   config(10, 128, 1024, 256),
   config(7, 100, 320, 64),
 ])
