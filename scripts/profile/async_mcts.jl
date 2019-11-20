@@ -1,34 +1,33 @@
-import AlphaZero
+using Revise
+using AlphaZero
 using ProgressMeter
 using Plots
 
 # It is important not to profile async mcts on tic tac toe as the number
 # of states in this game is small and so the mcts tree quickly contains
 # every state.
-include("../games/mancala/game.jl")
-import .Mancala ; Game = Mancala.Game
+include("../using_game.jl")
+@using_game "connect-four"
 
 REP = 500
 NUM_ITERATIONS = 512
-MAX_LOG_NWORKERS = 9 # 2^7 = 512
+MAX_LOG_NWORKERS = 9 # 2^9 = 512
 
 TIME_FIG = "mcts_speed"
 INFERENCE_TIME_RATIO_FIG = "inference_time_ratio"
 
-netparams = AlphaZero.SimpleNetHyperParams(
+network = SimpleNet{Game}(SimpleNetHP(
   width=500,
-  depth_common=4)
-
-network = AlphaZero.SimpleNet{Game}(netparams)
+  depth_common=4))
 
 function profile(nworkers, ngames)
-  mcts = AlphaZero.MCTS.Env{Game}(network, nworkers, 1.)
+  mcts = MCTS.Env{Game}(network, nworkers=nworkers, cpuct=1.)
   time = @elapsed begin
     @showprogress for i in 1:ngames
-      AlphaZero.MCTS.explore!(mcts, Game(), NUM_ITERATIONS)
+      MCTS.explore!(mcts, Game(), NUM_ITERATIONS)
     end
   end
-  return time, AlphaZero.MCTS.inference_time_ratio(mcts)
+  return time, MCTS.inference_time_ratio(mcts)
 end
 
 println("Compile everything...")
