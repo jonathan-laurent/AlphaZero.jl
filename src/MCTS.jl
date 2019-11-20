@@ -154,6 +154,7 @@ mutable struct Env{Game, Board, Action, Oracle}
   # Workers
   workers :: Vector{Worker{Board, Action}}
   global_lock :: ReentrantLock
+  remaining :: Int # Iterations counters
   # Parameters
   fill_batches :: Bool
   cpuct :: Float64
@@ -172,9 +173,10 @@ mutable struct Env{Game, Board, Action, Oracle}
     total_iterations = 0
     total_nodes_traversed = 0
     lock = ReentrantLock()
+    remaining = 0
     workers = [Worker{B, A}(i) for i in 1:nworkers]
     new{G, B, A, typeof(oracle)}(
-      tree, oracle, workers, lock, fill_batches, cpuct,
+      tree, oracle, workers, lock, remaining, fill_batches, cpuct,
       total_time, inference_time, total_iterations, total_nodes_traversed)
   end
 end
@@ -329,13 +331,11 @@ function backprop!(env, worker, white_reward)
   end
 end
 
-function worker_explore!(env::Env, worker::Worker, state, nsims)
-  for i in 1:nsims
-    @assert isempty(worker.stack)
-    white_reward = select!(env, worker, state)
-    backprop!(env, worker, white_reward)
-    @assert isempty(worker.stack)
-  end
+function worker_explore!(env::Env, worker::Worker, state)
+  @assert isempty(worker.stack)
+  white_reward = select!(env, worker, state)
+  backprop!(env, worker, white_reward)
+  @assert isempty(worker.stack)
 end
 
 # Does not evaluate finite number of batches
@@ -365,21 +365,24 @@ function inference_server(env::Env{G, B, A}) where {G, B, A}
 end
 
 function explore_sync!(env::Env, state, nsims)
-  elapsed = @elapsed worker_explore!(env, env.workers[1], state, nsims)
+  elapsed = @elapsed for i in 1:nsims
+    worker_explore!(env, env.workers[1], state)
+  end
   env.total_time += elapsed
 end
 
 function explore_async!(env::Env, state, nsims)
-  # Amount of work per worker
-  # (rounding nsims to the upper multiple of nworkers)
-  pw = ceil(Int, nsims / length(env.workers))
+  env.remaining = nsims
   elapsed = @elapsed begin
     @sync begin
       @async @printing_errors inference_server(env)
       for w in env.workers
         @async @printing_errors begin
           lock(env.global_lock)
-          worker_explore!(env, w, state, pw)
+          while env.remaining > 0
+            env.remaining -= 1
+            worker_explore!(env, w, state)
+          end
           put!(w.send, nothing) # send termination message to the server
           unlock(env.global_lock)
         end
