@@ -1,6 +1,5 @@
 # AlphaZero.jl
 
-[![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://jonathan-laurent.github.io/AlphaZero.jl/stable)
 [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://jonathan-laurent.github.io/AlphaZero.jl/dev)
 [![Build Status](https://travis-ci.com/jonathan-laurent/AlphaZero.jl.svg?branch=master)](https://travis-ci.com/jonathan-laurent/AlphaZero.jl)
 [![Codecov](https://codecov.io/gh/jonathan-laurent/AlphaZero.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/jonathan-laurent/AlphaZero.jl)
