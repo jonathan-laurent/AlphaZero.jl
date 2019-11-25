@@ -1,5 +1,6 @@
+# Optimized CuArrays settings
 ENV["CUARRAYS_MEMORY_LIMIT"] = 7_500_000_000
-#ENV["CUARRAYS_MEMORY_POOL"] = "split" # "binned"
+ENV["CUARRAYS_MEMORY_POOL"] = "split" # "binned"
 
 using Revise
 using AlphaZero
@@ -22,4 +23,4 @@ function play_game(session)
   GI.interactive!(Game(), MCTS.AI(mcts, timeout=5.0), GI.Human())
 end
 
-play_game(session)
+# play_game(session)

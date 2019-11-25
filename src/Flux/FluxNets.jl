@@ -100,7 +100,9 @@ end
 function Network.gc(::FluxNetwork)
   CUARRAYS_IMPORTED || return
   GC.gc(true)
-  CuArrays.BinnedPool.reclaim(true)
+  if ENV["CUARRAYS_MEMORY_POOL"] == "binned"
+    CuArrays.BinnedPool.reclaim(true)
+  end
   #CuArrays.clearpool() # Not available anymore
 end
 

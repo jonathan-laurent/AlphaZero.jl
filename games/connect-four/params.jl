@@ -6,21 +6,21 @@ Network = ResNet{Game}
 
 netparams = ResNetHP(
   num_filters=128,
-  num_blocks=5,
+  num_blocks=7,
   conv_kernel_size=(3, 3),
   num_policy_head_filters=4,
   num_value_head_filters=32,
   batch_norm_momentum=0.3)
 
 self_play = SelfPlayParams(
-  num_games=(DEBUG ? 20 : 3_000),
+  num_games=(DEBUG ? 20 : 4_000),
   reset_mcts_every=600,
-  gc_every=150,
+  gc_every=0,
   mcts=MctsParams(
     use_gpu=true,
     num_workers=64,
     num_iters_per_turn=320,
-    cpuct=4,
+    cpuct=3,
     temperature=StepSchedule(
       start=1.0,
       change_at=[10],
@@ -38,7 +38,7 @@ arena = ArenaParams(
 learning = LearningParams(
   batch_size=256,
   loss_computation_batch_size=1024,
-  gc_every=20_000,
+  gc_every=0,
   learning_rate=1e-3,
   l2_regularization=4e-5,
   nonvalidity_penalty=1.,
@@ -52,12 +52,12 @@ params = Params(
   num_game_stages=5,
   perform_memory_analysis=false,
   mem_buffer_size=PLSchedule(
-  [      0,      20],
-  [100_000, 800_000]))
+  [      0,        20],
+  [100_000, 1_000_000]))
 
 validation = RolloutsValidation(
   num_games=(DEBUG ? 10 : 200),
-  reset_mcts_every=100,
+  reset_mcts_every=200,
   baseline=MctsParams(
     num_iters_per_turn=1000,
     dirichlet_noise_ϵ=0),
