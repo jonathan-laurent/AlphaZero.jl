@@ -3,7 +3,8 @@ using AlphaZero
 
 makedocs(
     sitename = "AlphaZero",
-    format = Documenter.HTML(prettyurls = false),
+    authors="Jonathan Laurent",
+    format = Documenter.HTML(prettyurls=false),
     modules = [AlphaZero],
     pages = [
         "index.md",
@@ -11,5 +12,10 @@ makedocs(
         "network.md",
         "mcts.md",
         "misc.md"
-    ]
+    ],
+    repo="github.com/jonathan-laurent/AlphaZero.jl/blob/{commit}{path}#L{line}"
+)
+
+deploydocs(;
+    repo="github.com/jonathan-laurent/AlphaZero.jl",
 )

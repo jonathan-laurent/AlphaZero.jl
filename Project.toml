@@ -3,6 +3,15 @@ uuid = "8ed9eb0b-7496-408d-8c8b-2119aeea02cd"
 authors = ["Jonathan Laurent <jonathan.laurent@cs.cmu.edu>"]
 version = "0.1.0"
 
+[compat]
+julia = ">= 1.2"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
+
 [deps]
 CUDAapi = "3895d2a7-ec45-59b8-82bb-cfc6a382f9b3"
 ColorSchemes = "35d6a980-a343-548e-a6ea-1d62b119f2f4"
