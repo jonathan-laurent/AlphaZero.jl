@@ -27,6 +27,7 @@ end
 @kwdef struct SelfPlayParams
   num_games :: Int
   reset_mcts_every :: Int
+  gc_every :: Int = 0
   mcts :: MctsParams
 end
 

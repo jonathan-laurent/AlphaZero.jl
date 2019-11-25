@@ -144,6 +144,9 @@ function self_play!(env::Env{G}, handler) where G
           MCTS.approximate_memory_footprint(player.mcts))
         MCTS.reset!(player.mcts)
       end
+      if params.gc_every > 0 && i % params.gc_every == 0
+        Network.gc(env.bestnn)
+      end
     end
   end
   MCTS.memory_footprint(player.mcts)
