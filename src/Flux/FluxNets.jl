@@ -46,7 +46,7 @@ else
 end
 
 using Flux: Tracker, relu, softmax
-using Flux: Chain, Dense, Conv, BatchNorm, SkipConnection
+using Flux: Chain, Dense, Conv, BatchNorm #, SkipConnection
 
 #####
 ##### Flux Networks
@@ -99,8 +99,9 @@ end
 
 function Network.gc(::FluxNetwork)
   CUARRAYS_IMPORTED || return
-  GC.gc()
-  #CuArrays.clearpool() # Not available any more
+  GC.gc(true)
+  CuArrays.BinnedPool.reclaim(true)
+  #CuArrays.clearpool() # Not available anymore
 end
 
 #####
@@ -132,6 +133,25 @@ Network.on_gpu(nn::TwoHeadNetwork) = on_gpu(nn.vbranch[end].b)
 #####
 
 linearize(x) = reshape(x, :, size(x)[end])
+
+#####
+##### For Flux 0.8.3
+#####
+
+struct SkipConnection
+  layers
+  connection
+end
+
+Flux.@treelike SkipConnection
+
+function (skip::SkipConnection)(input)
+  skip.connection(skip.layers(input), input)
+end
+
+function Base.show(io::IO, b::SkipConnection)
+  print(io, "SkipConnection(", b.layers, ", ", b.connection, ")")
+end
 
 #####
 ##### Include networks library
