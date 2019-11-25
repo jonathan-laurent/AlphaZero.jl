@@ -1,0 +1,16 @@
+*.jl.*.cov
+*.jl.cov
+*.jl.mem
+.DS_Store
+/dev/
+/docs/build/
+/docs/site/
+
+TODO.md
+inference-speedup.png
+inference_time_ratio.png
+mcts_speed.png
+session-*
+
+*~
+*.data
