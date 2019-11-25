@@ -4,9 +4,6 @@ os:
   - linux
 julia:
   - 1.2
-matrix:
-  allow_failures:
-    - julia: nightly
 notifications:
   email: false
 after_success:
