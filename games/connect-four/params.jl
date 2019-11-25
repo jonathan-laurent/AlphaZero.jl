@@ -5,7 +5,7 @@ cold_temperature = 0.2
 Network = ResNet{Game}
 
 netparams = ResNetHP(
-  num_filters=64,
+  num_filters=128,
   num_blocks=5,
   conv_kernel_size=(3, 3),
   num_policy_head_filters=4,
@@ -15,10 +15,11 @@ netparams = ResNetHP(
 self_play = SelfPlayParams(
   num_games=(DEBUG ? 20 : 3_000),
   reset_mcts_every=600,
+  gc_every=150,
   mcts=MctsParams(
     use_gpu=true,
-    num_workers=128,
-    num_iters_per_turn=512,
+    num_workers=64,
+    num_iters_per_turn=320,
     cpuct=4,
     temperature=StepSchedule(
       start=1.0,
@@ -27,9 +28,9 @@ self_play = SelfPlayParams(
     dirichlet_noise_ϵ=0.05))
 
 arena = ArenaParams(
-  num_games=(DEBUG ? 15 : 150),
-  reset_mcts_every=100,
-  update_threshold=(2 * 0.58 - 1),
+  num_games=(DEBUG ? 15 : 200),
+  reset_mcts_every=200,
+  update_threshold=(2 * 0.55 - 1),
   mcts=MctsParams(self_play.mcts,
     temperature=StepSchedule(cold_temperature),
     dirichlet_noise_ϵ=0.05))
@@ -37,9 +38,9 @@ arena = ArenaParams(
 learning = LearningParams(
   batch_size=256,
   loss_computation_batch_size=1024,
-  gc_every=0,
+  gc_every=20_000,
   learning_rate=1e-3,
-  l2_regularization=1e-4,
+  l2_regularization=4e-5,
   nonvalidity_penalty=1.,
   checkpoints=[1, 2])
 
@@ -51,8 +52,8 @@ params = Params(
   num_game_stages=5,
   perform_memory_analysis=false,
   mem_buffer_size=PLSchedule(
-    [      0,       40],
-    [200_000, 2_000_000]))
+  [      0,      20],
+  [100_000, 800_000]))
 
 validation = RolloutsValidation(
   num_games=(DEBUG ? 10 : 200),
