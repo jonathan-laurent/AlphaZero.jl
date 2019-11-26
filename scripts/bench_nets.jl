@@ -29,7 +29,7 @@ end
 if !isdir(DIR)
   # Generate the data
   mkpath(DIR)
-  let session = Session(Game, Network,
+  let session = Session(Game, Net,
       params, netparams, dir=DIR, autosave=false)
     AlphaZero.Log.section(session.logger, 1, "Generating playing experience")
     self_play!(session.env, session)
@@ -41,7 +41,7 @@ mem = deserialize(MEMFILE)
 
 analyze_network("baseline", mem,
   Network(netparams))
-  
+
 analyze_network("batch-norm", mem,
   Network(FluxNets.SimpleNetHP(netparams, width=600)))
 

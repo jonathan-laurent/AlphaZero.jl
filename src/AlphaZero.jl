@@ -10,7 +10,7 @@ export RolloutsValidation
 export AbstractSchedule, PLSchedule, StepSchedule
 export Params, SelfPlayParams, ArenaParams, MctsParams, LearningParams
 export Env, train!, learning!, self_play!, memory_report, get_experience
-export Session, resume!, save, explore, plot_learning
+export Session, resume!, save, explore, plot_learning, play_game
 export SimpleNet, SimpleNetHP, ResNet, ResNetHP
 
 include("Util.jl")

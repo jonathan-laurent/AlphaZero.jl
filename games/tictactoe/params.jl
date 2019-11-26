@@ -53,7 +53,7 @@ end
 #####
 
 if USE_RESNET
-  Network = ResNet{Game}
+  Net = ResNet{Game}
   netparams = ResNetHP(
     num_filters=64,
     num_blocks=5,
@@ -62,7 +62,7 @@ if USE_RESNET
     num_value_head_filters=32,
     batch_norm_momentum=0.5)
 else
-  Network = SimpleNet{Game}
+  Net = SimpleNet{Game}
   netparams = SimpleNetHP(
     width=500,
     depth_common=4)

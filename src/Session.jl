@@ -208,6 +208,12 @@ function explore(session::Session{<:Env{Game}}) where Game
   AlphaZero.launch(explorer)
 end
 
+function play_game(session::Session{<:Env{Game}}) where Game
+  net = Network.copy(session.env.bestnn, on_gpu=true, test_mode=true)
+  mcts = MCTS.Env{Game}(net, nworkers=64)
+  GI.interactive!(Game(), MCTS.AI(mcts, timeout=5.0), GI.Human())
+end
+
 #####
 ##### Event handlers
 #####

@@ -13,8 +13,8 @@ A generic, simple and fast implementation of Deepmind's AlphaZero algorithm.
 
 ## How to run
 
-To launch a training session for game _connect four_, just run:
+To launch a training session for the game _connect four_, just run:
 
 ```ssh
-julia --project --color=yes scripts/alphazero.jl --game connect-four
+julia --project --color=yes scripts/alphazero.jl --game connect-four train
 ```

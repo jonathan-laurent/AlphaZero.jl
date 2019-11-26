@@ -18,7 +18,7 @@ using Serialization: serialize, deserialize
 if !isfile(MEMFILE)
   # Generate the data
   mkpath(DIR)
-  let session = Session(Game, Network,
+  let session = Session(Game, Net,
       params, netparams, dir=DIR, autosave=false)
     AlphaZero.Log.section(session.logger, 1, "Generating playing experience")
     self_play!(session.env, session)
@@ -27,7 +27,7 @@ if !isfile(MEMFILE)
 end
 experience = deserialize(MEMFILE)
 
-network = Network(netparams)
+network = Net(netparams)
 env = Env{Game}(params, network, experience)
 dir = joinpath(DIR, "session")
 mkpath(dir)

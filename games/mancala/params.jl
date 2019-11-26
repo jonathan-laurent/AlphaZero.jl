@@ -1,4 +1,4 @@
-Network = ResNet{Game}
+Net = ResNet{Game}
 
 netparams = ResNetHP(
   num_filters=64,
