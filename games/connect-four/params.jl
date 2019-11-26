@@ -14,7 +14,7 @@ netparams = ResNetHP(
 
 self_play = SelfPlayParams(
   num_games=(DEBUG ? 20 : 4_000),
-  reset_mcts_every=600,
+  reset_mcts_every=1_000,
   gc_every=0,
   mcts=MctsParams(
     use_gpu=true,
@@ -53,7 +53,7 @@ params = Params(
   perform_memory_analysis=false,
   mem_buffer_size=PLSchedule(
   [      0,        20],
-  [100_000, 1_000_000]))
+  [120_000, 1_000_000]))
 
 validation = RolloutsValidation(
   num_games=(DEBUG ? 10 : 200),

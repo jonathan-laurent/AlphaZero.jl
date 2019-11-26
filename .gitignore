@@ -10,7 +10,8 @@ TODO.md
 inference-speedup.png
 inference_time_ratio.png
 mcts_speed.png
-session-*
+sessions
+archive
 
 *~
 *.data
