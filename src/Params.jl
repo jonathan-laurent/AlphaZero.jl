@@ -7,6 +7,20 @@
 # For dirichlet noise parameters, see:
 # https://medium.com/oracledevs/lessons-from-alphazero-part-3
 
+"""
+Parameters of an MCTS player.
+
+| Parameter              | Type                    | Default             |
+|:-----------------------|:-----------------------:|:-------------------:|
+| `num_workers`          | `Int`                   | `1`                 |
+| `use_gpu`              | `Bool`                  | `false`             |
+| `num_iters_per_turn`   | `Int`                   | -                   |
+| `cpuct`                | `Float64`               | `1.`                |
+| `temperature`          | `StepSchedule{Float64}` | `StepSchedule(1.)`  |
+| `dirichlet_noise_nα`   | `Float64`               | `10.`               |
+| `dirichlet_noise_ϵ`    | `Float64`               | `0.`                |
+
+"""
 @kwdef struct MctsParams
   num_workers :: Int = 1
   use_gpu :: Bool = false

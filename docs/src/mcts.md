@@ -12,8 +12,8 @@ CurrentModule = AlphaZero.MCTS
 
 ```@docs
 Oracle
-evaluate
-evaluate_batch
+evaluate(::Oracle, board, actions)
+evaluate_batch(::Oracle, batch)
 RolloutOracle
 ```
 

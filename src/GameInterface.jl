@@ -18,13 +18,9 @@ Abstract base type for a game state.
 
 Any subtype `Game` must implement the following constructors:
 
----
-
     Game()
 
 Return the initial state of the game.
-
----
 
     Game(board, white_playing=true)
 

@@ -17,7 +17,7 @@ using Statistics: mean
 
 Abstract base type for a neural network.
 
----
+# Constructor
 
 Any subtype `Network` must implement the following constructor:
 

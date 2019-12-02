@@ -8,7 +8,7 @@ module MCTS
 using DataStructures: Stack
 using Distributions: Categorical
 
-using ..Util: @printing_errors
+using ..Util: @printing_errors, @unimplemented
 import ..GI
 
 #####
@@ -33,7 +33,9 @@ Return a pair `(P, V)` where:
   - `P` is a probability vector on available actions
   - `V` is a scalar estimating the value or win probability for white.
 """
-function evaluate end
+function evaluate(oracle::Oracle, board, available_actions)
+  @unimplemented
+end
 
 """
     MCTS.evaluate_batch(oracle::Oracle, batch)

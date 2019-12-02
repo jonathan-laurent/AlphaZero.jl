@@ -48,8 +48,8 @@ evaluate
 ### Oracle interface
 
 ```@docs
-MCTS.evaluate(::AbstractNetwork)
-MCTS.evaluate_batch(::AbstractNetwork)
+MCTS.evaluate(::AbstractNetwork, board, actions)
+MCTS.evaluate_batch(::AbstractNetwork, batch)
 ```
 
 ### Misc

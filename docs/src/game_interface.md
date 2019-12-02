@@ -1,4 +1,4 @@
-# Game Interface
+# [Game Interface](@id game_interface)
 
 ```@meta
 CurrentModule = AlphaZero.GameInterface
