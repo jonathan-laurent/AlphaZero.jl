@@ -40,7 +40,7 @@ learning = LearningParams(
   loss_computation_batch_size=1024,
   gc_every=0,
   learning_rate=1e-3,
-  l2_regularization=4e-5,
+  l2_regularization=1e-5,
   nonvalidity_penalty=1.,
   checkpoints=[1, 2])
 
@@ -48,7 +48,7 @@ params = Params(
   arena=arena,
   self_play=self_play,
   learning=learning,
-  num_iters=40,
+  num_iters=100,
   num_game_stages=5,
   perform_memory_analysis=false,
   mem_buffer_size=PLSchedule(
