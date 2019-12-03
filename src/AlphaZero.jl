@@ -57,7 +57,7 @@ include("Plots.jl")
 include("Session.jl")
 
 # We support Flux and Knet
-const USE_KNET = false
+const USE_KNET = true
 
 if USE_KNET
   @eval begin

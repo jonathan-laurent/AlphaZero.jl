@@ -36,7 +36,6 @@ if CUARRAYS_IMPORTED
     CuArrays.allowscalar(false)
     on_gpu(::Type{<:Array}) = false
     on_gpu(::Type{<:CuArray}) = true
-    on_gpu(::Type{<:Flux.TrackedArray{R,N,A}}) where {R, N, A} = on_gpu(A)
     on_gpu(x) = on_gpu(typeof(x))
   end
 else
@@ -45,8 +44,8 @@ else
   end
 end
 
-using Flux: Tracker, relu, softmax
-using Flux: Chain, Dense, Conv, BatchNorm #, SkipConnection
+using Flux: relu, softmax
+using Flux: Chain, Dense, Conv, BatchNorm, SkipConnection
 
 #####
 ##### Flux Networks
@@ -68,12 +67,17 @@ function Network.to_gpu(nn::FluxNetwork)
   return Flux.gpu(nn)
 end
 
-Network.set_test_mode!(nn::FluxNetwork, mode) = Flux.testmode!(nn, mode)
+# TODO: dirty hack to cope with the fact that Flux 0.10 removed Flux.testmode!
+const TEST_MODE = IdDict()
+
+function Network.set_test_mode!(nn::FluxNetwork, mode)
+  TEST_MODE[nn] = mode
+end
 
 Network.convert_input(nn::FluxNetwork, x) =
   Network.on_gpu(nn) ? Flux.gpu(x) : x
 
-Network.convert_output(nn::FluxNetwork, x) = Tracker.data(Flux.cpu(x))
+Network.convert_output(nn::FluxNetwork, x) = Flux.cpu(x)
 
 Network.params(nn::FluxNetwork) = Flux.params(nn)
 
@@ -86,10 +90,20 @@ regularized_child_leaves(l) = []
 regularized_child_leaves(l::Flux.Dense) = [l.W]
 regularized_child_leaves(l::Flux.Conv) = [l.weight]
 
-# Inspired by the implementation of Flux.params
+# Reimplementation of what used to be Flux.prefor, does not visit leafs
+function foreach_flux_node(f::Function, x, seen = IdDict())
+  Flux.isleaf(x) && return
+  haskey(seen, x) && return
+  seen[x] = true
+  f(x)
+  for child in Flux.trainable(x)
+    foreach_flux_node(f, child, seen)
+  end
+end
+
 function Network.regularized_params(net::FluxNetwork)
   ps = Flux.Params()
-  Flux.prefor(net) do p
+  foreach_flux_node(net) do p
     for r in regularized_child_leaves(p)
       any(x -> x === r, ps) || push!(ps, r)
     end
@@ -100,10 +114,7 @@ end
 function Network.gc(::FluxNetwork)
   CUARRAYS_IMPORTED || return
   GC.gc(true)
-  if ENV["CUARRAYS_MEMORY_POOL"] == "binned"
-    CuArrays.BinnedPool.reclaim(true)
-  end
-  #CuArrays.clearpool() # Not available anymore
+  CuArrays.reclaim()
 end
 
 #####
@@ -113,17 +124,19 @@ end
 abstract type TwoHeadNetwork{G} <: FluxNetwork{G} end
 
 function Network.forward(nn::TwoHeadNetwork, board)
+  # TODO: eliminate this horror when Flux catches up
+  # @eval Flux.istraining() = $(!get(TEST_MODE, nn, false))
   c = nn.common(board)
   v = nn.vbranch(c)
   p = nn.pbranch(c)
   return (p, v)
 end
 
-# Flux.@treelike does not work do to Network being parametric
-Flux.children(nn::TwoHeadNetwork) = (nn.common, nn.vbranch, nn.pbranch)
-
-function Flux.mapchildren(f, nn::Net) where Net <: TwoHeadNetwork
-  Net(nn.hyper, f(nn.common), f(nn.vbranch), f(nn.pbranch))
+# Flux.@functor does not work do to Network being parametric
+function Flux.functor(nn::Net) where Net <: TwoHeadNetwork
+  children = (nn.common, nn.vbranch, nn.pbranch)
+  constructor = cs -> Net(nn.hyper, cs...)
+  return (children, constructor)
 end
 
 Network.hyperparams(nn::TwoHeadNetwork) = nn.hyper
@@ -135,25 +148,6 @@ Network.on_gpu(nn::TwoHeadNetwork) = on_gpu(nn.vbranch[end].b)
 #####
 
 linearize(x) = reshape(x, :, size(x)[end])
-
-#####
-##### For Flux 0.8.3
-#####
-
-struct SkipConnection
-  layers
-  connection
-end
-
-Flux.@treelike SkipConnection
-
-function (skip::SkipConnection)(input)
-  skip.connection(skip.layers(input), input)
-end
-
-function Base.show(io::IO, b::SkipConnection)
-  print(io, "SkipConnection(", b.layers, ", ", b.connection, ")")
-end
 
 #####
 ##### Include networks library
