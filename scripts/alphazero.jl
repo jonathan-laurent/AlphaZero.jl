@@ -4,7 +4,7 @@
 #####
 
 ENV["CUARRAYS_MEMORY_LIMIT"] = 7_500_000_000
-ENV["CUARRAYS_MEMORY_POOL"] = "binned" # "binned" / "split"
+ENV["CUARRAYS_MEMORY_POOL"] = "split" # "binned" / "split"
 
 using Revise
 using AlphaZero
