@@ -49,7 +49,7 @@ A default implementation is provided that calls [`MCTS.evaluate`](@ref)
 sequentially on each position.
 """
 function evaluate_batch(oracle::Oracle, batch)
-  return [evaluate(oracle, b, a) for (b, a) in requests]
+  return [evaluate(oracle, b, a) for (b, a) in batch]
 end
 
 """
