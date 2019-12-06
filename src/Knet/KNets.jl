@@ -86,7 +86,7 @@ end
 
 function Network.gc(::KNetwork)
   GPU_AVAILABLE || return
-  GC.gc()
+  GC.gc(true)
   Knet.gc()
 end
 
