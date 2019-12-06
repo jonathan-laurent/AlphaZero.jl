@@ -5,7 +5,7 @@
 
 module AlphaZero
 
-export MCTS, GameInterface, GI, Report, Network
+export MCTS, GameInterface, GI, Report, Network, Benchmark
 export RolloutsValidation
 export AbstractSchedule, PLSchedule, StepSchedule
 export Params, SelfPlayParams, ArenaParams, MctsParams, LearningParams
@@ -52,7 +52,10 @@ include("Learning.jl")
 include("Play.jl")
 include("Training.jl")
 include("Explorer.jl")
-include("Validation.jl")
+
+include("Benchmark.jl")
+using .Benchmark
+
 include("Plots.jl")
 include("Session.jl")
 

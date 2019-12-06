@@ -13,13 +13,13 @@ mutable struct Session{Env}
   logfile :: IO
   logger :: Logger
   autosave :: Bool
-  validation :: Option{Validation}
+  benchmark :: Vector{Benchmark.Duel}
   # Temporary state for logging
   progress :: Option{Progress}
 
-  function Session(env, dir, logfile, logger, autosave, validation=nothing)
+  function Session(env, dir, logfile, logger, autosave, benchmark=[])
     return new{typeof(env)}(
-      env, dir, logfile, logger, autosave, validation, nothing)
+      env, dir, logfile, logger, autosave, benchmark, nothing)
   end
 end
 
@@ -33,7 +33,7 @@ const ITC_FILE         =  "iter.txt"
 const REPORT_FILE      =  "report.json"
 const PARAMS_FILE      =  "params.json"
 const NET_PARAMS_FILE  =  "netparams.json"
-const VALIDATION_FILE  =  "validation.json"
+const BENCHMARK_FILE   =  "benchmark.json"
 const LOG_FILE         =  "log.txt"
 const PLOTS_DIR        =  "plots"
 
@@ -109,21 +109,25 @@ function valid_session_dir(dir)
   isfile(joinpath(dir, ITC_FILE))
 end
 
-function run_validation_experiment(session, idir)
-  if !isnothing(session.validation)
-    v = session.validation
-    Log.section(session.logger, 2, "Running validation experiment")
-    progress = Log.Progress(session.logger, length(v))
-    report = validation_score(session.env, v, progress)
+function run_benchmark(session, idir)
+  report = Benchmark.Report()
+  for duel in session.benchmark
+    player_name = Benchmark.name(duel.player)
+    baseline_name = Benchmark.name(duel.baseline)
+    legend = "$player_name against $baseline_name"
+    Log.section(session.logger, 2, "Running benchmark: $legend")
+    progress = Log.Progress(session.logger, duel.num_games)
+    outcome = Benchmark.run(session.env, duel, progress)
+    push!(report, outcome)
     show_space_after_progress_bar(session)
-    z = fmt("+.2f", report.z)
-    wr = win_rate(report.z)
+    z = fmt("+.2f", outcome.avgz)
+    wr = win_rate(outcome.avgz)
     Log.print(session.logger, "Average reward: $z (win rate of $wr%)")
-    if session.autosave
-      isdir(idir) || mkpath(idir)
-      open(joinpath(idir, VALIDATION_FILE), "w") do io
-        JSON2.pretty(io, JSON2.write(report))
-      end
+  end
+  if session.autosave
+    isdir(idir) || mkpath(idir)
+    open(joinpath(idir, BENCHMARK_FILE), "w") do io
+      JSON2.pretty(io, JSON2.write(report))
     end
   end
 end
@@ -140,31 +144,31 @@ end
 
 """
     Session(Game, Network, params, netparams;
-      dir="session", autosave=true, validation=nothing)
+      dir="session", autosave=true, benchmark=[])
 
 Create a new session.
 """
 function Session(
     ::Type{Game}, ::Type{Network}, params, netparams;
-    dir="session", autosave=true, autoload=true, validation=nothing
+    dir="session", autosave=true, autoload=true, benchmark=[]
   ) where {Game, Network}
   autosave && (isdir(dir) || mkpath(dir))
   logfile = autosave ? open(joinpath(dir, LOG_FILE), "a") : devnull
   logger = Logger(logfile=logfile)
   if autoload && valid_session_dir(dir)
     env = load_env(Game, Network, logger, dir)
-    session = Session(env, dir, logfile, logger, autosave, validation)
+    session = Session(env, dir, logfile, logger, autosave, benchmark)
   else
     Log.section(logger, 1, "Initializing a new AlphaZero environment")
     network = Network(netparams)
     env = Env{Game}(params, network)
-    session = Session(env, dir, logfile, logger, autosave, validation)
+    session = Session(env, dir, logfile, logger, autosave, benchmark)
     # Show initial report
     Log.section(logger, 2, "Initial report")
     Report.print(logger, initial_report(env))
     if autosave
       save(session)
-      run_validation_experiment(session, iterdir(session.dir, 0))
+      run_benchmark(session, iterdir(session.dir, 0))
       save(session, iterdir(session.dir, 0))
     end
   end
@@ -172,25 +176,25 @@ function Session(
 end
 
 """
-    Session(Game, Network, dir; autosave=true, validation=nothing)
+    Session(Game, Network, dir; autosave=true, benchmark=[])
 
 Load an existing session from a directory.
 """
 function Session(
-    ::Type{Game}, ::Type{Network}, dir; autosave=true, validation=nothing
+    ::Type{Game}, ::Type{Network}, dir; autosave=true, benchmark=[]
   ) where {Game, Network}
   logfile = open(joinpath(dir, LOG_FILE), "a")
   logger = Logger(logfile=logfile)
   env = load_env(Game, Network, logger, dir)
-  return Session(env, dir, logfile, logger, autosave, validation)
+  return Session(env, dir, logfile, logger, autosave, benchmark)
 end
 
 function Session(env::Env, dir)
   logfile = open(joinpath(dir, LOG_FILE), "a")
   logger = Logger(logfile=logfile)
   autosave = false
-  validation = nothing
-  return Session(env, dir, logfile, logger, autosave, validation)
+  benchmark = []
+  return Session(env, dir, logfile, logger, autosave, benchmark)
 end
 
 function resume!(session::Session)
@@ -281,7 +285,7 @@ end
 
 function Handlers.iteration_finished(session::Session, report)
   idir = iterdir(session.dir, session.env.itc)
-  run_validation_experiment(session, idir)
+  run_benchmark(session, idir)
   if session.autosave
     save(session)
     save(session, idir)
@@ -301,7 +305,7 @@ function Handlers.training_finished(session::Session)
 end
 
 #####
-##### Validation
+##### Run benchmark
 #####
 
 function walk_iterations(::Type{G}, ::Type{N}, dir::String) where {G, N}
@@ -312,6 +316,7 @@ function walk_iterations(::Type{G}, ::Type{N}, dir::String) where {G, N}
   return (load_env(G, N, Logger(devnull), iterdir(dir, i)) for i in 0:n-1)
 end
 
+#=
 function validate(::Type{G}, ::Type{N}, dir::String, v) where {G, N}
   logger = Logger()
   Log.section(logger, 1, "Running validation experiment")
@@ -324,15 +329,16 @@ function validate(::Type{G}, ::Type{N}, dir::String, v) where {G, N}
     Log.print(logger, "Average reward: $z")
   end
 end
+=#
 
 function get_reports(dir::String)
   n = 0
   ireps = Report.Iteration[]
-  vreps = ValidationReport[]
+  benchs = Benchmark.Report[]
   while valid_session_dir(iterdir(dir, n))
     idir = iterdir(dir, n)
     rep_file = joinpath(idir, REPORT_FILE)
-    val_file = joinpath(idir, VALIDATION_FILE)
+    val_file = joinpath(idir, BENCHMARK_FILE)
     if isfile(rep_file)
       open(rep_file, "r") do io
         push!(ireps, JSON2.read(io, Report.Iteration))
@@ -340,23 +346,23 @@ function get_reports(dir::String)
     end
     if isfile(val_file)
       open(val_file, "r") do io
-        push!(vreps, JSON2.read(io, ValidationReport))
+        push!(benchs, JSON2.read(io, Benchmark.Report))
       end
     end
     n += 1
   end
   length(ireps) == n - 1 || (ireps = nothing)
-  length(vreps) == n || (vreps = nothing)
+  length(benchs) == n || (benchs = nothing)
   # Load params file
   params_file = joinpath(dir, PARAMS_FILE)
   params = open(params_file, "r") do io
     JSON2.read(io, Params)
   end
-  return params, ireps, vreps
+  return params, ireps, benchs
 end
 
 function plot_training(dir::String)
-  params, ireps, vreps = get_reports(dir)
+  params, ireps, benchs = get_reports(dir)
   isnothing(ireps) && return
-  plot_training(params, ireps, vreps, joinpath(dir, PLOTS_DIR))
+  plot_training(params, ireps, benchs, joinpath(dir, PLOTS_DIR))
 end

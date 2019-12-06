@@ -42,7 +42,7 @@ include("using_game.jl")
 
 session = Session(
   Game, Net, params, netparams,
-  dir=SESSION_DIR, autosave=true, validation=validation)
+  dir=SESSION_DIR, autosave=true, benchmark=benchmark)
 
 if cmd == "train"
   resume!(session)

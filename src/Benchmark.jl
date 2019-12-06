@@ -1,34 +1,94 @@
 #####
-##### Validate against rollouts
+##### Utilities to benchmark an AlphaZero system
 #####
 
-struct ValidationReport
-  z :: Float64
+module Benchmark
+
+import ..Util.@unimplemented
+import ..Env, ..AbstractPlayer, ..AbstractNetwork
+import ..MCTS, ..MctsParams, ..MctsPlayer, ..pit
+
+using ProgressMeter
+
+struct DuelOutcome
+  player :: String
+  baseline :: String
+  avgz :: Float64
   games :: Vector{Float64}
   time :: Float64
 end
 
-abstract type Validation end
+const Report = Vector{DuelOutcome}
 
-@kwdef struct RolloutsValidation <: Validation
-  num_games :: Int
-  reset_mcts_every :: Int
-  baseline :: MctsParams
-  contender :: MctsParams
+abstract type Player end
+
+function instantiate(player::Player, nn)
+  @unimplemented
 end
 
-Base.length(v::RolloutsValidation) = v.num_games
+function name(::Player) :: String
+  @unimplemented
+end
 
-function validation_score(env::Env{G}, v::RolloutsValidation, progress) where G
-  baseline = MctsPlayer(MCTS.RolloutOracle{G}(), v.baseline)
-  contender = MctsPlayer(env.bestnn, v.contender)
-  let games = Vector{Float64}(undef, v.num_games)
-    avg, time = @timed begin
-      pit(baseline, contender, v.num_games, v.reset_mcts_every) do i, z
+struct Duel
+  num_games :: Int
+  reset_every :: Int
+  player :: Player
+  baseline :: Player
+  function Duel(player, baseline; num_games, reset_every=0)
+    return new(num_games, reset_every, player, baseline)
+  end
+end
+
+function run(env::Env, duel::Duel, progress=nothing)
+  player = instantiate(duel.player, env.bestnn)
+  baseline = instantiate(duel.baseline, env.bestnn)
+  let games = Vector{Float64}(undef, duel.num_games)
+    avgz, time = @timed begin
+      pit(baseline, player, duel.num_games, duel.reset_every) do i, z
         games[i] = z
-        next!(progress)
+        isnothing(progress) || next!(progress)
       end
     end
-    return ValidationReport(avg, games, time)
+    return DuelOutcome(
+      name(duel.player), name(duel.baseline), avgz, games, time)
   end
+end
+
+#####
+##### Standard players
+#####
+
+struct MctsRollouts <: Player
+  params :: MctsParams
+end
+
+name(::MctsRollouts) = "MCTS Rollouts"
+
+function instantiate(p::MctsRollouts, nn::AbstractNetwork{G}) where G
+  params = MctsParams(p.params,
+    num_workers=1,
+    use_gpu=false)
+  return MctsPlayer(MCTS.RolloutOracle{G}(), params)
+end
+
+struct Full <: Player
+  params :: MctsParams
+end
+
+name(::Full) = "AlphaZero"
+
+instantiate(p::Full, nn) = MctsPlayer(nn, p.params)
+
+struct NetworkOnly <: Player
+  params :: MctsParams
+end
+
+name(::NetworkOnly) = "Network Only"
+
+function instantiate(p::NetworkOnly, nn)
+  params = MctsParams(p.params, num_iters_per_turn=0)
+  return MctsPlayer(nn, params)
+end
+
 end

@@ -89,23 +89,27 @@ end
 function plot_training(
     params::Params,
     iterations::Vector{Report.Iteration},
-    validation::Option{Vector{ValidationReport}},
+    benchs::Option{Vector{Benchmark.Report}},
     dir::String)
   n = length(iterations)
-  isnothing(validation) || @assert length(validation) == n + 1
+  isnothing(benchs) || @assert length(benchs) == n + 1
   iszero(n) && return
   isdir(dir) || mkpath(dir)
   plots, files = [], []
-  # Validation score
-  if !isnothing(validation)
+  # Benchmark score
+  if !isnothing(benchs)
+    nduels = length(benchs[1])
+    @assert all(length(b) == nduels for b in benchs)
+    bench_data = [[b[i].avgz for b in benchs] for i in 1:nduels]
+    bench_labels = ["$(d.player) / $(d.baseline)" for d in benchs[1]]
     vbars = Plots.plot(0:n,
-      [v.z for v in validation],
-      title="Validation Score",
+      bench_data,
+      title="Average Reward",
       ylims=(-1.0, 1.0),
-      legend=nothing)
-    Plots.hline!(vbars, [0])
+      legend=:bottomright,
+      labels=bench_labels)
     push!(plots, vbars)
-    push!(files, "validation")
+    push!(files, "benchmark")
   end
   # Exploration depth
   expdepth = Plots.plot(1:n,
@@ -140,7 +144,7 @@ function plot_training(
       iterations[i].memory.all_samples.status.loss
     end
     # Loss per game stage
-    nstages = params.num_game_stages
+    nstages = minimum(length(it.memory.per_game_stage) for it in iterations)
     colors = range(colorant"blue", stop=colorant"red", length=nstages)
     losses_ps = Plots.plot(title="Loss per Game Stage", ylims=(0, Inf))
     for s in 1:nstages

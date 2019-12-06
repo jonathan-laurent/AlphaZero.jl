@@ -55,14 +55,13 @@ params = Params(
   [      0,        20],
   [120_000, 1_000_000]))
 
-validation = RolloutsValidation(
-  num_games=(DEBUG ? 10 : 200),
-  reset_mcts_every=200,
-  baseline=MctsParams(
-    num_iters_per_turn=1000,
-    dirichlet_noise_ϵ=0),
-  contender=MctsParams(self_play.mcts,
-    temperature=StepSchedule(cold_temperature),
-    dirichlet_noise_ϵ=0))
+deployed_mcts = MctsParams(self_play.mcts,
+  temperature=StepSchedule(cold_temperature),
+  dirichlet_noise_ϵ=0)
 
-# validation = nothing
+benchmark = [
+  Benchmark.Duel(
+    Benchmark.Full(deployed_mcts),
+    Benchmark.MctsRollouts(
+      MctsParams(deployed_mcts, num_iters_per_turn=1000)),
+    num_games=(DEBUG ? 10 : 200))]
