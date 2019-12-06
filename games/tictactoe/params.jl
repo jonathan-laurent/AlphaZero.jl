@@ -2,11 +2,32 @@
 ##### Training regimes
 #####
 
+const DEBUG = true
+
 const FAST_TRAINING = true
 
 const USE_RESNET = true
 
-if FAST_TRAINING
+if DEBUG
+
+  NUM_ITERS = 3
+
+  SP_NUM_GAMES   = 2
+  SP_NUM_MCTS_ITERS = 2
+
+  ARENA_NUM_GAMES = 2
+  ARENA_WIN_RATE_THRESH = 0.51
+
+  LEARNING_BATCH_SIZE = 2
+  LEARNING_CHECKPOINTS = [1]
+
+  MEM_BUFFER_SIZE = PLSchedule(
+    [  0,    4],
+    [500, 2500])
+
+  VALIDATION_NUM_GAMES = 2
+
+elseif FAST_TRAINING
 
   NUM_ITERS = 8
 
@@ -24,7 +45,6 @@ if FAST_TRAINING
     [500, 2500])
 
   VALIDATION_NUM_GAMES = 100
-  VALIDATION_BASELINE_NUM_MCTS_ITERS = 100
 
 else # Long training
 
@@ -44,7 +64,6 @@ else # Long training
     [20_000, 60_000])
 
   VALIDATION_NUM_GAMES = 500
-  VALIDATION_BASELINE_NUM_MCTS_ITERS = 1000
 
 end
 
@@ -106,14 +125,8 @@ params = Params(
   num_game_stages=9,
   mem_buffer_size=MEM_BUFFER_SIZE)
 
-validation = RolloutsValidation(
-  num_games=VALIDATION_NUM_GAMES,
-  reset_mcts_every=VALIDATION_NUM_GAMES,
-  baseline=MctsParams(
-    num_workers=1,
-    num_iters_per_turn=VALIDATION_BASELINE_NUM_MCTS_ITERS,
-    dirichlet_noise_ϵ=0.1),
-  contender=MctsParams(
-    num_workers=1,
-    num_iters_per_turn=0,
-    dirichlet_noise_ϵ=0.1))
+benchmark = [
+  Benchmark.Duel(
+    Benchmark.Full(self_play.mcts),
+    Benchmark.MctsRollouts(self_play.mcts),
+    num_games=VALIDATION_NUM_GAMES)]
