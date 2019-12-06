@@ -6,7 +6,6 @@
 ENV["CUARRAYS_MEMORY_LIMIT"] = 7_500_000_000
 ENV["CUARRAYS_MEMORY_POOL"] = "binned" # "binned" / "split"
 
-using Revise
 using AlphaZero
 
 #####
@@ -37,12 +36,13 @@ cmd = args["%COMMAND%"]
 ##### Main
 #####
 
-include("using_game.jl")
-@using_default_game
+include("game_module.jl")
+@game_module SelectedGame "tictactoe"
+using .SelectedGame: Game, Training
 
 session = Session(
-  Game, Net, params, netparams,
-  dir=SESSION_DIR, autosave=true, benchmark=benchmark)
+  Game, Training.Network, Training.params, Training.netparams,
+  dir=Training.SESSION_DIR, autosave=true, benchmark=Training.benchmark)
 
 if cmd == "train"
   resume!(session)

@@ -5,7 +5,6 @@
 
 ENV["CUARRAYS_MEMORY_LIMIT"] = 7_500_000_000
 
-using Revise
 using AlphaZero
 
 include("using_game.jl")

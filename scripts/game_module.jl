@@ -28,24 +28,27 @@ function find_game_dir(name)
   return game_dir
 end
 
-macro using_game(name)
-  mod = Symbol(snake(name))
-  game_dir = find_game_dir(name)
-  game_file = joinpath(game_dir, "game.jl")
-  params_file = joinpath(game_dir, "params.jl")
-  session_dir = joinpath("sessions", name)
-  @eval begin
-    include($game_file)
-    using .$mod
-    include($params_file)
-    SESSION_DIR = $session_dir
-  end
-end
-
 const DEFAULT_GAME = "connect-four"
 
-const GAME = haskey(ENV, "GAME") ? ENV["GAME"] : DEFAULT_GAME
-
-macro using_default_game()
-  :(@using_game $GAME)
+macro game_module(Mname, game=nothing)
+  if isnothing(game)
+    game = get(ENV, "GAME", DEFAULT_GAME)
+  end
+  mod = Symbol(snake(game))
+  game_dir = find_game_dir(game)
+  game_file = joinpath(game_dir, "game.jl")
+  params_file = joinpath(game_dir, "params.jl")
+  session_dir = joinpath("sessions", game)
+  return Expr(:toplevel, quote
+    @eval module $Mname
+      export Training, Game, Board
+      include($game_file)
+      module Training
+        using AlphaZero
+        import ..Game
+        include($params_file)
+        const SESSION_DIR = $session_dir
+      end
+    end
+  end)
 end

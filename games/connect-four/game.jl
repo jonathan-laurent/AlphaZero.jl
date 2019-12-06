@@ -1,7 +1,3 @@
-module ConnectFour
-
-export Game, Board
-
 import AlphaZero.GI
 
 using Printf
@@ -253,6 +249,4 @@ function GI.read_state(::Type{Game})
   catch e
     return nothing
   end
-end
-
 end

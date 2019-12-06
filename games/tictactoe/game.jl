@@ -1,7 +1,3 @@
-module Tictactoe
-
-export Game, Board
-
 import AlphaZero.GI
 using StaticArrays
 
@@ -17,7 +13,7 @@ const Board = SVector{NUM_POSITIONS, Cell}
 const INITIAL_BOARD = Board(repeat([nothing], NUM_POSITIONS))
 
 mutable struct Game
-  board     :: Board
+  board :: Board
   curplayer :: Player
   function Game(board=INITIAL_BOARD, player=WHITE)
     new(board, player)
@@ -174,6 +170,4 @@ function GI.print_state(g::Game; with_position_names=true, botmargin=true)
     print("\n")
   end
   botmargin && print("\n")
-end
-
 end

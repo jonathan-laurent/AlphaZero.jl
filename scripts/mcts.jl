@@ -1,7 +1,8 @@
 using AlphaZero
 
-include("using_game.jl")
-@using_default_game
+include("game_module.jl")
+@game_module SelectedGame
+using .SelectedGame: Game
 
 game = Game()
 env = MCTS.Env{Game}(MCTS.RolloutOracle{Game}())

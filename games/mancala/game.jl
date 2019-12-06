@@ -1,7 +1,3 @@
-module Mancala
-
-export Game, Board
-
 import AlphaZero.GI
 
 using Printf
@@ -309,5 +305,3 @@ end
 
 # Example of creating game objects manually:
 # Game(Board([10, 20], [[1 0 0 0 0 0]; [1 0 2 0 2 0]]), true)
-
-end
