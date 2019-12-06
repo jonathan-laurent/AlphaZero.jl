@@ -4,7 +4,7 @@
 
 function plot_losses(getlosses, range, title)
   fields = fieldnames(Report.Loss)
-  labels = [string(f) for f in fields]
+  labels = [string(f) for _ in 1:1, f in fields]
   data = [[getfield(getlosses(i), f) for i in range] for f in fields]
   return Plots.plot(range, data,
     label=labels, title=title, ylims=(0, Inf))
@@ -89,25 +89,25 @@ end
 function plot_training(
     params::Params,
     iterations::Vector{Report.Iteration},
-    benchs::Option{Vector{Benchmark.Report}},
+    benchs::Vector{Benchmark.Report},
     dir::String)
   n = length(iterations)
-  isnothing(benchs) || @assert length(benchs) == n + 1
+  @assert length(benchs) == n + 1
   iszero(n) && return
   isdir(dir) || mkpath(dir)
   plots, files = [], []
   # Benchmark score
-  if !isnothing(benchs)
-    nduels = length(benchs[1])
+  nduels = length(benchs[1])
+  if nduels >= 1
     @assert all(length(b) == nduels for b in benchs)
     bench_data = [[b[i].avgz for b in benchs] for i in 1:nduels]
-    bench_labels = ["$(d.player) / $(d.baseline)" for d in benchs[1]]
+    bench_labels = ["$(d.player) / $(d.baseline)" for _ in 1:1, d in benchs[1]]
     vbars = Plots.plot(0:n,
       bench_data,
       title="Average Reward",
       ylims=(-1.0, 1.0),
       legend=:bottomright,
-      labels=bench_labels)
+      label=bench_labels)
     push!(plots, vbars)
     push!(files, "benchmark")
   end

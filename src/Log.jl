@@ -50,6 +50,10 @@ offset(l::Logger) = INDENT_STEP * l.indent_level
 
 console_only!(l::Logger, v=true) = l.console_only = v
 
+logfile(l::Logger) = l.logfile
+
+set_logfile!(l::Logger, file) = l.logfile = file
+
 function console_only(f, l::Logger)
   v = l.console_only
   console_only!(l, true)
@@ -93,7 +97,7 @@ end
 function Progress(logger::Logger, nsteps)
   indent = repeat(" ", offset(logger))
   desc = indent * "Progress: "
-  return ProgressMeter.Progress(nsteps, desc=desc)
+  return ProgressMeter.Progress(nsteps, desc=desc, output=logger.console)
 end
 
 #####
