@@ -135,17 +135,17 @@ end
 
 function load_session_report(dir::String, niters)
   rep = SessionReport()
-  for i in 0:n
-    idir = iterdir(dir, n)
+  for itc in 0:niters
+    idir = iterdir(dir, itc)
     ifile = joinpath(idir, REPORT_FILE)
     bfile = joinpath(idir, BENCHMARK_FILE)
     # Load the benchmark report
     isfile(bfile) || error("Not found: $bfile")
     open(bfile, "r") do io
-      push!(rep.benchmark, JSON2.read(io, Report.Iteration))
+      push!(rep.benchmark, JSON2.read(io, Benchmark.Report))
     end
     # Load the iteration report
-    if i > 0
+    if itc > 0
       isfile(ifile) || error("Not found: $ifile")
       open(ifile, "r") do io
         push!(rep.iterations, JSON2.read(io, Report.Iteration))
@@ -281,6 +281,7 @@ function Session(
     @assert same_json(env.params, params)
     @assert same_json(Network.hyperparams(env.bestnn), netparams)
     session = Session(env, dir, logger, autosave, benchmark)
+    session.report = load_session_report(dir, env.itc)
   else
     network = Net(netparams)
     env = Env{Game}(params, network)
