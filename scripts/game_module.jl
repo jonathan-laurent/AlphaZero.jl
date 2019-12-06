@@ -2,21 +2,6 @@
 ##### Utilities to load available games
 #####
 
-# Convert a string identifier in upper snake case
-function snake(str)
-  ret = Char[]
-  new_word = true
-  for c in str
-    if c ∈ ['-', '_']
-      new_word = true
-    else
-      push!(ret, new_word ? uppercase(c) : c)
-      new_word = false
-    end
-  end
-  return String(ret)
-end
-
 function find_game_dir(name)
   game_dir = joinpath("games", name)
   for i in 0:5
@@ -34,7 +19,6 @@ macro game_module(Mname, game=nothing)
   if isnothing(game)
     game = get(ENV, "GAME", DEFAULT_GAME)
   end
-  mod = Symbol(snake(game))
   game_dir = find_game_dir(game)
   game_file = joinpath(game_dir, "game.jl")
   params_file = joinpath(game_dir, "params.jl")
