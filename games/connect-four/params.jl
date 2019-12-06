@@ -1,6 +1,6 @@
 const DEBUG = false
 
-cold_temperature = 0.2
+cold_temperature = 0.1
 
 Net = ResNet{Game}
 
@@ -14,7 +14,7 @@ netparams = ResNetHP(
 
 self_play = SelfPlayParams(
   num_games=(DEBUG ? 20 : 4_000),
-  reset_mcts_every=1_000,
+  reset_mcts_every=2_000,
   gc_every=0,
   mcts=MctsParams(
     use_gpu=true,
@@ -23,13 +23,13 @@ self_play = SelfPlayParams(
     cpuct=3,
     temperature=StepSchedule(
       start=1.0,
-      change_at=[10],
+      change_at=[8],
       values=[cold_temperature]),
     dirichlet_noise_ϵ=0.05))
 
 arena = ArenaParams(
-  num_games=(DEBUG ? 15 : 200),
-  reset_mcts_every=200,
+  num_games=(DEBUG ? 15 : 400),
+  reset_mcts_every=400,
   update_threshold=(2 * 0.55 - 1),
   mcts=MctsParams(self_play.mcts,
     temperature=StepSchedule(cold_temperature),
