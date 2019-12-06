@@ -65,7 +65,7 @@ struct Trainer
   Hp
   function Trainer(
     network::AbstractNetwork{G},
-    examples::Vector{<:TrainingExample},
+    examples::AbstractVector{<:TrainingExample},
     params::LearningParams
   ) where G
     examples = merge_by_board(examples)

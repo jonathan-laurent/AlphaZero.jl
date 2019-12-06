@@ -43,7 +43,7 @@ function merge_samples(es::Vector{TrainingExample{B}}) where B
 end
 
 # Merge samples that correspond to identical boards
-function merge_by_board(es::Vector{TrainingExample{B}}) where B
+function merge_by_board(es::AbstractVector{TrainingExample{B}}) where B
   dict = Dict{B, Vector{TrainingExample{B}}}()
   sizehint!(dict, length(es))
   for e in es
