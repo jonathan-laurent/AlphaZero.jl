@@ -2,7 +2,7 @@ const DEBUG = false
 
 cold_temperature = 0.1
 
-Net = ResNet{Game}
+Network = ResNet{Game}
 
 netparams = ResNetHP(
   num_filters=128,

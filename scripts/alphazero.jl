@@ -37,7 +37,7 @@ cmd = args["%COMMAND%"]
 #####
 
 include("game_module.jl")
-@game_module SelectedGame "tictactoe"
+@game_module SelectedGame
 using .SelectedGame: Game, Training
 
 session = Session(
