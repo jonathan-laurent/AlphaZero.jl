@@ -3,7 +3,7 @@
 #####
 
 const USE_RESNET = true
-const LEARNING_MODE = :debug
+const LEARNING_MODE = :fast
 
 function get_params(mode=:full)
   @assert mode ∈ [:debug, :fast, :full]
@@ -112,6 +112,10 @@ function get_params(mode=:full)
     Benchmark.Duel(
       Benchmark.Full(self_play.mcts),
       Benchmark.MctsRollouts(self_play.mcts),
+      num_games=benchmark_num_games),
+    Benchmark.Duel(
+      Benchmark.NetworkOnly(self_play.mcts),
+      Benchmark.MinMaxTS(depth=5),
       num_games=benchmark_num_games)]
 
   return Net, netparams, params, benchmark

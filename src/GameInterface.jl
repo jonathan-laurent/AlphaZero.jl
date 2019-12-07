@@ -125,6 +125,15 @@ function play!(state::AbstractGame, action)
   @unimplemented
 end
 
+"""
+    heuristic_value(state::AbstractGame)
+
+Return a heuristic estimate of the state value for the current player.
+"""
+function heuristic_value(state::AbstractGame)
+  @unimplemented
+end
+
 #####
 ##### Machine learning interface
 #####

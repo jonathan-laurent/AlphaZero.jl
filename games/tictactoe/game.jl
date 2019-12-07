@@ -81,6 +81,34 @@ function GI.play!(g::Game, pos)
 end
 
 #####
+##### Simple heuristic for minmax
+#####
+
+function alignment_value_for(g::Game, player, alignment)
+  γ = 0.3
+  N = 0
+  for pos in alignment
+    mark = g.board[pos]
+    if mark == player
+      N += 1
+    elseif !isnothing(mark)
+      return 0.
+    end
+  end
+  return γ ^ (BOARD_SIDE - 1 - N)
+end
+
+function heuristic_value_for(g::Game, player)
+  return sum(alignment_value_for(g, player, al) for al in ALIGNMENTS)
+end
+
+function GI.heuristic_value(g::Game)
+  mine = heuristic_value_for(g, g.curplayer)
+  yours = heuristic_value_for(g, !g.curplayer)
+  return mine - yours
+end
+
+#####
 ##### Machine Learning API
 #####
 

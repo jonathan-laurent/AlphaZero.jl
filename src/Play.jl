@@ -7,7 +7,7 @@ abstract type AbstractPlayer{Game} end
 """
     think(::AbstractPlayer, state, turn_number::Int)
 
-Return an `(action, π)` pair where `action` is the chosen action and
+Return an `(a, π)` pair where `a` is the chosen action and
 `π` a probability distribution over available actions.
 
 Note that `a` does not have to be drawn from `π`.
@@ -30,7 +30,7 @@ function think(player::RandomPlayer, state, turn)
   actions = GI.available_actions(state)
   n = length(actions)
   π = ones(n) ./ length(actions)
-  return π, rand(actions)
+  return rand(actions), π
 end
 
 #####
@@ -110,7 +110,7 @@ function think(p::MctsPlayer, state, turn)
     π_exp = (1 - p.ϵ) * π_mcts + p.ϵ * rand(noise)
   end
   a = actions[rand(Categorical(fix_probvec(π_exp)))]
-  return π_mcts, a
+  return a, π_mcts
 end
 
 function reset!(player::MctsPlayer)
@@ -134,7 +134,7 @@ function play(
       return z
     end
     player = GI.white_playing(state) ? white : black
-    π, a = think(player, state, nturns)
+    a, π = think(player, state, nturns)
     if !isnothing(memory)
       cboard = GI.canonical_board(state)
       push_sample!(memory, cboard, π, GI.white_playing(state), nturns)

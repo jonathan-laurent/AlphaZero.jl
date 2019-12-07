@@ -5,7 +5,7 @@
 
 module AlphaZero
 
-export MCTS, GameInterface, GI, Report, Network, Benchmark
+export MCTS, MinMax, GameInterface, GI, Report, Network, Benchmark
 export RolloutsValidation
 export AbstractSchedule, PLSchedule, StepSchedule
 export Params, SelfPlayParams, ArenaParams, MctsParams, LearningParams
@@ -20,6 +20,9 @@ using .Util: Option, @unimplemented
 include("GameInterface.jl")
 import .GameInterface
 const GI = GameInterface
+
+include("MinMax.jl")
+import .MinMax
 
 include("MCTS.jl")
 import .MCTS

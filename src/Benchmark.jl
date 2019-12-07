@@ -7,6 +7,7 @@ module Benchmark
 import ..Util.@unimplemented
 import ..Env, ..AbstractPlayer, ..AbstractNetwork
 import ..MCTS, ..MctsParams, ..MctsPlayer, ..pit
+import ..MinMax, ..GI
 
 using ProgressMeter
 
@@ -89,6 +90,34 @@ name(::NetworkOnly) = "Network Only"
 function instantiate(p::NetworkOnly, nn)
   params = MctsParams(p.params, num_iters_per_turn=0)
   return MctsPlayer(nn, params)
+end
+
+# Also implements the AlphaZero.AbstractPlayer interface
+struct MinMaxTS <: Player
+  depth :: Int
+  MinMaxTS(;depth) = new(depth)
+end
+
+struct MinMaxPlayer{G} <: AbstractPlayer{G}
+  depth :: Int
+end
+
+name(p::MinMaxTS) = "MinMax (depth $(p.depth))"
+
+function instantiate(p::MinMaxTS, nn::AbstractNetwork{G}) where G
+  return MinMaxPlayer{G}(p.depth)
+end
+
+import ..reset!, ..think
+
+reset!(::MinMaxPlayer) = nothing
+
+function think(p::MinMaxPlayer, state, turn)
+  actions = GI.available_actions(state)
+  aid = MinMax.minmax(state, actions, p.depth)
+  π = zeros(size(actions))
+  π[aid] = 1.
+  return actions[aid], π
 end
 
 end
