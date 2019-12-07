@@ -427,7 +427,7 @@ function Handlers.training_finished(session::Session)
 end
 
 #####
-##### Time travel
+##### Replay training
 #####
 
 #=

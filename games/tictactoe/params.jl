@@ -3,7 +3,7 @@
 #####
 
 const USE_RESNET = true
-const LEARNING_MODE = :debug
+const TRAINING_MODE = get(ENV, "TRAINING_MODE", "debug") |> Symbol
 
 function get_params(mode=:full)
   @assert mode ∈ [:debug, :fast, :full]
@@ -122,4 +122,4 @@ function get_params(mode=:full)
   return Net, netparams, params, benchmark
 end
 
-Network, netparams, params, benchmark = get_params(LEARNING_MODE)
+Network, netparams, params, benchmark = get_params(TRAINING_MODE)

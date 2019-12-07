@@ -1,4 +1,4 @@
-const DEBUG = false
+const DEBUG = get(ENV, "TRAINING_MODE", "") == "debug"
 
 cold_temperature = 0.1
 
@@ -13,8 +13,8 @@ netparams = ResNetHP(
   batch_norm_momentum=0.3)
 
 self_play = SelfPlayParams(
-  num_games=(DEBUG ? 20 : 4_000),
-  reset_mcts_every=2_000,
+  num_games=(DEBUG ? 1 : 4_000),
+  reset_mcts_every=1_000,
   gc_every=0,
   mcts=MctsParams(
     use_gpu=true,
@@ -28,7 +28,7 @@ self_play = SelfPlayParams(
     dirichlet_noise_ϵ=0.05))
 
 arena = ArenaParams(
-  num_games=(DEBUG ? 15 : 400),
+  num_games=(DEBUG ? 1 : 400),
   reset_mcts_every=400,
   update_threshold=(2 * 0.55 - 1),
   mcts=MctsParams(self_play.mcts,
@@ -50,6 +50,7 @@ params = Params(
   learning=learning,
   num_iters=100,
   num_game_stages=5,
+  ternary_rewards=true,
   perform_memory_analysis=false,
   mem_buffer_size=PLSchedule(
   [      0,        20],
@@ -64,4 +65,8 @@ benchmark = [
     Benchmark.Full(deployed_mcts),
     Benchmark.MctsRollouts(
       MctsParams(deployed_mcts, num_iters_per_turn=1000)),
-    num_games=(DEBUG ? 10 : 200))]
+    num_games=(DEBUG ? 1 : 200)),
+  Benchmark.Duel(
+    Benchmark.Full(deployed_mcts),
+    Benchmark.MinMaxTS(depth=4),
+    num_games=(DEBUG ? 1 : 200))]
