@@ -86,31 +86,51 @@ end
 ##### Training summary plots
 #####
 
+function plot_benchmark(
+    params::Params,
+    benchs::Vector{Benchmark.Report},
+    dir::String)
+  isempty(benchs) && return
+  n = length(benchs) - 1
+  nduels = length(benchs[1])
+  nduels >= 1 || return
+  @assert all(length(b) == nduels for b in benchs)
+  isdir(dir) || mkpath(dir)
+  labels = ["$(d.player) / $(d.baseline)" for _ in 1:1, d in benchs[1]]
+  # Average reward
+  avgz_data = [[b[i].avgz for b in benchs] for i in 1:nduels]
+  avgz = Plots.plot(0:n,
+    avgz_data,
+    title="Average Reward",
+    ylims=(-1.0, 1.0),
+    legend=:bottomright,
+    label=labels)
+  Plots.savefig(avgz, joinpath(dir, "benchmark_reward"))
+  # Percentage of lost games
+  if params.ternary_rewards
+    function compute_ploss(b)
+      stats = Benchmark.TernaryOutcomeStatistics(b)
+      return ceil(Int, 100 * (stats.num_lost / length(b.rewards)))
+    end
+    ploss_data = [[compute_ploss(b[i]) for b in benchs] for i in 1:nduels]
+    ploss = Plots.plot(0:n,
+      ploss_data,
+      title="Percentage of Lost Games",
+      ylims=(0, 100),
+      legend=:topright,
+      label=labels)
+    Plots.savefig(ploss, joinpath(dir, "benchmark_lost_games"))
+  end
+end
+
 function plot_training(
     params::Params,
     iterations::Vector{Report.Iteration},
-    benchs::Vector{Benchmark.Report},
     dir::String)
   n = length(iterations)
-  @assert length(benchs) == n + 1
   iszero(n) && return
   isdir(dir) || mkpath(dir)
   plots, files = [], []
-  # Benchmark score
-  nduels = length(benchs[1])
-  if nduels >= 1
-    @assert all(length(b) == nduels for b in benchs)
-    bench_data = [[b[i].avgz for b in benchs] for i in 1:nduels]
-    bench_labels = ["$(d.player) / $(d.baseline)" for _ in 1:1, d in benchs[1]]
-    vbars = Plots.plot(0:n,
-      bench_data,
-      title="Average Reward",
-      ylims=(-1.0, 1.0),
-      legend=:bottomright,
-      label=bench_labels)
-    push!(plots, vbars)
-    push!(files, "benchmark")
-  end
   # Exploration depth
   expdepth = Plots.plot(1:n,
     [it.self_play.average_exploration_depth for it in iterations],
@@ -170,7 +190,6 @@ function plot_training(
   append!(plots, [arena, entropies, nsamples, expdepth])
   append!(files, ["arena", "entropies", "nsamples", "exploration_depth"])
   for (file, plot) in zip(files, plots)
-    #Plots.plot!(plot, dpi=200, size=(600, 200))
     Plots.savefig(plot, joinpath(dir, file))
   end
 end

@@ -189,9 +189,9 @@ function save_increment(session::Session, bench, itrep=nothing)
     # Do the plotting
     params = session.env.params
     isnothing(itrep) || plot_iteration(itrep, params, idir)
-    plot_training(params,
-      session.report.iterations, session.report.benchmark,
-      joinpath(session.dir, PLOTS_DIR))
+    plotsdir = joinpath(session.dir, PLOTS_DIR)
+    plot_training(params, session.report.iterations, plotsdir)
+    plot_benchmark(params, session.report.benchmark, plotsdir)
   end
 end
 
