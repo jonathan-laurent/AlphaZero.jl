@@ -64,6 +64,7 @@ end
   mem_buffer_size :: PLSchedule{Int}
   num_game_stages :: Int # as featured in memory reports)
   perform_memory_analysis :: Bool = true
+  ternary_rewards :: Bool = false
 end
 
 for T in [MctsParams, ArenaParams, SelfPlayParams, LearningParams, Params]

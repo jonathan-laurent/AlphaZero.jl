@@ -201,6 +201,8 @@ end
 
 win_rate(z) = round(Int, 100 * (z + 1) / 2)
 
+percentage(x, total) = round(Int, 100 * (x / total))
+
 function show_space_after_progress_bar(session)
   Log.console_only(session.logger) do
     Log.sep(session.logger, force=true)
@@ -219,8 +221,18 @@ function run_benchmark(session)
     push!(report, outcome)
     show_space_after_progress_bar(session)
     z = fmt("+.2f", outcome.avgz)
-    wr = win_rate(outcome.avgz)
-    Log.print(session.logger, "Average reward: $z (win rate of $wr%)")
+    if session.env.params.ternary_rewards
+      stats = Benchmark.TernaryOutcomeStatistics(outcome)
+      n = length(outcome.rewards)
+      pwon = percentage(stats.num_won, n)
+      pdraw = percentage(stats.num_draw, n)
+      plost = percentage(stats.num_lost, n)
+      details = "$pwon% won, $pdraw% draw, $plost% lost"
+    else
+      wr = win_rate(outcome.avgz)
+      details = "win rate of $wr%"
+    end
+    Log.print(session.logger, "Average reward: $z ($details)")
   end
   return report
 end

@@ -3,7 +3,7 @@
 #####
 
 const USE_RESNET = true
-const LEARNING_MODE = :fast
+const LEARNING_MODE = :debug
 
 function get_params(mode=:full)
   @assert mode ∈ [:debug, :fast, :full]
@@ -106,7 +106,8 @@ function get_params(mode=:full)
     learning=learning,
     num_iters=num_iters,
     num_game_stages=9,
-    mem_buffer_size=mem_buffer_size)
+    mem_buffer_size=mem_buffer_size,
+    ternary_rewards=true)
 
   benchmark = [
     Benchmark.Duel(

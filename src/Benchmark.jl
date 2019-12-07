@@ -15,7 +15,7 @@ struct DuelOutcome
   player :: String
   baseline :: String
   avgz :: Float64
-  games :: Vector{Float64}
+  rewards :: Vector{Float64}
   time :: Float64
 end
 
@@ -54,6 +54,28 @@ function run(env::Env, duel::Duel, progress=nothing)
     return DuelOutcome(
       name(duel.player), name(duel.baseline), avgz, games, time)
   end
+end
+
+#####
+##### Statistics for games with ternary rewards
+#####
+
+struct TernaryOutcomeStatistics
+  num_won  :: Int
+  num_draw :: Int
+  num_lost :: Int
+end
+
+function TernaryOutcomeStatistics(rewards::AbstractVector{<:Number})
+  num_won  = count(==(1), rewards)
+  num_draw = count(==(0), rewards)
+  num_lost = count(==(-1), rewards)
+  @assert num_won + num_draw + num_lost == length(rewards)
+  return TernaryOutcomeStatistics(num_won, num_draw, num_lost)
+end
+
+function TernaryOutcomeStatistics(outcome::DuelOutcome)
+  return TernaryOutcomeStatistics(outcome.rewards)
 end
 
 #####
