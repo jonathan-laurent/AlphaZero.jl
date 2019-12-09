@@ -431,7 +431,8 @@ function policy(env::Env, state; τ=1.0)
       end
     end
   τinv = 1 / τ
-  D = [a.N ^ τinv for a in info.stats]
+  Ntot = sum(a.N for a in info.stats)
+  D = [(a.N / Ntot) ^ τinv for a in info.stats]
   return actions, D ./ sum(D)
 end
 
