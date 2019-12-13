@@ -151,10 +151,16 @@ self_play!(player, memory) = play(player, player, memory)
 #####
 
 """
-    pit(handler, baseline, contender, ngames [, reset_period])
+    @enum ColorPolicy ALTERNATE_COLORS BASELINE_WHITE CONTENDER_WHITE
 
-Evaluate two players against each other on a series of games,
-alternating colors.
+Policy for attributing colors in a duel between a baseline and a contender.
+"""
+@enum ColorPolicy ALTERNATE_COLORS BASELINE_WHITE CONTENDER_WHITE
+
+"""
+    pit(handler, baseline, contender, ngames)
+
+Evaluate two players against each other on a series of games.
 
 # Arguments
 
@@ -163,25 +169,31 @@ alternating colors.
      for the contender player
   - `baseline, contender :: AbstractPlayer`
   - `ngames`: number of games to play
-  - `reset_period`: if set, players are reset every `reset_period` games
+
+# Optional keyword arguments
+  - `reset_every`: if set, players are reset every `reset_every` games
+  - `color_policy`: determine the [color attribution policy](@ref ColorPolicy),
+    which is `ALTERNATE_COLORS` by default
 """
 function pit(
-    handler, baseline::AbstractPlayer, contender::AbstractPlayer,
-    ngames, reset_period=0)
-  baseline_first = true
+    handler, baseline::AbstractPlayer, contender::AbstractPlayer, num_games;
+    reset_every=nothing, color_policy=ALTERNATE_COLORS)
+  baseline_white = (color_policy != CONTENDER_WHITE)
   zsum = 0.
-  for i in 1:ngames
-    white = baseline_first ? baseline : contender
-    black = baseline_first ? contender : baseline
+  for i in 1:num_games
+    white = baseline_white ? baseline : contender
+    black = baseline_white ? contender : baseline
     z = play(white, black)
-    baseline_first && (z = -z)
+    baseline_white && (z = -z)
     zsum += z
     handler(i, z)
-    if reset_period > 0 && (i % reset_period == 0 || i == ngames)
+    if !isnothing(reset_every) && (i % reset_every == 0 || i == num_games)
       reset!(baseline)
       reset!(contender)
     end
-    baseline_first = !baseline_first
+    if color_policy == ALTERNATE_COLORS
+      baseline_white = !baseline_white
+    end
   end
-  return zsum / ngames
+  return zsum / num_games
 end

@@ -89,8 +89,10 @@ function training_epoch!(tr::Trainer)
   data = Util.random_batches(tr.samples, tr.params.batch_size) do x
     Network.convert_input(tr.network, x)
   end
-  data = Util.periodic_gc(data, tr.params.gc_every) do
-    Network.gc(tr.network)
+  if !isnothing(tr.params.gc_every)
+    data = Util.periodic_gc(data, tr.params.gc_every) do
+      Network.gc(tr.network)
+    end
   end
   Network.train!(tr.network, loss, data, tr.params.learning_rate)
   Network.gc(tr.network)
@@ -130,8 +132,10 @@ function learning_status(tr::Trainer)
   batches = Util.random_batches(tr.samples, batch_size, partial=partial) do x
     Network.convert_input(tr.network, x)
   end
-  batches = Util.periodic_gc(batches, tr.params.gc_every) do
-    Network.gc(tr.network)
+  if !isnothing(tr.params.gc_every)
+    batches = Util.periodic_gc(batches, tr.params.gc_every) do
+      Network.gc(tr.network)
+    end
   end
   reports = [learning_status(tr, batch) for batch in batches]
   Network.gc(tr.network)
@@ -149,10 +153,10 @@ end
 function memory_report(
     mem::MemoryBuffer,
     nn::AbstractNetwork{G},
-    params::LearningParams,
-    nstages
+    learning_params::LearningParams,
+    params::MemAnalysisParams
     ) where G
-  Tr(es) = Trainer(nn, es, params)
+  Tr(es) = Trainer(nn, es, learning_params)
   all_samples = samples_report(Tr(get(mem)))
   latest_batch = isempty(last_batch(mem)) ?
     all_samples :
@@ -160,7 +164,7 @@ function memory_report(
   per_game_stage = begin
     es = get(mem)
     sort!(es, by=(e->e.t))
-    csize = ceil(Int, length(es) / nstages)
+    csize = ceil(Int, length(es) / params.num_game_stages)
     stages = collect(Iterators.partition(es, csize))
     map(stages) do es
       t = mean(e.t for e in es)

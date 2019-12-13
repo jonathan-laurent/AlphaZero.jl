@@ -268,7 +268,7 @@ end
 """
     Session(env::Env)
 
-Initialize a session from an environment
+Initialize a session from an environment.
 """
 function Session(
     env::Env, dir=nothing; autosave=true, nostdout=false, benchmark=[])

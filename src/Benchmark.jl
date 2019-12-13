@@ -1,15 +1,16 @@
-#####
-##### Utilities to benchmark an AlphaZero system
-#####
-
+"""
+Utilities to evaluate players against one another.
+"""
 module Benchmark
 
 import ..Util.@unimplemented
 import ..Env, ..AbstractPlayer, ..AbstractNetwork
 import ..MCTS, ..MctsParams, ..MctsPlayer, ..pit
+import ..ColorPolicy, ..ALTERNATE_COLORS
 import ..MinMax, ..GI
 
 using ProgressMeter
+using Distributions: Categorical
 
 struct DuelOutcome
   player :: String
@@ -33,11 +34,13 @@ end
 
 struct Duel
   num_games :: Int
-  reset_every :: Int
+  reset_every :: Union{Nothing, Int}
+  color_policy :: ColorPolicy
   player :: Player
   baseline :: Player
-  function Duel(player, baseline; num_games, reset_every=0)
-    return new(num_games, reset_every, player, baseline)
+  function Duel(player, baseline;
+      num_games, reset_every=nothing, color_policy=ALTERNATE_COLORS)
+    return new(num_games, reset_every, color_policy, player, baseline)
   end
 end
 
@@ -46,9 +49,11 @@ function run(env::Env, duel::Duel, progress=nothing)
   baseline = instantiate(duel.baseline, env.bestnn)
   let games = Vector{Float64}(undef, duel.num_games)
     avgz, time = @timed begin
-      pit(baseline, player, duel.num_games, duel.reset_every) do i, z
-        games[i] = z
-        isnothing(progress) || next!(progress)
+      pit(
+        baseline, player, duel.num_games,
+        reset_every=duel.reset_every, color_policy=duel.color_policy) do i, z
+          games[i] = z
+          isnothing(progress) || next!(progress)
       end
     end
     return DuelOutcome(
@@ -117,17 +122,19 @@ end
 # Also implements the AlphaZero.AbstractPlayer interface
 struct MinMaxTS <: Player
   depth :: Int
-  MinMaxTS(;depth) = new(depth)
+  ϵ :: Float64
+  MinMaxTS(;depth, random_ϵ=0.) = new(depth, random_ϵ)
 end
 
 struct MinMaxPlayer{G} <: AbstractPlayer{G}
   depth :: Int
+  ϵ :: Float64
 end
 
 name(p::MinMaxTS) = "MinMax (depth $(p.depth))"
 
 function instantiate(p::MinMaxTS, nn::AbstractNetwork{G}) where G
-  return MinMaxPlayer{G}(p.depth)
+  return MinMaxPlayer{G}(p.depth, p.ϵ)
 end
 
 import ..reset!, ..think
@@ -137,9 +144,11 @@ reset!(::MinMaxPlayer) = nothing
 function think(p::MinMaxPlayer, state, turn)
   actions = GI.available_actions(state)
   aid = MinMax.minmax(state, actions, p.depth)
-  π = zeros(size(actions))
-  π[aid] = 1.
-  return actions[aid], π
+  n = length(actions)
+  π = zeros(n); π[aid] = 1.
+  η = ones(n) / n
+  π = (1 - p.ϵ) * π + p.ϵ * η
+  return rand(Categorical(π)), π
 end
 
 end

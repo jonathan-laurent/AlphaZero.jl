@@ -2,6 +2,12 @@
 ##### A simple minmax player to be used as a baseline
 #####
 
+"""
+A simple implementation of the minmax tree search algorithm that relies on
+[`GameInterface`](@ref Main.AlphaZero.GameInterface), to be used
+as a baseline against AlphaZero. Heuristic board values are provided by
+the [`GameInterface.heuristic_value`](@ref) function.
+"""
 module MinMax
 
 import ..GI
@@ -31,7 +37,6 @@ function value(game, depth)
   end
 end
 
-# Return a Q-value and an action
 function qvalue(game, action, depth)
   @assert isnothing(GI.white_reward(game))
   wp = GI.white_playing(game)

@@ -129,6 +129,17 @@ end
     heuristic_value(state::AbstractGame)
 
 Return a heuristic estimate of the state value for the current player.
+
+The given state must be nonfinal and returned values must belong to the
+``(-∞, ∞)`` interval. Also, implementations of this function must be
+antisymmetric in the sense that:
+```
+heuristic_value(s) ==
+  - heuristic_value(Game(board_symmetric(s), white_playing(s)))
+```
+
+This function is not needed by AlphaZero but it is useful for building
+baselines such as minmax players.
 """
 function heuristic_value(state::AbstractGame)
   @unimplemented

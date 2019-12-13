@@ -32,5 +32,5 @@ a standard desktop computer with a GPU.
 
 To get optimal performances, it is recommended to run `AlphaZero.jl` with
 Julia 1.4 (nightly), which includes a
-[critical feature](https://github.com/JuliaLang/julia/pull/33448s)
+[critical feature](https://github.com/JuliaLang/julia/pull/33448)
 that enables `CuArrays` to force incremental GC collections.

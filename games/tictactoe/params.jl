@@ -105,7 +105,6 @@ function get_params(mode=:full)
     self_play=self_play,
     learning=learning,
     num_iters=num_iters,
-    num_game_stages=9,
     mem_buffer_size=mem_buffer_size,
     ternary_rewards=true)
 

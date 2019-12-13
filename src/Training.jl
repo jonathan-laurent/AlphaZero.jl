@@ -66,8 +66,8 @@ function evaluate_network(baseline, contender, params, handler)
   baseline = MctsPlayer(baseline, params.mcts)
   contender = MctsPlayer(contender, params.mcts)
   ngames = params.num_games
-  reset_period = params.reset_mcts_every
-  return pit(baseline, contender, ngames, reset_period) do i, z
+  rp = params.reset_mcts_every
+  return pit(baseline, contender, ngames; reset_every=rp) do i, z
     Handlers.checkpoint_game_played(handler)
   end
 end
@@ -139,12 +139,14 @@ function self_play!(env::Env{G}, handler) where G
     for i in 1:params.num_games
       self_play!(player, env.memory)
       Handlers.game_played(handler)
-      if i % params.reset_mcts_every == 0 || i == params.num_games
+      reset_every = params.reset_mcts_every
+      if (!isnothing(reset_every) && i % reset_every == 0) ||
+          i == params.num_games
         mem_footprint = max(mem_footprint,
           MCTS.approximate_memory_footprint(player.mcts))
         MCTS.reset!(player.mcts)
       end
-      if params.gc_every > 0 && i % params.gc_every == 0
+      if !isnothing(params.gc_every) && i % params.gc_every == 0
         Network.gc(env.bestnn)
       end
     end
@@ -161,13 +163,13 @@ function self_play!(env::Env{G}, handler) where G
 end
 
 function memory_report(env::Env{G}, handler) where G
-  if env.params.perform_memory_analysis
-    nstages = env.params.num_game_stages
-    report = memory_report(env.memory, env.bestnn, env.params.learning, nstages)
+  if isnothing(env.params.memory_analysis)
+    return nothing
+  else
+    report = memory_report(
+      env.memory, env.bestnn, env.params.learning, env.params.memory_analysis)
     Handlers.memory_analyzed(handler, report)
     return report
-  else
-    return nothing
   end
 end
 
