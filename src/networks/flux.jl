@@ -153,7 +153,7 @@ linearize(x) = reshape(x, :, size(x)[end])
 ##### Include networks library
 #####
 
-include("SimpleNet.jl")
-include("ResNet.jl")
+include("architectures/simplenet.jl")
+include("architectures/resnet.jl")
 
 end

@@ -13,7 +13,7 @@ import ..Util
 
 import Knet
 
-include("Layers.jl")
+include("knet/layers.jl")
 
 #####
 ##### Traversal utilities
@@ -120,7 +120,7 @@ end
 ##### Include networks library
 #####
 
-include("../Flux/SimpleNet.jl")
-include("../Flux/ResNet.jl")
+include("architectures/simplenet.jl")
+include("architectures/resnet.jl")
 
 end

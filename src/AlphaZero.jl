@@ -13,25 +13,25 @@ export Env, train!, learning!, self_play!, memory_report, get_experience
 export Session, resume!, save, explore, play_game, run_new_benchmark
 export SimpleNet, SimpleNetHP, ResNet, ResNetHP
 
-include("Util.jl")
+include("util.jl")
 import .Util
 using .Util: Option, @unimplemented
 
-include("GameInterface.jl")
+include("game.jl")
 import .GameInterface
 const GI = GameInterface
 
-include("MinMax.jl")
+include("minmax.jl")
 import .MinMax
 
-include("MCTS.jl")
+include("mcts.jl")
 import .MCTS
 
-include("Log.jl")
-using .Log
-
-include("Network.jl")
+include("networks/network.jl")
 using .Network
+
+include("ui/log.jl")
+using .Log
 
 import Plots
 import Colors
@@ -47,32 +47,32 @@ using DataStructures: Stack, CircularBuffer
 using Distributions: Categorical, Dirichlet
 using Statistics: mean
 
-include("Schedule.jl")
-include("Params.jl")
-include("Report.jl")
-include("MemoryBuffer.jl")
-include("Learning.jl")
-include("Play.jl")
-include("Training.jl")
-include("Explorer.jl")
+include("schedule.jl")
+include("params.jl")
+include("report.jl")
+include("memory.jl")
+include("learning.jl")
+include("play.jl")
+include("training.jl")
 
-include("Benchmark.jl")
+include("benchmark.jl")
 using .Benchmark
 
-include("Plots.jl")
-include("Session.jl")
+include("ui/explorer.jl")
+include("ui/plots.jl")
+include("ui/session.jl")
 
 # We support Flux and Knet
 const USE_KNET = true
 
 if USE_KNET
   @eval begin
-    include("Knet/KNets.jl")
+    include("networks/knet.jl")
     using .KNets
   end
 else
   @eval begin
-    include("Flux/FluxNets.jl")
+    include("networks/flux.jl")
     using .FluxNets
   end
 end
