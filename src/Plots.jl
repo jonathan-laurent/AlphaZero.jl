@@ -104,7 +104,8 @@ function plot_benchmark(
     title="Average Reward",
     ylims=(-1.0, 1.0),
     legend=:bottomright,
-    label=labels)
+    label=labels,
+    xlabel="iteration")
   Plots.savefig(avgz, joinpath(dir, "benchmark_reward"))
   # Percentage of lost games
   if params.ternary_rewards
@@ -118,7 +119,8 @@ function plot_benchmark(
       title="Percentage of Lost Games",
       ylims=(0, 100),
       legend=:topright,
-      label=labels)
+      label=labels,
+      xlabel="iteration")
     Plots.savefig(ploss, joinpath(dir, "benchmark_lost_games"))
   end
 end
@@ -136,12 +138,14 @@ function plot_training(
     [it.self_play.average_exploration_depth for it in iterations],
     title="Average Exploration Depth",
     ylims=(0, Inf),
-    legend=:none)
+    legend=:none,
+    xlabel="iteration")
   # Number of samples
   nsamples = Plots.plot(0:n,
     [0;[it.self_play.memory_size for it in iterations]],
     title="Experience Buffer Size",
-    label="Number of samples")
+    label="Number of samples",
+    xlabel="iteration")
   Plots.plot!(nsamples, 0:n,
     [0;[it.self_play.memory_num_distinct_boards for it in iterations]],
     label="Number of distinct boards")
@@ -152,10 +156,11 @@ function plot_training(
     title="Arena Results",
     ylims=(-1, 1),
     t=:bar,
-    legend=:none)
+    legend=:none,
+    xlabel="iteration")
   Plots.hline!(arena, [0, params.arena.update_threshold])
   # Plots related to the memory analysis
-  if !any(it -> isnothing(it.memory), iterations)
+  if all(it -> !isnothing(it.memory), iterations)
     # Loss on last batch
     losses_last = plot_losses(1:n, "Loss on last batch") do i
       iterations[i].memory.latest_batch.status.loss
@@ -166,7 +171,8 @@ function plot_training(
     # Loss per game stage
     nstages = minimum(length(it.memory.per_game_stage) for it in iterations)
     colors = range(colorant"blue", stop=colorant"red", length=nstages)
-    losses_ps = Plots.plot(title="Loss per Game Stage", ylims=(0, Inf))
+    losses_ps = Plots.plot(
+      title="Loss per Game Stage", ylims=(0, Inf), xlabel="iteration")
     for s in 1:nstages
       Plots.plot!(losses_ps, 1:n, [
           it.memory.per_game_stage[s].samples_stats.status.loss.L
