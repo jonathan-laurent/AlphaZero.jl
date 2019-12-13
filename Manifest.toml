@@ -190,9 +190,9 @@ version = "0.8.1"
 
 [[Documenter]]
 deps = ["Base64", "Dates", "DocStringExtensions", "InteractiveUtils", "JSON", "LibGit2", "Logging", "Markdown", "REPL", "Test", "Unicode"]
-git-tree-sha1 = "39983099735c3abc07f04ef6df4e3e1d4e8680d5"
+git-tree-sha1 = "8b53adb01a21523a89278e4fd65083e0ac520dd6"
 repo-rev = "master"
-repo-url = "git@github.com:jonathan-laurent/Documenter.jl.git"
+repo-url = "https://github.com/jonathan-laurent/Documenter.jl.git"
 uuid = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 version = "0.24.2"
 
