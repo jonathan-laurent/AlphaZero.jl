@@ -86,14 +86,17 @@ function save_env(env::Env, dir)
 end
 
 function load_env(
-    ::Type{Game}, ::Type{Network}, logger, dir) where {Game, Network}
+    ::Type{Game}, ::Type{Network}, logger, dir; params=nothing
+  ) where {Game, Network}
   Log.section(logger, 1, "Loading environment")
   # Load parameters
-  params_file = joinpath(dir, PARAMS_FILE)
-  params = open(params_file, "r") do io
-    JSON2.read(io, Params)
+  if isnothing(params)
+    params_file = joinpath(dir, PARAMS_FILE)
+    params = open(params_file, "r") do io
+      JSON2.read(io, Params)
+    end
+    Log.print(logger, "Loading parameters from: $(params_file)")
   end
-  Log.print(logger, "Loading parameters from: $(params_file)")
   # Try to load network or otherwise network params
   net_file = joinpath(dir, NET_FILE)
   netparams_file = joinpath(dir, NET_PARAMS_FILE)
@@ -283,14 +286,16 @@ Create a new session.
 """
 function Session(
     ::Type{Game}, ::Type{Net}, params, netparams;
-    dir=nothing, autosave=true, nostdout=false, benchmark=[]
+    dir=nothing, autosave=true, nostdout=false, benchmark=[],
+    load_saved_params=false
   ) where {Game, Net}
   logger = session_logger(dir, nostdout, autosave)
   if valid_session_dir(dir)
-    env = load_env(Game, Net, logger, dir)
+    env = load_env(Game, Net, logger, dir,
+      params=(load_saved_params ? nothing : params))
     # The parameters must be unchanged
     same_json(x, y) = JSON2.write(x) == JSON2.write(y)
-    @assert same_json(env.params, params)
+    same_json(env.params, params) || @info "Using modified parameters"
     @assert same_json(Network.hyperparams(env.bestnn), netparams)
     session = Session(env, dir, logger, autosave, benchmark)
     session.report = load_session_report(dir, env.itc)
@@ -430,7 +435,7 @@ end
 ##### Replay training
 #####
 
-#=
+
 function walk_iterations(::Type{G}, ::Type{N}, dir::String) where {G, N}
   n = 0
   while valid_session_dir(iterdir(dir, n))
@@ -438,18 +443,25 @@ function walk_iterations(::Type{G}, ::Type{N}, dir::String) where {G, N}
   end
   return (load_env(G, N, Logger(devnull), iterdir(dir, i)) for i in 0:n-1)
 end
-=#
-#=
-function validate(::Type{G}, ::Type{N}, dir::String, v) where {G, N}
-  logger = Logger()
-  Log.section(logger, 1, "Running validation experiment")
-  for env in walk_iterations(G, N, dir)
-    Log.section(logger, 2, "Iteration $(env.itc)")
-    progress = Log.Progress(logger, v.num_games)
-    report = validation_score(env, v, progress)
-    show_space_after_progress_bar(session)
-    z = fmt("+.2f", report.z)
-    Log.print(logger, "Average reward: $z")
+
+function run_new_benchmark(
+    session::Session{<:Env{G, N}}, name, benchmark
+  ) where {G,N}
+  old_env = session.env
+  Log.section(session.logger, 1, "Computing new benchmark: $name")
+  reports = Benchmark.Report[]
+  @assert !isnothing(session.dir)
+  for env in walk_iterations(G, N, session.dir)
+    session.env = env
+    push!(reports, run_benchmark(session))
   end
+  session.env = old_env
+  # Save and plot
+  dir = joinpath(session.dir, name)
+  isdir(dir) || mkpath(dir)
+  open(joinpath(dir, BENCHMARK_FILE), "w") do io
+    JSON2.pretty(io, JSON2.write(reports))
+  end
+  plot_benchmark(session.env.params, reports, dir)
+  return
 end
-=#
