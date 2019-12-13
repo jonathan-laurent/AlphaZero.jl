@@ -1,25 +1,42 @@
-# AlphaZero
+# Training Parameters
 
 ```@meta
 CurrentModule = AlphaZero
 ```
 
-## Modules
-
-```@docs
-MCTS
-GameInterface
-Network
-```
-
-## Training Parameters
+## General
 
 ```@docs
 Params
+```
+
+## Self Play
+
+```@docs
 SelfPlayParams
+```
+
+## Learning
+
+```@docs
 LearningParams
+```
+
+## Arena
+
+```@docs
 ArenaParams
+```
+
+## Memory Analysis
+
+```@docs
 MemAnalysisParams
+```
+
+## MCTS
+
+```@docs
 MctsParams
 ```
 
