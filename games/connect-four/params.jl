@@ -44,14 +44,11 @@ learning = LearningParams(
   nonvalidity_penalty=1.,
   checkpoints=[1, 2])
 
-mem_analysis = MemAnalysisParams(
-  num_game_stages=5)
-
 params = Params(
   arena=arena,
   self_play=self_play,
   learning=learning,
-  memory_analysis=mem_analysis,
+  memory_analysis=nothing,
   num_iters=100,
   ternary_rewards=true,
   mem_buffer_size=PLSchedule(

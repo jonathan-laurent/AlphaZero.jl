@@ -8,7 +8,8 @@ module AlphaZero
 export MCTS, MinMax, GameInterface, GI, Report, Network, Benchmark
 export RolloutsValidation
 export AbstractSchedule, PLSchedule, StepSchedule
-export Params, SelfPlayParams, ArenaParams, MctsParams, LearningParams
+export Params, MctsParams
+export SelfPlayParams, ArenaParams, LearningParams, MemAnalysisParams
 export Env, train!, learning!, self_play!, memory_report, get_experience
 export Session, resume!, save, explore, play_game, run_new_benchmark
 export SimpleNet, SimpleNetHP, ResNet, ResNetHP
