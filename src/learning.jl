@@ -147,7 +147,7 @@ function samples_report(tr::Trainer)
   num_examples = sum(e.n for e in tr.examples)
   num_boards = length(tr.examples)
   Wtot = num_boards * tr.Wmean
-  return Report.Samples(num_examples, num_boards, Wtot, tr.Hp, status)
+  return Report.Samples(num_examples, num_boards, Wtot, status)
 end
 
 function memory_report(

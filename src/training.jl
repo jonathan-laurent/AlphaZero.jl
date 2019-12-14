@@ -2,6 +2,26 @@
 ##### High level training procedure
 #####
 
+"""
+    Env{Game, Network, Board}
+
+Type for an AlphZero environment.
+
+The environment features the current best neural network, a memory buffer
+and an iteration counter.
+
+# Constructor
+
+    Env{Game}(params, network, experience=[], itc=0)
+
+Construct a new AlphaZero environment.
+- `Game` is the type of the game being played
+- `params` has type [`Params`](@ref)
+- `network` is the initial neural network and has type [`AbstractNetwork`](@ref)
+- `experience` is the initial content of the memory buffer
+    (see [`get_experience`](@ref))
+- `itc` is the value of the iteration counter (0 at the start of training)
+"""
 mutable struct Env{Game, Network, Board}
   params :: Params
   bestnn :: Network
@@ -22,6 +42,32 @@ end
 ##### Training handlers
 #####
 
+"""
+    Handlers
+
+Namespace for the callback functions that are used during training.
+
+All callback functions take a handler object `h` as their first argument
+and sometimes a second argment `r` that consists in a [report](@ref Report).
+
+| Callback                    | Comment                                        |
+|:----------------------------|:-----------------------------------------------|
+| `iteration_started(h)`      | called at the beggining of an iteration        |
+| `self_play_started(h)`      | called once per iter before self play starts   |
+| `game_played(h)`            | called after each game of self play            |
+| `self_play_finished(h, r)`  | sends report: [`Report.SelfPlay`](@ref)        |
+| `memory_analyzed(h, r)`     | sends report: [`Report.Memory`](@ref)          |
+| `learning_started(h, r)`    | sends report: [`Report.LearningStatus`](@ref)  |
+| `learning_epoch(h, r)`      | sends report: [`Report.Epoch`](@ref)           |
+| `checkpoint_started(h)`     | called before a checkpoint evaluation starts   |
+| `checkpoint_game_played(h)` | called after each arena game                   |
+| `checkpoint_finished(h, r)` | sends report: [`Report.Checkpoint`](@ref)      |
+| `learning_finished(h, r)`   | sends report: [`Report.Learning`](@ref)        |
+| `iteration_finished(h, r)`  | sends report: [`Report.Iteration`](@ref)       |
+| `training_finished(h)`      | called once at the end of training             |
+
+An example handler object is [`Session`](@ref).
+"""
 module Handlers
 
   function iteration_started(h)      return end
@@ -43,16 +89,22 @@ end
 import .Handlers
 
 #####
-##### Training loop
+##### Public utilities
 #####
 
+"""
+    get_experience(env::Env)
+
+Return the content of the agent's memory as a vector of samples.
+"""
 get_experience(env::Env) = get(env.memory)
 
-function resize_memory!(env::Env{G,N,B}, n) where {G,N,B}
-  exp = get(env.memory)
-  env.memory = MemoryBuffer{B}(n, exp)
-end
+"""
+    initial_report(env::Env)
 
+Return a report summarizing the configuration of agent before training starts,
+as an object of type [`Report.Initial`](@ref).
+"""
 function initial_report(env::Env)
   num_network_parameters = Network.num_parameters(env.bestnn)
   num_reg_params = Network.num_regularized_parameters(env.bestnn)
@@ -60,6 +112,15 @@ function initial_report(env::Env)
   mcts_footprint_per_node = MCTS.memory_footprint_per_node(player.mcts)
   return Report.Initial(
     num_network_parameters, num_reg_params, mcts_footprint_per_node)
+end
+
+#####
+##### Training loop
+#####
+
+function resize_memory!(env::Env{G,N,B}, n) where {G,N,B}
+  exp = get(env.memory)
+  env.memory = MemoryBuffer{B}(n, exp)
 end
 
 function evaluate_network(baseline, contender, params, handler)
@@ -72,7 +133,7 @@ function evaluate_network(baseline, contender, params, handler)
   end
 end
 
-function learning!(env::Env{G}, handler) where G
+function learning!(env::Env, handler)
   # Initialize the training process
   ap = env.params.arena
   lp = env.params.learning
@@ -162,7 +223,7 @@ function self_play!(env::Env{G}, handler) where G
   return report
 end
 
-function memory_report(env::Env{G}, handler) where G
+function memory_report(env::Env, handler)
   if isnothing(env.params.memory_analysis)
     return nothing
   else
@@ -173,7 +234,15 @@ function memory_report(env::Env{G}, handler) where G
   end
 end
 
-function train!(env::Env{G}, handler=nothing) where G
+"""
+    train!(env::Env, handler=nothing)
+
+Start or resume the training of an AlphaZero agent.
+
+A `handler` object can be passed that implements a subset of the callback
+functions defined in [`Handlers`](@ref).
+"""
+function train!(env::Env, handler=nothing)
   while env.itc < env.params.num_iters
     Handlers.iteration_started(handler)
     resize_memory!(env, env.params.mem_buffer_size[env.itc])

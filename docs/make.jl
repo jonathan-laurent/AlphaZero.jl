@@ -19,7 +19,8 @@ makedocs(
             "reference/game_interface.md",
             "reference/mcts.md",
             "reference/network.md",
-            "reference/misc.md"
+            "reference/environment.md",
+            "reference/reports.md"
         ],
         "Contribution Guide" => "contributing.md"
     ],
