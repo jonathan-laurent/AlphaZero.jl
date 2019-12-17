@@ -172,7 +172,7 @@ Evaluate two players against each other on a series of games.
 
 # Optional keyword arguments
   - `reset_every`: if set, players are reset every `reset_every` games
-  - `color_policy`: determine the [color attribution policy](@ref ColorPolicy),
+  - `color_policy`: determine the [`ColorPolicy`](@ref),
     which is `ALTERNATE_COLORS` by default
 """
 function pit(

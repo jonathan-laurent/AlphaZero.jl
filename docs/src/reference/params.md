@@ -44,4 +44,7 @@ MctsParams
 
 ```@docs
 necessary_samples
+AbstractSchedule
+StepSchedule
+PLSchedule
 ```

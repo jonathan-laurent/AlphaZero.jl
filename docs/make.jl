@@ -7,7 +7,7 @@ makedocs(
     sitename = "AlphaZero",
     authors="Jonathan Laurent",
     format = Documenter.HTML(prettyurls=PRETTY_URLS),
-    modules = [AlphaZero],
+    #modules = [AlphaZero],
     pages = [
         "Home" => "index.md",
         "Tutorial" => [

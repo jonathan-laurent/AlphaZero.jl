@@ -48,7 +48,7 @@ end
 Namespace for the callback functions that are used during training.
 
 All callback functions take a handler object `h` as their first argument
-and sometimes a second argment `r` that consists in a [report](Training Reports).
+and sometimes a second argment `r` that consists in a report.
 
 | Callback                    | Comment                                        |
 |:----------------------------|:-----------------------------------------------|
@@ -66,9 +66,11 @@ and sometimes a second argment `r` that consists in a [report](Training Reports)
 | `iteration_finished(h, r)`  | sends report: [`Report.Iteration`](@ref)       |
 | `training_finished(h)`      | called once at the end of training             |
 
-An example handler object is [`Session`](@ref).
+An example handler object is `Session`.
 """
 module Handlers
+
+  import ..Report
 
   function iteration_started(h)      return end
   function self_play_started(h)      return end

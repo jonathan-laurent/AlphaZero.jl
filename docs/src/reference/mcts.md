@@ -1,19 +1,19 @@
 # MCTS
 
-A generic, standalone implementation of asynchronous Monte Carlo Tree Search.
-It can be used on any game that implements the [`GameInterface`](@ref
-Main.AlphaZero.GameInterface) interface and with any external oracle.
-
 ```@meta
 CurrentModule = AlphaZero.MCTS
 ```
+
+A generic, standalone implementation of asynchronous Monte Carlo Tree Search.
+It can be used on any game that implements the `GameInterface`
+interface and with any external oracle.
 
 ## Oracles
 
 ```@docs
 Oracle
 evaluate(::Oracle, board, actions)
-evaluate_batch(::Oracle, batch)
+evaluate_batch(::Oracle, batches)
 RolloutOracle
 ```
 

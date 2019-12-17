@@ -2,6 +2,14 @@
 ##### Schedules
 #####
 
+"""
+    AbstractSchedule{R}
+
+Abstract type for a parameter schedule, which represents a function from
+nonnegative integers to numbers of type `R`.
+
+Subtypes must implement the `getindex` operator.
+"""
 abstract type AbstractSchedule{R} end
 
 function Base.getindex(s::AbstractSchedule, i::Int)
@@ -12,8 +20,13 @@ end
 ##### Piecewise linar schedule
 #####
 
-# We keep the internal representation simple for JSON serialization
-struct PLSchedule{R}
+"""
+    PLSchedule{R} <: AbstractSchedule{R}
+
+Type for piecewise linear schedules.
+"""
+struct PLSchedule{R} <: AbstractSchedule{R}
+  # We keep the internal representation simple for JSON serialization
   xs :: Vector{Int}
   ys :: Vector{R}
   function PLSchedule{R}(xs, ys) where R
@@ -58,6 +71,11 @@ end
 ##### Step function
 #####
 
+"""
+    StepSchedule{R} <: AbstractSchedule{R}
+
+Type for step function schedules.
+"""
 struct StepSchedule{R} <: AbstractSchedule{R}
   start :: R
   xs :: Vector{Int}

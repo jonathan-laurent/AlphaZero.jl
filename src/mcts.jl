@@ -1,7 +1,7 @@
 """
 A generic, standalone implementation of asynchronous Monte Carlo Tree Search.
-It can be used on any game that implements the [`GameInterface`](@ref
-Main.AlphaZero.GameInterface) interface and with any external oracle.
+It can be used on any game that implements the [`GameInterface`](@ref)
+interface and with any external oracle.
 """
 module MCTS
 
@@ -9,7 +9,7 @@ using DataStructures: Stack
 using Distributions: Categorical
 
 using ..Util: @printing_errors, @unimplemented
-import ..GI
+import ..GI, ..GameInterface
 
 #####
 ##### Interface for external oracles

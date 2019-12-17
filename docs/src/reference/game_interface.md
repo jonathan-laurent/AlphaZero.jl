@@ -4,8 +4,8 @@
 CurrentModule = AlphaZero.GameInterface
 ```
 
-The [`GameInterface`](@ref Main.AlphaZero.GameInterface) module provides a
-generic interface for two-players, zero-sum, symmetric board games.
+The `GameInterface` module provides a generic interface for two-players,
+zero-sum, symmetric board games.
 
   * Types, traits and constructors
     - [`Game()`](@ref AbstractGame)

@@ -6,6 +6,7 @@ CurrentModule = AlphaZero
 
 ```@docs
 Benchmark
+Benchmark.Report
 ```
 
 ## Duels
