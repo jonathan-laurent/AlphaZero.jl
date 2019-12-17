@@ -212,7 +212,8 @@ function think(p::MinMaxPlayer, state, turn)
   π = zeros(n); π[aid] = 1.
   η = ones(n) / n
   π = (1 - p.ϵ) * π + p.ϵ * η
-  return rand(Categorical(π)), π
+  a = actions[rand(Categorical(π))]
+  return a, π
 end
 
 end
