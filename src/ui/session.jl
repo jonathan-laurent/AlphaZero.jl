@@ -7,6 +7,12 @@
 
 The full collection of benchmarks and statistics
 collected during a training session.
+
+# Fields
+- `iterations`: vector of ``n`` iteration reports with type
+    [`Report.Iteration`](@ref)
+- `benchmark`: vector of `n+1` benchmark reports with type
+    [`Benchmark.Report`](@ref)
 """
 struct SessionReport
   iterations :: Vector{Report.Iteration}
@@ -26,7 +32,14 @@ end
 """
     Session{Env}
 
-A basic user interface for AlphaZero environments.
+A wrapper on an AlphaZero environment that adds features such as:
+- Logging and plotting
+- Loading and saving of environments
+In particular, it implements the [`Handlers`](@ref) interface.
+
+# Public fields
+- `env::Env` is the environment wrapped by the session
+- `report` is the current session report, with type [`SessionReport`](@ref)
 """
 mutable struct Session{Env}
   env :: Env
@@ -177,7 +190,7 @@ end
 
 autosave_enabled(s::Session) = s.autosave && !isnothing(s.dir)
 
-function save_increment(session::Session, bench, itrep=nothing)
+function save_increment!(session::Session, bench, itrep=nothing)
   push!(session.report.benchmark, bench)
   isnothing(itrep) || push!(session.report.iterations, itrep)
   if autosave_enabled(session)
@@ -240,13 +253,12 @@ function run_benchmark(session)
   return report
 end
 
-function zeroth_iteration(session::Session)
+function zeroth_iteration!(session::Session)
   @assert session.env.itc == 0
-  Log.section(session.logger, 1, "Initializing a new AlphaZero environment")
   Log.section(session.logger, 2, "Initial report")
   Report.print(session.logger, initial_report(session.env))
   bench = run_benchmark(session)
-  save_increment(session, bench)
+  save_increment!(session, bench)
 end
 
 #####
@@ -269,20 +281,30 @@ end
 #####
 
 """
-    Session(env::Env)
+    Session(::Type{Game}, ::Type{Net}, params, netparams) where {Game, Net}
 
-Initialize a session from an environment.
-"""
-function Session(
-    env::Env, dir=nothing; autosave=true, nostdout=false, benchmark=[])
-  logger = session_logger(dir, nostdout, autosave)
-  return Session(env, dir, logger, autosave, benchmark)
-end
+Create a new session given some parameters, or load it from disk if
+it already exists.
 
-"""
-    Session(::Type{Game}, ::Type{Network}, params, netparams)
+# Arguments
+- `Game` is the type ot the game that is being learnt
+- `Net` is the type of the network that is being used
+- `params` has type [`Params`](@ref)
+- `netparams` has type [`Network.HyperParams(Net)`](@ref Network.HyperParams)
 
-Create a new session.
+# Optional keyword arguments
+- `dir`: session directory in which all files and reports are saved; this
+    argument is either a string or `nothing` (default), in which case the
+    session won't be saved automatically and no file will be generated
+- `autosave`: if set to `false`, the session won't be saved automatically nor
+    any file will be generated (default is `true`)
+- `nostdout`: disables logging on the standard output when set to `true`
+    (default is `false`)
+- `benchmark`: vector of [`Benchmark.Duel`](@ref) to be used as a benchmark
+    (default is `[]`)
+- `load_saved_params`: if set to `true`, load the training parameters from
+    the session directory (if present) rather than using the `params`
+    argument (default is `false`)
 """
 function Session(
     ::Type{Game}, ::Type{Net}, params, netparams;
@@ -303,15 +325,19 @@ function Session(
     network = Net(netparams)
     env = Env{Game}(params, network)
     session = Session(env, dir, logger, autosave, benchmark)
-    zeroth_iteration(session)
+    Log.section(session.logger, 1, "Initializing a new AlphaZero environment")
+    zeroth_iteration!(session)
   end
   return session
 end
 
 """
-    Session(::Type{Game}, ::Type{Network}, dir::String)
+    Session(::Type{Game}, ::Type{Network}, dir::String) where {Game, Net}
 
 Load an existing session from a directory.
+
+This constructor features the optional keyword arguments
+`autosave`, `nostdout` and `benchmark`.
 """
 function Session(
     ::Type{Game}, ::Type{Network}, dir::String;
@@ -321,6 +347,27 @@ function Session(
   logger = session_logger(dir, nostdout, autosave)
   env = load_env(Game, Network, logger, dir)
   return Session(env, dir, logger, autosave, benchmark)
+end
+
+"""
+    Session(env::Env [, dir])
+
+Create a session from an initial environment.
+
+- The iteration counter of the environment must be equal to 0
+- If a session directory is provided, this directory must not exist yet
+
+This constructor features the optional keyword arguments
+`autosave`, `nostdout` and `benchmark`.
+"""
+function Session(
+    env::Env, dir=nothing; autosave=true, nostdout=false, benchmark=[])
+  @assert isnothing(dir) || !isdir(dir)
+  @assert env.itc == 0
+  logger = session_logger(dir, nostdout, autosave)
+  session = Session(env, dir, logger, autosave, benchmark)
+  zeroth_iteration!(session)
+  return session
 end
 
 #####
@@ -422,7 +469,7 @@ end
 
 function Handlers.iteration_finished(session::Session, report)
   bench = run_benchmark(session)
-  save_increment(session, bench, report)
+  save_increment!(session, bench, report)
   flush(Log.logfile(session.logger))
 end
 

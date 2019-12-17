@@ -31,3 +31,11 @@ Report.Memory
 ```@docs
 Report.SelfPlay
 ```
+
+## Training
+
+```@docs
+Report.Initial
+Report.Iteration
+Report.Perfs
+```

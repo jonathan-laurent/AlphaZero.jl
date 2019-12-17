@@ -12,6 +12,19 @@ import ..MinMax, ..GI
 using ProgressMeter
 using Distributions: Categorical
 
+"""
+    Benchmark.DuelOutcome
+
+The outcome of a duel between two players.
+
+# Fields
+- `player` and `baseline` are `String` fields containing the names of
+    both players involved in the duel
+- `avgz` is the average reward collected by `player`
+- `rewards` is a vector containing all rewards collected by `player`
+    (one per game played)
+- `time` is the amount of computing time took consumed by the duel, in seconds
+"""
 struct DuelOutcome
   player :: String
   baseline :: String
@@ -20,8 +33,18 @@ struct DuelOutcome
   time :: Float64
 end
 
+"""
+    Benchmark.Report = Vector{Benchmark.DuelOutcome}
+
+A benchmark report is a vector of [`Benchmark.DuelOutcome`](@ref) objects.
+"""
 const Report = Vector{DuelOutcome}
 
+"""
+    Benchmark.Player
+
+Abstract type for a player that can be featured in a benchmark duel.
+"""
 abstract type Player end
 
 function instantiate(player::Player, nn)
@@ -32,6 +55,17 @@ function name(::Player) :: String
   @unimplemented
 end
 
+"""
+    Benchmark.Duel(player, baseline; num_games)
+
+Specify a duel that consists in `num_games` games between
+`player` and `baseline`, each of them of type [`Benchmark.Player`](@ref).
+
+# Optional keyword arguments
+- `reset_every`: if set, the MCTS tree is reset every `reset_mcts_every` games
+    to avoid running out of memory
+- `color_policy` has type [`ColorPolicy`](@ref) (`ALTERNATE_COLORS`) by default
+"""
 struct Duel
   num_games :: Int
   reset_every :: Union{Nothing, Int}
@@ -87,6 +121,13 @@ end
 ##### Standard players
 #####
 
+"""
+    Benchmark.MctsRollouts(params) <: Benchmark.Player
+
+Pure MCTS baseline that uses rollouts to evaluate new positions.
+
+- Constructor argument `params` has type [`MctsParams`](@ref).
+"""
 struct MctsRollouts <: Player
   params :: MctsParams
 end
@@ -100,6 +141,13 @@ function instantiate(p::MctsRollouts, nn::AbstractNetwork{G}) where G
   return MctsPlayer(MCTS.RolloutOracle{G}(), params)
 end
 
+"""
+    Benchmark.Full(params) <: Benchmark.Player
+
+Full AlphaZero player that combines MCTS with the learnt network.
+
+- Constructor argument `params` has type [`MctsParams`](@ref).
+"""
 struct Full <: Player
   params :: MctsParams
 end
@@ -108,6 +156,16 @@ name(::Full) = "AlphaZero"
 
 instantiate(p::Full, nn) = MctsPlayer(nn, p.params)
 
+"""
+    Benchmark.NetworkOnly(params) <: Benchmark.Player
+
+Player that uses the policy output by the learnt network directly,
+instead of relying on MCTS.
+
+-  Constructor argument `params` has type [`MctsParams`](@ref), but only the
+    following fields are used: `use_gpu`, `temperature`, `dirichlet_noise_nα`
+    and `dirichlet_noise_ϵ`.
+"""
 struct NetworkOnly <: Player
   params :: MctsParams
 end
@@ -119,7 +177,13 @@ function instantiate(p::NetworkOnly, nn)
   return MctsPlayer(nn, params)
 end
 
-# Also implements the AlphaZero.AbstractPlayer interface
+
+"""
+    Benchmark.MinMaxTS(;depth, random_ϵ=0.) <: Benchmark.Player
+
+Minmax baseline, which plans at depth `depth` and selects a
+random action with probability `random_ϵ` for exploration.
+"""
 struct MinMaxTS <: Player
   depth :: Int
   ϵ :: Float64

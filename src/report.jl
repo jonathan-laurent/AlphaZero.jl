@@ -4,6 +4,9 @@ hyperparameters tuning.
 """
 module Report
 
+# Some imports for docstrings cross-references
+import ..MCTS, ..Network, ..MemAnalysisParams
+
 """
     Report.Loss
 
@@ -105,7 +108,7 @@ Statistics about a set of samples, as collected during memory analysis.
 - `num_samples`: total number of samples
 - `num_boards`: number of distinct board positions
 - `Wtot`: total weight of the samples
-- `status`: [`Report.LearningSTatus`](@ref) statistics of the current network
+- `status`: [`Report.LearningStatus`](@ref) statistics of the current network
     on the samples
 """
 struct Samples
@@ -156,23 +159,49 @@ end
 Report generated after the self-play phase of an iteration.
 
 - `inference_time_ratio`: see [`MCTS.inference_time_ratio`](@ref)
+- `samples_gen_speed`: average number of samples generated per second
+- `average_exploration_depth`: see [`MCTS.average_exploration_depth`](@ref)
+- `mcts_memory_footprint`: estimation of the maximal memory footprint of the
+    MCTS tree during self-play, as computed by
+    [`MCTS.approximate_memory_footprint`](@ref)
+- `memory_size`: number of samples in the memory buffer at the end of the
+    self-play phase
+- `memory_num_distinct_boards`: number of distinct board positions in the
+    memory buffer at the end of the self-play phase
 """
 struct SelfPlay
   inference_time_ratio :: Float64
-  samples_gen_speed :: Float64 # in samples/second
+  samples_gen_speed :: Float64
   average_exploration_depth :: Float64
   mcts_memory_footprint :: Int
-  # Basic memory statistics
   memory_size :: Int
   memory_num_distinct_boards :: Int
 end
 
+"""
+    Report.Perfs
+
+Performances report for a subroutine.
+- `time`: total time spent, in seconds
+- `allocated`: amount of memory allocated, in bytes
+- `gc_time`: total amount of time spent in the garbage collector
+"""
 struct Perfs
   time :: Float64
   allocated :: Int64
   gc_time :: Float64
 end
 
+"""
+    Report.Iteration
+
+Report generated after each training iteration.
+- `perfs_self_play`, `perfs_memory_analysis` and `perfs_learning` are
+    performance reports for the different phases of the iteration, as
+    objects of type [`Report.Perfs`](@ref)
+- `self_play`, `memory`, `learning` have types [`Report.SelfPlay`](@ref),
+    [`Report.SelfPlay`](@ref) and [`Report.Learning`](@ref) respectively
+"""
 struct Iteration
   perfs_self_play :: Perfs
   perfs_memory_analysis :: Perfs
@@ -182,6 +211,15 @@ struct Iteration
   learning :: Learning
 end
 
+"""
+    Report.Initial
+
+Report summarizing the configuration of an agent before training starts.
+- `num_network_parameters`: see [`Network.num_parameters`](@ref)
+- `num_network_regularized_parameters`:
+    see [`Network.num_regularized_parameters`](@ref)
+- `mcts_footprint_per_node`: see [`MCTS.memory_footprint_per_node`](@ref)
+"""
 struct Initial
   num_network_parameters :: Int
   num_network_regularized_parameters :: Int

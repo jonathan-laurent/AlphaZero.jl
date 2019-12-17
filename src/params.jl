@@ -227,8 +227,9 @@ Parameters for the AlphaZero training process.
 # Explanation
 
 The AlphaZero training process consists in `num_iters` iterations. Each
-iteration can be decomposed into a [self-play](@ref SelfPlayParams) phase
-and a [learning](@ref LearningParams) phase.
+iteration can be decomposed into a self-play phase
+(see [`SelfPlayParams`](@ref)) and a learning phase
+(see [`LearningParams`](@ref)).
 
 Set `ternary_rewards` to `true` if the rewards that are issued by
 the current game environment always belong to ``\\{-1, 0, 1\\}`` so that

@@ -48,7 +48,7 @@ end
 Namespace for the callback functions that are used during training.
 
 All callback functions take a handler object `h` as their first argument
-and sometimes a second argment `r` that consists in a [report](@ref Report).
+and sometimes a second argment `r` that consists in a [report](Training Reports).
 
 | Callback                    | Comment                                        |
 |:----------------------------|:-----------------------------------------------|

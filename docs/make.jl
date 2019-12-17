@@ -20,6 +20,8 @@ makedocs(
             "reference/mcts.md",
             "reference/network.md",
             "reference/environment.md",
+            "reference/benchmark.md",
+            "reference/session.md",
             "reference/reports.md"
         ],
         "Contribution Guide" => "contributing.md"

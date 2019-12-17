@@ -105,23 +105,34 @@ function plot_benchmark(
     ylims=(-1.0, 1.0),
     legend=:bottomright,
     label=labels,
-    xlabel="iteration")
+    xlabel="Iteration number")
   Plots.savefig(avgz, joinpath(dir, "benchmark_reward"))
-  # Percentage of lost games
   if params.ternary_rewards
-    function compute_ploss(b)
+    function compute_percentage(b, f)
       stats = Benchmark.TernaryOutcomeStatistics(b)
-      return ceil(Int, 100 * (stats.num_lost / length(b.rewards)))
+      return ceil(Int, 100 * (f(stats) / length(b.rewards)))
     end
-    ploss_data = [[compute_ploss(b[i]) for b in benchs] for i in 1:nduels]
+    function compute_data(f)
+      return [[compute_percentage(b[i], f) for b in benchs] for i in 1:nduels]
+    end
+    # Percentage of lost games
     ploss = Plots.plot(0:n,
-      ploss_data,
+      compute_data(s -> s.num_lost),
       title="Percentage of Lost Games",
       ylims=(0, 100),
       legend=:topright,
       label=labels,
-      xlabel="iteration")
+      xlabel="Iteration number")
     Plots.savefig(ploss, joinpath(dir, "benchmark_lost_games"))
+    # Percentage of won games
+    pwin = Plots.plot(0:n,
+      compute_data(s -> s.num_won),
+      title="Percentage of Won Games",
+      ylims=(0, 100),
+      legend=:bottomright,
+      label=labels,
+      xlabel="Iteration number")
+    Plots.savefig(pwin, joinpath(dir, "benchmark_won_games"))
   end
 end
 
@@ -139,13 +150,13 @@ function plot_training(
     title="Average Exploration Depth",
     ylims=(0, Inf),
     legend=:none,
-    xlabel="iteration")
+    xlabel="Iteration number")
   # Number of samples
   nsamples = Plots.plot(0:n,
     [0;[it.self_play.memory_size for it in iterations]],
     title="Experience Buffer Size",
     label="Number of samples",
-    xlabel="iteration")
+    xlabel="Iteration number")
   Plots.plot!(nsamples, 0:n,
     [0;[it.self_play.memory_num_distinct_boards for it in iterations]],
     label="Number of distinct boards")
@@ -157,7 +168,7 @@ function plot_training(
     ylims=(-1, 1),
     t=:bar,
     legend=:none,
-    xlabel="iteration")
+    xlabel="Iteration number")
   Plots.hline!(arena, [0, params.arena.update_threshold])
   # Plots related to the memory analysis
   if all(it -> !isnothing(it.memory), iterations)
@@ -172,7 +183,7 @@ function plot_training(
     nstages = minimum(length(it.memory.per_game_stage) for it in iterations)
     colors = range(colorant"blue", stop=colorant"red", length=nstages)
     losses_ps = Plots.plot(
-      title="Loss per Game Stage", ylims=(0, Inf), xlabel="iteration")
+      title="Loss per Game Stage", ylims=(0, Inf), xlabel="Iteration number")
     for s in 1:nstages
       Plots.plot!(losses_ps, 1:n, [
           it.memory.per_game_stage[s].samples_stats.status.loss.L
@@ -188,7 +199,8 @@ function plot_training(
     [it.learning.initial_status.Hp for it in iterations],
     ylims=(0, Inf),
     title="Policy Entropy",
-    label="MCTS")
+    label="MCTS",
+    xlabel="Iteration number")
   Plots.plot!(entropies, 1:n,
     [it.learning.initial_status.Hpnet for it in iterations],
     label="Network")
