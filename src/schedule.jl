@@ -6,9 +6,8 @@
     AbstractSchedule{R}
 
 Abstract type for a parameter schedule, which represents a function from
-nonnegative integers to numbers of type `R`.
-
-Subtypes must implement the `getindex` operator.
+nonnegative integers to numbers of type `R`. Subtypes must implement the
+`getindex` operator.
 """
 abstract type AbstractSchedule{R} end
 

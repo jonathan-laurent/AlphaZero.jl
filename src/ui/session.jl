@@ -400,11 +400,6 @@ function play_game(session::Session{<:Env{Game}}) where Game
 end
 
 #####
-##### Run benchmarks
-#####
-
-
-#####
 ##### Event handlers
 #####
 
@@ -481,7 +476,6 @@ end
 #####
 ##### Replay training
 #####
-
 
 function walk_iterations(::Type{G}, ::Type{N}, dir::String) where {G, N}
   n = 0
