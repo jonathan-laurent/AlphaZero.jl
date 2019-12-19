@@ -50,6 +50,7 @@ board
 board_symmetric
 available_actions
 play!
+heuristic_value
 ```
 
 ## Machine Learning Interface
