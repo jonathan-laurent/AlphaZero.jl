@@ -13,7 +13,7 @@ netparams = ResNetHP(
   batch_norm_momentum=0.3)
 
 self_play = SelfPlayParams(
-  num_games=(DEBUG ? 1 : 6_000),
+  num_games=(DEBUG ? 1 : 5_000),
   reset_mcts_every=1_000,
   gc_every=nothing,
   mcts=MctsParams(
@@ -53,7 +53,7 @@ params = Params(
   ternary_rewards=true,
   mem_buffer_size=PLSchedule(
   [      0,        20],
-  [200_000, 1_000_000]))
+  [150_000, 1_000_000]))
 
 deployed_mcts = MctsParams(self_play.mcts,
   temperature=StepSchedule(cold_temperature),
