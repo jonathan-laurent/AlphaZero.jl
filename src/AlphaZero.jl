@@ -80,8 +80,3 @@ else
 end
 
 end
-
-# External resources on AlphaZero and MCTS:
-# + https://web.stanford.edu/~surag/posts/alphazero.html
-# + https://int8.io/monte-carlo-tree-search-beginners-guide/
-# + https://medium.com/oracledevs/lessons-from-alpha-zero

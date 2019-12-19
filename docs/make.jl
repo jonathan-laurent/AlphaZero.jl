@@ -24,7 +24,7 @@ makedocs(
             "reference/session.md",
             "reference/reports.md"
         ],
-        "Contribution Guide" => "contributing.md"
+        "Contributions Guide" => "contributing.md"
     ],
     repo="https://github.com/jonathan-laurent/AlphaZero.jl/blob/{commit}{path}#L{line}"
 )

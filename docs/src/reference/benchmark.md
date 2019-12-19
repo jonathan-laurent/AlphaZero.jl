@@ -1,4 +1,4 @@
-# Benchmark
+# [Benchmark](@id benchmark)
 
 ```@meta
 CurrentModule = AlphaZero

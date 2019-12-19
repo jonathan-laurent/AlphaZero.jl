@@ -1,4 +1,4 @@
-# Network Interface
+# [Network Interface](@id network_interface)
 
 ```@meta
 CurrentModule = AlphaZero.Network
