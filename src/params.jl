@@ -29,6 +29,9 @@ It is typical to use a high value of the temperature parameter ``τ``
 during the first moves of a game to increase exploration and then switch to
 a small value. Therefore, `temperature` has type [`StepSchedule`](@ref).
 
+For information on parameters `cpuct`, `dirichlet_noise_ϵ` and
+`dirichlet_noise_α`, see [`MCTS.Env`](@ref).
+
 # AlphaGo Zero Parameters
 
 In the original AlphaGo Zero paper:

@@ -126,17 +126,18 @@ mutable struct Worker{Board, Action}
 end
 
 """
-    MCTS.Env{Game}(oracle; nworkers=1, fill_batches=false, cpuct=1.) where Game
+    MCTS.Env{Game}(oracle; <keyword args>) where Game
 
-Create and initialize an MCTS environment.
+Create and initialize an MCTS environment with a given `oracle`.
 
-## Arguments
+## Keyword Arguments
 
-  - `oracle`: external oracle
-  - `nworkers`: numbers of asynchronous workers (see below)
-  - `fill_batches`: if true, a constant batch size is enforced for evaluation
-     requests, by completing batches with dummy entries if necessary
-  - `cpuct`: exploration constant (in the UCT formula)
+  - `nworkers=1`: numbers of asynchronous workers (see below)
+  - `fill_batches=false`: if true, a constant batch size is enforced for
+     evaluation requests, by completing batches with dummy entries if necessary
+  - `cpuct=1.`: exploration constant in the UCT formula
+  - `noise_ϵ=0., noise_α=1.`: parameters for the dirichlet exploration noise
+     (see below)
 
 ## Asynchronous MCTS
 
@@ -147,6 +148,21 @@ Create and initialize an MCTS environment.
     along with an additional task to serve board evaluation requests.
     Such requests are processed by batches of
     size `nworkers` using [`MCTS.evaluate_batch`](@ref).
+
+## Dirichlet Noise
+
+A naive way to ensure exploration during training is to adopt an ϵ-greedy
+policy, playing a random move at every turn instead of using the policy
+prescribed by [`MCTS.policy`](@ref) with probability ϵ.
+The problem with this naive strategy is that it may lead the player to make
+terrible moves at critical moments, thereby biasing the policy evaluation
+mechanism.
+
+A superior alternative is to add a random bias to the neural prior for the root
+node during MCTS exploration: instead of considering the policy ``p`` output
+by the neural network in the UCT formula, one uses ``(1-ϵ)p + ϵη`` where ``η``
+is drawn once per call to [`MCTS.explore!`](@ref) from a Dirichlet distribution
+of parameter ``α``.
 """
 mutable struct Env{Game, Board, Action, Oracle}
   # Store (nonterminal) state statistics assuming player one is to play
@@ -170,7 +186,7 @@ mutable struct Env{Game, Board, Action, Oracle}
 
   function Env{G}(oracle;
       nworkers=1, fill_batches=false,
-      cpuct=1., noise_ϵ=0., noise_α=10., ) where G
+      cpuct=1., noise_ϵ=0., noise_α=1.) where G
     B = GI.Board(G)
     A = GI.Action(G)
     tree = Dict{B, BoardInfo}()
