@@ -1,3 +1,5 @@
+ENV["CUARRAYS_MEMORY_POOL"] = "split" # "binned" / "split"
+
 using Revise
 using AlphaZero
 using AlphaZero.Log
@@ -28,7 +30,7 @@ function profile_self_play(configs::Vector)
     ("EXPD", expd, s -> s[3])])
   for (title, net, params) in configs
     profile_self_play(net, params, 1) # Compilation
-    rep = profile_self_play(net, params, 20)
+    rep = profile_self_play(net, params, 50)
     Log.table_row(log, tab, rep, [title])
   end
 end
@@ -37,32 +39,26 @@ end
 ##### Main
 #####
 
-include("../using_game.jl")
-@using_default_game
+include("../game_module.jl")
+@game_module SelectedGame
+using .SelectedGame: Game, Training
 
 function config(nblocks, nfilters, niters, nworkers)
   title = "$nblocks blocks, $nfilters filters, $niters iters, $nworkers workers"
-  network = ResNet{Game}(ResNetHP(netparams,
+  network = ResNet{Game}(ResNetHP(Training.netparams,
     num_blocks=nblocks, num_filters=nfilters))
-  params = MctsParams(self_play.mcts,
+  params = MctsParams(Training.params.self_play.mcts,
     num_iters_per_turn=niters,
     num_workers=nworkers)
   return (title, network, params)
 end
 
-# We want 3000 games per iteration?
-# Iteration: self-play=30minutes
+# We want 5000 games per iteration?
+# Iteration: self-play=1h
 # Therefore, we want to simulate 100 games per minute
 
-nblocks = 10
-nfilters = 128
-
 profile_self_play([
-  config(7, 128, 320, 64),
-  config(5, 128, 320, 64),
-  config(7, 64, 320, 64),
-  config(5, 64, 320, 64),
-  config(5, 64, 640, 128),
-  config(10, 128, 1024, 256),
-  config(7, 100, 320, 64),
+  config(7, 128, 400, 64),
+  config(7, 128, 800, 64),
+  config(7, 128, 800, 128),
 ])
