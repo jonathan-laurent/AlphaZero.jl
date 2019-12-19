@@ -5,6 +5,6 @@ CurrentModule = AlphaZero
 ```
 
 ```@docs
-think
+GameInterface.think
 pit
 ```

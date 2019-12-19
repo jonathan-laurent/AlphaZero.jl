@@ -21,19 +21,13 @@ An MCTS player picks actions as follows. Given a game state, it launches
 `num_iters_per_turn` MCTS iterations that are executed asynchronously on
 `num_workers` workers, with UCT exploration constant `cpuct`.
 
-Then, an action is picked according to the distribution
-``(1 - ϵ) π + ϵ η `` where
+Then, an action is picked according to the distribution ``π`` where
+``π_i ∝ n_i^τ`` with ``n_i`` the number of time that the ``i^{\\text{th}}``
+action was visited and ``τ`` the `temperature` parameter.
 
-+ ``π_i ∝ n_i^τ`` with ``n_i`` the number of time that the ``i^{\\text{th}}``
-  action was visited and ``τ`` the `temperature` parameter
-+ ``η ∼ \\text{Dir}(α)`` with ``α`` defined of the ratio of
-  `dirichlet_noise_nα` by the number of available actions.
-
-# Remarks
-
-+ It is typical to use a high value of the temperature parameter ``τ``
-  during the first moves of a game to increase exploration and then switch to
-  a small value. Therefore, `temperature` has type [`StepSchedule`](@ref).
+It is typical to use a high value of the temperature parameter ``τ``
+during the first moves of a game to increase exploration and then switch to
+a small value. Therefore, `temperature` has type [`StepSchedule`](@ref).
 
 # AlphaGo Zero Parameters
 
@@ -44,9 +38,9 @@ In the original AlphaGo Zero paper:
 + The temperature is set to 1 for the 30 first moves and then to an
   infinitesimal value.
 + The ``ϵ`` parameter for the Dirichlet noise is set to ``0.25`` and
-  ``η \\sim \\text{Dir}(0.03)``. Given that there are ``19 × 19 + 1 = 362``
-  possible actions in Go, this gives us a value for `dirichlet_noise_nα` of
-  ``0.03 × 362 = 10.86``.
+  the ``α`` parameter to ``0.03``, which is consistent with the heuristic
+  of using ``α = 10/n`` with ``n`` the maximum number of possibles moves,
+  which is ``19 × 19 + 1 = 362`` in the case of Go.
 """
 @kwdef struct MctsParams
   num_workers :: Int = 1

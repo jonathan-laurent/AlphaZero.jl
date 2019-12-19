@@ -26,3 +26,10 @@ Benchmark.NetworkOnly
 Benchmark.MctsRollouts
 Benchmark.MinMaxTS
 ```
+
+## Minmax Baseline
+
+```@docs
+MinMax
+MinMax.Player
+```
