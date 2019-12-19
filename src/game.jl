@@ -3,7 +3,9 @@ A generic interface for zero-sum, symmetric games.
 """
 module GameInterface
 
-using ..Util: @unimplemented
+export AbstractPlayer
+
+using ..Util: @unimplemented, rand_categorical
 
 #####
 ##### Types
@@ -253,12 +255,53 @@ function board_memsize(::Type{G}) where G
 end
 
 #####
-##### Minimalistic game interface
+##### Abstract type for players
 #####
 
-abstract type Player end
+abstract type AbstractPlayer{Game} end
 
-struct Human <: Player end
+"""
+   think(::AbstractPlayer, state, turn=nothing)
+
+Return a probability distribution over actions as a `(actions, π)` pair.
+"""
+function think(::AbstractPlayer, state, turn=nothing)
+  @unimplemented
+end
+
+"""
+    reset_player!(::AbstractPlayer)
+
+Reset the internal memory of a player. The default implementation does nothing.
+"""
+function reset_player!(::AbstractPlayer)
+  return
+end
+
+function select_move(player::AbstractPlayer, state, turn=nothing)
+  actions, π = think(player, state, turn)
+  #println(ceil.(100 * π), "\n")
+  return actions[Util.rand_categorical(π)]
+end
+
+#####
+##### Random Player
+#####
+
+struct RandomPlayer{Game} <: AbstractPlayer{Game} end
+
+function think(player::RandomPlayer, state, turn)
+  actions = GI.available_actions(state)
+  n = length(actions)
+  π = ones(n) ./ length(actions)
+  return π
+end
+
+#####
+##### Minimalistic interface for humans
+#####
+
+struct Human{Game} <: AbstractPlayer{Game} end
 
 struct Quit <: Exception end
 
@@ -274,7 +317,13 @@ function select_move(::Human, game)
   return a
 end
 
-function interactive!(game, white::Player, black::Player)
+"""
+    interactive!(game, white, black)
+
+Launch an interactive session for `game` between players `white` and `black`.
+Both players have type `AbstractPlayer` and one of them is typically `Human`.
+"""
+function interactive!(game, white, black)
   try
   print_state(game)
   while isnothing(white_reward(game))
@@ -289,6 +338,6 @@ function interactive!(game, white::Player, black::Player)
   end
 end
 
-interactive!(game) = interactive!(game, Human(), Human())
+interactive!(game::G) where G = interactive!(game, Human{G}(), Human{G}())
 
 end

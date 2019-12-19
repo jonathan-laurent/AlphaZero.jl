@@ -23,23 +23,23 @@ self_play = SelfPlayParams(
     cpuct=3,
     temperature=StepSchedule(
       start=1.0,
-      change_at=[10],
+      change_at=[8],
       values=[cold_temperature]),
-    dirichlet_noise_ϵ=0.05))
+    dirichlet_noise_ϵ=0.25,
+    dirichlet_noise_α=1.0))
 
 arena = ArenaParams(
   num_games=(DEBUG ? 1 : 400),
   reset_mcts_every=400,
   update_threshold=(2 * 0.54 - 1),
   mcts=MctsParams(self_play.mcts,
-    temperature=StepSchedule(cold_temperature),
-    dirichlet_noise_ϵ=0.05))
+    temperature=StepSchedule(cold_temperature)))
 
 learning = LearningParams(
   batch_size=256,
   loss_computation_batch_size=1024,
   gc_every=nothing,
-  learning_rate=2e-3,
+  learning_rate=1e-3,
   l2_regularization=1e-4,
   nonvalidity_penalty=1.,
   checkpoints=[1, 2])
@@ -57,7 +57,7 @@ params = Params(
 
 deployed_mcts = MctsParams(self_play.mcts,
   temperature=StepSchedule(cold_temperature),
-  dirichlet_noise_ϵ=0)
+  dirichlet_noise_ϵ=0.10)
 
 benchmark = [
   Benchmark.Duel(
@@ -68,6 +68,6 @@ benchmark = [
     color_policy=CONTENDER_WHITE),
   Benchmark.Duel(
     Benchmark.Full(deployed_mcts),
-    Benchmark.MinMaxTS(depth=4, random_ϵ=0.05),
+    Benchmark.MinMaxTS(depth=4, τ=0.2),
     num_games=(DEBUG ? 1 : 200),
     color_policy=CONTENDER_WHITE)]

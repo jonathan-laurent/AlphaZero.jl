@@ -3,6 +3,7 @@ module Util
 export Option, @unimplemented
 
 import Random
+using Distributions: Categorical
 
 const Option{T} = Union{T, Nothing}
 
@@ -111,6 +112,27 @@ function generate_update_constructor(T)
     #$Tname(;$(fields...)) = $Tname($(fields...))
     $Tname($base::$Tname; $(fields_withdef...)) = $Tname($(fields...))
   end
+end
+
+# Categorical uses `isprobvec`, which tends to be picky when receiving a
+# Vector{Float64} argument
+function fix_probvec(π)
+  π = convert(Vector{Float32}, π)
+  s = sum(π)
+  if !(s ≈ 1)
+    if iszero(s)
+      n = length(π)
+      π = ones(Float32, n) ./ n
+    else
+      π ./= s
+    end
+  end
+  return π
+end
+
+function rand_categorical(π)
+  π = fix_probvec(π)
+  return rand(Categorical(π))
 end
 
 end

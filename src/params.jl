@@ -12,8 +12,8 @@ Parameters of an MCTS player.
 | `num_iters_per_turn`   | `Int`                   |  -                  |
 | `cpuct`                | `Float64`               | `1.`                |
 | `temperature`          | `StepSchedule{Float64}` | `StepSchedule(1.)`  |
-| `dirichlet_noise_nα`   | `Float64`               | `10.`               |
-| `dirichlet_noise_ϵ`    | `Float64`               | `0.`                |
+| `dirichlet_noise_ϵ`    | `Float64`               |  -                  |
+| `dirichlet_noise_α`    | `Float64`               |  -                  |
 
 # Explanation
 
@@ -54,8 +54,8 @@ In the original AlphaGo Zero paper:
   cpuct :: Float64 = 1.
   num_iters_per_turn :: Int
   temperature :: StepSchedule{Float64} = StepSchedule(1.)
-  dirichlet_noise_nα :: Float64 = 10.
-  dirichlet_noise_ϵ :: Float64 = 0.
+  dirichlet_noise_ϵ :: Float64
+  dirichlet_noise_α :: Float64
 end
 
 """

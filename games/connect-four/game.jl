@@ -85,7 +85,7 @@ function num_connected_axis(board, player, pos, axis)
 end
 
 function winning_pattern_at(board, player, pos)
-  return any(((1, 1), (1, 0), (0, 1))) do axis
+  return any(((1, 1), (1, -1), (1, 0), (0, 1))) do axis
     num_connected_axis(board, player, pos, axis) >= TO_CONNECT
   end
 end
@@ -107,7 +107,6 @@ function GI.play!(g::Game, col)
   update_status!(g, (col, row))
   g.curplayer = other(g.curplayer)
 end
-
 
 function Game(board::Board; white_playing=true)
   g = Game()
@@ -159,29 +158,32 @@ end
 ##### Simple heuristic for minmax
 #####
 
-function alignment_from(pos, dir)
-  al = Tuple{Int, Int}[]
+const Pos = Tuple{Int, Int}
+const Alignment = Vector{Pos}
+
+function alignment_from(pos, dir) :: Union{Alignment, Nothing}
+  al = Alignment()
   for i in 1:TO_CONNECT
-    @assert valid_pos(pos)
+    valid_pos(pos) || (return nothing)
     push!(al, pos)
     pos = pos .+ dir
   end
   return al
 end
 
-function alignments_with(dir)
-  xmax = NUM_COLS - dir[1] * (TO_CONNECT - 1)
-  ymax = NUM_ROWS - dir[2] * (TO_CONNECT - 1)
-  return [alignment_from((x, y), dir) for x in 1:xmax for y in 1:ymax]
+function alignments_with(dir) :: Vector{Alignment}
+  als = [alignment_from((x, y), dir) for x in 1:NUM_COLS for y in 1:NUM_ROWS]
+  return filter(al -> !isnothing(al), als)
 end
 
 const ALIGNMENTS = [
-  alignments_with((1, 1));
-  alignments_with((0, 1));
-  alignments_with((1, 0))]
+  alignments_with((1,  1));
+  alignments_with((1, -1));
+  alignments_with((0,  1));
+  alignments_with((1,  0))]
 
   function alignment_value_for(g::Game, player, alignment)
-    γ = 0.3
+    γ = 0.1
     N = 0
     for pos in alignment
       cell = g.board[pos...]

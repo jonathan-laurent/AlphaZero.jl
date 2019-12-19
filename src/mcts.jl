@@ -6,7 +6,7 @@ interface and with any external oracle.
 module MCTS
 
 using DataStructures: Stack
-using Distributions: Categorical
+using Distributions: Categorical, Dirichlet
 
 using ..Util: @printing_errors, @unimplemented
 import ..GI, ..GameInterface
@@ -160,13 +160,17 @@ mutable struct Env{Game, Board, Action, Oracle}
   # Parameters
   fill_batches :: Bool
   cpuct :: Float64
+  noise_ϵ :: Float64
+  noise_α :: Float64
   # Performance statistics
   total_time :: Float64
   inference_time :: Float64
   total_iterations :: Int64
   total_nodes_traversed :: Int64
 
-  function Env{G}(oracle; nworkers=1, fill_batches=false, cpuct=1.) where G
+  function Env{G}(oracle;
+      nworkers=1, fill_batches=false,
+      cpuct=1., noise_ϵ=0., noise_α=10., ) where G
     B = GI.Board(G)
     A = GI.Action(G)
     tree = Dict{B, BoardInfo}()
@@ -178,7 +182,8 @@ mutable struct Env{Game, Board, Action, Oracle}
     remaining = 0
     workers = [Worker{B, A}(i) for i in 1:nworkers]
     new{G, B, A, typeof(oracle)}(
-      tree, oracle, workers, lock, remaining, fill_batches, cpuct,
+      tree, oracle, workers, lock, remaining, fill_batches,
+      cpuct, noise_ϵ, noise_α,
       total_time, inference_time, total_iterations, total_nodes_traversed)
   end
 end
@@ -283,11 +288,13 @@ end
 ##### Main algorithm
 #####
 
-function uct_scores(info::BoardInfo, cpuct)
+function uct_scores(info::BoardInfo, cpuct, ϵ, η)
+  @assert iszero(ϵ) || length(η) == length(info.stats)
   sqrtNtot = sqrt(Ntot(info))
-  return map(info.stats) do a
+  return map(enumerate(info.stats)) do (i, a)
     Q = (a.W - a.nworkers) / max(a.N, 1)
-    Q + cpuct * a.P * sqrtNtot / (a.N + 1)
+    P = iszero(ϵ) ? a.P : (1-ϵ) * a.P + ϵ * η[i]
+    Q + cpuct * P * sqrtNtot / (a.N + 1)
   end
 end
 
@@ -299,9 +306,10 @@ function push_board_action!(env, worker, (b, wp, aid))
     astats.P, astats.W, astats.N + 1, astats.nworkers + 1)
 end
 
-function select!(env, worker, state)
+function select!(env, worker, state, η)
   state = copy(state)
   env.total_iterations += 1
+  isroot = true
   while true
     wr = GI.white_reward(state)
     isnothing(wr) || (return wr)
@@ -310,12 +318,14 @@ function select!(env, worker, state)
     actions = GI.available_actions(state)
     let (info, new_node) = board_info(env, worker, board, actions)
       new_node && (return info.Vest)
-      scores = uct_scores(info, env.cpuct)
+      ϵ = isroot ? env.noise_ϵ : 0.
+      scores = uct_scores(info, env.cpuct, ϵ, η)
       best_action_id = argmax(scores)
       best_action = actions[best_action_id]
       push_board_action!(env, worker, (board, wp, best_action_id))
       GI.play!(state, best_action)
       env.total_nodes_traversed += 1
+      isroot = false
     end
   end
 end
@@ -333,9 +343,9 @@ function backprop!(env, worker, white_reward)
   end
 end
 
-function worker_explore!(env::Env, worker::Worker, state)
+function worker_explore!(env::Env, worker::Worker, state, η)
   @assert isempty(worker.stack)
-  white_reward = select!(env, worker, state)
+  white_reward = select!(env, worker, state, η)
   backprop!(env, worker, white_reward)
   @assert isempty(worker.stack)
 end
@@ -366,15 +376,23 @@ function inference_server(env::Env{G, B, A}) where {G, B, A}
   end
 end
 
+function dirichlet_noise(state, α)
+  actions = GI.available_actions(state)
+  n = length(actions)
+  return rand(Dirichlet(n, α))
+end
+
 function explore_sync!(env::Env, state, nsims)
+  η = dirichlet_noise(state, env.noise_α)
   elapsed = @elapsed for i in 1:nsims
-    worker_explore!(env, env.workers[1], state)
+    worker_explore!(env, env.workers[1], state, η)
   end
   env.total_time += elapsed
 end
 
 function explore_async!(env::Env, state, nsims)
   env.remaining = nsims
+  η = dirichlet_noise(state, env.noise_α)
   elapsed = @elapsed begin
     @sync begin
       @async @printing_errors inference_server(env)
@@ -383,7 +401,7 @@ function explore_async!(env::Env, state, nsims)
           lock(env.global_lock)
           while env.remaining > 0
             env.remaining -= 1
-            worker_explore!(env, w, state)
+            worker_explore!(env, w, state, η)
           end
           put!(w.send, nothing) # send termination message to the server
           unlock(env.global_lock)
@@ -399,9 +417,6 @@ end
     MCTS.explore!(env, state, nsims)
 
 Run `nsims` MCTS iterations from `state`.
-
-In case there are multiple workers, `nsims` is rounded up to the nearest
-integer multiple of the number of workers.
 """
 function explore!(env::Env, state, nsims)
   asynchronous(env) ?
@@ -472,13 +487,13 @@ end
 ##### MCTS AI (for illustration purposes)
 #####
 
-struct AI <: GI.Player
-  env :: Env
+struct AI{Game} <: GI.AbstractPlayer{Game}
+  env :: Env{Game}
   step :: Int
   timeout :: Float64
   random :: Bool
-  function AI(env; step=1024, timeout=3., random=false)
-    new(env, step, timeout, random)
+  function AI(env::Env{G}; step=1024, timeout=3., random=false) where G
+    new{G}(env, step, timeout, random)
   end
 end
 

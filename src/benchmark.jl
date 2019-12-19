@@ -4,13 +4,12 @@ Utilities to evaluate players against one another.
 module Benchmark
 
 import ..Util.@unimplemented
-import ..Env, ..AbstractPlayer, ..AbstractNetwork
+import ..Env, ..AbstractPlayer, ..AbstractNetwork, ..NetworkPlayer
 import ..MCTS, ..MctsParams, ..MctsPlayer, ..pit
 import ..ColorPolicy, ..ALTERNATE_COLORS
 import ..MinMax, ..GI
 
 using ProgressMeter
-using Distributions: Categorical
 
 """
     Benchmark.DuelOutcome
@@ -157,63 +156,35 @@ name(::Full) = "AlphaZero"
 instantiate(p::Full, nn) = MctsPlayer(nn, p.params)
 
 """
-    Benchmark.NetworkOnly(params) <: Benchmark.Player
+    Benchmark.NetworkOnly(;use_gpu=true) <: Benchmark.Player
 
 Player that uses the policy output by the learnt network directly,
 instead of relying on MCTS.
-
--  Constructor argument `params` has type [`MctsParams`](@ref), but only the
-    following fields are used: `use_gpu`, `temperature`, `dirichlet_noise_nα`
-    and `dirichlet_noise_ϵ`.
 """
 struct NetworkOnly <: Player
-  params :: MctsParams
+  use_gpu :: Bool
+  NetworkOnly(;use_gpu=true) = new(use_gpu)
 end
 
 name(::NetworkOnly) = "Network Only"
 
-function instantiate(p::NetworkOnly, nn)
-  params = MctsParams(p.params, num_iters_per_turn=0)
-  return MctsPlayer(nn, params)
-end
-
+instantiate(p::NetworkOnly, nn) = NetworkPlayer(nn, use_gpu=p.use_gpu)
 
 """
-    Benchmark.MinMaxTS(;depth, random_ϵ=0.) <: Benchmark.Player
+    Benchmark.MinMaxTS(;depth, τ=0.) <: Benchmark.Player
 
-Minmax baseline, which plans at depth `depth` and selects a
-random action with probability `random_ϵ` for exploration.
+Minmax baseline, which relies on [`MinMax.Player`](@ref).
 """
 struct MinMaxTS <: Player
   depth :: Int
-  ϵ :: Float64
-  MinMaxTS(;depth, random_ϵ=0.) = new(depth, random_ϵ)
-end
-
-struct MinMaxPlayer{G} <: AbstractPlayer{G}
-  depth :: Int
-  ϵ :: Float64
+  τ :: Float64
+  MinMaxTS(;depth, τ=0.) = new(depth, τ)
 end
 
 name(p::MinMaxTS) = "MinMax (depth $(p.depth))"
 
-function instantiate(p::MinMaxTS, nn::AbstractNetwork{G}) where G
-  return MinMaxPlayer{G}(p.depth, p.ϵ)
-end
-
-import ..reset!, ..think
-
-reset!(::MinMaxPlayer) = nothing
-
-function think(p::MinMaxPlayer, state, turn)
-  actions = GI.available_actions(state)
-  aid = MinMax.minmax(state, actions, p.depth)
-  n = length(actions)
-  π = zeros(n); π[aid] = 1.
-  η = ones(n) / n
-  π = (1 - p.ϵ) * π + p.ϵ * η
-  a = actions[rand(Categorical(π))]
-  return a, π
+function instantiate(p::MinMaxTS, ::AbstractNetwork{G}) where G
+  return MinMax.Player{G}(depth=p.depth, τ=p.τ)
 end
 
 end

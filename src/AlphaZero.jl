@@ -21,6 +21,7 @@ using .Util: Option, @unimplemented
 include("game.jl")
 import .GameInterface
 const GI = GameInterface
+using .GameInterface: AbstractPlayer
 
 include("minmax.jl")
 import .MinMax

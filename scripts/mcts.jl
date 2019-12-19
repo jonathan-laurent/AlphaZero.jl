@@ -6,4 +6,4 @@ using .SelectedGame: Game
 
 game = Game()
 env = MCTS.Env{Game}(MCTS.RolloutOracle{Game}())
-GI.interactive!(game, MCTS.AI(env, timeout=1.), GI.Human())
+GI.interactive!(game, MCTS.AI(env, timeout=1.), GI.Human{Game}())

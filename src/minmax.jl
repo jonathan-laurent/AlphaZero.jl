@@ -49,15 +49,39 @@ end
 
 minmax(game, actions, depth) = argmax([qvalue(game, a, depth) for a in actions])
 
-struct AI <: GI.Player
+struct Player{G} <: GI.AbstractPlayer{G}
   depth :: Int
-  AI(;depth) = new(depth)
+  τ :: Float64
+  Player{G}(;depth, τ=0.) where G = new{G}(depth, τ)
 end
 
-function GI.select_move(ai::AI, game)
+function GI.think(p::Player, game, turn=nothing)
   actions = GI.available_actions(game)
-  aid = minmax(game, actions, ai.depth)
-  return actions[aid]
+  n = length(actions)
+  qs = [qvalue(game, a, p.depth) for a in actions]
+  winning = findall(==(Inf), qs)
+  if isempty(winning)
+    notlosing = findall(>(-Inf), qs)
+    best = argmax(qs)
+    if isempty(notlosing)
+      π = ones(n)
+    elseif iszero(p.τ)
+      π = zeros(n)
+      all_best = findall(==(qs[best]), qs)
+      π[all_best] .= 1.
+    else
+      qmax = qs[best]
+      @assert qmax > -Inf
+      C = maximum(abs(qs[a]) for a in notlosing) + eps()
+      π = exp.((qs .- qmax) ./ C)
+      π .^= (1 / p.τ)
+    end
+  else
+    π = zeros(n)
+    π[winning] .= 1.
+  end
+  π ./= sum(π)
+  return actions, π
 end
 
 end

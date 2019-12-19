@@ -36,15 +36,15 @@ function get_params(mode=:full)
 
   else
     num_iters = 4
-    sp_num_games = 4000
+    sp_num_games = 8000
     sp_num_mcts_iters = 320
-    arena_num_games = 1000
+    arena_num_games = 200
     arena_win_rate_thresh = 0.55
     learning_batch_size = 256
-    learning_checkpoints = [1, 2, 5, 10, 20]
+    learning_checkpoints = [2, 5, 15]
     mem_buffer_size = PLSchedule(
-      [     0,      4],
-      [20_000, 60_000])
+      [     0,       4],
+      [80_000, 160_000])
     benchmark_num_games = 500
   end
 
@@ -76,11 +76,11 @@ function get_params(mode=:full)
 
   self_play = SelfPlayParams(
     num_games=sp_num_games,
-    reset_mcts_every=sp_num_games,
     mcts = MctsParams(
       num_workers=1,
       num_iters_per_turn=sp_num_mcts_iters,
-      dirichlet_noise_ϵ=0.15))
+      dirichlet_noise_ϵ=0.25,
+      dirichlet_noise_α=1.0))
 
   # Evaluate with 0 MCTS iterations
   # Exploration is induced by MCTS and by the temperature τ=1
@@ -88,10 +88,7 @@ function get_params(mode=:full)
     num_games=arena_num_games,
     reset_mcts_every=1,
     update_threshold=(2*arena_win_rate_thresh - 1),
-    mcts = MctsParams(
-      num_workers=1,
-      num_iters_per_turn=0,
-      dirichlet_noise_ϵ=0.1))
+    mcts = MctsParams(self_play.mcts))
 
   learning = LearningParams(
     l2_regularization=1e-4,
@@ -114,8 +111,8 @@ function get_params(mode=:full)
       Benchmark.MctsRollouts(self_play.mcts),
       num_games=benchmark_num_games),
     Benchmark.Duel(
-      Benchmark.NetworkOnly(self_play.mcts),
-      Benchmark.MinMaxTS(depth=5),
+      Benchmark.NetworkOnly(),
+      Benchmark.MinMaxTS(depth=5, τ=1.),
       num_games=benchmark_num_games)]
 
   return Net, netparams, params, benchmark
