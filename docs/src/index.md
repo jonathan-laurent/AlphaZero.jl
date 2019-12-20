@@ -21,23 +21,24 @@ have exciting applications in many different research areas.
 
 ### What does make this implementation fast and why does it matter?
 
-Because AlphaZero is computing-hungry, successful open-source
+Because AlphaZero is resource-hungry, successful open-source
 implementations (such as
   [Leela Zero](https://github.com/leela-zero/leela-zero/tree/next/src))
 are written in low-level languages (such as C++) and optimized to work
 on large, distributed clusters. This makes them hardly accessible for
 researchers and hackers.
 
-Many short Python implementations can be found on Github but none of them is
-able to beat a reasonable baseline on simple games such as _Connect Four_ or
+Many simple Python implementations can be found on Github, but none of them is
+able to beat a reasonable baseline on games such as _Connect Four_ or
 _Othello_. As an illustration, the benchmark in the README of the
 [most popular of them](https://github.com/suragnair/alpha-zero-general) only
 features a _random_ baseline, along with a _greedy_ baseline that
 does not appear to be significantly stronger.
 
-`AlphaZero.jl` is designed to be as simple as those implementations and it
-is about 40x faster, making it possible to solve nontrivial games on a
-standard desktop computer with a GPU. This gain mostly comes from two sources:
+`AlphaZero.jl` is designed to be as simple as those implementations.
+In addition, it is about 40x faster, making it possible to solve nontrivial
+ games on a standard desktop computer with a GPU.
+This gain comes mostly from two sources:
 - **Julia's inherent speed:** most machine learning algorithms do not suffer
   much from being written in python as most of the computation happens within
   heavily optimized matrix manipulation routines. This is not the case with
