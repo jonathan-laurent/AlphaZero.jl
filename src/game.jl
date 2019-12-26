@@ -5,7 +5,8 @@ module GameInterface
 
 export AbstractPlayer
 
-using ..Util: @unimplemented, rand_categorical
+import ..Util
+using ..Util: @unimplemented
 
 #####
 ##### Types
