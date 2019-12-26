@@ -44,7 +44,7 @@ function board_statistics(env::Env{G}, mcts, board) where G
   # Collect MCTS statistics
   if haskey(mcts.tree, board)
     info = mcts.tree[board]
-    ucts = MCTS.uct_scores(info, mcts.cpuct)
+    ucts = MCTS.uct_scores(info, mcts.cpuct, 0., nothing)
     report.Nmcts = MCTS.Ntot(info)
     for (i, a) in enumerate(actions)
       astats = info.stats[i]
