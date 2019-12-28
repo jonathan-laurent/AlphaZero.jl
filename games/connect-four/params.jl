@@ -2,7 +2,7 @@ const DEBUG = get(ENV, "TRAINING_MODE", "") == "debug"
 
 cold_temperature = 0.05
 
-Network = ResNet{Game}
+Network = ResNet
 
 netparams = ResNetHP(
   num_filters=128,
@@ -30,7 +30,7 @@ self_play = SelfPlayParams(
 
 arena = ArenaParams(
   num_games=(DEBUG ? 1 : 400),
-  reset_mcts_every=400,
+  reset_mcts_every=nothing,
   update_threshold=(2 * 0.54 - 1),
   mcts=MctsParams(self_play.mcts,
     temperature=StepSchedule(cold_temperature)))
@@ -49,7 +49,7 @@ params = Params(
   self_play=self_play,
   learning=learning,
   memory_analysis=nothing,
-  num_iters=80,
+  num_iters=100,
   ternary_rewards=true,
   mem_buffer_size=PLSchedule(
   [      0,        20],

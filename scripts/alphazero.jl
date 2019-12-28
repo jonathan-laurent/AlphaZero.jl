@@ -3,7 +3,7 @@
 ##### This file can also be included directly in the REPL.
 #####
 
-ENV["CUARRAYS_MEMORY_LIMIT"] = 7_500_000_000
+# ENV["CUARRAYS_MEMORY_LIMIT"] = 7_500_000_000
 ENV["CUARRAYS_MEMORY_POOL"] = "split" # "binned" / "split"
 
 using AlphaZero
@@ -41,7 +41,7 @@ include("game_module.jl")
 using .SelectedGame: Game, Training
 
 session = Session(
-  Game, Training.Network, Training.params, Training.netparams,
+  Game, Training.Network{Game}, Training.params, Training.netparams,
   dir=Training.SESSION_DIR, autosave=true, benchmark=Training.benchmark)
 
 if cmd == "train"

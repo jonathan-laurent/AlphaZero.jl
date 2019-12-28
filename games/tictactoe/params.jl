@@ -55,7 +55,7 @@ function get_params(mode=:full)
   #####
 
   if USE_RESNET
-    Net = ResNet{Game}
+    Net = ResNet
     netparams = ResNetHP(
       num_filters=64,
       num_blocks=5,
@@ -64,7 +64,7 @@ function get_params(mode=:full)
       num_value_head_filters=32,
       batch_norm_momentum=0.5)
   else
-    Net = SimpleNet{Game}
+    Net = SimpleNet
     netparams = SimpleNetHP(
       width=500,
       depth_common=4)
