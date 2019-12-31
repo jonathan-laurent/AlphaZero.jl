@@ -49,7 +49,7 @@ params = Params(
   self_play=self_play,
   learning=learning,
   memory_analysis=nothing,
-  num_iters=100,
+  num_iters=120,
   ternary_rewards=true,
   mem_buffer_size=PLSchedule(
   [      0,        20],
