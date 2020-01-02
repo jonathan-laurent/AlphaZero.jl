@@ -21,12 +21,15 @@ const Board = SMatrix{NUM_COLS, NUM_ROWS, Cell, NUM_CELLS}
 
 const INITIAL_BOARD = @SMatrix zeros(Cell, NUM_COLS, NUM_ROWS)
 
-mutable struct Game
+mutable struct Game <: GI.AbstractGame
   board :: Board
   curplayer :: Player
   finished :: Bool
   winner :: Player
   actions :: Vector{Int}
+  # Actions history, which uniquely identifies the current board position
+  # Used by external solvers
+  history :: Union{Nothing, Vector{Int}}
 end
 
 function Game()
@@ -35,14 +38,19 @@ function Game()
   finished = false
   winner = 0x00
   actions = collect(1:NUM_COLS)
-  Game(board, curplayer, finished, winner, actions)
+  history = Int[]
+  Game(board, curplayer, finished, winner, actions, history)
 end
 
 GI.Board(::Type{Game}) = Board
 GI.Action(::Type{Game}) = Int
 
-Base.copy(g::Game) =
-  Game(g.board, g.curplayer, g.finished, g.winner, copy(g.actions))
+function Base.copy(g::Game)
+  Game(g.board, g.curplayer, g.finished, g.winner,
+    copy(g.actions), copy(g.history))
+end
+
+history(g::Game) = g.history
 
 #####
 ##### Defining game rules
@@ -102,6 +110,7 @@ function update_status!(g::Game, pos)
 end
 
 function GI.play!(g::Game, col)
+  isnothing(g.history) || push!(g.history, col)
   row = first_free(g.board, col)
   g.board = setindex(g.board, g.curplayer, col, row)
   update_status!(g, (col, row))
@@ -110,6 +119,7 @@ end
 
 function Game(board::Board; white_playing=true)
   g = Game()
+  g.history = nothing
   g.board = board
   g.curplayer = white_playing ? WHITE : BLACK
   update_available_actions!(g)

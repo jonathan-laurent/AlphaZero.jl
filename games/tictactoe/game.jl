@@ -12,7 +12,7 @@ const Cell = Union{Nothing, Player}
 const Board = SVector{NUM_POSITIONS, Cell}
 const INITIAL_BOARD = Board(repeat([nothing], NUM_POSITIONS))
 
-mutable struct Game
+mutable struct Game <: GI.AbstractGame
   board :: Board
   curplayer :: Player
   function Game(board=INITIAL_BOARD, player=WHITE)

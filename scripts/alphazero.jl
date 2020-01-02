@@ -7,6 +7,7 @@
 ENV["CUARRAYS_MEMORY_POOL"] = "split" # "binned" / "split"
 
 using AlphaZero
+include("games.jl")
 
 #####
 ##### Parse arguments
@@ -14,10 +15,9 @@ using AlphaZero
 
 using ArgParse
 argstab = ArgParseSettings()
-available_games = ["tictactoe", "connect-four", "mancala"]
 @add_arg_table argstab begin
   "--game"
-    help = "Select a game ($(join(available_games, "/")))"
+    help = "Select a game ($(join(AVAILABLE_GAMES, "/")))"
   "train"
     action = :command
     help = "Resume the training session"
@@ -32,17 +32,25 @@ args = parse_args(isempty(ARGS) ? ["train"] : ARGS, argstab)
 !isnothing(args["game"]) && (ENV["GAME"] = args["game"])
 cmd = args["%COMMAND%"]
 
+if !haskey(ENV, "GAME")
+  println(stderr, "You must specify a game.")
+  exit()
+end
+
+const GAME = ENV["GAME"]
+
 #####
 ##### Main
 #####
 
-include("game_module.jl")
-@game_module SelectedGame
+const SelectedGame = GAME_MODULE[GAME]
 using .SelectedGame: Game, Training
+
+const SESSION_DIR = joinpath("sessions", GAME)
 
 session = Session(
   Game, Training.Network{Game}, Training.params, Training.netparams,
-  dir=Training.SESSION_DIR, autosave=true, benchmark=Training.benchmark)
+  dir=SESSION_DIR, autosave=true, benchmark=Training.benchmark)
 
 if cmd == "train"
   resume!(session)
