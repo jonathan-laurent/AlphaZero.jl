@@ -1,11 +1,13 @@
 const DEBUG = get(ENV, "TRAINING_MODE", "") == "debug"
 
+const SMALLER_NETWORK = true
+
 cold_temperature = 0.05
 
 Network = ResNet
 
 netparams = ResNetHP(
-  num_filters=128,
+  num_filters=(SMALLER_NETWORK ? 64 : 128),
   num_blocks=7,
   conv_kernel_size=(3, 3),
   num_policy_head_filters=4,
