@@ -1,9 +1,8 @@
 using AlphaZero
 using Test
 
-include("../scripts/game_module.jl")
-@game_module TicTacToe "tictactoe"
-using .TicTacToe: Game, Training
+include("../games/tictactoe/main.jl")
+using .Tictactoe: Game, Training
 
 @testset "AlphaZero.jl" begin
   @test begin
