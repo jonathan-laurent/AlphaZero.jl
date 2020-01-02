@@ -1,4 +1,4 @@
-# Training Parameters
+# [Training Parameters](@id params)
 
 ```@meta
 CurrentModule = AlphaZero
@@ -10,7 +10,7 @@ CurrentModule = AlphaZero
 Params
 ```
 
-## Self Play
+## Self-Play
 
 ```@docs
 SelfPlayParams

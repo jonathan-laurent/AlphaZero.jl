@@ -15,10 +15,11 @@ makedocs(
             "tutorial/connect-four.md",
             "tutorial/add_game.md"],
         "Reference" => [
+            "reference/overview.md",
             "reference/params.md",
             "reference/game_interface.md",
-            "reference/mcts.md",
             "reference/network.md",
+            "reference/mcts.md",
             "reference/environment.md",
             "reference/benchmark.md",
             "reference/session.md",

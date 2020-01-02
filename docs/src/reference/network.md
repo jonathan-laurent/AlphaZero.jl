@@ -4,8 +4,9 @@
 CurrentModule = AlphaZero.Network
 ```
 
-This module defines a generic, framework-agnostic interface for neural network
-oracles.
+```@docs
+Network
+```
 
 ## Mandatory interface
 

@@ -1,4 +1,4 @@
-# Sessions
+# [Sessions](@id sessions)
 
 ```@meta
 CurrentModule = AlphaZero
@@ -6,14 +6,7 @@ CurrentModule = AlphaZero
 
 ```@docs
 Session
-```
-
-## Constructors
-
-```@docs
-Session(::Type{G}, ::Type{N}, params, netparams) where {G, N}
-Session(::Type{G}, ::Type{N}, dir::String) where {G, N}
-Session(::Env)
+Session(::Env) # Strangely, this includes all constructors...
 ```
 
 ## Session Reports

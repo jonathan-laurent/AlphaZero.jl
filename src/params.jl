@@ -85,7 +85,8 @@ a new neural network to the current best.
 # AlphaGo Zero Parameters
 
 In the original AlphaGo Zero paper, 400 games are played to evaluate a network
-and the `update_threshold` parameter corresponds to a 55% win rate.
+and the `update_threshold` parameter is set to a value that corresponds to a
+55% win rate.
 """
 @kwdef struct ArenaParams
   num_games :: Int

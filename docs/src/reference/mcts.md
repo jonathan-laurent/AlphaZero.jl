@@ -4,9 +4,9 @@
 CurrentModule = AlphaZero.MCTS
 ```
 
-A generic, standalone implementation of asynchronous Monte Carlo Tree Search.
-It can be used on any game that implements the `GameInterface`
-interface and with any external oracle.
+```@docs
+MCTS
+```
 
 ## Oracles
 

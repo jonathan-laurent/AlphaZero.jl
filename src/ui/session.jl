@@ -11,7 +11,7 @@ collected during a training session.
 # Fields
 - `iterations`: vector of ``n`` iteration reports with type
     [`Report.Iteration`](@ref)
-- `benchmark`: vector of `n+1` benchmark reports with type
+- `benchmark`: vector of ``n+1`` benchmark reports with type
     [`Benchmark.Report`](@ref)
 """
 struct SessionReport
@@ -283,7 +283,7 @@ end
 """
     Session(::Type{Game}, ::Type{Net}, params, netparams) where {Game, Net}
 
-Create a new session given some parameters, or load it from disk if
+Create a new session using the given parameters, or load it from disk if
 it already exists.
 
 # Arguments
@@ -336,7 +336,7 @@ end
 
 Load an existing session from a directory.
 
-This constructor features the optional keyword arguments
+This constructor accepts the optional keyword arguments
 `autosave`, `nostdout` and `benchmark`.
 """
 function Session(
@@ -350,7 +350,7 @@ function Session(
 end
 
 """
-    Session(env::Env [, dir])
+    Session(env::Env[, dir])
 
 Create a session from an initial environment.
 

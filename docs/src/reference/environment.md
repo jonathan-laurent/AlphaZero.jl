@@ -1,4 +1,4 @@
-# Environment
+# [Environment](@id environment)
 
 ```@meta
 CurrentModule = AlphaZero

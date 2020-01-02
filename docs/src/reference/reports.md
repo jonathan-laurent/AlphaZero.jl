@@ -1,4 +1,4 @@
-# Training Reports
+# [Training Reports](@id reports)
 
 ```@meta
 CurrentModule = AlphaZero

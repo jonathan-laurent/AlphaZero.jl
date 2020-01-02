@@ -1,9 +1,12 @@
 """
 A generic, standalone implementation of asynchronous Monte Carlo Tree Search.
-It can be used on any game that implements the [`GameInterface`](@ref)
+It can be used on any game that implements the `GameInterface`
 interface and with any external oracle.
 """
 module MCTS
+
+# Note: probably due to a bug, the [`GameInterface`](@ref) reference in the
+# module docstring is not resolved, but `GameInterface.play!` is.
 
 using DataStructures: Stack
 using Distributions: Categorical, Dirichlet
