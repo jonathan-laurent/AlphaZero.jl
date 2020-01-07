@@ -12,6 +12,7 @@ export SelfPlayParams, ArenaParams, LearningParams, MemAnalysisParams
 export Env, train!, learning!, self_play!, get_experience
 export ColorPolicy, ALTERNATE_COLORS, BASELINE_WHITE, CONTENDER_WHITE
 export Session, resume!, save, explore, play_game, run_new_benchmark
+export AbstractNetwork, OptimiserSpec, Momentum, CyclicMomentum
 export SimpleNet, SimpleNetHP, ResNet, ResNetHP
 
 include("util.jl")
@@ -38,6 +39,7 @@ using .Log
 import Plots
 import Colors
 import JSON2
+import JSON3
 
 using Formatting
 using Crayons
@@ -60,10 +62,6 @@ include("training.jl")
 include("benchmark.jl")
 using .Benchmark
 
-include("ui/explorer.jl")
-include("ui/plots.jl")
-include("ui/session.jl")
-
 # We support Flux and Knet
 const USE_KNET = true
 
@@ -78,5 +76,10 @@ else
     using .FluxNets
   end
 end
+
+include("ui/explorer.jl")
+include("ui/plots.jl")
+include("ui/json.jl")
+include("ui/session.jl")
 
 end

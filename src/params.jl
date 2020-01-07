@@ -172,7 +172,7 @@ In the original AlphaGo Zero paper:
 @kwdef struct LearningParams
   use_gpu :: Bool = true
   gc_every :: Union{Nothing, Int} = nothing
-  learning_rate :: Float32 = 1f-3
+  optimiser :: OptimiserSpec
   l2_regularization :: Float32
   nonvalidity_penalty :: Float32 = 1f0
   batch_size :: Int

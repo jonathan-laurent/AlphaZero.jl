@@ -92,6 +92,11 @@ function get_params(mode=:full)
 
   learning = LearningParams(
     l2_regularization=1e-4,
+    optimiser=CyclicMomentum(
+      lr_low=1e-3,
+      lr_high=1e-2,
+      momentum_high=0.9,
+      momentum_low=0.8),
     batch_size=learning_batch_size,
     loss_computation_batch_size=2048,
     nonvalidity_penalty=1.,

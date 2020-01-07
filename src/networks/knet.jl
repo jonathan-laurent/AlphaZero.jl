@@ -8,8 +8,7 @@ export SimpleNet, SimpleNetHP, ResNet, ResNetHP
 
 using ..Network
 using Base: @kwdef
-import ..GameInterface
-import ..Util
+import ..GameInterface, ..Util, ..CyclicSchedule
 
 import Knet
 
@@ -80,8 +79,19 @@ Network.convert_input(nn::KNetwork, x) =
 Network.convert_output(::KNetwork, x) = x
 Network.convert_output(::KNetwork, x::Knet.KnetArray) = Array(x)
 
-function Network.train!(nn::KNetwork, loss, data, lr)
-  Knet.adam(loss, data, lr=lr) |> collect
+function Network.train!(nn::KNetwork, opt::Momentum, loss, data)
+  Knet.momentum(loss, data, lr=opt.lr, gamma=opt.momentum) |> collect
+end
+
+function Network.train!(nn::KNetwork, opt::CyclicMomentum, loss, data)
+  n = length(data)
+  lr = CyclicSchedule(opt.lr_low, opt.lr_high, n=n, xmax=0.9)
+  momentum = CyclicSchedule(opt.momentum_high, opt.momentum_low, n=n, xmax=0.9)
+  optimiser = Knet.Momentum(lr=opt.lr_low, gamma=opt.momentum_high)
+  for (i, _) in enumerate(Knet.minimize(loss, data, optimiser))
+    optimiser.lr = lr[i]
+    optimiser.gamma = momentum[i]
+  end
 end
 
 function Network.gc(::KNetwork)

@@ -95,3 +95,13 @@ function Base.getindex(s::StepSchedule, i::Int)
    isnothing(idx) && (return s.start)
    return s.ys[idx]
 end
+
+"""
+    Cyclic Schedule{R}
+"""
+
+function CyclicSchedule(start, mid; n, xmax)
+  xmid = floor(Int, xmax * n / 2)
+  xend = floor(Int, xmax * n)
+  return PLSchedule([1, xmid, xend], [start, mid, start])
+end

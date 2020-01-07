@@ -3,12 +3,11 @@ A generic, framework agnostic interface for neural networks.
 """
 module Network
 
-export AbstractNetwork
+export AbstractNetwork, OptimiserSpec, Momentum, CyclicMomentum
 
-import ..MCTS
-import ..GameInterface
-import ..Util
+import ..MCTS, ..GameInterface, ..Util
 
+using Base: @kwdef
 using ..Util: @unimplemented
 using Statistics: mean
 
@@ -149,15 +148,6 @@ function forward(::AbstractNetwork, boards)
 end
 
 """
-    train!(::AbstractNetwork, loss, data, learning_rate)
-
-Train a given network on data.
-"""
-function train!(::AbstractNetwork, loss, data, learning_rate)
-  @unimplemented
-end
-
-"""
     regularized_params(::AbstractNetwork)
 
 Return the collection of regularized parameters of a network.
@@ -182,6 +172,31 @@ end
 Perform full garbage collection.
 """
 function gc(::AbstractNetwork)
+  @unimplemented
+end
+
+# Optimizers and training
+
+abstract type OptimiserSpec end
+
+@kwdef struct Momentum <: OptimiserSpec
+  lr :: Float32
+  momentum :: Float32
+end
+
+@kwdef struct CyclicMomentum <: OptimiserSpec
+  lr_low :: Float32
+  lr_high :: Float32
+  momentum_low :: Float32
+  momentum_high :: Float32
+end
+
+"""
+    train!(::AbstractNetwork, opt::OptimiserSpec, loss, data, learning_rate)
+
+Train a given network on data.
+"""
+function train!(::AbstractNetwork, opt::OptimiserSpec, loss, data)
   @unimplemented
 end
 

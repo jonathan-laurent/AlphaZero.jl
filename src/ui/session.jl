@@ -85,16 +85,16 @@ function save_env(env::Env, dir)
   isdir(dir) || mkpath(dir)
   # Saving parameters
   open(joinpath(dir, PARAMS_FILE), "w") do io
-    JSON2.pretty(io, JSON2.write(env.params))
+    JSON2.pretty(io, JSON3.write(env.params))
   end
   open(joinpath(dir, NET_PARAMS_FILE), "w") do io
-    JSON2.pretty(io, JSON2.write(Network.hyperparams(env.bestnn)))
+    JSON2.pretty(io, JSON3.write(Network.hyperparams(env.bestnn)))
   end
   # Saving state
   serialize(joinpath(dir, NET_FILE), env.bestnn)
   serialize(joinpath(dir, MEM_FILE), get(env.memory))
   open(joinpath(dir, ITC_FILE), "w") do io
-    JSON2.write(io, env.itc)
+    JSON3.write(io, env.itc)
   end
 end
 
@@ -106,7 +106,7 @@ function load_env(
   if isnothing(params)
     params_file = joinpath(dir, PARAMS_FILE)
     params = open(params_file, "r") do io
-      JSON2.read(io, Params)
+      JSON3.read(io, Params)
     end
     Log.print(logger, "Loading parameters from: $(params_file)")
   end
@@ -118,7 +118,7 @@ function load_env(
     Log.print(logger, "Loading network from: $(net_file)")
   else
     network = open(netparams_file, "r") do io
-      params = JSON2.read(io, HyperParams(Network))
+      params = JSON3.read(io, HyperParams(Network))
       Network(params)
     end
   end
@@ -135,7 +135,7 @@ function load_env(
   itc_file = joinpath(dir, ITC_FILE)
   if isfile(itc_file)
     itc = open(itc_file, "r") do io
-      JSON2.read(io)
+      JSON3.read(io)
     end
     Log.print(logger, "Loaded iteration counter from: $(itc_file)")
   else
@@ -158,13 +158,13 @@ function load_session_report(dir::String, niters)
     # Load the benchmark report
     isfile(bfile) || error("Not found: $bfile")
     open(bfile, "r") do io
-      push!(rep.benchmark, JSON2.read(io, Benchmark.Report))
+      push!(rep.benchmark, JSON3.read(io, Benchmark.Report))
     end
     # Load the iteration report
     if itc > 0
       isfile(ifile) || error("Not found: $ifile")
       open(ifile, "r") do io
-        push!(rep.iterations, JSON2.read(io, Report.Iteration))
+        push!(rep.iterations, JSON3.read(io, Report.Iteration))
       end
     end
   end
@@ -174,12 +174,12 @@ end
 
 function save_report_increment(session, bench, itrep, idir)
   open(joinpath(idir, BENCHMARK_FILE), "w") do io
-    JSON2.pretty(io, JSON2.write(bench))
+    JSON2.pretty(io, JSON3.write(bench))
   end
   if session.env.itc > 0
     @assert !isnothing(itrep)
     open(joinpath(idir, REPORT_FILE), "w") do io
-      JSON2.pretty(io, JSON2.write(itrep))
+      JSON2.pretty(io, JSON3.write(itrep))
     end
   end
 end
@@ -316,7 +316,7 @@ function Session(
     env = load_env(Game, Net, logger, dir,
       params=(load_saved_params ? nothing : params))
     # The parameters must be unchanged
-    same_json(x, y) = JSON2.write(x) == JSON2.write(y)
+    same_json(x, y) = JSON3.write(x) == JSON3.write(y)
     same_json(env.params, params) || @info "Using modified parameters"
     @assert same_json(Network.hyperparams(env.bestnn), netparams)
     session = Session(env, dir, logger, autosave, benchmark)
@@ -501,7 +501,7 @@ function run_new_benchmark(
   dir = joinpath(session.dir, name)
   isdir(dir) || mkpath(dir)
   open(joinpath(dir, BENCHMARK_FILE), "w") do io
-    JSON2.pretty(io, JSON2.write(reports))
+    JSON2.pretty(io, JSON3.write(reports))
   end
   plot_benchmark(session.env.params, reports, dir)
   return

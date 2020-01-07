@@ -94,7 +94,7 @@ function training_epoch!(tr::Trainer)
       Network.gc(tr.network)
     end
   end
-  Network.train!(tr.network, loss, data, tr.params.learning_rate)
+  Network.train!(tr.network, tr.params.optimiser, loss, data)
   Network.gc(tr.network)
 end
 
