@@ -3,7 +3,9 @@
 ##### Chain
 #####
 
-struct Chain
+# Note: Knet serialization requires everything to be mutable
+
+mutable struct Chain
   layers
   Chain(xs...) = new(xs)
 end
@@ -23,7 +25,7 @@ end
 ##### Dense
 #####
 
-struct Dense
+mutable struct Dense
   W
   b
   σ
@@ -45,7 +47,7 @@ mapchildren(f, c::Dense) = Dense(f(c.W), f(c.b), f(c.σ))
 ##### Conv
 #####
 
-struct Conv
+mutable struct Conv
   W
   pad
 end
@@ -87,7 +89,7 @@ end
 ##### Skip connection
 #####
 
-struct SkipConnection
+mutable struct SkipConnection
   block
   connection
 end

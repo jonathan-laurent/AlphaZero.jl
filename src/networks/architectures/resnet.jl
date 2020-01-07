@@ -17,7 +17,7 @@ end
 
 Util.generate_update_constructor(ResNetHP) |> eval
 
-struct ResNet{Game} <: TwoHeadNetwork{Game}
+mutable struct ResNet{Game} <: TwoHeadNetwork{Game}
   hyper
   common
   vbranch

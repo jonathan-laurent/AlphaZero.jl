@@ -13,7 +13,7 @@ end
 
 Util.generate_update_constructor(SimpleNetHP) |> eval
 
-struct SimpleNet{Game} <: TwoHeadNetwork{Game}
+mutable struct SimpleNet{Game} <: TwoHeadNetwork{Game}
   hyper
   common
   vbranch
