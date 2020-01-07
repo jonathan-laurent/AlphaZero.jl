@@ -1,6 +1,5 @@
 ENV["CUARRAYS_MEMORY_POOL"] = "split" # "binned" / "split"
 
-using Revise
 using AlphaZero
 using AlphaZero.Log
 using Formatting
@@ -39,8 +38,9 @@ end
 ##### Main
 #####
 
-include("../game_module.jl")
-@game_module SelectedGame
+include("../games.jl")
+const GAME = "connect-four"
+const SelectedGame = GAME_MODULE[GAME]
 using .SelectedGame: Game, Training
 
 function config(nblocks, nfilters, niters, nworkers)
