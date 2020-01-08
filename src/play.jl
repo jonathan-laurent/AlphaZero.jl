@@ -1,14 +1,106 @@
 #####
+##### Interface for players
+#####
+
+"""
+    AbstractPlayer{Game}
+
+Abstract type for a game player.
+"""
+abstract type AbstractPlayer{Game} end
+
+"""
+   think(::AbstractPlayer, state, turn=nothing)
+
+Return a probability distribution over actions as a `(actions, π)` pair.
+
+The `turn` argument, if provided, indicates the number of actions that have
+been played before by both players. It is useful as during self-play,
+AlphaZero typically drops its temperature parameter after a fixed number of
+turns.
+"""
+function think(::AbstractPlayer, state, turn=nothing)
+  @unimplemented
+end
+
+"""
+    reset_player!(::AbstractPlayer)
+
+Reset the internal memory of a player. The default implementation does nothing.
+"""
+function reset_player!(::AbstractPlayer)
+  return
+end
+
+"""
+    select_move(player::AbstractPlayer, state, turn=nothing)
+
+Return a single action. A default implementation is provided that samples
+an action according to the distribution computed by [`think`](@ref).
+"""
+function select_move(player::AbstractPlayer, state, turn=nothing)
+  actions, π = think(player, state, turn)
+  return actions[Util.rand_categorical(π)]
+end
+
+#####
+##### Random Player
+#####
+
+"""
+    RandomPlayer{Game} <: AbstractPlayer{Game}
+
+A player that picks actions uniformly at random.
+"""
+struct RandomPlayer{Game} <: AbstractPlayer{Game} end
+
+function think(player::RandomPlayer, state, turn)
+  actions = GI.available_actions(state)
+  n = length(actions)
+  π = ones(n) ./ length(actions)
+  return π
+end
+
+#####
 ##### An MCTS-based player
 #####
 
+"""
+    MctsPlayer{Game, MctsEnv} <: AbstractPlayer{Game}
+
+A player that selects actions using MCTS.
+
+# Constructors
+
+    MctsPlayer(mcts::MCTS.Env; τ, niters, timeout=nothing)
+
+Construct a player from an MCTS environment. When computing each move:
+- MCTS simulations are executed for `timeout` seconds by groups of `niters`
+  if the `timeout` parameter is provided
+- otherwise, `niters` MCTS simulations are run
+The temperature parameter `τ` can be either a real number or a
+[`StepSchedule`](@ref).
+
+    MctsPlayer(oracle::MCTS.Oracle, params::MctsParams)
+
+Construct an MCTS player from an oracle and an [`MctsParams`](@ref) structure.
+If the oracle is a network, this constructor handles copying it, putting it
+in test mode and copying it on the GPU (if necessary).
+"""
 struct MctsPlayer{G, M} <: AbstractPlayer{G}
   mcts :: M
   niters :: Int
+  timeout :: Union{Float64, Nothing}
   τ :: StepSchedule{Float64} # Temperature
-  function MctsPlayer(mcts::MCTS.Env{G}, niters; τ) where G
+  function MctsPlayer(mcts::MCTS.Env{G}; τ, niters, timeout=nothing) where G
     @assert niters > 0
-    new{G, typeof(mcts)}(mcts, niters, τ)
+    @assert isnothing(timeout) || timeout > 0
+    if isa(τ, Number)
+      τ = StepSchedule(Float64(τ))
+    else
+      @assert isa(τ, StepSchedule)
+    end
+    new{G, typeof(mcts)}(mcts, niters, timeout, τ)
   end
 end
 
@@ -25,7 +117,9 @@ function MctsPlayer(oracle::MCTS.Oracle{G}, params::MctsParams) where G
     cpuct=params.cpuct,
     noise_ϵ=params.dirichlet_noise_ϵ,
     noise_α=params.dirichlet_noise_α)
-  return MctsPlayer(mcts, params.num_iters_per_turn, τ=params.temperature)
+  return MctsPlayer(mcts,
+    niters=params.num_iters_per_turn,
+    τ=params.temperature)
 end
 
 # MCTS with random oracle
@@ -36,15 +130,24 @@ function RandomMctsPlayer(::Type{G}, params::MctsParams) where G
     cpuct=params.cpuct,
     noise_ϵ=params.dirichlet_noise_ϵ,
     noise_α=params.dirichlet_noise_α)
-  return MctsPlayer(mcts, params.num_iters_per_turn, τ=params.temperature)
+  return MctsPlayer(mcts,
+    niters=params.num_iters_per_turn,
+    τ=params.temperature)
 end
 
-function GI.think(p::MctsPlayer, state, turn)
-  MCTS.explore!(p.mcts, state, p.niters)
+function think(p::MctsPlayer, state, turn)
+  if isnothing(p.timeout) # Fixed number of MCTS simulations
+    MCTS.explore!(p.mcts, state, p.niters)
+  else # Run simulations until timeout
+    start = time()
+    while time() - start < p.timeout
+      MCTS.explore!(p.mcts, state, p.niters)
+    end
+  end
   return MCTS.policy(p.mcts, state, τ=p.τ[turn])
 end
 
-function GI.reset_player!(player::MctsPlayer)
+function reset_player!(player::MctsPlayer)
   MCTS.reset!(player.mcts)
 end
 
@@ -52,6 +155,12 @@ end
 ##### Network player
 #####
 
+"""
+    NetworkPlayer{Game, Net} <: AbstractPlayer{Game}
+
+A player that uses the policy output by a neural network directly,
+instead of relying on MCTS.
+"""
 struct NetworkPlayer{G, N} <: AbstractPlayer{G}
   network :: N
   function NetworkPlayer(nn::AbstractNetwork{G}; use_gpu=true) where G
@@ -60,7 +169,7 @@ struct NetworkPlayer{G, N} <: AbstractPlayer{G}
   end
 end
 
-function GI.think(p::NetworkPlayer, state, turn)
+function think(p::NetworkPlayer, state, turn)
   actions = GI.available_actions(state)
   board = GI.canonical_board(state)
   π, _ = MCTS.evaluate(p.network, board, actions)
@@ -68,10 +177,18 @@ function GI.think(p::NetworkPlayer, state, turn)
 end
 
 #####
-##### MCTS players can play against each other
+##### Players can play against each other
 #####
 
-# Returns the reward and the game length
+"""
+    play(white, black, memory=nothing)
+
+Play a game between two [`AbstractPlayer`](@ref) and return the reward
+obtained by `white`.
+
+If the `memory` argument is provided, samples are automatically collected
+from this game.
+"""
 function play(
     white::AbstractPlayer{Game}, black::AbstractPlayer{Game}, memory=nothing
   ) :: Float64 where Game
@@ -84,7 +201,7 @@ function play(
       return z
     end
     player = GI.white_playing(state) ? white : black
-    actions, π = GI.think(player, state, nturns)
+    actions, π = think(player, state, nturns)
     a = actions[Util.rand_categorical(π)]
     if !isnothing(memory)
       cboard = GI.canonical_board(state)
@@ -95,6 +212,9 @@ function play(
   end
 end
 
+"""
+    self_play!(player, memory) = play(player, player, memory)
+"""
 self_play!(player, memory) = play(player, player, memory)
 
 #####
@@ -139,8 +259,8 @@ function pit(
     zsum += z
     handler(i, z)
     if !isnothing(reset_every) && (i % reset_every == 0 || i == num_games)
-      GI.reset_player!(baseline)
-      GI.reset_player!(contender)
+      reset_player!(baseline)
+      reset_player!(contender)
     end
     if color_policy == ALTERNATE_COLORS
       baseline_white = !baseline_white
@@ -148,3 +268,55 @@ function pit(
   end
   return zsum / num_games
 end
+
+#####
+##### Simple utilities to play an interactive game
+#####
+
+"""
+    Human{Game} <: AbstractPlayer{Game}
+
+Human player that queries the standard input for actions.
+
+Does not implement [`think`](@ref) but [`select_move`](@ref).
+"""
+struct Human{Game} <: AbstractPlayer{Game} end
+
+struct Quit <: Exception end
+
+function select_move(::Human, game, turn=nothing)
+  a = nothing
+  while isnothing(a) || a ∉ GI.available_actions(game)
+    print("> ")
+    str = readline()
+    print("\n")
+    isempty(str) && throw(Quit())
+    a = GI.parse_action(game, str)
+  end
+  return a
+end
+
+"""
+    interactive!(game, white, black)
+
+Launch an interactive session for `game` between players `white` and `black`.
+Both players have type `AbstractPlayer` and one of them is typically `Human`.
+"""
+function interactive!(game, white, black)
+  try
+  GI.print_state(game)
+  turn = 0
+  while isnothing(GI.white_reward(game))
+    player = GI.white_playing(game) ? white : black
+    action = select_move(player, game, turn)
+    GI.play!(game, action)
+    GI.print_state(game)
+    turn += 1
+  end
+  catch e
+    isa(e, Quit) || rethrow(e)
+    return
+  end
+end
+
+interactive!(game::G) where G = interactive!(game, Human{G}(), Human{G}())

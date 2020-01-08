@@ -447,7 +447,8 @@ end
     MCTS.policy(env, state; τ=1.)
 
 Return the recommended stochastic policy on `state`,
-with temperature parameter equal to `τ`.
+with temperature parameter equal to `τ`. If `τ` is zero, all the weight
+goes to the action with the highest visits count.
 
 A call to this function must always be preceded by
 a call to [`MCTS.explore!`](@ref).
@@ -464,10 +465,18 @@ function policy(env::Env, state; τ=1.0)
         rethrow(e)
       end
     end
-  τinv = 1 / τ
-  Ntot = sum(a.N for a in info.stats)
-  D = [(a.N / Ntot) ^ τinv for a in info.stats]
-  return actions, D ./ sum(D)
+  if iszero(τ)
+    best = argmax([a.N for a in info.stats])
+    π = zeros(length(actions))
+    π[best] = 1.0
+    return actions, π
+  else
+    τinv = 1 / τ
+    Ntot = sum(a.N for a in info.stats)
+    π = [(a.N / Ntot) ^ τinv for a in info.stats]
+    π ./= sum(π)
+  end
+  return actions, π
 end
 
 """
@@ -500,33 +509,6 @@ MCTS iteration, not counting the root.
 """
 function average_exploration_depth(env)
   return env.total_nodes_traversed / env.total_iterations
-end
-
-#####
-##### MCTS AI (for illustration purposes)
-#####
-
-struct AI{Game} <: GI.AbstractPlayer{Game}
-  env :: Env{Game}
-  step :: Int
-  timeout :: Float64
-  random :: Bool
-  function AI(env::Env{G}; step=1024, timeout=3., random=false) where G
-    new{G}(env, step, timeout, random)
-  end
-end
-
-function GI.select_move(ai::AI, state)
-  start = time()
-  while time() - start < ai.timeout
-    explore!(ai.env, state, ai.step)
-  end
-  actions, distr = policy(ai.env, state)
-  if ai.random
-    return actions[rand(Categorical(distr))]
-  else
-    return actions[argmax(distr)]
-  end
 end
 
 end

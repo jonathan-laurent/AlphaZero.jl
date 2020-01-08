@@ -8,7 +8,7 @@ using .SelectedGame: Game
 computer = MinMax.Player{Game}(depth=4, τ=0.2)
 
 println("Profiling thinking time:")
-@time GI.select_move(computer, Game())
+@time AlphaZero.select_move(computer, Game())
 println("")
 
-GI.interactive!(Game(), computer, GI.Human{Game}())
+interactive!(Game(), computer, Human{Game}())

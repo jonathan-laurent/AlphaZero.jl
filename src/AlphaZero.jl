@@ -6,14 +6,15 @@
 module AlphaZero
 
 export MCTS, MinMax, GameInterface, GI, Report, Network, Benchmark
-export AbstractSchedule, PLSchedule, StepSchedule
-export Params, MctsParams
-export SelfPlayParams, ArenaParams, LearningParams, MemAnalysisParams
+export Params, SelfPlayParams, LearningParams, ArenaParams
+export MctsParams, MemAnalysisParams
 export Env, train!, learning!, self_play!, get_experience
+export AbstractPlayer, interactive!, MctsPlayer, Human
 export ColorPolicy, ALTERNATE_COLORS, BASELINE_WHITE, CONTENDER_WHITE
 export Session, resume!, save, explore, play_game, run_new_benchmark
 export AbstractNetwork, OptimiserSpec, Momentum, CyclicMomentum
 export SimpleNet, SimpleNetHP, ResNet, ResNetHP
+export AbstractSchedule, PLSchedule, StepSchedule
 
 include("util.jl")
 import .Util
@@ -22,10 +23,6 @@ using .Util: Option, @unimplemented
 include("game.jl")
 import .GameInterface
 const GI = GameInterface
-using .GameInterface: AbstractPlayer
-
-include("minmax.jl")
-import .MinMax
 
 include("mcts.jl")
 import .MCTS
@@ -58,6 +55,9 @@ include("memory.jl")
 include("learning.jl")
 include("play.jl")
 include("training.jl")
+
+include("minmax.jl")
+import .MinMax
 
 include("benchmark.jl")
 using .Benchmark

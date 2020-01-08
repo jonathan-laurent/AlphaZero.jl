@@ -2,6 +2,18 @@
 ##### Converting samples
 #####
 
+# A samples collection is represented on the learning side as a (W, X, A, P, V)
+# tuple. Each component is a `Float32` tensor whose last dimension corresponds
+# to the sample index. Writing `n` the number of samples and `a` the total
+# number of actions:
+# - W (size 1×n) contains the samples weights
+# - X (size …×n) contains the board representations
+# - A (size a×n) contains the action masks (values are either 0 or 1)
+# - P (size a×n) contains the recorded MCTS policies
+# - V (size 1×n) contains the recorded values
+# Note that the weight of a sample is computed as an increasing
+# function of its `n` field.
+
 function convert_sample(Game, e::TrainingExample)
   w = [log2(e.n) + 1]
   x = GI.vectorize_board(Game, e.b)
@@ -28,8 +40,8 @@ end
 ##### Learning procedure
 #####
 
+# Surprisingly, Flux does not like the following code (scalar operations):
 # mse_wmean(ŷ, y, w) = sum((ŷ .- y).^2 .* w) / sum(w)
-# Surprisingly, Flux does not like the code above (scalar operations)
 mse_wmean(ŷ, y, w) = sum((ŷ .- y) .* (ŷ .- y) .* w) / sum(w)
 
 klloss_wmean(π̂, π, w) = -sum(π .* log.(π̂ .+ eps(eltype(π))) .* w) / sum(w)
@@ -54,8 +66,6 @@ function losses(nn, params, Wmean, Hp, (W, X, A, P, V))
   return (L, Lp, Lv, Lreg, Linv)
 end
 
-# Works with Float32
-# Takes care of interfacing with the GPU
 struct Trainer
   network
   examples
@@ -71,7 +81,6 @@ struct Trainer
     examples = merge_by_board(examples)
     samples = convert_samples(G, examples)
     network = Network.copy(network, on_gpu=params.use_gpu, test_mode=false)
-    #samples = Network.convert_input_tuple(network, samples)
     W, X, A, P, V = samples
     Wmean = mean(W)
     Hp = entropy_wmean(P, W)

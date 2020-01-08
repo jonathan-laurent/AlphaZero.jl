@@ -9,7 +9,7 @@ module Solver
 
 import ..Game, ..history, ..WHITE, ..NUM_CELLS
 
-import AlphaZero: GI, GameInterface, AbstractPlayer
+import AlphaZero: GI, GameInterface, AbstractPlayer, think
 
 struct Player <: AbstractPlayer{Game}
   process :: Base.Process
@@ -78,7 +78,7 @@ function qvalue(player, game, action)
   return pswitch ? - nextv : nextv
 end
 
-function GI.think(p::Player, g, turn=nothing)
+function think(p::Player, g, turn=nothing)
   as = GI.available_actions(g)
   qs = [qvalue(p, g, a) for a in as]
   maxq = maximum(qs)

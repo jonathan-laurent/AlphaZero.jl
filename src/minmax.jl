@@ -9,7 +9,7 @@ a baseline against AlphaZero. Heuristic board values are provided by the
 """
 module MinMax
 
-import ..GI, ..GameInterface
+import ..GI, ..GameInterface, ..AbstractPlayer, ..think
 
 function current_player_value(white_reward, white_playing) :: Float64
   if iszero(white_reward)
@@ -49,7 +49,7 @@ end
 minmax(game, actions, depth) = argmax([qvalue(game, a, depth) for a in actions])
 
 """
-    MinMax.Player{Game} <: AbstractPlayer{G}
+    MinMax.Player{Game} <: AbstractPlayer{Game}
 
 A stochastic minmax player, to be used as a baseline.
 
@@ -74,13 +74,13 @@ Otherwise,
   finite Q values, making the decision invariant to rescaling of
   [`GameInterface.heuristic_value`](@ref).
 """
-struct Player{G} <: GI.AbstractPlayer{G}
+struct Player{G} <: AbstractPlayer{G}
   depth :: Int
   τ :: Float64
   Player{G}(;depth, τ=0.) where G = new{G}(depth, τ)
 end
 
-function GI.think(p::Player, game, turn=nothing)
+function think(p::Player, game, turn=nothing)
   actions = GI.available_actions(game)
   n = length(actions)
   qs = [qvalue(game, a, p.depth) for a in actions]

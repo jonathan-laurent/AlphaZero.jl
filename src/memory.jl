@@ -3,14 +3,43 @@
 ##### datastructure to collect self-play experience
 #####
 
+"""
+    TrainingExample{Board}
+
+Type of a training sample. A sample features the following fields:
+- `b :: Board` is the board position (by convention, white is to play)
+- `π :: Vector{Float64}` is the recorded MCTS policy for this position
+- `z :: Float64` is the reward collected at the end of the game
+- `t :: Float64` is the number of moves remaining before the end of the game
+- `n :: Int` is the number of times the board position `b` was recorded
+
+As revealed by the last field `n`, several samples that correspond to the
+same board position can be merged, in which case the `π`, `z` and `t`
+fields are averaged together.
+"""
 struct TrainingExample{Board}
   b :: Board
   π :: Vector{Float64}
   z :: Float64
-  n :: Int # number of times the board position `b` has been seen
   t :: Float64 # average time before game end
+  n :: Int # number of times the board position `b` has been seen
 end
 
+"""
+    MemoryBuffer{Board}
+
+A circular buffer to hold memory samples.
+
+# How to use
+
+- Use `new_batch!(mem)` to start a new batch, typically once per iteration
+  before self-play.
+- Use `push_sample!(mem, board, policy, white_playing, turn)` to record
+  a sample during a game, where `turn` is the number of actions that have
+  been played by both players since the start of the current game.
+- Use `push_game!(mem, white_reward, game_length)` when a game terminates
+  for which samples have been collected.
+"""
 mutable struct MemoryBuffer{Board}
   # State-policy pairs accumulated during the current game.
   # The z component is 1 if white was playing and -1 otherwise
