@@ -54,7 +54,6 @@ function remaining_stones(game, player)
   return NUM_CELLS ÷ 2 - p
 end
 
-
 function value(player, game)
   z = GI.white_reward(game)
   if isnothing(z)
@@ -83,8 +82,6 @@ function GI.think(p::Player, g, turn=nothing)
   as = GI.available_actions(g)
   qs = [qvalue(p, g, a) for a in as]
   maxq = maximum(qs)
-  @show history_string(g)
-  @show qs
   opt = findall(>=(maxq), qs)
   π = zeros(length(as))
   π[opt] .= 1 / length(opt)
