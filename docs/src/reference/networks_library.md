@@ -11,7 +11,6 @@ KNets
 ## Knet Utilities
 
 ```@docs
-KNets
 KNets.KNetwork
 KNets.TwoHeadNetwork
 ```
