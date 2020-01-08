@@ -1,7 +1,7 @@
-#####
-##### Interface with the Knet.jl framework
-#####
-
+"""
+This module provides utilities to build neural networks with Knet,
+along with a library of standard architectures.
+"""
 module KNets
 
 export SimpleNet, SimpleNetHP, ResNet, ResNetHP
@@ -49,6 +49,22 @@ end
 ##### Implementing the `Network` interface
 #####
 
+"""
+    KNetwork{Game} <: AbstractNetwork{Game}
+
+Abstract type for neural networks implemented using the _Knet_ framework.
+
+Subtypes are expected to be expressed as the composition of Flux-like
+layers that implement a functor interface through functions `children` and
+`mapchildren`. A custom implementation of `regularized_params_` must also
+be implemented for layers containing parameters that are subject to
+regularization.
+
+Provided that the above holds, `KNetwork` implements the full network interface
+with the following exceptions:
+[`Network.HyperParams`](@ref), [`Network.hyperparams`](@ref),
+[`Network.forward`](@ref) and [`Network.on_gpu`](@ref).
+"""
 abstract type KNetwork{Game} <: AbstractNetwork{Game} end
 
 Base.copy(nn::KNetwork) = Base.deepcopy(nn)
@@ -104,25 +120,36 @@ end
 ##### Common functions between two-head neural networks
 #####
 
+"""
+    TwoHeadNetwork{Game} <: KNetwork{G}
+
+An abstract type for two-head neural networks implemented with Knet.
+
+Subtypes are assumed to have the following fields:
+`hyper`, `common`, `vhead` and `phead`. Based on those, an implementation
+is provided for [`Network.hyperparams`](@ref), [`Network.forward`](@ref) and
+[`Network.on_gpu`](@ref), leaving only [`Network.HyperParams`](@ref) to
+be implemented.
+"""
 abstract type TwoHeadNetwork{G} <: KNetwork{G} end
 
 function Network.forward(nn::TwoHeadNetwork, board)
   c = nn.common(board)
-  v = nn.vbranch(c)
-  p = nn.pbranch(c)
+  v = nn.vhead(c)
+  p = nn.phead(c)
   return (p, v)
 end
 
-children(nn::TwoHeadNetwork) = (nn.common, nn.vbranch, nn.pbranch)
+children(nn::TwoHeadNetwork) = (nn.common, nn.vhead, nn.phead)
 
 function mapchildren(f, nn::Net) where Net <: TwoHeadNetwork
-  Net(nn.hyper, f(nn.common), f(nn.vbranch), f(nn.pbranch))
+  Net(nn.hyper, f(nn.common), f(nn.vhead), f(nn.phead))
 end
 
 Network.hyperparams(nn::TwoHeadNetwork) = nn.hyper
 
 function Network.on_gpu(nn::TwoHeadNetwork)
-  b = nn.vbranch.layers[end].b
+  b = nn.vhead.layers[end].b
   return isa(Knet.value(b), Knet.KnetArray)
 end
 

@@ -1,27 +1,53 @@
-#####
-##### Dense Resnet
-#####
+"""
+    ResNetHP
 
-# Recommended configuration:
-# AlphaZero: 20 blocks (40 in final version), 256 filters
-# Oracle basic: 5 blocks, 64 filters
-# Oracle final: 20 blocks, 128 filters
+Hyperparameters for the convolutional resnet architecture.
+
+| Parameter                 | Type                | Default   |
+|:--------------------------|:--------------------|:----------|
+| `num_blocks`              | `Int`               |  -        |
+| `num_filters`             | `Int`               |  -        |
+| `conv_kernel_size`        | `Tuple{Int, Int}`   |  -        |
+| `num_policy_head_filters` | `Int`               | `2`       |
+| `num_value_head_filters`  | `Int`               | `1`       |
+| `batch_norm_momentum`     | `Float32`           | `0.6f0`   |
+
+The trunk of the two-head network consists of `num_blocks` consecutive blocks.
+Each block features two convolutional layers with `num_filters` filters and
+with kernel size `conv_kernel_size`. Note that both kernel dimensions must be
+odd.
+
+During training, the network is evaluated in training mode on the whole
+dataset to compute the loss before it is switched to test model using
+big batches. Therefore, it makes sense to use a low batch norm momentum.
+
+# AlphaGo Zero Parameters
+
+The network in the original paper from Deepmind features 20 blocks with 256
+filters per convolutional layer.
+"""
 @kwdef struct ResNetHP
   num_blocks :: Int
   num_filters :: Int
   conv_kernel_size :: Tuple{Int, Int}
   num_policy_head_filters :: Int = 2
   num_value_head_filters :: Int = 1
-  batch_norm_momentum :: Float32 = 1f0
+  batch_norm_momentum :: Float32 = 0.6f0
 end
 
 Util.generate_update_constructor(ResNetHP) |> eval
 
+"""
+    ResNet{Game} <: TwoHeadNetwork{Game}
+
+The convolutional residual network architecture that is used
+in the original AlphaGo Zero paper. See hyperparameters [`ResNetHP`](@ref).
+"""
 mutable struct ResNet{Game} <: TwoHeadNetwork{Game}
   hyper
   common
-  vbranch
-  pbranch
+  vhead
+  phead
 end
 
 function ResNetBlock(size, n, bnmom)
@@ -50,19 +76,19 @@ function ResNet{G}(hyper::ResNetHP) where G
     Conv(ksize, bsize[3]=>nf, pad=pad),
     BatchNorm(nf, relu, momentum=bnmom),
     [ResNetBlock(ksize, nf, bnmom) for i in 1:hyper.num_blocks]...)
-  pbranch = Chain(
+  phead = Chain(
     Conv((1, 1), nf=>npf),
     BatchNorm(npf, relu, momentum=bnmom),
     linearize,
     Dense(bsize[1] * bsize[2] * npf, outdim),
     softmax)
-  vbranch = Chain(
+  vhead = Chain(
     Conv((1, 1), nf=>nvf),
     BatchNorm(nvf, relu, momentum=bnmom),
     linearize,
     Dense(bsize[1] * bsize[2] * nvf, nf, relu),
     Dense(nf, 1, tanh))
-  ResNet{G}(hyper, common, vbranch, pbranch)
+  ResNet{G}(hyper, common, vhead, phead)
 end
 
 Network.HyperParams(::Type{<:ResNet}) = ResNetHP

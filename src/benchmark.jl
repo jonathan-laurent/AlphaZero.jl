@@ -125,7 +125,7 @@ end
 
 Pure MCTS baseline that uses rollouts to evaluate new positions.
 
-- Constructor argument `params` has type [`MctsParams`](@ref).
+Argument `params` has type [`MctsParams`](@ref).
 """
 struct MctsRollouts <: Player
   params :: MctsParams
@@ -145,7 +145,7 @@ end
 
 Full AlphaZero player that combines MCTS with the learnt network.
 
-- Constructor argument `params` has type [`MctsParams`](@ref).
+Argument `params` has type [`MctsParams`](@ref).
 """
 struct Full <: Player
   params :: MctsParams

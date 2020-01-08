@@ -1,7 +1,7 @@
-#####
-##### Interface with the Flux.jl framework
-#####
-
+"""
+This module provides utilities to build neural networks with Flux,
+along with a library of standard architectures.
+"""
 module FluxNets
 
 export SimpleNet, SimpleNetHP, ResNet, ResNetHP
@@ -127,21 +127,21 @@ function Network.forward(nn::TwoHeadNetwork, board)
   # TODO: eliminate this horror when Flux catches up
   # @eval Flux.istraining() = $(!get(TEST_MODE, nn, false))
   c = nn.common(board)
-  v = nn.vbranch(c)
-  p = nn.pbranch(c)
+  v = nn.vhead(c)
+  p = nn.phead(c)
   return (p, v)
 end
 
 # Flux.@functor does not work do to Network being parametric
 function Flux.functor(nn::Net) where Net <: TwoHeadNetwork
-  children = (nn.common, nn.vbranch, nn.pbranch)
+  children = (nn.common, nn.vhead, nn.phead)
   constructor = cs -> Net(nn.hyper, cs...)
   return (children, constructor)
 end
 
 Network.hyperparams(nn::TwoHeadNetwork) = nn.hyper
 
-Network.on_gpu(nn::TwoHeadNetwork) = on_gpu(nn.vbranch[end].b)
+Network.on_gpu(nn::TwoHeadNetwork) = on_gpu(nn.vhead[end].b)
 
 #####
 ##### Utilities for the networks library

@@ -7,9 +7,9 @@ Deepmind's AlphaZero algorithm:
 * Generic interfaces make it easy to add support for
   [new games](@ref game_interface) or new
   [learning frameworks](@ref network_interface).
-* Being about two orders magnitudes faster than competing alternatives,
-  this implementation enables to solve nontrivial games on a standard
-  desktop computer with a GPU.
+* Being about two orders of magnitude faster than competing alternatives
+  written in Python, this implementation enables to solve nontrivial games on
+  a standard desktop computer with a GPU.
 
 ### Why should I care about AlphaZero?
 

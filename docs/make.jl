@@ -19,6 +19,7 @@ makedocs(
             "reference/params.md",
             "reference/game_interface.md",
             "reference/network.md",
+            "reference/networks_library.md",
             "reference/mcts.md",
             "reference/environment.md",
             "reference/benchmark.md",

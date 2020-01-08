@@ -1,23 +1,39 @@
-#####
-##### Simple Example Network: Vanilla MLP
-#####
+"""
+    SimpleNetHP
 
+Hyperparameters for the simplenet architecture.
+
+| Parameter                     | Description                                  |
+|:------------------------------|:---------------------------------------------|
+| `width :: Int`                | Number of neurons on each dense layer        |
+| `depth_common :: Int`         | Number of dense layers in the trunk          |
+| `depth_phead = 1`             | Number of hidden layers in the actions head  |
+| `depth_vhead = 1`             | Number of hidden layers in the value  head   |
+| `use_batch_norm = false`      | Use batch normalization between each layer   |
+| `batch_norm_momentum = 0.6f0` | Momentum of batch norm statistics updates    |
+"""
 @kwdef struct SimpleNetHP
   width :: Int
   depth_common :: Int
-  depth_pbranch :: Int = 1
-  depth_vbranch :: Int = 1
+  depth_phead :: Int = 1
+  depth_vhead :: Int = 1
   use_batch_norm :: Bool = false
-  batch_norm_momentum :: Float32 = 1f0
+  batch_norm_momentum :: Float32 = 0.6f0
 end
 
 Util.generate_update_constructor(SimpleNetHP) |> eval
 
+"""
+    SimpleNet{Game} <: TwoHeadNetwork{Game}
+
+A simple two-headed architecture with only dense layers.
+See hyperparameters [`SimpleNetHP`](@ref).
+"""
 mutable struct SimpleNet{Game} <: TwoHeadNetwork{Game}
   hyper
   common
-  vbranch
-  pbranch
+  vhead
+  phead
 end
 
 function SimpleNet{G}(hyper::SimpleNetHP) where G
@@ -39,14 +55,14 @@ function SimpleNet{G}(hyper::SimpleNetHP) where G
     linearize,
     make_dense(indim, hsize),
     hlayers(hyper.depth_common)...)
-  vbranch = Chain(
-    hlayers(hyper.depth_vbranch)...,
+  vhead = Chain(
+    hlayers(hyper.depth_vhead)...,
     Dense(hsize, 1, tanh))
-  pbranch = Chain(
-    hlayers(hyper.depth_pbranch)...,
+  phead = Chain(
+    hlayers(hyper.depth_phead)...,
     Dense(hsize, outdim),
     softmax)
-  SimpleNet{G}(hyper, common, vbranch, pbranch)
+  SimpleNet{G}(hyper, common, vhead, phead)
 end
 
 Network.HyperParams(::Type{<:SimpleNet}) = SimpleNetHP

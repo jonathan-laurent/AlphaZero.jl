@@ -9,12 +9,12 @@ is still a great challenge for reinforcement learning.[^1]
 [^1]:
     To the best of our knowledge, none of the many existing Python
     implementations of AlphaZero are able to learn a player that beats a simple
-    minmax baseline (that plans at depth 4) on a single desktop computer.
+    minmax baseline (that plans at depth at least 2) on a single desktop computer.
 
 ## Setup
 
 To replicate the experiment in this tutorial, we recommend having a CUDA
-compatible GPU with 8GB of memory or more. Each training iteration took about
+compatible GPU with 6GB of memory or more. Each training iteration took about
 one hour and a half on a standard desktop computer with an Intel Core i5 9600K
 processor and an Nvidia RTX 2070 GPU.
 
@@ -23,7 +23,6 @@ processor and an Nvidia RTX 2070 GPU.
     `AlphaZero.jl` with Julia 1.4 (nightly), which includes a
     [critical feature](https://github.com/JuliaLang/julia/pull/33448)
     that enables `CuArrays` to force incremental GC collections.
-
 
 To download `AlphaZero.jl` and start a new training session,
 just run the following:
@@ -43,17 +42,13 @@ ENV["CUARRAYS_MEMORY_POOL"] = "split"
 
 using AlphaZero
 
-module ConnectFour
-    include("games/connect-four/game.jl")
-end
-module Training
-    using AlphaZero
-    include("games/connect-four/params.jl")
-end
+include("games/connect-four/main.jl")
+using .ConnectFour: Game, Training
+
 const SESSION_DIR = "sessions/connect-four"
 
 session = AlphaZero.Session(
-    ConnectFour.Game,
+    Game,
     Training.Network{ConnectFour.Game},
     Training.params,
     Training.netparams,
@@ -70,7 +65,7 @@ AlphaZero [session](@ref sessions) is created with the following arguments:
 
 | Argument             | Description                                                                     |
 |:---------------------|:--------------------------------------------------------------------------------|
-| `ConnectFour.Game`   | Game type, which implements the [game interface](@ref game_interface).          |
+| `Game`               | Game type, which implements the [game interface](@ref game_interface).          |
 | `Training.Network`   | Network type, which implements the [network interface](@ref network_interface). |
 | `Training.params`    | Training [parameters](@ref params).                                             |
 | `Training.netparams` | Network hyperparameters.                                                        |
