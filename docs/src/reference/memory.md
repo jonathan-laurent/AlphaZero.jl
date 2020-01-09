@@ -5,6 +5,6 @@ CurrentModule = AlphaZero
 ```
 
 ```@docs
-TrainingExample
+TrainingSample
 MemoryBuffer
 ```
