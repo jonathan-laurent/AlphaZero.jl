@@ -128,21 +128,36 @@ of self-play across 200 iterations).
 end
 
 """
+    SamplesWeighingPolicy
+
+During self-play, early board positions are possibly encountered many
+times across several games. The corresponding samples are then merged
+together and given a weight ``W`` that is a nondecreasing function of the
+number ``n`` of merged samples:
+
+  - `CONSTANT_WEIGHT`: ``W(n) = 1``
+  - `LOG_WEIGHT`: ``W(n) = \\log_2(n) + 1``
+  - `LINEAR_WEIGHT`: ``W(n) = n``
+"""
+@enum SamplesWeighingPolicy CONSTANT_WEIGHT LOG_WEIGHT LINEAR_WEIGHT
+
+"""
     LearningParams
 
 Parameters governing the learning phase of a training iteration, where
 the neural network is updated to fit the data in the memory buffer.
 
-| Parameter                     | Type                    | Default     |
-|:------------------------------|:------------------------|:------------|
-| `use_gpu`                     | `Bool`                  | `true`      |
-| `gc_every`                    | `Union{Nothing, Int}`   | `nothing`   |
-| `optimiser`                   | [`OptimiserSpec`](@ref) |  -          |
-| `l2_regularization`           | `Float32`               |  -          |
-| `nonvalidity_penalty`         | `Float32`               | `1f0`       |
-| `batch_size`                  | `Int`                   |  -          |
-| `loss_computation_batch_size` | `Int`                   |  -          |
-| `checkpoints`                 | `Vector{Int}`           |  -          |
+| Parameter                     | Type                            | Default    |
+|:------------------------------|:--------------------------------|:-----------|
+| `use_gpu`                     | `Bool`                          | `true`     |
+| `gc_every`                    | `Union{Nothing, Int}`           | `nothing`  |
+| `samples_weighing_policy`     | [`SamplesWeighingPolicy`](@ref) |  -         |
+| `optimiser`                   | [`OptimiserSpec`](@ref)         |  -         |
+| `l2_regularization`           | `Float32`                       |  -         |
+| `nonvalidity_penalty`         | `Float32`                       | `1f0`      |
+| `batch_size`                  | `Int`                           |  -         |
+| `loss_computation_batch_size` | `Int`                           |  -         |
+| `checkpoints`                 | `Vector{Int}`                   |  -         |
 
 # Description
 
@@ -172,6 +187,7 @@ In the original AlphaGo Zero paper:
 @kwdef struct LearningParams
   use_gpu :: Bool = true
   gc_every :: Union{Nothing, Int} = nothing
+  samples_weighing_policy :: SamplesWeighingPolicy
   optimiser :: OptimiserSpec
   l2_regularization :: Float32
   nonvalidity_penalty :: Float32 = 1f0
@@ -212,15 +228,15 @@ end
 
 The AlphaZero parameters.
 
-| Parameter          | Type                                | Default   |
-|:-------------------|:------------------------------------|:----------|
-| `self_play`        | [`SelfPlayParams`](@ref)            |  -        |
-| `learning`         | [`LearningParams`](@ref)            |  -        |
-| `arena`            | [`ArenaParams`](@ref)               |  -        |
-| `memory_analysis`  | `Union{Nothing, MemAnalysisParams}` | `nothing` |
-| `num_iters`        | `Int`                               |  -        |
-| `mem_buffer_size`  | `PLSchedule{Int}`                   |  -        |
-| `ternary_rewards`  | `Bool`                              | `false`   |
+| Parameter                  | Type                                | Default   |
+|:---------------------------|:------------------------------------|:----------|
+| `self_play`                | [`SelfPlayParams`](@ref)            |  -        |
+| `learning`                 | [`LearningParams`](@ref)            |  -        |
+| `arena`                    | [`ArenaParams`](@ref)               |  -        |
+| `memory_analysis`          | `Union{Nothing, MemAnalysisParams}` | `nothing` |
+| `num_iters`                | `Int`                               |  -        |
+| `mem_buffer_size`          | `PLSchedule{Int}`                   |  -        |
+| `ternary_rewards`          | `Bool`                              | `false`   |
 
 # Explanation
 

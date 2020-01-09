@@ -14,8 +14,15 @@
 # Note that the weight of a sample is computed as an increasing
 # function of its `n` field.
 
-function convert_sample(Game, e::TrainingSample)
-  w = [log2(e.n) + 1]
+function convert_sample(Game, wp, e::TrainingSample)
+  if wp == CONSTANT_WEIGHT
+    w = Float32[1]
+  elseif wp == LOG_WEIGHT
+    w = Float32[log2(e.n) + 1]
+  else
+    @assert wp == LINEAR_WEIGHT
+    w = Float32[n]
+  end
   x = GI.vectorize_board(Game, e.b)
   actions = GI.available_actions(Game(e.b))
   a = GI.actions_mask(Game, actions)
@@ -25,8 +32,8 @@ function convert_sample(Game, e::TrainingSample)
   return (w, x, a, p, v)
 end
 
-function convert_samples(Game, es::Vector{<:TrainingSample})
-  ces = [convert_sample(Game, e) for e in es]
+function convert_samples(Game, wp, es::Vector{<:TrainingSample})
+  ces = [convert_sample(Game, wp, e) for e in es]
   W = Util.superpose((e[1] for e in ces))
   X = Util.superpose((e[2] for e in ces))
   A = Util.superpose((e[3] for e in ces))
@@ -79,7 +86,7 @@ struct Trainer
     params::LearningParams
   ) where G
     examples = merge_by_board(examples)
-    samples = convert_samples(G, examples)
+    samples = convert_samples(G, params.samples_weighing_policy, examples)
     network = Network.copy(network, on_gpu=params.use_gpu, test_mode=false)
     W, X, A, P, V = samples
     Wmean = mean(W)

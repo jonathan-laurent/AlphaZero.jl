@@ -20,6 +20,7 @@ SelfPlayParams
 
 ```@docs
 LearningParams
+SamplesWeighingPolicy
 ```
 
 ## Arena

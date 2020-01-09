@@ -91,6 +91,7 @@ function get_params(mode=:full)
     mcts = MctsParams(self_play.mcts))
 
   learning = LearningParams(
+    samples_weighing_policy=LOG_WEIGHT,
     l2_regularization=1e-4,
     optimiser=CyclicMomentum(
       lr_low=1e-3,

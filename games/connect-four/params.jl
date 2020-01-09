@@ -38,6 +38,7 @@ arena = ArenaParams(
     temperature=StepSchedule(cold_temperature)))
 
 learning = LearningParams(
+  samples_weighing_policy=LOG_WEIGHT,
   batch_size=256,
   loss_computation_batch_size=1024,
   gc_every=nothing,
