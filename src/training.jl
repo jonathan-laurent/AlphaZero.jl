@@ -19,7 +19,7 @@ Construct a new AlphaZero environment.
 - `params` has type [`Params`](@ref)
 - `network` is the initial neural network and has type [`AbstractNetwork`](@ref)
 - `experience` is the initial content of the memory buffer
-   as a vector of [`TrainingExample`](@ref)
+   as a vector of [`TrainingSample`](@ref)
 - `itc` is the value of the iteration counter (0 at the start of training)
 """
 mutable struct Env{Game, Network, Board}
@@ -98,7 +98,7 @@ import .Handlers
     get_experience(env::Env)
 
 Return the content of the agent's memory as a
-vector of [`TrainingExample`](@ref).
+vector of [`TrainingSample`](@ref).
 """
 get_experience(env::Env) = get(env.memory)
 

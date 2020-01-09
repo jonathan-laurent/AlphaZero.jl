@@ -14,7 +14,7 @@
 # Note that the weight of a sample is computed as an increasing
 # function of its `n` field.
 
-function convert_sample(Game, e::TrainingExample)
+function convert_sample(Game, e::TrainingSample)
   w = [log2(e.n) + 1]
   x = GI.vectorize_board(Game, e.b)
   actions = GI.available_actions(Game(e.b))
@@ -25,7 +25,7 @@ function convert_sample(Game, e::TrainingExample)
   return (w, x, a, p, v)
 end
 
-function convert_samples(Game, es::Vector{<:TrainingExample})
+function convert_samples(Game, es::Vector{<:TrainingSample})
   ces = [convert_sample(Game, e) for e in es]
   W = Util.superpose((e[1] for e in ces))
   X = Util.superpose((e[2] for e in ces))
@@ -75,7 +75,7 @@ struct Trainer
   Hp
   function Trainer(
     network::AbstractNetwork{G},
-    examples::AbstractVector{<:TrainingExample},
+    examples::AbstractVector{<:TrainingSample},
     params::LearningParams
   ) where G
     examples = merge_by_board(examples)
