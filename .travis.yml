@@ -25,5 +25,8 @@ jobs:
     - stage: Documentation
       julia: 1.3
       os: linux
-      script: julia --project docs/make.jl
+      script: julia --project -e '
+          using Pkg;
+          Pkg.instantiate();
+          include("docs/make.jl")'
       after_success: skip
