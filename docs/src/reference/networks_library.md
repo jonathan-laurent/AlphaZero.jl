@@ -17,9 +17,16 @@ KNets.TwoHeadNetwork
 
 ## Networks Library
 
+### Convolutional ResNet
+
 ```@docs
 KNets.ResNet
 KNets.ResNetHP
+```
+
+### Simple Network
+
+```@docs
 KNets.SimpleNet
 KNets.SimpleNetHP
 ```

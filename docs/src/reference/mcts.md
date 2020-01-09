@@ -12,8 +12,8 @@ MCTS
 
 ```@docs
 Oracle
-evaluate(::Oracle, board, actions)
-evaluate_batch(::Oracle, batches)
+evaluate
+evaluate_batch
 RolloutOracle
 ```
 
@@ -26,7 +26,7 @@ policy
 reset!
 ```
 
-## Profiling utilities
+## Profiling Utilities
 
 ```@docs
 inference_time_ratio

@@ -19,7 +19,7 @@ Construct a new AlphaZero environment.
 - `params` has type [`Params`](@ref)
 - `network` is the initial neural network and has type [`AbstractNetwork`](@ref)
 - `experience` is the initial content of the memory buffer
-    (see [`get_experience`](@ref))
+   as a vector of [`TrainingExample`](@ref)
 - `itc` is the value of the iteration counter (0 at the start of training)
 """
 mutable struct Env{Game, Network, Board}
@@ -46,6 +46,8 @@ end
     Handlers
 
 Namespace for the callback functions that are used during training.
+This enables logging, saving and plotting to be implemented separately.
+An example handler object is `Session`.
 
 All callback functions take a handler object `h` as their first argument
 and sometimes a second argment `r` that consists in a report.
@@ -65,8 +67,6 @@ and sometimes a second argment `r` that consists in a report.
 | `learning_finished(h, r)`   | sends report: [`Report.Learning`](@ref)        |
 | `iteration_finished(h, r)`  | sends report: [`Report.Iteration`](@ref)       |
 | `training_finished(h)`      | called once at the end of training             |
-
-An example handler object is `Session`.
 """
 module Handlers
 
@@ -97,7 +97,8 @@ import .Handlers
 """
     get_experience(env::Env)
 
-Return the content of the agent's memory as a vector of samples.
+Return the content of the agent's memory as a
+vector of [`TrainingExample`](@ref).
 """
 get_experience(env::Env) = get(env.memory)
 

@@ -1,5 +1,8 @@
 """
 Utilities to evaluate players against one another.
+
+Typically, between each training iteration, different players
+relying on the current neural network compete against a set of baselines.
 """
 module Benchmark
 
@@ -22,7 +25,7 @@ The outcome of a duel between two players.
 - `avgz` is the average reward collected by `player`
 - `rewards` is a vector containing all rewards collected by `player`
     (one per game played)
-- `time` is the amount of computing time took consumed by the duel, in seconds
+- `time` is the computing time spent running the duel, in seconds
 """
 struct DuelOutcome
   player :: String
@@ -42,7 +45,12 @@ const Report = Vector{DuelOutcome}
 """
     Benchmark.Player
 
-Abstract type for a player that can be featured in a benchmark duel.
+Abstract type to specify a player that can be featured in a benchmark duel.
+
+Subtypes must implement the following functions:
+  - `Benchmark.instantiate(player, nn)`: instantiate the player specification
+      into an [`AbstractPlayer`](@ref) given a neural network
+  - `Benchmark.name(player)`: return a `String` describing the player
 """
 abstract type Player end
 
@@ -63,7 +71,8 @@ Specify a duel that consists in `num_games` games between
 # Optional keyword arguments
 - `reset_every`: if set, the MCTS tree is reset every `reset_mcts_every` games
     to avoid running out of memory
-- `color_policy` has type [`ColorPolicy`](@ref) (`ALTERNATE_COLORS`) by default
+- `color_policy` has type [`ColorPolicy`](@ref) and is `ALTERNATE_COLORS`
+    by default
 """
 struct Duel
   num_games :: Int

@@ -1,1 +1,1 @@
-# [Public API Overview](@id api_overview)
+# [Codebase Overview](@id overview)

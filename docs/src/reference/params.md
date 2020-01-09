@@ -47,4 +47,5 @@ necessary_samples
 AbstractSchedule
 StepSchedule
 PLSchedule
+CyclicSchedule
 ```

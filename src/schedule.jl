@@ -23,6 +23,19 @@ end
     PLSchedule{R} <: AbstractSchedule{R}
 
 Type for piecewise linear schedules.
+
+# Constructors
+
+    PLSchedule(cst)
+
+Return a schedule with a constant value `cst`.
+
+    PLSchedule(xs, ys)
+
+Return a piecewise linear schedule such that:
+  - For all `i`, `(xs[i], ys[i])` belongs to the schedule's graph.
+  - Before `xs[1]`, the schedule has value `ys[1]`.
+  - After `xs[end]`, the schedule has value `ys[end]`.
 """
 struct PLSchedule{R} <: AbstractSchedule{R}
   # We keep the internal representation simple for JSON serialization
@@ -74,6 +87,17 @@ end
     StepSchedule{R} <: AbstractSchedule{R}
 
 Type for step function schedules.
+
+# Constructors
+
+    StepSchedule(cst)
+
+Return a schedule with a constant value `cst`.
+
+    StepSchedule(;start, change_at, values)
+
+Return a schedule that has initial value `start`. For all `i`, the schedule
+takes value `values[i]` at step `change_at[i]`.
 """
 struct StepSchedule{R} <: AbstractSchedule{R}
   start :: R
@@ -97,9 +121,11 @@ function Base.getindex(s::StepSchedule, i::Int)
 end
 
 """
-    Cyclic Schedule{R}
-"""
+    CyclicSchedule(start, mid; n, xmax)
 
+Return a [`PLSchedule`](@ref) that describes a cycle from `start` to `mid`
+and then back to `start`.
+"""
 function CyclicSchedule(start, mid; n, xmax)
   xmid = floor(Int, xmax * n / 2)
   xend = floor(Int, xmax * n)

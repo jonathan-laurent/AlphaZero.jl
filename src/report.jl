@@ -65,10 +65,10 @@ end
 """
     Report.Epoch
 
-Report generated after each learning epoch
+Report generated after each learning epoch.
 
 - `status_after`: learning status after the epoch, as an object of type
-    [`LearningStatus`](@ref)
+    [`Report.LearningStatus`](@ref)
 """
 struct Epoch
   status_after :: LearningStatus

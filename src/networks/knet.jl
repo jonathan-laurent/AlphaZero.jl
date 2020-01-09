@@ -54,11 +54,12 @@ end
 
 Abstract type for neural networks implemented using the _Knet_ framework.
 
-Subtypes are expected to be expressed as the composition of Flux-like
-layers that implement a functor interface through functions `children` and
-`mapchildren`. A custom implementation of `regularized_params_` must also
-be implemented for layers containing parameters that are subject to
-regularization.
+  - Subtypes are expected to be expressed as the composition of Flux-like
+    layers that implement a functor interface through functions `children` and
+    `mapchildren`.
+  - A custom implementation of `regularized_params_` must also
+    be implemented for layers containing parameters that are subject to
+    regularization.
 
 Provided that the above holds, `KNetwork` implements the full network interface
 with the following exceptions:

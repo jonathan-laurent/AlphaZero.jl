@@ -28,6 +28,8 @@ Return the initial state of the game.
     Game(board, white_playing=true)
 
 Return the unique state specified by a board and a current player.
+By convention, the first player to play is called _white_ and
+the other is called _black_.
 """
 abstract type AbstractGame end
 

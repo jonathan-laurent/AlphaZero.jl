@@ -27,7 +27,6 @@ Util.generate_update_constructor(SimpleNetHP) |> eval
     SimpleNet{Game} <: TwoHeadNetwork{Game}
 
 A simple two-headed architecture with only dense layers.
-See hyperparameters [`SimpleNetHP`](@ref).
 """
 mutable struct SimpleNet{Game} <: TwoHeadNetwork{Game}
   hyper

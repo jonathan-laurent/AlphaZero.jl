@@ -7,11 +7,11 @@
     TrainingExample{Board}
 
 Type of a training sample. A sample features the following fields:
-- `b :: Board` is the board position (by convention, white is to play)
-- `π :: Vector{Float64}` is the recorded MCTS policy for this position
-- `z :: Float64` is the reward collected at the end of the game
-- `t :: Float64` is the number of moves remaining before the end of the game
-- `n :: Int` is the number of times the board position `b` was recorded
+- `b::Board` is the board position (by convention, white is to play)
+- `π::Vector{Float64}` is the recorded MCTS policy for this position
+- `z::Float64` is the reward collected at the end of the game
+- `t::Float64` is the number of moves remaining before the end of the game
+- `n::Int` is the number of times the board position `b` was recorded
 
 As revealed by the last field `n`, several samples that correspond to the
 same board position can be merged, in which case the `π`, `z` and `t`
@@ -36,7 +36,7 @@ A circular buffer to hold memory samples.
   before self-play.
 - Use `push_sample!(mem, board, policy, white_playing, turn)` to record
   a sample during a game, where `turn` is the number of actions that have
-  been played by both players since the start of the current game.
+  been played by both players since the start of the game.
 - Use `push_game!(mem, white_reward, game_length)` when a game terminates
   for which samples have been collected.
 """

@@ -14,7 +14,6 @@ Benchmark.Report
 ```@docs
 Benchmark.Duel
 Benchmark.DuelOutcome
-ColorPolicy
 ```
 
 ## Players

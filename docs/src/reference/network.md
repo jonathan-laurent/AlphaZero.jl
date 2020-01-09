@@ -8,7 +8,7 @@ CurrentModule = AlphaZero.Network
 Network
 ```
 
-## Mandatory interface
+## Mandatory Interface
 
 ```@docs
 AbstractNetwork
@@ -21,7 +21,7 @@ params
 regularized_params
 ```
 
-### Conversion and copy
+### Conversion and Copy
 
 ```@docs
 Base.copy(::AbstractNetwork)
@@ -38,20 +38,23 @@ convert_output
 gc
 ```
 
-## Derived functions
+## Derived Functions
 
-### Evaluation function
+### Evaluation Function
 
 ```@docs
 evaluate
 ```
 
-### Oracle interface
+### Oracle Interface
 
-```@docs
-MCTS.evaluate(::AbstractNetwork, board, actions)
-MCTS.evaluate_batch(::AbstractNetwork, batch)
-```
+All subtypes of `AbstractNetwork` implement the
+[`MCTS.Oracle`](@ref) interface through functions:
+  - [`MCTS.evaluate`](@ref)
+  - [`MCTS.evaluate_batch`](@ref).
+
+Since evaluating a neural network on single samples at a
+time is slow, the latter should be used whenever possible.
 
 ### Misc
 
@@ -60,4 +63,12 @@ num_parameters
 num_regularized_parameters
 mean_weight
 copy(::AbstractNetwork)
+```
+
+### Optimiser Specification
+
+```@docs
+OptimiserSpec
+Momentum
+CyclicMomentum
 ```

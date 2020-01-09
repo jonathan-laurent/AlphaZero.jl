@@ -18,7 +18,7 @@ with kernel size `conv_kernel_size`. Note that both kernel dimensions must be
 odd.
 
 During training, the network is evaluated in training mode on the whole
-dataset to compute the loss before it is switched to test model using
+dataset to compute the loss before it is switched to test model, using
 big batches. Therefore, it makes sense to use a low batch norm momentum.
 
 # AlphaGo Zero Parameters
@@ -41,7 +41,7 @@ Util.generate_update_constructor(ResNetHP) |> eval
     ResNet{Game} <: TwoHeadNetwork{Game}
 
 The convolutional residual network architecture that is used
-in the original AlphaGo Zero paper. See hyperparameters [`ResNetHP`](@ref).
+in the original AlphaGo Zero paper.
 """
 mutable struct ResNet{Game} <: TwoHeadNetwork{Game}
   hyper

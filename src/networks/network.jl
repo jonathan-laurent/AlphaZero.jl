@@ -79,9 +79,9 @@ function to_cpu(::AbstractNetwork)
 end
 
 """
-    on_gpu(::AbstractNetwork)
+    on_gpu(::AbstractNetwork) :: Bool
 
-Test if a network is located on GPU.
+Test whether or not a network is located on GPU.
 """
 function on_gpu(::AbstractNetwork)
   @unimplemented
@@ -133,7 +133,7 @@ end
 """
     forward(::AbstractNetwork, boards)
 
-Compute the forward pass of the network on a batch of inputs.
+Compute the forward pass of a network on a batch of inputs.
 
 Expect a `Float32` tensor `boards` whose batch dimension is the last one.
 
@@ -160,7 +160,7 @@ end
 """
     params(::AbstractNetwork)
 
-Return the collection of trainable parameters of the network.
+Return the collection of trainable parameters of a network.
 """
 function params(::AbstractNetwork)
   @unimplemented
@@ -169,7 +169,7 @@ end
 """
     gc(::AbstractNetwork)
 
-Perform full garbage collection.
+Perform full garbage collection and empty the GPU memory pool.
 """
 function gc(::AbstractNetwork)
   @unimplemented
@@ -177,13 +177,33 @@ end
 
 # Optimizers and training
 
+"""
+    OptimiserSpec
+
+Abstract type for an optimiser specification.
+"""
 abstract type OptimiserSpec end
 
+"""
+    Momentum(; lr, momentum)
+
+SGD optimiser with momentum.
+"""
 @kwdef struct Momentum <: OptimiserSpec
   lr :: Float32
   momentum :: Float32
 end
 
+"""
+    CyclicMomentum(; lr_low, lr_high, momentum_low, momentum_high)
+
+SGD optimiser with a cyclic momentum and learning rate.
+
+  - During an epoch, the learning rate goes from `lr_low`
+    to `lr_high` and then back to `lr_low`.
+  - The momentum evolves in the opposite way, from high values
+    to low values and then back to high values.
+"""
 @kwdef struct CyclicMomentum <: OptimiserSpec
   lr_low :: Float32
   lr_high :: Float32
@@ -192,9 +212,13 @@ end
 end
 
 """
-    train!(::AbstractNetwork, opt::OptimiserSpec, loss, data, learning_rate)
+    train!(::AbstractNetwork, opt::OptimiserSpec, loss, data)
 
-Train a given network on data.
+Update a given network to fit some data.
+  - [`opt::OptimiserSpec`](@ref OptimiserSpec) specified which optimiser
+    to use
+  - `loss` is a function that maps a batch of samples to a tracked real
+  - `data` is an iterator over minibatches
 """
 function train!(::AbstractNetwork, opt::OptimiserSpec, loss, data)
   @unimplemented
@@ -254,7 +278,7 @@ Return a `(P, V, Pinv)` triple where:
      that indicates the total probability weight put by the network
      on invalid actions for each sample.
 
-All tensors manipulated by this function have type `Float32`.
+All tensors manipulated by this function have elements of type `Float32`.
 """
 function evaluate(nn::AbstractNetwork, board, actions_mask)
   p, v = forward(nn, board)
@@ -268,17 +292,6 @@ end
 to_singleton_batch(x) = reshape(x, size(x)..., 1)
 from_singleton_batch(x) = reshape(x, size(x)[1:end-1])
 
-"""
-    MCTS.evaluate(::AbstractNetwork, board, available_actions)
-
-Evaluate a single board position.
-See [`MCTS.evaluate(::MCTS.Oracle)`](@ref).
-
-!!! warning
-    Evaluating a neural network on a single sample at a time is slow.
-    When possible, use [`MCTS.evaluate_batch`](@ref
-    MCTS.evaluate_batch(::AbstractNetwork)) instead.
-"""
 function MCTS.evaluate(nn::AbstractNetwork{G}, board, available_actions) where G
   x = GameInterface.vectorize_board(G, board)
   a = GameInterface.actions_mask(G, available_actions)
@@ -288,12 +301,6 @@ function MCTS.evaluate(nn::AbstractNetwork{G}, board, available_actions) where G
   return (p[a], v[1])
 end
 
-"""
-    MCTS.evaluate_batch(::AbstractNetwork, batch)
-
-Evaluate a batch of positions.
-See [`MCTS.evaluate_batch(::MCTS.Oracle)`](@ref).
-"""
 function MCTS.evaluate_batch(nn::AbstractNetwork{G}, batch) where G
   X = Util.superpose((
     GameInterface.vectorize_board(G, b)

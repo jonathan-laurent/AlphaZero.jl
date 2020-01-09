@@ -5,19 +5,19 @@
 """
     AbstractPlayer{Game}
 
-Abstract type for a game player.
+Abstract type for a player of `Game`.
 """
 abstract type AbstractPlayer{Game} end
 
 """
-   think(::AbstractPlayer, state, turn=nothing)
+    think(::AbstractPlayer, state, turn=nothing)
 
 Return a probability distribution over actions as a `(actions, π)` pair.
 
 The `turn` argument, if provided, indicates the number of actions that have
-been played before by both players. It is useful as during self-play,
-AlphaZero typically drops its temperature parameter after a fixed number of
-turns.
+been played before by both players in the current game.
+It is useful as during self-play, AlphaZero typically drops its temperature
+parameter after a fixed number of turns.
 """
 function think(::AbstractPlayer, state, turn=nothing)
   @unimplemented
@@ -26,7 +26,8 @@ end
 """
     reset_player!(::AbstractPlayer)
 
-Reset the internal memory of a player. The default implementation does nothing.
+Reset the internal memory of a player (e.g. the MCTS tree).
+The default implementation does nothing.
 """
 function reset_player!(::AbstractPlayer)
   return
@@ -104,9 +105,11 @@ A player that selects actions using MCTS.
     MctsPlayer(mcts::MCTS.Env; τ, niters, timeout=nothing)
 
 Construct a player from an MCTS environment. When computing each move:
-- MCTS simulations are executed for `timeout` seconds by groups of `niters`
-  if the `timeout` parameter is provided
+
+- if `timeout` is provided,
+  MCTS simulations are executed for `timeout` seconds by groups of `niters`
 - otherwise, `niters` MCTS simulations are run
+
 The temperature parameter `τ` can be either a real number or a
 [`StepSchedule`](@ref).
 
@@ -216,7 +219,7 @@ Play a game between two [`AbstractPlayer`](@ref) and return the reward
 obtained by `white`.
 
 If the `memory` argument is provided, samples are automatically collected
-from this game.
+from this game (see [`MemoryBuffer`](@ref)).
 """
 function play(
     white::AbstractPlayer{Game}, black::AbstractPlayer{Game}, memory=nothing
@@ -243,6 +246,8 @@ end
 
 """
     self_play!(player, memory) = play(player, player, memory)
+
+Play a game against oneself while collecting samples.
 """
 self_play!(player, memory) = play(player, player, memory)
 
@@ -260,14 +265,13 @@ Policy for attributing colors in a duel between a baseline and a contender.
 """
     pit(handler, baseline, contender, ngames)
 
-Evaluate two players against each other on a series of games.
+Evaluate two `AbstractPlayer` against each other on a series of games.
 
 # Arguments
 
   - `handler`: this function is called after each simulated
      game with two arguments: the game number `i` and the collected reward `z`
      for the contender player
-  - `baseline, contender :: AbstractPlayer`
   - `ngames`: number of games to play
 
 # Optional keyword arguments
@@ -307,7 +311,8 @@ end
 
 Human player that queries the standard input for actions.
 
-Does not implement [`think`](@ref) but [`select_move`](@ref).
+Does not implement [`think`](@ref) but instead implements
+[`select_move`](@ref) directly.
 """
 struct Human{Game} <: AbstractPlayer{Game} end
 
@@ -328,8 +333,9 @@ end
 """
     interactive!(game, white, black)
 
-Launch an interactive session for `game` between players `white` and `black`.
-Both players have type `AbstractPlayer` and one of them is typically `Human`.
+Launch an interactive session for `game::AbstractGame` between players
+`white` and `black`. Both players have type `AbstractPlayer` and one of them
+is typically [`Human`](@ref).
 """
 function interactive!(game, white, black)
   try

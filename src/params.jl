@@ -133,16 +133,16 @@ end
 Parameters governing the learning phase of a training iteration, where
 the neural network is updated to fit the data in the memory buffer.
 
-| Parameter                     | Type                  | Default     |
-|:------------------------------|:----------------------|:------------|
-| `use_gpu`                     | `Bool`                | `true`      |
-| `gc_every`                    | `Union{Nothing, Int}` | `nothing`   |
-| `learning_rate`               | `Float32`             | `1f-3`      |
-| `l2_regularization`           | `Float32`             |  -          |
-| `nonvalidity_penalty`         | `Float32`             | `1f0`       |
-| `batch_size`                  | `Int`                 |  -          |
-| `loss_computation_batch_size` | `Int`                 |  -          |
-| `checkpoints`                 | `Vector{Int}`         |  -          |
+| Parameter                     | Type                    | Default     |
+|:------------------------------|:------------------------|:------------|
+| `use_gpu`                     | `Bool`                  | `true`      |
+| `gc_every`                    | `Union{Nothing, Int}`   | `nothing`   |
+| `optimiser`                   | [`OptimiserSpec`](@ref) |  -          |
+| `l2_regularization`           | `Float32`               |  -          |
+| `nonvalidity_penalty`         | `Float32`               | `1f0`       |
+| `batch_size`                  | `Int`                   |  -          |
+| `loss_computation_batch_size` | `Int`                   |  -          |
+| `checkpoints`                 | `Vector{Int}`           |  -          |
 
 # Description
 
@@ -210,7 +210,7 @@ end
 """
     Params
 
-Parameters for the AlphaZero training process.
+The AlphaZero parameters.
 
 | Parameter          | Type                                | Default   |
 |:-------------------|:------------------------------------|:----------|
@@ -229,9 +229,13 @@ iteration can be decomposed into a self-play phase
 (see [`SelfPlayParams`](@ref)) and a learning phase
 (see [`LearningParams`](@ref)).
 
-Set `ternary_rewards` to `true` if the rewards that are issued by
-the current game environment always belong to ``\\{-1, 0, 1\\}`` so that
-the logging and profiling tools can take advantage of this property.
+  - `ternary_rewards`: set to `true` if the rewards issued by
+    the game environment always belong to ``\\{-1, 0, 1\\}`` so that
+    the logging and profiling tools can take advantage of this property.
+  - `mem_buffer_size`: size schedule of the memory buffer, in terms of number
+    of samples. It is typical to start with a small memory buffer that is grown
+    progressively so as to wash out the initial low-quality self-play data
+    more quickly.
 
 # AlphaGo Zero Parameters
 
