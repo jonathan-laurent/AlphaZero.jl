@@ -5,9 +5,6 @@ interface and with any external oracle.
 """
 module MCTS
 
-# Note: probably due to a bug, the [`GameInterface`](@ref) reference in the
-# module docstring is not resolved, but `GameInterface.play!` is.
-
 using DataStructures: Stack
 using Distributions: Categorical, Dirichlet
 
@@ -175,7 +172,7 @@ mutable struct Env{Game, Board, Action, Oracle}
   # Workers
   workers :: Vector{Worker{Board, Action}}
   global_lock :: ReentrantLock
-  remaining :: Int # Iterations counters
+  remaining :: Int # Counts the number of remaining simulations to do
   # Parameters
   fill_batches :: Bool
   cpuct :: Float64
@@ -369,7 +366,6 @@ function worker_explore!(env::Env, worker::Worker, state, η)
   @assert isempty(worker.stack)
 end
 
-# Does not evaluate finite number of batches
 function inference_server(env::Env{G, B, A}) where {G, B, A}
   to_watch = env.workers
   while true

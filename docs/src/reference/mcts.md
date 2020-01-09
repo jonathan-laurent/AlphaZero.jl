@@ -1,4 +1,4 @@
-# MCTS
+# [MCTS](@id mcts)
 
 ```@meta
 CurrentModule = AlphaZero.MCTS

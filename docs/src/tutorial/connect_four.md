@@ -1,4 +1,4 @@
-# [Learning to Play Connect Four](@id connect-four)
+# [Learning to Play Connect Four](@id connect_four)
 
 In this section, we discuss how to use `AlphaZero.jl` to learn to play
 _Connect Four_ without any form of supervision or prior knowledge.
