@@ -12,10 +12,10 @@ makedocs(
     "Home" => "index.md",
     "Tutorial" => [
       "tutorial/alphazero_intro.md",
-      "tutorial/connect-four.md",
-      "tutorial/add_game.md"],
+      "tutorial/connect_four.md",
+      "tutorial/add_game.md",
+      "tutorial/codebase_overview.md"],
     "Reference" => [
-      "reference/overview.md",
       "reference/params.md",
       "reference/game_interface.md",
       "reference/mcts.md",
