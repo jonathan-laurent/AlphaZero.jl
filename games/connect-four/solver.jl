@@ -8,18 +8,20 @@
 module Solver
 
 import ..Game, ..history, ..WHITE, ..NUM_CELLS
-
-import AlphaZero: GI, GameInterface, AbstractPlayer, think
+import AlphaZero: GI, GameInterface, Benchmark, AbstractPlayer, think
 
 struct Player <: AbstractPlayer{Game}
   process :: Base.Process
-  ϵ_random :: Float32
   function Player(;
       solver_dir=joinpath(@__DIR__, "solver", "connect4"),
-      solver_name="c4solver", ϵ_random=0.)
+      solver_name="c4solver",
+      disable_stderr=true)
     cmd = Cmd(`./$solver_name`, dir=solver_dir)
+    if disable_stderr
+      cmd = pipeline(cmd, stderr=devnull)
+    end
     p = open(cmd, "r+")
-    return new(p, ϵ_random)
+    return new(p)
   end
 end
 
@@ -87,5 +89,7 @@ function think(p::Player, g, turn=nothing)
   π[opt] .= 1 / length(opt)
   return as, π
 end
+
+Benchmark.PerfectPlayer(::Type{Game}) = Player
 
 end

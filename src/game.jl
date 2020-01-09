@@ -1,5 +1,5 @@
 """
-A generic interface for zero-sum, symmetric games.
+A generic interface for symmetric, zero-sum games.
 """
 module GameInterface
 

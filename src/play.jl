@@ -54,11 +54,40 @@ A player that picks actions uniformly at random.
 """
 struct RandomPlayer{Game} <: AbstractPlayer{Game} end
 
-function think(player::RandomPlayer, state, turn)
+function think(player::RandomPlayer, state, turn=nothing)
   actions = GI.available_actions(state)
   n = length(actions)
   π = ones(n) ./ length(actions)
   return π
+end
+
+#####
+##### Epsilon-greedy player
+#####
+
+"""
+    EpsilonGreedyPlayer{Game, Player} <: AbstractPlayer{Game}
+
+A wrapper on a player that makes it choose a random move
+with a fixed ``ϵ`` probability.
+"""
+struct EpsilonGreedyPlayer{G, P} <: AbstractPlayer{G}
+  player :: P
+  ϵ :: Float64
+  function EpsilonGreedyPlayer(p::AbstractPlayer{G}, ϵ) where G
+    return new{G, typeof(p)}(p, ϵ)
+  end
+end
+
+function think(p::EpsilonGreedyPlayer, state, turn=nothing)
+  actions, π = think(p.player, state, turn)
+  n = length(actions)
+  η = ones(n) ./ n
+  return actions, (1 - p.ϵ) * π + p.ϵ * η
+end
+
+function reset!(p::EpsilonGreedyPlayer)
+  reset!(p.player)
 end
 
 #####

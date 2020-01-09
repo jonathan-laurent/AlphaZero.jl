@@ -25,6 +25,7 @@ Benchmark.Full
 Benchmark.NetworkOnly
 Benchmark.MctsRollouts
 Benchmark.MinMaxTS
+Benchmark.Solver
 ```
 
 ## Minmax Baseline

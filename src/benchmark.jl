@@ -4,10 +4,10 @@ Utilities to evaluate players against one another.
 module Benchmark
 
 import ..Util.@unimplemented
-import ..Env, ..AbstractPlayer, ..AbstractNetwork, ..NetworkPlayer
-import ..MCTS, ..MctsParams, ..MctsPlayer, ..pit
+import ..AbstractNetwork, ..MinMax, ..GI
+import ..Env, ..MCTS, ..MctsParams, ..pit
 import ..ColorPolicy, ..ALTERNATE_COLORS
-import ..MinMax, ..GI
+import ..AbstractPlayer, ..EpsilonGreedyPlayer, ..NetworkPlayer, ..MctsPlayer
 
 using ProgressMeter
 
@@ -185,6 +185,27 @@ name(p::MinMaxTS) = "MinMax (depth $(p.depth))"
 
 function instantiate(p::MinMaxTS, ::AbstractNetwork{G}) where G
   return MinMax.Player{G}(depth=p.depth, τ=p.τ)
+end
+
+"""
+    Benchmark.Solver(;ϵ) <: Benchmark.Player
+
+Perfect solver that plays randomly with probability `ϵ`.
+"""
+struct Solver <: Player
+  ϵ :: Float64
+  Solver(;ϵ) = new(ϵ)
+end
+
+# Return the type of the perfect player for a given type of game
+function PerfectPlayer(::Type{<:GI.AbstractGame})
+  @unimplemented
+end
+
+name(p::Solver) = "Perfect Player ($(round(Int, 100 * p.ϵ))% random)"
+
+function instantiate(p::Solver, nn::AbstractNetwork{G}) where G
+  return EpsilonGreedyPlayer(PerfectPlayer(G)(), p.ϵ)
 end
 
 end

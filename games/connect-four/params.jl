@@ -76,4 +76,9 @@ benchmark = [
     Benchmark.Full(deployed_mcts),
     Benchmark.MinMaxTS(depth=4, τ=0.2),
     num_games=(DEBUG ? 1 : 400),
+    color_policy=CONTENDER_WHITE),
+  Benchmark.Duel(
+    Benchmark.Full(deployed_mcts),
+    Benchmark.Solver(ϵ=0.1),
+    num_games=(DEBUG ? 1 : 400),
     color_policy=CONTENDER_WHITE)]

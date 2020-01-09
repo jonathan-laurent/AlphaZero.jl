@@ -9,7 +9,7 @@ export MCTS, MinMax, GameInterface, GI, Report, Network, Benchmark
 export Params, SelfPlayParams, LearningParams, ArenaParams
 export MctsParams, MemAnalysisParams
 export Env, train!, learning!, self_play!, get_experience
-export AbstractPlayer, interactive!, MctsPlayer, Human
+export AbstractGame, AbstractPlayer, interactive!, MctsPlayer, Human
 export ColorPolicy, ALTERNATE_COLORS, BASELINE_WHITE, CONTENDER_WHITE
 export Session, resume!, save, explore, play_game, run_new_benchmark
 export AbstractNetwork, OptimiserSpec, Momentum, CyclicMomentum
@@ -21,7 +21,7 @@ import .Util
 using .Util: Option, @unimplemented
 
 include("game.jl")
-import .GameInterface
+using .GameInterface
 const GI = GameInterface
 
 include("mcts.jl")
