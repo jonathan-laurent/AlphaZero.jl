@@ -60,7 +60,7 @@ params = Params(
     num_game_stages=4),
   mem_buffer_size=PLSchedule(
   [      0,        40],
-  [200_000, 2_000_000]))
+  [150_000, 2_000_000]))
 
 deployed_mcts = MctsParams(self_play.mcts,
   temperature=StepSchedule(COLD_TEMPERATURE))
