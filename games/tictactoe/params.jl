@@ -110,6 +110,8 @@ function get_params(mode=:full)
     learning=learning,
     num_iters=num_iters,
     mem_buffer_size=mem_buffer_size,
+    memory_analysis=MemAnalysisParams(
+      num_game_stages=4),
     ternary_rewards=true)
 
   benchmark = [

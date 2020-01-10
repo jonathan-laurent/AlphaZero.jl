@@ -54,9 +54,10 @@ params = Params(
   arena=arena,
   self_play=self_play,
   learning=learning,
-  memory_analysis=nothing,
   num_iters=120,
   ternary_rewards=true,
+  memory_analysis=MemAnalysisParams(
+    num_game_stages=4),
   mem_buffer_size=PLSchedule(
   [      0,        40],
   [200_000, 2_000_000]))

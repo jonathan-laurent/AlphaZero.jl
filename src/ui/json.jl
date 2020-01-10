@@ -14,7 +14,8 @@ for T in [
     # Network Hyperparameters
     SimpleNetHP, ResNetHP,
     # Parameters
-    MctsParams, ArenaParams, SelfPlayParams, LearningParams, Params,
+    Params, SelfPlayParams, LearningParams, ArenaParams,
+    MctsParams, MemAnalysisParams,
     # Optimisers
     Momentum, CyclicMomentum,
     # Schedules

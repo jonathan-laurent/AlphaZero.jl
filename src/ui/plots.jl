@@ -57,7 +57,7 @@ function performances_plot(rep::Report.Iteration)
         title="Self Play") end end
   # Learning details
   learning = Plots.pie(
-    ["Samples Conversion", "Loss computation", "Optimization", "Evaluation"],
+    ["Samples conversion", "Loss computation", "Optimization", "Evaluation"],
     [ rep.learning.time_convert,
       rep.learning.time_loss,
       rep.learning.time_train,
@@ -78,9 +78,6 @@ function plot_iteration(
   pplot = performances_plot(report)
   Plots.savefig(pplot, joinpath(dir, "performances"))
 end
-# To test:
-# params, ireps, vreps = AlphaZero.get_reports("sessions/connect-four")
-# AlphaZero.plot_iteration(ireps[end], params, "TEST")
 
 #####
 ##### Training summary plots
@@ -170,14 +167,16 @@ function plot_training(
     legend=:none,
     xlabel="Iteration number")
   Plots.hline!(arena, [0, params.arena.update_threshold])
+  # Loss on the full memory after an iteration
+  lfmt = "Loss on Full Memory (when iteration starts)"
+  losses_fullmem = plot_losses(1:n, lfmt) do i
+    iterations[i].learning.initial_status.loss
+  end
   # Plots related to the memory analysis
   if all(it -> !isnothing(it.memory), iterations)
     # Loss on last batch
-    losses_last = plot_losses(1:n, "Loss on last batch") do i
+    losses_last = plot_losses(1:n, "Loss on Last Batch") do i
       iterations[i].memory.latest_batch.status.loss
-    end
-    losses_fullmem = plot_losses(1:n, "Loss on full memory") do i
-      iterations[i].memory.all_samples.status.loss
     end
     # Loss per game stage
     nstages = minimum(length(it.memory.per_game_stage) for it in iterations)
@@ -191,8 +190,8 @@ function plot_training(
         label="$s",
         color=colors[s])
     end
-    append!(plots, [losses_last, losses_fullmem, losses_ps])
-    append!(files, ["loss_last_batch", "loss_fullmem", "loss_per_stage"])
+    append!(plots, [losses_last, losses_ps])
+    append!(files, ["loss_last_batch", "loss_per_stage"])
   end
   # Policies entropy
   entropies = Plots.plot(1:n,
@@ -205,8 +204,10 @@ function plot_training(
     [it.learning.initial_status.Hpnet for it in iterations],
     label="Network")
   # Assembling everything together
-  append!(plots, [arena, entropies, nsamples, expdepth])
-  append!(files, ["arena", "entropies", "nsamples", "exploration_depth"])
+  append!(plots,
+    [arena, entropies, nsamples, expdepth, losses_fullmem])
+  append!(files,
+    ["arena", "entropies", "nsamples", "exploration_depth", "loss"])
   for (file, plot) in zip(files, plots)
     Plots.savefig(plot, joinpath(dir, file))
   end

@@ -43,7 +43,7 @@ const GAME = ENV["GAME"]
 ##### Main
 #####
 
-const SelectedGame = GAME_MODULE[GAME]
+SelectedGame = GAME_MODULE[GAME]
 using .SelectedGame: Game, Training
 
 const SESSION_DIR = joinpath("sessions", GAME)
