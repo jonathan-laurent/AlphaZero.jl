@@ -28,9 +28,8 @@ any idea, feedback or suggestion.
 
 #### Add support for a new game
 
-The simplest way to contribute to `AlphaZero.jl` is probably to add support
-for a new game and demonstrate AlphaZero on it.
-Games that we would be excited to see being added include:
+The simplest way to contribute to `AlphaZero.jl` is to add support
+for new games. Interesting candidates include:
 Othello, [Gobblet](https://en.wikipedia.org/wiki/Gobblet), Go 9x9, Chess...
 
 Guidelines for including new games are available [here](@ref add_game).
@@ -67,7 +66,7 @@ To add a new interface option, we recommend that you proceed as follows:
 A first step may be to add support for nonsymmetric games. Then, a more
 ambitious goal would be to add support for games with imperfect information.
 Note that how to best adapt the AlphaZero approach to those games is pretty much
-an open question though.
+an open question.
 
 On the engineering side, it may be nice to replace the current
 [game interface](@ref game_interface) by something more standard such as
