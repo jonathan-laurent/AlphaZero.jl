@@ -37,12 +37,11 @@ if !haskey(ENV, "GAME")
   exit()
 end
 
-const GAME = ENV["GAME"]
-
 #####
 ##### Main
 #####
 
+GAME = ENV["GAME"]
 SelectedGame = GAME_MODULE[GAME]
 using .SelectedGame: Game, Training
 

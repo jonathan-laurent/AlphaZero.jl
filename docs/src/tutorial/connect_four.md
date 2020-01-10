@@ -8,8 +8,8 @@ is still a great challenge for reinforcement learning.[^1]
 
 [^1]:
     To the best of our knowledge, none of the many existing Python
-    implementations of AlphaZero are able to learn a player that beats a simple
-    minmax baseline (that plans at depth at least 2) on a single desktop computer.
+    implementations of AlphaZero are able to learn a player that beats a
+    minmax baseline that plans at depth 2 on a single desktop computer.
 
 ## Setup
 

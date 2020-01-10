@@ -1,8 +1,8 @@
 using AlphaZero
 
 include("games.jl")
-const GAME = get(ENV, "GAME", "tictactoe")
-const SelectedGame = GAME_MODULE[GAME]
+GAME = get(ENV, "GAME", "tictactoe")
+SelectedGame = GAME_MODULE[GAME]
 using .SelectedGame: Game
 
 game = Game()

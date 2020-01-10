@@ -1,24 +1,28 @@
-using Revise
+#####
+##### Profile Asynchronous MCTS to figure out the optimal number of workers
+#####
+
 using AlphaZero
 using ProgressMeter
 using Plots
 
-# It is important not to profile async mcts on tic tac toe as the number
+# It is important not to profile async mcts on tictactoe as the number
 # of states in this game is small and so the mcts tree quickly contains
 # every state.
-include("../using_game.jl")
-@using_game "connect-four"
 
-REP = 500
-NUM_ITERATIONS = 512
-MAX_LOG_NWORKERS = 9 # 2^9 = 512
+include("../games.jl")
+GAME = get(ENV, "GAME", "connect-four")
+SelectedGame = GAME_MODULE[GAME]
+using .SelectedGame: Game, Training
+
+REP = 100
+NUM_ITERATIONS = 256
+MAX_LOG_NWORKERS = 8 # 2^8 = 256
 
 TIME_FIG = "mcts_speed"
 INFERENCE_TIME_RATIO_FIG = "inference_time_ratio"
 
-network = SimpleNet{Game}(SimpleNetHP(
-  width=500,
-  depth_common=4))
+network = Training.Network{Game}(Training.netparams)
 
 function profile(nworkers, ngames)
   mcts = MCTS.Env{Game}(network, nworkers=nworkers, cpuct=1.)

@@ -35,10 +35,10 @@ For more details, we recommend the following resources.
 
 ### External resources
 
+- A short and effective introduction to AlphaZero is Surag Nair's
+   [excellent tutorial](https://web.stanford.edu/~surag/posts/alphazero.html).
 - A good resource to learn about Monte Carlo Tree Search (MCTS) is this
    [Int8 tutorial](https://int8.io/monte-carlo-tree-search-beginners-guide/).
-- A simple and effective introduction to AlphaZero is Surag Nair's
-   [excellent tutorial](https://web.stanford.edu/~surag/posts/alphazero.html).
 - Then, DeepMind's original
    [Nature paper](https://www.nature.com/articles/nature24270)
    is a nice read.

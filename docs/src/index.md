@@ -22,11 +22,9 @@ have exciting applications in many different research areas.
 ### What does make this implementation fast and why does it matter?
 
 Because AlphaZero is resource-hungry, successful open-source
-implementations (such as
-  [Leela Zero](https://github.com/leela-zero/leela-zero/tree/next/src))
-are written in low-level languages (such as C++) and optimized to work
-on large, distributed clusters. This makes them hardly accessible for
-researchers and hackers.
+implementations (such as [Leela Zero](https://github.com/leela-zero/leela-zero))
+consist in large and complex codebases written in low-level languages (such
+as C++). This makes them hardly accessible for students, researchers and hackers.
 
 Many simple Python implementations can be found on Github, but none of them is
 able to beat a reasonable baseline on games such as _Connect Four_ or
@@ -35,7 +33,7 @@ _Othello_. As an illustration, the benchmark in the README of the
 features a _random_ baseline, along with a _greedy_ baseline that
 does not appear to be significantly stronger.
 
-`AlphaZero.jl` is designed to be as simple as those implementations.
+`AlphaZero.jl` is designed to be as simple as those Python implementations.
 In addition, it is about two orders of magnitude faster, making it possible
 to solve nontrivial games on a standard desktop computer with a GPU.
 This gain comes mostly from two sources:

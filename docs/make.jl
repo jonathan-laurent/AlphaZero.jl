@@ -12,8 +12,9 @@ makedocs(
     "Home" => "index.md",
     "Tutorial" => [
       "tutorial/alphazero_intro.md",
-      "tutorial/connect_four.md",
-      "tutorial/codebase_overview.md"],
+      "tutorial/connect_four.md"
+      #"tutorial/codebase_overview.md"
+    ],
     "Reference" => [
       "reference/params.md",
       "reference/game_interface.md",
@@ -29,7 +30,8 @@ makedocs(
     ],
     "Contributing" => [
       "contributing/guide.md",
-      "contributing/add_game.md"]
+      "contributing/add_game.md"
+    ]
   ],
   repo="https://github.com/jonathan-laurent/AlphaZero.jl/blob/{commit}{path}#L{line}"
 )
