@@ -1,7 +1,5 @@
 const DEBUG = get(ENV, "TRAINING_MODE", "") == "debug"
 
-const COLD_TEMPERATURE = 0.5
-
 Network = ResNet
 
 netparams = ResNetHP(
@@ -15,7 +13,6 @@ netparams = ResNetHP(
 self_play = SelfPlayParams(
   num_games=(DEBUG ? 1 : 5_000),
   reset_mcts_every=1_000,
-  gc_every=nothing,
   mcts=MctsParams(
     use_gpu=true,
     num_workers=64,
@@ -24,7 +21,7 @@ self_play = SelfPlayParams(
     temperature=StepSchedule(
       start=1.0,
       change_at=[8],
-      values=[COLD_TEMPERATURE]),
+      values=[0.5]),
     dirichlet_noise_ϵ=0.2,
     dirichlet_noise_α=1.0))
 
@@ -32,14 +29,15 @@ arena = ArenaParams(
   num_games=(DEBUG ? 1 : 200),
   reset_mcts_every=nothing,
   update_threshold=(2 * 0.55 - 1),
-  mcts=MctsParams(self_play.mcts,
-    temperature=StepSchedule(COLD_TEMPERATURE)))
+  mcts=MctsParams(
+    self_play.mcts,
+    temperature=StepSchedule(0.3),
+    dirichlet_noise_ϵ=0.1))
 
 learning = LearningParams(
   samples_weighing_policy=LOG_WEIGHT,
   batch_size=512,
   loss_computation_batch_size=1024,
-  gc_every=nothing,
   optimiser=CyclicMomentum(
     lr_base=1e-2,
     lr_high=1e-1,
@@ -62,23 +60,17 @@ params = Params(
   [      0,        40],
   [150_000, 2_000_000]))
 
-deployed_mcts = MctsParams(self_play.mcts,
-  temperature=StepSchedule(COLD_TEMPERATURE))
+baselines = [
+  Benchmark.MctsRollouts(
+    MctsParams(arena.mcts, num_iters_per_turn=1000)),
+  Benchmark.MinMaxTS(depth=5, τ=0.2),
+  Benchmark.Solver(ϵ=0.05)]
 
-benchmark = [
+make_duel(baseline) =
   Benchmark.Duel(
-    Benchmark.Full(deployed_mcts),
-    Benchmark.MctsRollouts(
-      MctsParams(deployed_mcts, num_iters_per_turn=1000)),
+    Benchmark.Full(arena.mcts),
+    baseline,
     num_games=(DEBUG ? 1 : 200),
-    color_policy=CONTENDER_WHITE),
-  Benchmark.Duel(
-    Benchmark.Full(deployed_mcts),
-    Benchmark.MinMaxTS(depth=5, τ=0.2),
-    num_games=(DEBUG ? 1 : 200),
-    color_policy=CONTENDER_WHITE),
-  Benchmark.Duel(
-    Benchmark.Full(deployed_mcts),
-    Benchmark.Solver(ϵ=0.1),
-    num_games=(DEBUG ? 1 : 200),
-    color_policy=CONTENDER_WHITE)]
+    color_policy=CONTENDER_WHITE)
+
+benchmark = make_duel.(baselines)
