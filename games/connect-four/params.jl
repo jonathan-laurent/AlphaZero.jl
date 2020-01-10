@@ -1,6 +1,6 @@
 const DEBUG = get(ENV, "TRAINING_MODE", "") == "debug"
 
-const COLD_TEMPERATURE = 0.
+const COLD_TEMPERATURE = 0.5
 
 Network = ResNet
 
