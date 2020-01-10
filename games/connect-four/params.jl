@@ -29,7 +29,7 @@ self_play = SelfPlayParams(
     dirichlet_noise_α=1.0))
 
 arena = ArenaParams(
-  num_games=(DEBUG ? 1 : 400),
+  num_games=(DEBUG ? 1 : 200),
   reset_mcts_every=nothing,
   update_threshold=(2 * 0.55 - 1),
   mcts=MctsParams(self_play.mcts,
@@ -70,15 +70,15 @@ benchmark = [
     Benchmark.Full(deployed_mcts),
     Benchmark.MctsRollouts(
       MctsParams(deployed_mcts, num_iters_per_turn=1000)),
-    num_games=(DEBUG ? 1 : 400),
+    num_games=(DEBUG ? 1 : 200),
     color_policy=CONTENDER_WHITE),
   Benchmark.Duel(
     Benchmark.Full(deployed_mcts),
     Benchmark.MinMaxTS(depth=5, τ=0.2),
-    num_games=(DEBUG ? 1 : 400),
+    num_games=(DEBUG ? 1 : 200),
     color_policy=CONTENDER_WHITE),
   Benchmark.Duel(
     Benchmark.Full(deployed_mcts),
     Benchmark.Solver(ϵ=0.1),
-    num_games=(DEBUG ? 1 : 400),
+    num_games=(DEBUG ? 1 : 200),
     color_policy=CONTENDER_WHITE)]
