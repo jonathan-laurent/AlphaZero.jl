@@ -92,7 +92,7 @@ function run(env::Env, duel::Duel, progress=nothing)
   let games = Vector{Float64}(undef, duel.num_games)
     avgz, time = @timed begin
       pit(
-        baseline, player, duel.num_games,
+        player, baseline, duel.num_games,
         reset_every=duel.reset_every, color_policy=duel.color_policy) do i, z
           games[i] = z
           isnothing(progress) || next!(progress)

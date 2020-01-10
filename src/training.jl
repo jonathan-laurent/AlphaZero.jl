@@ -131,7 +131,7 @@ function evaluate_network(baseline, contender, params, handler)
   contender = MctsPlayer(contender, params.mcts)
   ngames = params.num_games
   rp = params.reset_mcts_every
-  return pit(baseline, contender, ngames; reset_every=rp) do i, z
+  return pit(contender, baseline, ngames; reset_every=rp) do i, z
     Handlers.checkpoint_game_played(handler)
   end
 end

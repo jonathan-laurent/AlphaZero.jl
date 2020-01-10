@@ -263,7 +263,7 @@ Policy for attributing colors in a duel between a baseline and a contender.
 @enum ColorPolicy ALTERNATE_COLORS BASELINE_WHITE CONTENDER_WHITE
 
 """
-    pit(handler, baseline, contender, ngames)
+    pit(handler, contender, baseline, ngames)
 
 Evaluate two `AbstractPlayer` against each other on a series of games.
 
@@ -280,7 +280,7 @@ Evaluate two `AbstractPlayer` against each other on a series of games.
     which is `ALTERNATE_COLORS` by default
 """
 function pit(
-    handler, baseline::AbstractPlayer, contender::AbstractPlayer, num_games;
+    handler, contender::AbstractPlayer, baseline::AbstractPlayer, num_games;
     reset_every=nothing, color_policy=ALTERNATE_COLORS)
   baseline_white = (color_policy != CONTENDER_WHITE)
   zsum = 0.
