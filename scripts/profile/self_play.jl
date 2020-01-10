@@ -4,6 +4,8 @@ using AlphaZero
 using AlphaZero.Log
 using Formatting
 
+const REPEAT = 200
+
 #####
 ##### Profiling utilities
 #####
@@ -29,7 +31,7 @@ function profile_self_play(configs::Vector)
     ("EXPD", expd, s -> s[3])])
   for (title, net, params) in configs
     profile_self_play(net, params, 1) # Compilation
-    rep = profile_self_play(net, params, 50)
+    rep = profile_self_play(net, params, REPEAT)
     Log.table_row(log, tab, rep, [title])
   end
 end
@@ -53,12 +55,9 @@ function config(nblocks, nfilters, niters, nworkers)
   return (title, network, params)
 end
 
-# We want 5000 games per iteration?
-# Iteration: self-play=1h
-# Therefore, we want to simulate 100 games per minute
-
 profile_self_play([
-  config(7, 128, 400, 64),
-  config(7, 128, 800, 64),
-  config(7, 128, 800, 128),
+  config( 7,  64, 400, 64),
+  config( 7, 128, 400, 64),
+  config(10, 128, 400, 64),
+  config(10, 128, 320, 64),
 ])
