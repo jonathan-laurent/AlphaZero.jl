@@ -121,13 +121,13 @@ function Base.getindex(s::StepSchedule, i::Int)
 end
 
 """
-    CyclicSchedule(start, mid; n, xmax)
+    CyclicSchedule(base, mid, term; n, xmid=0.45, xback=0.90)
 
-Return a [`PLSchedule`](@ref) that describes a cycle from `start` to `mid`
-and then back to `start`.
+Return the [`PLSchedule`](@ref) that is typically used for cyclic
+learning rate scheduling.
 """
-function CyclicSchedule(start, mid; n, xmax)
-  xmid = floor(Int, xmax * n / 2)
-  xend = floor(Int, xmax * n)
-  return PLSchedule([1, xmid, xend], [start, mid, start])
+function CyclicSchedule(base, mid, term; n, xmid=0.45, xback=0.90)
+  nmid  = floor(Int, xmid * n)
+  nback = floor(Int, xback * n)
+  return PLSchedule([1, nmid, nback, n], [base, mid, base, term])
 end

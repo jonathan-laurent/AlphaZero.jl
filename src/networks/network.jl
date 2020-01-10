@@ -195,7 +195,7 @@ SGD optimiser with momentum.
 end
 
 """
-    CyclicMomentum(; lr_low, lr_high, momentum_low, momentum_high)
+    CyclicMomentum(; lr_base, lr_high, lr_low, momentum_low, momentum_high)
 
 SGD optimiser with a cyclic momentum and learning rate.
 
@@ -205,8 +205,9 @@ SGD optimiser with a cyclic momentum and learning rate.
     to low values and then back to high values.
 """
 @kwdef struct CyclicMomentum <: OptimiserSpec
-  lr_low :: Float32
+  lr_base :: Float32
   lr_high :: Float32
+  lr_low  :: Float32
   momentum_low :: Float32
   momentum_high :: Float32
 end

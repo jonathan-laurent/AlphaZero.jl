@@ -102,8 +102,14 @@ end
 
 function Network.train!(nn::KNetwork, opt::CyclicMomentum, loss, data)
   n = length(data)
-  lr = CyclicSchedule(opt.lr_low, opt.lr_high, n=n, xmax=0.9)
-  momentum = CyclicSchedule(opt.momentum_high, opt.momentum_low, n=n, xmax=0.9)
+  lr = CyclicSchedule(
+    opt.lr_base,
+    opt.lr_high,
+    opt.lr_low, n=n)
+  momentum = CyclicSchedule(
+    opt.momentum_high,
+    opt.momentum_low,
+    opt.momentum_high, n=n)
   optimiser = Knet.Momentum(lr=opt.lr_low, gamma=opt.momentum_high)
   for (i, _) in enumerate(Knet.minimize(loss, data, optimiser))
     optimiser.lr = lr[i]
