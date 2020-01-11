@@ -17,7 +17,7 @@ for T in [
     Params, SelfPlayParams, LearningParams, ArenaParams,
     MctsParams, MemAnalysisParams,
     # Optimisers
-    Momentum, CyclicMomentum,
+    Nesterov, CyclicNesterov,
     # Schedules
     PLSchedule, StepSchedule
   ]
@@ -29,7 +29,7 @@ end
 JSON3.StructType(::Type{OptimiserSpec}) = JSON3.AbstractType()
 JSON3.subtypekey(::Type{OptimiserSpec}) = :type
 JSON3.subtypes(::Type{OptimiserSpec}) =
-  (momentum=Momentum, cyclic_momentum=CyclicMomentum)
+  (nesterov=Nesterov, cyclic_nesterov=CyclicNesterov)
 
 JSON3.StructType(::Type{<:AbstractSchedule}) = JSON3.AbstractType()
 JSON3.subtypekey(::Type{<:AbstractSchedule}) = :type

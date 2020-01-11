@@ -69,6 +69,6 @@ copy(::AbstractNetwork)
 
 ```@docs
 OptimiserSpec
-Momentum
-CyclicMomentum
+Nesterov
+CyclicNesterov
 ```

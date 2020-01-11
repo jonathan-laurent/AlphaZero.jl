@@ -3,7 +3,7 @@ A generic, framework agnostic interface for neural networks.
 """
 module Network
 
-export AbstractNetwork, OptimiserSpec, Momentum, CyclicMomentum
+export AbstractNetwork, OptimiserSpec, Nesterov, CyclicNesterov
 
 import ..MCTS, ..GameInterface, ..Util
 
@@ -185,26 +185,26 @@ Abstract type for an optimiser specification.
 abstract type OptimiserSpec end
 
 """
-    Momentum(; lr, momentum)
+    Nesterov(; lr, momentum)
 
-SGD optimiser with momentum.
+SGD optimiser with Nesterov momentum.
 """
-@kwdef struct Momentum <: OptimiserSpec
+@kwdef struct Nesterov <: OptimiserSpec
   lr :: Float32
   momentum :: Float32
 end
 
 """
-    CyclicMomentum(; lr_base, lr_high, lr_low, momentum_low, momentum_high)
+    CyclicNesterov(; lr_base, lr_high, lr_low, momentum_low, momentum_high)
 
-SGD optimiser with a cyclic momentum and learning rate.
+SGD optimiser with a cyclic learning rate and cyclic Nesterov momentum.
 
   - During an epoch, the learning rate goes from `lr_low`
     to `lr_high` and then back to `lr_low`.
   - The momentum evolves in the opposite way, from high values
     to low values and then back to high values.
 """
-@kwdef struct CyclicMomentum <: OptimiserSpec
+@kwdef struct CyclicNesterov <: OptimiserSpec
   lr_base :: Float32
   lr_high :: Float32
   lr_low  :: Float32

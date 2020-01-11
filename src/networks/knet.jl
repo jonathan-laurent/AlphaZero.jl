@@ -96,11 +96,11 @@ Network.convert_input(nn::KNetwork, x) =
 Network.convert_output(::KNetwork, x) = x
 Network.convert_output(::KNetwork, x::Knet.KnetArray) = Array(x)
 
-function Network.train!(nn::KNetwork, opt::Momentum, loss, data)
+function Network.train!(nn::KNetwork, opt::Nesterov, loss, data)
   Knet.momentum(loss, data, lr=opt.lr, gamma=opt.momentum) |> collect
 end
 
-function Network.train!(nn::KNetwork, opt::CyclicMomentum, loss, data)
+function Network.train!(nn::KNetwork, opt::CyclicNesterov, loss, data)
   n = length(data)
   lr = CyclicSchedule(
     opt.lr_base,
@@ -110,7 +110,7 @@ function Network.train!(nn::KNetwork, opt::CyclicMomentum, loss, data)
     opt.momentum_high,
     opt.momentum_low,
     opt.momentum_high, n=n)
-  optimiser = Knet.Momentum(lr=opt.lr_low, gamma=opt.momentum_high)
+  optimiser = Knet.Nesterov(lr=opt.lr_low, gamma=opt.momentum_high)
   for (i, _) in enumerate(Knet.minimize(loss, data, optimiser))
     optimiser.lr = lr[i]
     optimiser.gamma = momentum[i]

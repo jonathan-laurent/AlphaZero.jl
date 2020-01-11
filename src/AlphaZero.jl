@@ -13,7 +13,7 @@ export AbstractGame, AbstractPlayer, interactive!, MctsPlayer, Human
 export SamplesWeighingPolicy, CONSTANT_WEIGHT, LOG_WEIGHT, LINEAR_WEIGHT
 export ColorPolicy, ALTERNATE_COLORS, BASELINE_WHITE, CONTENDER_WHITE
 export Session, resume!, save, explore, play_game, run_new_benchmark
-export AbstractNetwork, OptimiserSpec, Momentum, CyclicMomentum
+export AbstractNetwork, OptimiserSpec, Nesterov, CyclicNesterov
 export SimpleNet, SimpleNetHP, ResNet, ResNetHP
 export AbstractSchedule, PLSchedule, StepSchedule
 
