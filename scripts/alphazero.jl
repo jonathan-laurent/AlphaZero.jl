@@ -6,6 +6,9 @@
 # ENV["CUARRAYS_MEMORY_LIMIT"] = 7_500_000_000
 ENV["CUARRAYS_MEMORY_POOL"] = "split" # "binned" / "split"
 
+# Enables running the script on a distant machine without an X server
+ENV["GKSwstype"]="nul"
+
 using AlphaZero
 include("games.jl")
 
