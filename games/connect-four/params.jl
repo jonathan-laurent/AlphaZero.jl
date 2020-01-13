@@ -3,25 +3,25 @@ const DEBUG = get(ENV, "TRAINING_MODE", "") == "debug"
 Network = ResNet
 
 netparams = ResNetHP(
-  num_filters=128,
-  num_blocks=8,
+  num_filters=64,
+  num_blocks=7,
   conv_kernel_size=(3, 3),
   num_policy_head_filters=4,
   num_value_head_filters=32,
-  batch_norm_momentum=0.6)
+  batch_norm_momentum=0.7)
 
 self_play = SelfPlayParams(
-  num_games=(DEBUG ? 1 : 5_000),
+  num_games=(DEBUG ? 1 : 4_000),
   reset_mcts_every=1_000,
   mcts=MctsParams(
     use_gpu=true,
     num_workers=64,
-    num_iters_per_turn=400,
-    cpuct=3,
+    num_iters_per_turn=320,
+    cpuct=2.0,
     temperature=StepSchedule(
       start=1.0,
       change_at=[8],
-      values=[0.5]),
+      values=[0.4]),
     dirichlet_noise_ϵ=0.2,
     dirichlet_noise_α=1.0))
 
@@ -31,7 +31,10 @@ arena = ArenaParams(
   update_threshold=(2 * 0.55 - 1),
   mcts=MctsParams(
     self_play.mcts,
-    temperature=StepSchedule(0.3),
+    temperature=StepSchedule(
+      start=0.3,
+      change_at=[8],
+      values=[0.1]),
     dirichlet_noise_ϵ=0.1))
 
 learning = LearningParams(
@@ -57,20 +60,24 @@ params = Params(
   memory_analysis=MemAnalysisParams(
     num_game_stages=4),
   mem_buffer_size=PLSchedule(
-  [      0,        40],
-  [150_000, 2_000_000]))
+  [      0,        60],
+  [150_000, 1_500_000]))
 
 baselines = [
   Benchmark.MctsRollouts(
-    MctsParams(arena.mcts, num_iters_per_turn=1000)),
-  Benchmark.MinMaxTS(depth=5, τ=0.2),
-  Benchmark.Solver(ϵ=0.05)]
+    MctsParams(
+      arena.mcts,
+      num_iters_per_turn=1000,
+      cpuct=1.)),
+  Benchmark.MinMaxTS(depth=5, τ=0.2)]
+
+# push!(baselines, Benchmark.Solver(ϵ=0.05))
 
 make_duel(baseline) =
   Benchmark.Duel(
     Benchmark.Full(arena.mcts),
     baseline,
-    num_games=(DEBUG ? 1 : 200),
+    num_games=(DEBUG ? 1 : 100),
     color_policy=CONTENDER_WHITE)
 
 benchmark = make_duel.(baselines)
