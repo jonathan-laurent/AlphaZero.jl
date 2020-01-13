@@ -185,16 +185,6 @@ Abstract type for an optimiser specification.
 abstract type OptimiserSpec end
 
 """
-    Nesterov(; lr, momentum)
-
-SGD optimiser with Nesterov momentum.
-"""
-@kwdef struct Nesterov <: OptimiserSpec
-  lr :: Float32
-  momentum :: Float32
-end
-
-"""
     CyclicNesterov(; lr_base, lr_high, lr_low, momentum_low, momentum_high)
 
 SGD optimiser with a cyclic learning rate and cyclic Nesterov momentum.
@@ -213,15 +203,16 @@ SGD optimiser with a cyclic learning rate and cyclic Nesterov momentum.
 end
 
 """
-    train!(::AbstractNetwork, opt::OptimiserSpec, loss, data)
+    train!(callback, ::AbstractNetwork, opt::OptimiserSpec, loss, data)
 
 Update a given network to fit some data.
-  - [`opt::OptimiserSpec`](@ref OptimiserSpec) specified which optimiser
-    to use
+  - [`opt`](@ref OptimiserSpec) specifies which optimiser to use
   - `loss` is a function that maps a batch of samples to a tracked real
   - `data` is an iterator over minibatches
+  - `callback(i, loss)` is called at each step with the batch number `i`
+     and the loss on last batch
 """
-function train!(::AbstractNetwork, opt::OptimiserSpec, loss, data)
+function train!(handle, ::AbstractNetwork, opt::OptimiserSpec, loss, data)
   @unimplemented
 end
 

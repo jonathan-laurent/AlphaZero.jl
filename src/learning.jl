@@ -110,8 +110,12 @@ function training_epoch!(tr::Trainer)
       Network.gc(tr.network)
     end
   end
-  Network.train!(tr.network, tr.params.optimiser, loss, data)
+  ls = Vector{Float32}()
+  Network.train!(tr.network, tr.params.optimiser, loss, data) do i, l
+    push!(ls, l)
+  end
   Network.gc(tr.network)
+  return ls
 end
 
 #####

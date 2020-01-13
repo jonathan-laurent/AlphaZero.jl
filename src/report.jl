@@ -69,9 +69,11 @@ Report generated after each learning epoch.
 
 - `status_after`: learning status after the epoch, as an object of type
     [`Report.LearningStatus`](@ref)
+- `losses`: loss value on each minibatch
 """
 struct Epoch
   status_after :: LearningStatus
+  losses :: Vector{Float32}
 end
 
 """

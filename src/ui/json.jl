@@ -17,7 +17,7 @@ for T in [
     Params, SelfPlayParams, LearningParams, ArenaParams,
     MctsParams, MemAnalysisParams,
     # Optimisers
-    Nesterov, CyclicNesterov,
+    CyclicNesterov,
     # Schedules
     PLSchedule, StepSchedule
   ]

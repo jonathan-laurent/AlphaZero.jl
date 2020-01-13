@@ -152,10 +152,11 @@ function learning!(env::Env, handler)
   # Loop over epochs
   for k in 1:maximum(lp.checkpoints)
     # Execute learning epoch
-    ttrain += @elapsed training_epoch!(trainer)
+    losses, dttrain = @timed training_epoch!(trainer)
     status, dtloss = @timed learning_status(trainer)
     tloss += dtloss
-    epoch_report = Report.Epoch(status)
+    ttrain += dttrain
+    epoch_report = Report.Epoch(status, losses)
     push!(epochs, epoch_report)
     Handlers.learning_epoch(handler, epoch_report)
     # Make checkpoints at fixed times

@@ -77,6 +77,14 @@ function plot_iteration(
   # Performances plot
   pplot = performances_plot(report)
   Plots.savefig(pplot, joinpath(dir, "performances"))
+  # Losses plot
+  losses = [l for e in report.learning.epochs for l in e.losses]
+  lplot = Plots.plot(collect(eachindex(losses)), losses,
+    title="Loss on Minibatches",
+    ylims=(0, Inf),
+    legend=nothing,
+    xlabel="Batch number")
+  Plots.savefig(lplot, joinpath(dir, "loss"))
 end
 
 #####
