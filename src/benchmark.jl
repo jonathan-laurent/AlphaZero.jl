@@ -140,7 +140,7 @@ struct MctsRollouts <: Player
   params :: MctsParams
 end
 
-name(::MctsRollouts) = "MCTS Rollouts"
+name(p::MctsRollouts) = "MCTS ($(p.params.num_iters_per_turn) rollouts)"
 
 function instantiate(p::MctsRollouts, nn::AbstractNetwork{G}) where G
   params = MctsParams(p.params,
