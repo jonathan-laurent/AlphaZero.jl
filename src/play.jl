@@ -277,17 +277,18 @@ Evaluate two `AbstractPlayer` against each other on a series of games.
 # Optional keyword arguments
   - `reset_every`: if set, players are reset every `reset_every` games
   - `color_policy`: determine the [`ColorPolicy`](@ref),
-    which is `ALTERNATE_COLORS` by default
+     which is `ALTERNATE_COLORS` by default
+  - `memory=nothing`: memory to use to record samples
 """
 function pit(
     handler, contender::AbstractPlayer, baseline::AbstractPlayer, num_games;
-    reset_every=nothing, color_policy=ALTERNATE_COLORS)
+    reset_every=nothing, color_policy=ALTERNATE_COLORS, memory=nothing)
   baseline_white = (color_policy != CONTENDER_WHITE)
   zsum = 0.
   for i in 1:num_games
     white = baseline_white ? baseline : contender
     black = baseline_white ? contender : baseline
-    z = play(white, black)
+    z = play(white, black, memory)
     baseline_white && (z = -z)
     zsum += z
     handler(i, z)
@@ -300,6 +301,31 @@ function pit(
     end
   end
   return zsum / num_games
+end
+
+#####
+##### Redudancy analysis
+#####
+
+# This type implements the interface of `MemoryBuffer` so that it can be
+# passed as the `memory` argument of `play` to record games.
+# Currently, this is only used to compute redundancy statistics
+struct Recorder{Game, Board}
+  boards :: Vector{Board}
+  function Recorder{G}() where G
+    B = GI.Board(G)
+    return new{G, B}([])
+  end
+end
+
+push_game!(r::Recorder, wr, gl) = nothing
+push_sample!(r::Recorder, b, π, wp, t) = push!(r.boards, b)
+
+function compute_redundancy(rec::Recorder{Game}) where Game
+  initb = GI.board(Game())
+  noninit = Set(rec.boards)
+  unique = filter(!=(initb), noninit)
+  return 1. - length(unique) / length(noninit)
 end
 
 #####

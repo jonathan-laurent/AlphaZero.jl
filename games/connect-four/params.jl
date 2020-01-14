@@ -61,7 +61,7 @@ params = Params(
     num_game_stages=4),
   mem_buffer_size=PLSchedule(
   [      0,        60],
-  [150_000, 1_500_000]))
+  [240_000, 1_800_000]))
 
 baselines = [
   Benchmark.MctsRollouts(

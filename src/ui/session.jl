@@ -248,7 +248,9 @@ function run_benchmark(session)
       wr = win_rate(outcome.avgz)
       details = "win rate of $wr%"
     end
-    Log.print(session.logger, "Average reward: $z ($details)")
+    red = fmt(".1f", 100 * outcome.redundancy)
+    msg = "Average reward: $z ($details), redundancy: $red%"
+    Log.print(session.logger, msg)
   end
   return report
 end
@@ -453,8 +455,10 @@ function Handlers.checkpoint_finished(session::Session, report)
   show_space_after_progress_bar(session)
   avgz = fmt("+.2f", report.reward)
   wr = win_rate(report.reward)
+  red = fmt(".1f", report.redundancy * 100)
   nnr = report.nn_replaced ? ", network replaced" : ""
-  Log.print(session.logger, "Average reward: $avgz (win rate of $wr%$nnr)")
+  msg = "Average reward: $avgz (win rate of $wr%$nnr), redundancy: $red%"
+  Log.print(session.logger, msg)
   Log.section(session.logger, 3, "Optimizing the loss")
 end
 

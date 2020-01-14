@@ -53,12 +53,16 @@ Report generated after a checkpoint evaluation.
 
 - `epoch_id`: number of epochs after which the checkpoint was computed
 - `reward`: average reward collected by the contender network
+- `redundancy`: ratio of duplicate positions encountered during the evaluation,
+   not counting the initial position. If this number is too high, you may
+   want to increase the move selection temperature.
 - `nn_replaced`: true if the current best neural network was updated after
-    the checkpoint
+   the checkpoint
 """
 struct Checkpoint
   epoch_id :: Int
   reward :: Float64
+  redundancy :: Float64
   nn_replaced :: Bool
 end
 

@@ -23,12 +23,13 @@ have exciting applications in many different research areas.
 
 Because AlphaZero is resource-hungry, successful open-source
 implementations (such as [Leela Zero](https://github.com/leela-zero/leela-zero))
-consist in large and complex codebases written in low-level languages (such
-as C++). This makes them hardly accessible for students, researchers and hackers.
+are written in low-level languages (such as C++) and optimized for highly
+distributed computing environments.
+This makes them hardly accessible for students, researchers and hackers.
 
 Many simple Python implementations can be found on Github, but none of them is
-able to beat a reasonable baseline on games such as _Connect Four_ or
-_Othello_. As an illustration, the benchmark in the README of the
+able to beat a reasonable baseline on games such as _Othello_ or
+_Connect Four_. As an illustration, the benchmark in the README of the
 [most popular of them](https://github.com/suragnair/alpha-zero-general) only
 features a _random_ baseline, along with a _greedy_ baseline that
 does not appear to be significantly stronger.

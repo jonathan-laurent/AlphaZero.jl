@@ -38,6 +38,11 @@ mutable struct Env{Game, Network, Board}
   end
 end
 
+GameType(env::Env{G}) where G = G
+GameType(env::MCTS.Env{G}) where G = G
+GameType(env::AbstractNetwork{G}) where G = G
+GameType(env::AbstractPlayer{G}) where G = G
+
 #####
 ##### Training handlers
 #####
@@ -124,16 +129,20 @@ end
 function resize_memory!(env::Env{G,N,B}, n) where {G,N,B}
   exp = get(env.memory)
   env.memory = MemoryBuffer{B}(n, exp)
+  return
 end
 
 function evaluate_network(baseline, contender, params, handler)
   baseline = MctsPlayer(baseline, params.mcts)
   contender = MctsPlayer(contender, params.mcts)
   ngames = params.num_games
+  rec = Recorder{GameType(baseline)}()
   rp = params.reset_mcts_every
-  return pit(contender, baseline, ngames; reset_every=rp) do i, z
+  avgz = pit(contender, baseline, ngames; reset_every=rp, memory=rec) do i, z
     Handlers.checkpoint_game_played(handler)
   end
+  redundancy = compute_redundancy(rec)
+  return avgz, redundancy
 end
 
 function learning!(env::Env, handler)
@@ -163,7 +172,8 @@ function learning!(env::Env, handler)
     if k ∈ lp.checkpoints
       Handlers.checkpoint_started(handler)
       cur_nn = get_trained_network(trainer)
-      evalz, dteval = @timed evaluate_network(env.bestnn, cur_nn, ap, handler)
+      (evalz, redundancy), dteval =
+        @timed evaluate_network(env.bestnn, cur_nn, ap, handler)
       teval += dteval
       # If eval is good enough, replace network
       success = evalz >= best_evalz
@@ -173,7 +183,7 @@ function learning!(env::Env, handler)
         env.randnn = false
         best_evalz = evalz
       end
-      checkpoint_report = Report.Checkpoint(k, evalz, success)
+      checkpoint_report = Report.Checkpoint(k, evalz, redundancy, success)
       push!(checkpoints, checkpoint_report)
       Handlers.checkpoint_finished(handler, checkpoint_report)
     end

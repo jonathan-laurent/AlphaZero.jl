@@ -8,7 +8,7 @@ module Benchmark
 
 import ..Util.@unimplemented
 import ..AbstractNetwork, ..MinMax, ..GI
-import ..Env, ..MCTS, ..MctsParams, ..pit
+import ..Env, ..MCTS, ..MctsParams, ..pit, ..compute_redundancy, ..Recorder
 import ..ColorPolicy, ..ALTERNATE_COLORS
 import ..AbstractPlayer, ..EpsilonGreedyPlayer, ..NetworkPlayer, ..MctsPlayer
 
@@ -23,6 +23,9 @@ The outcome of a duel between two players.
 - `player` and `baseline` are `String` fields containing the names of
     both players involved in the duel
 - `avgz` is the average reward collected by `player`
+- `redundancy` is the ratio of duplicate positions encountered during the
+   evaluation, not counting the initial position. If this number is too high,
+   you may want to increase the move selection temperature.
 - `rewards` is a vector containing all rewards collected by `player`
     (one per game played)
 - `time` is the computing time spent running the duel, in seconds
@@ -31,6 +34,7 @@ struct DuelOutcome
   player :: String
   baseline :: String
   avgz :: Float64
+  redundancy :: Float64
   rewards :: Vector{Float64}
   time :: Float64
 end
@@ -86,20 +90,29 @@ struct Duel
   end
 end
 
-function run(env::Env, duel::Duel, progress=nothing)
+"""
+    Benchmark.run(env::Env, duel::Benchmark.Duel, progress=nothing)
+
+Run a benchmark duel and return a [`Benchmark.DuelOutcome`](@ref).
+
+If a `progress` is provided, `next!(progress)` is called
+after each simulated game.
+"""
+function run(env::Env{G}, duel::Duel, progress=nothing) where G
   player = instantiate(duel.player, env.bestnn)
   baseline = instantiate(duel.baseline, env.bestnn)
+  rec = Recorder{G}()
   let games = Vector{Float64}(undef, duel.num_games)
     avgz, time = @timed begin
-      pit(
-        player, baseline, duel.num_games,
-        reset_every=duel.reset_every, color_policy=duel.color_policy) do i, z
-          games[i] = z
-          isnothing(progress) || next!(progress)
+      pit(player, baseline, duel.num_games, memory=rec,
+          reset_every=duel.reset_every, color_policy=duel.color_policy) do i, z
+        games[i] = z
+        isnothing(progress) || next!(progress)
       end
     end
+    red = compute_redundancy(rec)
     return DuelOutcome(
-      name(duel.player), name(duel.baseline), avgz, games, time)
+      name(duel.player), name(duel.baseline), avgz, red, games, time)
   end
 end
 

@@ -14,6 +14,7 @@ Benchmark.Report
 ```@docs
 Benchmark.Duel
 Benchmark.DuelOutcome
+Benchmark.run
 ```
 
 ## Players
