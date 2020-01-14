@@ -46,14 +46,16 @@ mutable struct Session{Env}
   dir :: Option{String}
   logger :: Logger
   autosave :: Bool
+  save_intermediate :: Bool
   benchmark :: Vector{Benchmark.Duel}
   # Temporary state for logging
   progress :: Option{Progress}
   report :: SessionReport
 
-  function Session(env, dir, logger, autosave, benchmark)
+  function Session(env, dir, logger, autosave, save_intermediate, benchmark)
     return new{typeof(env)}(
-      env, dir, logger, autosave, benchmark, nothing, SessionReport())
+      env, dir, logger, autosave, save_intermediate,
+      benchmark, nothing, SessionReport())
   end
 end
 
@@ -199,7 +201,7 @@ function save_increment!(session::Session, bench, itrep=nothing)
     # Save the environment state,
     # both at the root and in the last iteration folder
     save(session, session.dir)
-    save(session, idir)
+    session.save_intermediate && save(session, idir)
     # Save the collected statistics
     save_report_increment(session, bench, itrep, idir)
     # Do the plotting
@@ -298,20 +300,20 @@ it already exists.
 - `dir`: session directory in which all files and reports are saved; this
     argument is either a string or `nothing` (default), in which case the
     session won't be saved automatically and no file will be generated
-- `autosave`: if set to `false`, the session won't be saved automatically nor
-    any file will be generated (default is `true`)
-- `nostdout`: disables logging on the standard output when set to `true`
-    (default is `false`)
-- `benchmark`: vector of [`Benchmark.Duel`](@ref) to be used as a benchmark
-    (default is `[]`)
-- `load_saved_params`: if set to `true`, load the training parameters from
+- `autosave=true`: if set to `false`, the session won't be saved automatically nor
+    any file will be generated
+- `nostdout=false`: disables logging on the standard output when set to `true`
+- `benchmark=[]`: vector of [`Benchmark.Duel`](@ref) to be used as a benchmark
+- `load_saved_params=false`: if set to `true`, load the training parameters from
     the session directory (if present) rather than using the `params`
-    argument (default is `false`)
+    argument
+- `save_intermediate=true`: if set along with `autosave`, all intermediate
+    training environments are saved on disk
 """
 function Session(
     ::Type{Game}, ::Type{Net}, params, netparams;
     dir=nothing, autosave=true, nostdout=false, benchmark=[],
-    load_saved_params=false
+    load_saved_params=false, save_intermediate=true
   ) where {Game, Net}
   logger = session_logger(dir, nostdout, autosave)
   if valid_session_dir(dir)
@@ -321,12 +323,12 @@ function Session(
     same_json(x, y) = JSON3.write(x) == JSON3.write(y)
     same_json(env.params, params) || @info "Using modified parameters"
     @assert same_json(Network.hyperparams(env.bestnn), netparams)
-    session = Session(env, dir, logger, autosave, benchmark)
+    session = Session(env, dir, logger, autosave, save_intermediate, benchmark)
     session.report = load_session_report(dir, env.itc)
   else
     network = Net(netparams)
     env = Env{Game}(params, network)
-    session = Session(env, dir, logger, autosave, benchmark)
+    session = Session(env, dir, logger, autosave, save_intermediate, benchmark)
     Log.section(session.logger, 1, "Initializing a new AlphaZero environment")
     zeroth_iteration!(session)
   end
@@ -343,12 +345,12 @@ This constructor accepts the optional keyword arguments
 """
 function Session(
     ::Type{Game}, ::Type{Network}, dir::String;
-    autosave=true, nostdout=false, benchmark=[]
+    autosave=true, nostdout=false, benchmark=[], save_intermediate
   ) where {Game, Network}
   @assert valid_session_dir(dir)
   logger = session_logger(dir, nostdout, autosave)
   env = load_env(Game, Network, logger, dir)
-  return Session(env, dir, logger, autosave, benchmark)
+  return Session(env, dir, logger, autosave, save_intermediate, benchmark)
 end
 
 """
@@ -360,14 +362,15 @@ Create a session from an initial environment.
 - If a session directory is provided, this directory must not exist yet
 
 This constructor features the optional keyword arguments
-`autosave`, `nostdout` and `benchmark`.
+`autosave`, `save_intermediate`, `nostdout` and `benchmark`.
 """
 function Session(
-    env::Env, dir=nothing; autosave=true, nostdout=false, benchmark=[])
+    env::Env, dir=nothing; autosave=true, nostdout=false, benchmark=[],
+    save_intermediate=true)
   @assert isnothing(dir) || !isdir(dir)
   @assert env.itc == 0
   logger = session_logger(dir, nostdout, autosave)
-  session = Session(env, dir, logger, autosave, benchmark)
+  session = Session(env, dir, logger, autosave, save_intermediate, benchmark)
   zeroth_iteration!(session)
   return session
 end

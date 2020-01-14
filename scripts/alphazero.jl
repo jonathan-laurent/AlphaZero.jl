@@ -51,8 +51,9 @@ using .SelectedGame: Game, Training
 const SESSION_DIR = joinpath("sessions", GAME)
 
 session = Session(
-  Game, Training.Network{Game}, Training.params, Training.netparams,
-  dir=SESSION_DIR, autosave=true, benchmark=Training.benchmark)
+  Game, Training.Network{Game},Training.params, Training.netparams,
+  dir=SESSION_DIR, autosave=true, save_intermediate=true,
+  benchmark=Training.benchmark)
 
 if cmd == "train"
   resume!(session)
