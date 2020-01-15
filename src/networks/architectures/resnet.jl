@@ -19,7 +19,8 @@ odd.
 
 During training, the network is evaluated in training mode on the whole
 dataset to compute the loss before it is switched to test model, using
-big batches. Therefore, it makes sense to use a low batch norm momentum.
+big batches. Therefore, it makes sense to use a high batch norm momentum
+(put a lot of weight on the latest measurement).
 
 # AlphaGo Zero Parameters
 

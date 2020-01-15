@@ -46,8 +46,8 @@ GI.Board(::Type{Game}) = Board
 GI.Action(::Type{Game}) = Int
 
 function Base.copy(g::Game)
-  Game(g.board, g.curplayer, g.finished, g.winner,
-    copy(g.actions), copy(g.history))
+  history = isnothing(g.history) ? nothing : copy(g.history)
+  Game(g.board, g.curplayer, g.finished, g.winner, copy(g.actions), history)
 end
 
 history(g::Game) = g.history

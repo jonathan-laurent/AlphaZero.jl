@@ -4,7 +4,7 @@ netparams = SimpleNetHP(
   width=200,
   depth_common=8,
   use_batch_norm=true,
-  batch_norm_momentum=0.3)
+  batch_norm_momentum=1.)
 
 self_play = SelfPlayParams(
   num_games=10_000,
@@ -20,7 +20,7 @@ self_play = SelfPlayParams(
 arena = ArenaParams(
   num_games=100,
   reset_mcts_every=1,
-  update_threshold=0.02,
+  update_threshold=0.00,
   mcts = MctsParams(
     self_play.mcts,
     temperature=StepSchedule(0.3),
@@ -44,13 +44,11 @@ params = Params(
   arena=arena,
   self_play=self_play,
   learning=learning,
-  num_iters=4,
+  num_iters=2,
   memory_analysis=MemAnalysisParams(
     num_game_stages=4),
   ternary_rewards=true,
-  mem_buffer_size=PLSchedule(
-    [     0,       4],
-    [80_000, 160_000]))
+  mem_buffer_size=PLSchedule(80_000))
 
 benchmark = [
   Benchmark.Duel(
@@ -59,5 +57,5 @@ benchmark = [
     num_games=400),
   Benchmark.Duel(
     Benchmark.NetworkOnly(),
-    Benchmark.MinMaxTS(depth=5, τ=1.),
+    Benchmark.MinMaxTS(depth=6, τ=1.),
     num_games=400)]
