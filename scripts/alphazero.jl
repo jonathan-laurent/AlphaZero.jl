@@ -50,10 +50,19 @@ using .SelectedGame: Game, Training
 
 const SESSION_DIR = joinpath("sessions", GAME)
 
+params = Training.params
+netparams = Training.netparams
+benchmark = Training.benchmark
+
+include("lib/dummy_run.jl")
+
+if get(ENV, "DUMMY_RUN", "false") == "true"
+  params, benchmark = dummy_run_params(Training.params, Training.benchmark)
+end
+
 session = Session(
-  Game, Training.Network{Game},Training.params, Training.netparams,
-  dir=SESSION_DIR, autosave=true, save_intermediate=true,
-  benchmark=Training.benchmark)
+  Game, Training.Network{Game}, params, netparams, benchmark=benchmark,
+  dir=SESSION_DIR, autosave=true, save_intermediate=true)
 
 if cmd == "train"
   resume!(session)

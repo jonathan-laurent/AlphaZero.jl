@@ -1,5 +1,3 @@
-const DEBUG = get(ENV, "TRAINING_MODE", "") == "debug"
-
 Network = ResNet
 
 netparams = ResNetHP(
@@ -11,7 +9,7 @@ netparams = ResNetHP(
   batch_norm_momentum=0.7)
 
 self_play = SelfPlayParams(
-  num_games=(DEBUG ? 1 : 4_000),
+  num_games=4_000,
   reset_mcts_every=1_000,
   mcts=MctsParams(
     use_gpu=true,
@@ -26,9 +24,9 @@ self_play = SelfPlayParams(
     dirichlet_noise_α=1.0))
 
 arena = ArenaParams(
-  num_games=(DEBUG ? 1 : 200),
+  num_games=200,
   reset_mcts_every=nothing,
-  update_threshold=(2 * 0.55 - 1),
+  update_threshold=0.10,
   mcts=MctsParams(
     self_play.mcts,
     temperature=StepSchedule(
@@ -77,7 +75,7 @@ make_duel(baseline) =
   Benchmark.Duel(
     Benchmark.Full(arena.mcts),
     baseline,
-    num_games=(DEBUG ? 1 : 100),
+    num_games=100,
     color_policy=CONTENDER_WHITE)
 
 benchmark = make_duel.(baselines)

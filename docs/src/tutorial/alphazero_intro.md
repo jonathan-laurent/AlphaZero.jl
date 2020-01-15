@@ -1,4 +1,4 @@
-# Introduction to AlphaZero
+# [Introduction to AlphaZero](@id alphazero_intro)
 
 AlphaZero elegantly combines _search_ and _learning_, which are described
 in Rich Sutton's essay

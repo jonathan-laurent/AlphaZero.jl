@@ -1,130 +1,63 @@
-#####
-##### Training regimes
-#####
+Network = SimpleNet
 
-const USE_RESNET = true
-const TRAINING_MODE = get(ENV, "TRAINING_MODE", "debug") |> Symbol
+netparams = SimpleNetHP(
+  width=200,
+  depth_common=8,
+  use_batch_norm=true,
+  batch_norm_momentum=0.3)
 
-function get_params(mode=:full)
-  @assert mode ∈ [:debug, :fast, :full]
+self_play = SelfPlayParams(
+  num_games=10_000,
+  mcts = MctsParams(
+    use_gpu=false,
+    num_workers=1,
+    num_iters_per_turn=400,
+    cpuct=1.0,
+    temperature=StepSchedule(1.0),
+    dirichlet_noise_ϵ=0.2,
+    dirichlet_noise_α=1.0))
 
-  if mode == :debug
-    num_iters = 3
-    sp_num_games = 2
-    sp_num_mcts_iters = 2
-    arena_num_games = 2
-    arena_win_rate_thresh = 0.51
-    learning_batch_size = 2
-    learning_checkpoints = [1]
-    mem_buffer_size = PLSchedule(
-      [  0,    4],
-      [500, 2500])
-    benchmark_num_games = 2
+arena = ArenaParams(
+  num_games=100,
+  reset_mcts_every=1,
+  update_threshold=0.02,
+  mcts = MctsParams(
+    self_play.mcts,
+    temperature=StepSchedule(0.3),
+    dirichlet_noise_ϵ=0.1))
 
-  elseif mode == :fast
-    num_iters = 8
-    sp_num_games = 100
-    sp_num_mcts_iters = 20
-    arena_num_games = 100
-    arena_win_rate_thresh = 0.51
-    learning_batch_size = 32
-    learning_checkpoints = [10, 20]
-    mem_buffer_size = PLSchedule(
-      [  0,    4],
-      [500, 2500])
-    benchmark_num_games = 100
+learning = LearningParams(
+  samples_weighing_policy=LOG_WEIGHT,
+  l2_regularization=1e-4,
+  optimiser=CyclicNesterov(
+    lr_base=1e-3,
+    lr_high=1e-2,
+    lr_low=1e-3,
+    momentum_high=0.9,
+    momentum_low=0.7),
+  batch_size=32,
+  loss_computation_batch_size=2048,
+  nonvalidity_penalty=1.,
+  checkpoints=[20])
 
-  else
-    num_iters = 4
-    sp_num_games = 8000
-    sp_num_mcts_iters = 320
-    arena_num_games = 200
-    arena_win_rate_thresh = 0.55
-    learning_batch_size = 256
-    learning_checkpoints = [2, 5, 15]
-    mem_buffer_size = PLSchedule(
-      [     0,       4],
-      [80_000, 160_000])
-    benchmark_num_games = 500
-  end
+params = Params(
+  arena=arena,
+  self_play=self_play,
+  learning=learning,
+  num_iters=4,
+  memory_analysis=MemAnalysisParams(
+    num_game_stages=4),
+  ternary_rewards=true,
+  mem_buffer_size=PLSchedule(
+    [     0,       4],
+    [80_000, 160_000]))
 
-  # Now we can build the parameters
-
-  #####
-  ##### Network parameters
-  #####
-
-  if USE_RESNET
-    Net = ResNet
-    netparams = ResNetHP(
-      num_filters=64,
-      num_blocks=5,
-      conv_kernel_size=(3,3),
-      num_policy_head_filters=32,
-      num_value_head_filters=32,
-      batch_norm_momentum=0.5)
-  else
-    Net = SimpleNet
-    netparams = SimpleNetHP(
-      width=500,
-      depth_common=4)
-  end
-
-  #####
-  ##### Training parameters
-  #####
-
-  self_play = SelfPlayParams(
-    num_games=sp_num_games,
-    mcts = MctsParams(
-      num_workers=1,
-      num_iters_per_turn=sp_num_mcts_iters,
-      dirichlet_noise_ϵ=0.25,
-      dirichlet_noise_α=1.0))
-
-  # Evaluate with 0 MCTS iterations
-  # Exploration is induced by MCTS and by the temperature τ=1
-  arena = ArenaParams(
-    num_games=arena_num_games,
-    reset_mcts_every=1,
-    update_threshold=(2*arena_win_rate_thresh - 1),
-    mcts = MctsParams(self_play.mcts))
-
-  learning = LearningParams(
-    samples_weighing_policy=LOG_WEIGHT,
-    l2_regularization=1e-4,
-    optimiser=CyclicNesterov(
-      lr_base=1e-2,
-      lr_high=1e-1,
-      lr_low=1e-3,
-      momentum_high=0.9,
-      momentum_low=0.7),
-    batch_size=learning_batch_size,
-    loss_computation_batch_size=2048,
-    nonvalidity_penalty=1.,
-    checkpoints=learning_checkpoints)
-
-  params = Params(
-    arena=arena,
-    self_play=self_play,
-    learning=learning,
-    num_iters=num_iters,
-    mem_buffer_size=mem_buffer_size,
-    memory_analysis=MemAnalysisParams(
-      num_game_stages=4),
-    ternary_rewards=true)
-
-  benchmark = [
-    Benchmark.Duel(
-      Benchmark.Full(self_play.mcts),
-      Benchmark.MctsRollouts(self_play.mcts),
-      num_games=benchmark_num_games),
-    Benchmark.Duel(
-      Benchmark.NetworkOnly(),
-      Benchmark.MinMaxTS(depth=5, τ=1.),
-      num_games=benchmark_num_games)]
-
-  return Net, netparams, params, benchmark
-end
-
-Network, netparams, params, benchmark = get_params(TRAINING_MODE)
+benchmark = [
+  Benchmark.Duel(
+    Benchmark.Full(self_play.mcts),
+    Benchmark.MctsRollouts(self_play.mcts),
+    num_games=400),
+  Benchmark.Duel(
+    Benchmark.NetworkOnly(),
+    Benchmark.MinMaxTS(depth=5, τ=1.),
+    num_games=400)]
