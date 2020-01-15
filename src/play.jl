@@ -323,8 +323,8 @@ push_sample!(r::Recorder, b, π, wp, t) = push!(r.boards, b)
 
 function compute_redundancy(rec::Recorder{Game}) where Game
   initb = GI.board(Game())
-  noninit = Set(rec.boards)
-  unique = filter(!=(initb), noninit)
+  noninit = filter(!=(initb), rec.boards)
+  unique = Set(noninit)
   return 1. - length(unique) / length(noninit)
 end
 
