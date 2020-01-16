@@ -150,6 +150,17 @@ function heuristic_value(state::AbstractGame)
   @unimplemented
 end
 
+"""
+    symmetries(::Type{<:AbstractGame}, board, actions)
+
+Return the vector of all pairs `(σ(board), σ(actions))` for `σ`
+a nonidentical symmetry that preserves board value.
+"""
+function symmetries(::Type{G}, board, actions) where {G <: AbstractGame}
+  Sym = Tuple{Board(G), Vector{Action(G)}}
+  return Sym[]
+end
+
 #####
 ##### Machine learning interface
 #####
@@ -238,6 +249,8 @@ end
 ##### Derived functions
 #####
 
+game_terminated(state) = !isnothing(white_reward(state))
+
 board_dim(::Type{G}) where G = size(vectorize_board(G, board(G())))
 
 function actions_mask(::Type{G}, available_actions) where G
@@ -257,4 +270,13 @@ function board_memsize(::Type{G}) where G
   return Base.summarysize(board(G()))
 end
 
+end
+
+"""
+    GameType(T)
+
+Return the `Game` type associated with an object.
+"""
+function GameType(T)
+  @unimplemented
 end
