@@ -2,48 +2,70 @@
 ##### Computing board statistics
 #####
 
-@kwdef mutable struct BoardActionStats
-  Pmcts :: Option{Float64} = nothing
+# All state statistics and are expressed with respect to the current player
+
+@kwdef mutable struct StateActionStats
+  P     :: Option{Float64} = nothing  # Probability given by `think`
+  Pmem  :: Option{Float64} = nothing  # Recorded π component in memory
+  Pmcts :: Option{Float64} = nothing  # Percentage of MCTS visits
   Qmcts :: Option{Float64} = nothing
   UCT   :: Option{Float64} = nothing
-  Pmem  :: Option{Float64} = nothing
-  Pnet  :: Float64 = 0.
-  Qnet  :: Float64 = 0.
+  Pnet  :: Option{Float64} = nothing
+  Qnet  :: Option{Float64} = nothing
 end
 
-mutable struct BoardStats{Action}
-  Nmcts :: Int
-  Nmem  :: Int
-  Vnet  :: Float64
+mutable struct StateStats{Action}
+  Nmcts :: Option{Int}
+  Nmem  :: Option{Int}
   Vmem  :: Option{Float64}
-  # Sorted by Nmcts
-  actions :: Vector{Tuple{Action, BoardActionStats}}
-  function BoardStats(actions)
-    actions_stats = [(a, BoardActionStats()) for a in actions]
-    new{eltype(actions)}(0, 0, 0., nothing, actions_stats)
+  Vnet  :: Option{Float64}
+  actions :: Vector{Tuple{Action, StateActionStats}} # Sorted by P
+  function StateStats(actions)
+    actions_stats = [(a, StateActionStats()) for a in actions]
+    new{eltype(actions)}(nothing, nothing, nothing, nothing, actions_stats)
   end
 end
 
-function evaluate_Qnet(oracle::MCTS.Oracle{G}, board, action) where G
-  state = G(board)
-  @assert isnothing(GI.white_reward(state))
-  GI.play!(state, action)
+player_reward(state, white_reward) =
+  GI.white_playing(state) ? r : MCTS.symmetric_reward(white_reward)
+
+function evaluate_vnet(oracle::MCTS.Oracle, state)
   r = GI.white_reward(state)
-  isnothing(r) || (return r)
-  _, r = MCTS.evaluate(
-    oracle, GI.canonical_board(state), GI.available_actions(state))
-  GI.white_playing(state) || (r = MCTS.symmetric_reward(r))
-  return r
+  if !isnothing(r)
+    return player_reward(state, r)
+  else
+    cboard = GI.canonical_board(state)
+    return MCTS.evaluate(oracle, cboard, GI.available_actions(state))[2]
+  end
 end
 
-function board_statistics(env::Env{G}, mcts, board) where G
-  state = G(board)
-  @assert isnothing(GI.white_reward(state))
-  actions = GI.available_actions(state)
-  report = BoardStats(actions)
-  # Collect MCTS statistics
-  if haskey(mcts.tree, board)
-    info = mcts.tree[board]
+function evaluate_qnet(oracle::MCTS.Oracle, state, action)
+  @assert !GI.game_terminated(state)
+  next = copy(state)
+  GI.play!(next, action)
+  q = evaluate_vnet(oracle, next)
+  pswitch = (GI.white_playing(state) != GI.white_playing(next))
+  return pswitch ? MCTS.symmetric_reward(q) : q
+end
+
+player_oracle(p) = nothing
+player_oracle(p::MctsPlayer) = p.mcts.oracle
+player_oracle(p::NetworkPlayer) = p.network
+
+function state_statistics(state, player, memory=nothing)
+  @assert !GI.game_terminated(state)
+  cboard = GI.canonical_board(state)
+  # Make the player think
+  turn = 1 # TODO
+  actions, π = think(player, state, turn)
+  report = StateStats(actions)
+  for i in eachindex(actions)
+    report.actions[i][2].P = π[i]
+  end
+  # Collect MCTS Statistics
+  if isa(player, MctsPlayer) && haskey(player.mcts.tree, cboard)
+    mcts = player.mcts
+    info = mcts.tree[cboard]
     ucts = MCTS.uct_scores(info, mcts.cpuct, 0., nothing)
     report.Nmcts = MCTS.Ntot(info)
     for (i, a) in enumerate(actions)
@@ -55,31 +77,32 @@ function board_statistics(env::Env{G}, mcts, board) where G
     end
   end
   # Collect memory statistics
-  mem = merge_by_board(get(env.memory))
-  relevant = findall((ex -> ex.b == board), mem)
-  if !isempty(relevant)
-    @assert length(relevant) == 1
-    e = mem[relevant[1]]
-    report.Nmem = e.n
-    report.Vmem = e.z
-    for i in eachindex(actions)
-      report.actions[i][2].Pmem = e.π[i]
+  if !isnothing(memory)
+    mem = merge_by_board(get(memory))
+    relevant = findall((ex -> ex.b == cboard), mem)
+    if !isempty(relevant)
+      @assert length(relevant) == 1
+      e = mem[relevant[1]]
+      report.Nmem = e.n
+      report.Vmem = e.z
+      for i in eachindex(actions)
+        report.actions[i][2].Pmem = e.π[i]
+      end
     end
   end
-  # Evaluate the positions with the neural network
-  Pnet, Vnet = MCTS.evaluate(env.bestnn, board, actions)
-  report.Vnet = Vnet
-  for i in eachindex(actions)
-    arep = report.actions[i][2]
-    arep.Pnet = Pnet[i]
-    arep.Qnet = evaluate_Qnet(env.bestnn, board, actions[i])
+  # Collect network statistics
+  oracle = player_oracle(player)
+  if isa(oracle, AbstractNetwork)
+    Pnet, Vnet = MCTS.evaluate(oracle, cboard, actions)
+    report.Vnet = Vnet
+    for i in eachindex(actions)
+      arep = report.actions[i][2]
+      arep.Pnet = Pnet[i]
+      arep.Qnet = evaluate_qnet(oracle, state, actions[i])
+    end
   end
   # Sort the actions from best to worst
-  if report.Nmcts > 0
-    sortby = ((a, arep),) -> arep.Pmcts
-  else
-    sortby = ((a, arep),) -> arep.Pnet
-  end
+  sortby = ((a, arep),) -> arep.P
   sort!(report.actions, rev=true, by=sortby)
   return report
 end
@@ -88,8 +111,8 @@ end
 ##### Displaying board statistics
 #####
 
-function print_board_statistics(::Type{G}, stats::BoardStats) where G
-  prob   = Log.ColType(nothing, x -> fmt(".2f", 100 * x) * "%")
+function print_state_statistics(::Type{G}, stats::StateStats) where G
+  prob   = Log.ColType(nothing, x -> fmt(".1f", 100 * x) * "%")
   val    = Log.ColType(nothing, x -> fmt("+.2f", x))
   bigint = Log.ColType(nothing, n -> format(ceil(Int, n), commas=true))
   alabel = Log.ColType(nothing, identity)
@@ -101,6 +124,7 @@ function print_board_statistics(::Type{G}, stats::BoardStats) where G
     header_style=Log.BOLD)
   atable = Log.Table([
     ("",      alabel, r -> GI.action_string(G, r[1])),
+    ("",      prob,   r -> r[2].P),
     ("Pmcts", prob,   r -> r[2].Pmcts),
     ("Pnet",  prob,   r -> r[2].Pnet),
     ("UCT",   val,    r -> r[2].UCT),
@@ -115,10 +139,14 @@ function print_board_statistics(::Type{G}, stats::BoardStats) where G
   Log.sep(logger)
 end
 
-function print_state_statistics(env::Env{G}, mcts, state::G) where G
-  board = GI.canonical_board(state)
-  if isnothing(GI.white_reward(state))
-    print_board_statistics(G, board_statistics(env, mcts, board))
+# Return the stats
+function compute_and_print_state_statistics(exp)
+  if !GI.game_terminated(exp.state)
+    stats = state_statistics(exp.state, exp.player, exp.memory)
+    print_state_statistics(GameType(exp), stats)
+    return stats
+  else
+    return nothing
   end
 end
 
@@ -127,41 +155,67 @@ end
 #####
 
 mutable struct Explorer{Game}
-  env :: Env{Game}
   state :: Game
-  player :: MctsPlayer{Game}
-  history :: Stack
-  function Explorer(env, state)
-    G = typeof(state)
-    player = MctsPlayer(env.bestnn, env.params.self_play.mcts)
-    new{G}(env, state, player, Stack{Any}())
+  history :: Stack{Game}
+  player :: AbstractPlayer{Game}
+  memory :: Option{MemoryBuffer}
+  function Explorer(player::AbstractPlayer, state; memory=nothing)
+    Game = typeof(state)
+    history = Stack{Game}()
+    new{Game}(state, history, player, memory)
   end
+end
+
+GameType(::Explorer{Game}) where Game = Game
+
+function Explorer(env::Env, state=nothing; arena_mode=false)
+  Game = GameType(env)
+  isnothing(state) && (state = Game())
+  mcts_params = arena_mode ? env.params.arena.mcts : env.params.self_play.mcts
+  player = MctsPlayer(env.bestnn, mcts_params)
+  return Explorer(player, state, memory=env.memory)
+end
+
+function restart!(exp::Explorer)
+  reset_player!(exp.player)
+  empty!(exp.history)
+  exp.state = GameType(exp)()
 end
 
 save_state!(exp::Explorer) = push!(exp.history, copy(exp.state))
 
-function interpret!(exp::Explorer{G}, cmd, args=[]) where G
+# Return true if the command is valid, false otherwise
+function interpret!(exp::Explorer, stats, cmd, args=[])
   if cmd == "go"
-    st = GI.read_state(G)
+    st = GI.read_state(GameType(exp))
     if !isnothing(st)
       save_state!(exp)
       exp.state = st
       return true
     end
+  elseif cmd == "restart"
+    restart!(exp)
+    return true
   elseif cmd == "undo"
     if !isempty(exp.history)
       exp.state = pop!(exp.history)
       return true
     end
   elseif cmd == "do"
-    length(args) == 1 || return false
-    a = GI.parse_action(exp.state, args[1])
-    isnothing(a) && return false
-    a ∈ GI.available_actions(exp.state) || return false
+    GI.game_terminated(exp.state) && return false
+    if length(args) == 0
+      a = stats.actions[1][1]
+    else
+      length(args) == 1 || return false
+      a = GI.parse_action(exp.state, args[1])
+      isnothing(a) && return false
+      a ∈ GI.available_actions(exp.state) || return false
+    end
     save_state!(exp)
     GI.play!(exp.state, a)
     return true
   elseif cmd == "explore"
+    isa(exp.player, MctsPlayer) || (return false)
     try
       if isempty(args)
         n = exp.player.niters
@@ -182,7 +236,7 @@ function launch(exp::Explorer)
   while true
     # Print the state
     GI.print_state(exp.state)
-    print_state_statistics(exp.env, exp.player.mcts, exp.state)
+    stats = compute_and_print_state_statistics(exp)
     # Interpret command
     while true
       print("> ")
@@ -190,7 +244,7 @@ function launch(exp::Explorer)
       isempty(inp) && return
       cmd = inp[1]
       args = inp[2:end]
-      interpret!(exp, cmd, args) && break
+      interpret!(exp, stats, cmd, args) && break
     end
     println("")
   end
