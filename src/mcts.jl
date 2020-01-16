@@ -9,7 +9,7 @@ using DataStructures: Stack
 using Distributions: Categorical, Dirichlet
 
 using ..Util: @printing_errors, @unimplemented
-import ..GI, ..GameInterface
+import ..GI, ..GameInterface, ..GameType
 
 #####
 ##### Interface for external oracles
@@ -51,6 +51,8 @@ sequentially on each position.
 function evaluate_batch(oracle::Oracle, batch)
   return [evaluate(oracle, b, a) for (b, a) in batch]
 end
+
+GameType(::Oracle{Game}) where Game = Game
 
 """
     MCTS.RolloutOracle{Game} <: MCTS.Oracle{Game}
@@ -203,6 +205,8 @@ mutable struct Env{Game, Board, Action, Oracle}
       total_time, inference_time, total_iterations, total_nodes_traversed)
   end
 end
+
+GameType(::Env{Game}) where Game = Game
 
 """
     MCTS.memory_footprint_per_node(env)

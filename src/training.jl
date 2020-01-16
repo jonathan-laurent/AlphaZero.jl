@@ -38,10 +38,7 @@ mutable struct Env{Game, Network, Board}
   end
 end
 
-GameType(env::Env{G}) where G = G
-GameType(env::MCTS.Env{G}) where G = G
-GameType(env::AbstractNetwork{G}) where G = G
-GameType(env::AbstractPlayer{G}) where G = G
+GameType(env::Env{Game}) where Game = Game
 
 #####
 ##### Training handlers

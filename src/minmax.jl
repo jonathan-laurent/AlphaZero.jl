@@ -38,11 +38,10 @@ end
 
 function qvalue(game, action, depth)
   @assert isnothing(GI.white_reward(game))
-  wp = GI.white_playing(game)
-  game = copy(game)
-  GI.play!(game, action)
-  pswitch = wp != GI.white_playing(game)
-  nextv = value(game, depth - 1)
+  next = copy(game)
+  GI.play!(next, action)
+  pswitch = GI.white_playing(game) != GI.white_playing(next)
+  nextv = value(next, depth - 1)
   return pswitch ? - nextv : nextv
 end
 

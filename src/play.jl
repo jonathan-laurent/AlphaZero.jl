@@ -44,6 +44,8 @@ function select_move(player::AbstractPlayer, state, turn=nothing)
   return actions[Util.rand_categorical(π)]
 end
 
+GameType(::AbstractPlayer{Game}) where Game = Game
+
 #####
 ##### Random Player
 #####
