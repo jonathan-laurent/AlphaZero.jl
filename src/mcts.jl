@@ -109,21 +109,36 @@ Ntot(b::BoardInfo) = sum(s.N for s in b.stats)
 
 symmetric_reward(r::Real) = -r
 
-const InferenceRequest{B, A} = Union{Nothing, Tuple{B, Vector{A}}}
+# Queries
+# Workers can send three type of queries to the inference server:
+#   - Done: there is no more work available for the worker
+#   - Query: the worker makes an evaluation request
+#   - NoQuery: the worker does not need to make a request as the node it is
+#     on is already in the tree.
+abstract type EvaluationQuery{B, A} end
+struct Done{B, A} <: EvaluationQuery{B, A} end
+struct NoQuery{B, A} <: EvaluationQuery{B, A} end
+struct Query{B, A} <: EvaluationQuery{B, A}
+  board :: B
+  actions :: Vector{A}
+end
 
-const InferenceResult{R} = Tuple{Vector{R}, R}
+const AnyEvaluationQuery{B, A} = Union{Done{B, A}, NoQuery{B, A}, Query{B, A}}
+
+const EvaluationResult{R} = Tuple{Vector{R}, R}
 
 mutable struct Worker{Board, Action}
   id    :: Int # Useful for debugging purposes
   stack :: Stack{Tuple{Board, Bool, Int}} # board, white_playing, action_number
-  send  :: Channel{InferenceRequest{Board, Action}}
-  recv  :: Channel{InferenceResult{Float32}}
+  send  :: Channel{AnyEvaluationQuery{Board, Action}}
+  recv  :: Channel{EvaluationResult{Float32}}
+  queried :: Bool  # the worker queries the server during the current simulation
 
   function Worker{B, A}(id) where {B, A}
     stack = Stack{Tuple{B, Bool, Int}}()
-    send = Channel{InferenceRequest{B, A}}(1)
-    recv = Channel{InferenceResult{Float32}}(1)
-    new{B, A}(id, stack, send, recv)
+    send = Channel{AnyEvaluationQuery{B, A}}(1)
+    recv = Channel{EvaluationResult{Float32}}(1)
+    new{B, A}(id, stack, send, recv, false)
   end
 end
 
@@ -208,6 +223,9 @@ end
 
 GameType(::Env{Game}) where Game = Game
 
+Done(::Env{G,B,A}) where {G,B,A} = Done{B,A}()
+NoQuery(::Env{G,B,A}) where {G,B,A} = NoQuery{B,A}()
+
 """
     MCTS.memory_footprint_per_node(env)
 
@@ -266,10 +284,11 @@ function board_info_async(env, worker, board, actions)
     return (env.tree[board], false)
   else
     # Send a request to the inference server
-    put!(worker.send, (board, actions))
+    put!(worker.send, Query(board, actions))
     unlock(env.global_lock)
     P, V = take!(worker.recv)
     lock(env.global_lock)
+    worker.queried = true
     # Another worker may have sent the same request and initialized
     # the node before. Therefore, we have to test membership again.
     if !haskey(env.tree, board)
@@ -363,9 +382,23 @@ function backprop!(env, worker, white_reward)
   end
 end
 
+# It is important to guarantee that a worker sends one request to the
+# inference server per simulation. Otherwise, a worker could block all
+# the others if it repeatedly doesn't need to evaluate positions.
+function worker_yield!(env::Env, worker::Worker)
+  if asynchronous(env) && !worker.queried
+    put!(worker.send, NoQuery(env))
+    unlock(env.global_lock)
+    take!(worker.recv)
+    lock(env.global_lock)
+  end
+end
+
 function worker_explore!(env::Env, worker::Worker, state, η)
   @assert isempty(worker.stack)
+  worker.queried = false
   white_reward = select!(env, worker, state, η)
+  worker_yield!(env, worker)
   backprop!(env, worker, white_reward)
   @assert isempty(worker.stack)
 end
@@ -373,24 +406,35 @@ end
 function inference_server(env::Env{G, B, A}) where {G, B, A}
   to_watch = env.workers
   while true
+    # Updating the list of workers to watch
     requests = [take!(w.send) for w in to_watch]
-    active = [!isnothing(r) for r in requests]
-    n_active = count(active)
-    n_active > 0 || break
-    batch = convert(Vector{Tuple{B, Vector{A}}}, requests[active])
+    done = [isa(r, Done) for r in requests]
+    active = .~ done
+    any(active) || break
     to_watch = to_watch[active]
-    @assert !isempty(batch)
-    if env.fill_batches
-      nmissing = length(env.workers) - length(batch)
-      if nmissing > 0
-        append!(batch, [batch[1] for i in 1:nmissing])
+    requests = requests[active]
+    # Gathering queries
+    batch = [(q.board, q.actions) for q in requests if isa(q, Query)]
+    if isempty(batch)
+      answers, time = EvaluationResult{Float32}[], 0.
+    else
+      if env.fill_batches
+        nmissing = length(env.workers) - length(batch)
+        if nmissing > 0
+          append!(batch, [batch[1] for i in 1:nmissing])
+        end
+        @assert length(batch) == length(env.workers)
       end
-      @assert length(batch) == length(env.workers)
+      answers, time = @timed evaluate_batch(env.oracle, batch)
     end
-    answers, time = @timed evaluate_batch(env.oracle, batch)
+    dummy_answer = (Float32[], 0f0)
     env.inference_time += time
-    for i in 1:n_active
-      put!(to_watch[i].recv, answers[i])
+    for (i, q) in enumerate(requests)
+      if isa(q, Query)
+        put!(to_watch[i].recv, popfirst!(answers))
+      else
+        put!(to_watch[i].recv, dummy_answer)
+      end
     end
   end
 end
@@ -422,7 +466,7 @@ function explore_async!(env::Env, state, nsims)
             env.remaining -= 1
             worker_explore!(env, w, state, η)
           end
-          put!(w.send, nothing) # send termination message to the server
+          put!(w.send, Done(env))
           unlock(env.global_lock)
         end
       end
