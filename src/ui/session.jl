@@ -394,8 +394,8 @@ end
 
 function explore(session::Session{<:Env{Game}}) where Game
   Log.section(session.logger, 1, "Starting interactive exploration")
-  explorer = AlphaZero.Explorer(session.env)
-  AlphaZero.launch(explorer)
+  explorer = Explorer(session.env)
+  explore(explorer)
 end
 
 function play_game(session::Session{<:Env{Game}}) where Game

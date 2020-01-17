@@ -12,5 +12,5 @@ session = Session(
   Training.params, Training.netparams, benchmark=Training.benchmark,
   dir=SESSION_DIR, autosave=false, save_intermediate=false)
 
-explorer = AlphaZero.Explorer(session.env)
-AlphaZero.launch(explorer)
+explorer = Explorer(session.env)
+explore!(explorer)

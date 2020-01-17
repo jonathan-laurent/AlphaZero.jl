@@ -159,8 +159,9 @@ mutable struct Explorer{Game}
   history :: Stack{Game}
   player :: AbstractPlayer{Game}
   memory :: Option{MemoryBuffer}
-  function Explorer(player::AbstractPlayer, state; memory=nothing)
-    Game = typeof(state)
+  function Explorer(player::AbstractPlayer, state=nothing; memory=nothing)
+    Game = GameType(player)
+    isnothing(state) && (state = Game())
     history = Stack{Game}()
     new{Game}(state, history, player, memory)
   end
@@ -232,7 +233,7 @@ function interpret!(exp::Explorer, stats, cmd, args=[])
   return false
 end
 
-function launch(exp::Explorer)
+function explore(exp::Explorer)
   while true
     # Print the state
     GI.print_state(exp.state)
