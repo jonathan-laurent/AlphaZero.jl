@@ -10,7 +10,7 @@ netparams = ResNetHP(
 
 self_play = SelfPlayParams(
   num_games=4_000,
-  reset_mcts_every=1_000,
+  reset_mcts_every=1,
   mcts=MctsParams(
     use_gpu=true,
     num_workers=64,
@@ -29,7 +29,8 @@ arena = ArenaParams(
   update_threshold=0.10,
   mcts=MctsParams(
     self_play.mcts,
-    temperature=StepSchedule(0.05)))
+    temperature=StepSchedule(0.05),
+    dirichlet_noise_ϵ=0.05))
 
 learning = LearningParams(
   samples_weighing_policy=LOG_WEIGHT,
