@@ -6,7 +6,7 @@ netparams = ResNetHP(
   conv_kernel_size=(3, 3),
   num_policy_head_filters=4,
   num_value_head_filters=32,
-  batch_norm_momentum=0.2)
+  batch_norm_momentum=0.1)
 
 self_play = SelfPlayParams(
   num_games=4_000,
@@ -18,9 +18,9 @@ self_play = SelfPlayParams(
     cpuct=2.0,
     temperature=StepSchedule(
       start=1.0,
-      change_at=[8],
-      values=[0.4]),
-    dirichlet_noise_ϵ=0.2,
+      change_at=[10],
+      values=[0.2]),
+    dirichlet_noise_ϵ=0.25,
     dirichlet_noise_α=1.0))
 
 arena = ArenaParams(
@@ -29,11 +29,7 @@ arena = ArenaParams(
   update_threshold=0.10,
   mcts=MctsParams(
     self_play.mcts,
-    temperature=StepSchedule(
-      start=0.3,
-      change_at=[8],
-      values=[0.1]),
-    dirichlet_noise_ϵ=0.1))
+    temperature=StepSchedule(0.05)))
 
 learning = LearningParams(
   samples_weighing_policy=LOG_WEIGHT,
@@ -55,11 +51,12 @@ params = Params(
   learning=learning,
   num_iters=120,
   ternary_rewards=true,
+  use_symmetries=true,
   memory_analysis=MemAnalysisParams(
     num_game_stages=4),
   mem_buffer_size=PLSchedule(
   [      0,        60],
-  [240_000, 1_200_000]))
+  [240_000, 1_800_000]))
 
 baselines = [
   Benchmark.MctsRollouts(
@@ -67,7 +64,6 @@ baselines = [
       arena.mcts,
       num_iters_per_turn=1000,
       cpuct=1.)),
-  Benchmark.MinMaxTS(depth=4, τ=0.2),
   Benchmark.MinMaxTS(depth=5, τ=0.2)]
 
 # push!(baselines, Benchmark.Solver(ϵ=0.05))
