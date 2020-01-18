@@ -35,7 +35,7 @@ function evaluate_vnet(oracle::MCTS.Oracle, state)
     return player_reward(state, r)
   else
     cboard = GI.canonical_board(state)
-    return MCTS.evaluate(oracle, cboard, GI.available_actions(state))[2]
+    return MCTS.evaluate(oracle, cboard)[2]
   end
 end
 
@@ -93,7 +93,7 @@ function state_statistics(state, player, memory=nothing)
   # Collect network statistics
   oracle = player_oracle(player)
   if isa(oracle, AbstractNetwork)
-    Pnet, Vnet = MCTS.evaluate(oracle, cboard, actions)
+    Pnet, Vnet = MCTS.evaluate(oracle, cboard)
     report.Vnet = Vnet
     for i in eachindex(actions)
       arep = report.actions[i][2]
