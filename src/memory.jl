@@ -85,6 +85,23 @@ function merge_by_board(es::AbstractVector{TrainingSample{B}}) where B
   return [merge_samples(es) for es in values(dict)]
 end
 
+function apply_symmetry(::Type{Game}, sample, (symboard, aperm)) where Game
+  mask = GI.actions_mask(Game(sample.b))
+  symmask = GI.actions_mask(Game(symboard))
+  π = zeros(eltype(sample.π), length(mask))
+  π[mask] = sample.π
+  π = π[aperm]
+  @assert iszero(π[.~symmask])
+  π = π[symmask]
+  return TrainingSample(symboard, π, sample.z, sample.t, sample.n)
+end
+
+function augment_with_symmetries(Game, samples)
+  symsamples = [apply_symmetry(Game, s, sym)
+    for s in samples for sym in GI.symmetries(Game, s.b)]
+  return [samples ; symsamples]
+end
+
 get(buf::MemoryBuffer) = buf.mem[:]
 
 last_batch(buf::MemoryBuffer) = buf.mem[end-last_batch_size(buf)+1:end]

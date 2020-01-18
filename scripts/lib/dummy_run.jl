@@ -3,11 +3,12 @@
 ##### before launching a training session
 #####
 
-# Returned modified parameters where all num_games fields are set to 1
+# Returned modified parameters where all num_games fields are set to 1.
+# The number of iterations is set to 2.
 function dummy_run_params(params, benchmark)
   self_play = SelfPlayParams(params.self_play, num_games=1)
   arena = ArenaParams(params.arena, num_games=1)
-  params = Params(params, self_play=self_play, arena=arena)
+  params = Params(params, num_iters=2, self_play=self_play, arena=arena)
   benchmark = [
     Benchmark.Duel(d.player, d.baseline,
       num_games=1, color_policy=d.color_policy)

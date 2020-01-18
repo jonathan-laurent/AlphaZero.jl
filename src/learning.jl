@@ -24,10 +24,9 @@ function convert_sample(Game, wp, e::TrainingSample)
     w = Float32[n]
   end
   x = GI.vectorize_board(Game, e.b)
-  actions = GI.available_actions(Game(e.b))
-  a = GI.actions_mask(Game, actions)
+  a = GI.actions_mask(Game(e.b))
   p = zeros(size(a))
-  p[[GI.action_id(Game, a) for a in actions]] = e.π
+  p[a] = e.π
   v = [e.z]
   return (w, x, a, p, v)
 end

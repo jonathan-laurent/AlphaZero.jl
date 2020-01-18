@@ -13,4 +13,4 @@ session = Session(
   dir=SESSION_DIR, autosave=false, save_intermediate=false)
 
 explorer = Explorer(session.env)
-explore!(explorer)
+explore(explorer)

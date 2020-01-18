@@ -54,9 +54,13 @@ end
 ##### Game API
 #####
 
+const ACTIONS = collect(1:NUM_POSITIONS)
+
+GI.actions(::Type{Game}) = ACTIONS
+
 Base.copy(g::Game) = Game(g.board, g.curplayer)
 
-GI.available_actions(g::Game) = findall(==(nothing), g.board)
+GI.actions_mask(g::Game) = map(isnothing, g.board)
 
 GI.board(g::Game) = g.board
 
@@ -111,12 +115,6 @@ end
 #####
 ##### Machine Learning API
 #####
-
-GI.num_actions(::Type{Game}) = NUM_POSITIONS
-
-GI.action(::Type{Game}, id) = id
-
-GI.action_id(::Type{Game}, pos) = pos
 
 # Vectorized representation: 3x3x3 array
 # Channels: free, white, black

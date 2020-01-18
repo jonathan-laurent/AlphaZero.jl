@@ -61,7 +61,7 @@ function think(player::RandomPlayer, state, turn=nothing)
   actions = GI.available_actions(state)
   n = length(actions)
   π = ones(n) ./ length(actions)
-  return π
+  return actions, π
 end
 
 #####
@@ -206,7 +206,7 @@ end
 function think(p::NetworkPlayer, state, turn)
   actions = GI.available_actions(state)
   board = GI.canonical_board(state)
-  π, _ = MCTS.evaluate(p.network, board, actions)
+  π, _ = MCTS.evaluate(p.network, board)
   return actions, π
 end
 

@@ -51,12 +51,21 @@ Return the action type corresponding to `Game`.
 
 Actions must be "symmetric" in the following sense:
 
-```julia
+```
 available_actions(s) ==
   available_actions(Game(board_symmetric(s), !white_playing(s)))
 ```
 """
 function Action(::Type{<:AbstractGame})
+  @unimplemented
+end
+
+"""
+    actions(::Type{<:AbstractGame})
+
+Return the vector of all game actions.
+"""
+function actions(::Type{<:AbstractGame})
   @unimplemented
 end
 
@@ -112,13 +121,29 @@ function board_symmetric(::AbstractGame)
 end
 
 """
+    actions_mask(state::AbstractGame)
+
+Return a boolean mask indicating what actions are available from `state`.
+
+The following identities must hold:
+
+    game_terminated(state) || any(actions_mask(state))
+    length(actions_mask(state)) == length(actions(typeof(state)))
+"""
+function actions_mask(state::AbstractGame)
+  @unimplemented
+end
+
+"""
     available_actions(state::AbstractGame)
 
-Return the vector of all available actions, which must be nonempty if
-`isnothing(white_reward(state))`.
+Return the vector of all available actions. A default implementation is
+provided based on [`actions`](@ref) and [`actions_mask`](@ref).
 """
-function available_actions(::AbstractGame)
-  @unimplemented
+function available_actions(state::AbstractGame)
+  Game = typeof(state)
+  mask = actions_mask(state)
+  return actions(Game)[mask]
 end
 
 """
@@ -150,15 +175,30 @@ function heuristic_value(state::AbstractGame)
   @unimplemented
 end
 
-"""
-    symmetries(::Type{<:AbstractGame}, board, actions)
+#####
+##### Symmetries
+#####
 
-Return the vector of all pairs `(σ(board), σ(actions))` for `σ`
-a nonidentical symmetry that preserves board value.
 """
-function symmetries(::Type{G}, board, actions) where {G <: AbstractGame}
-  Sym = Tuple{Board(G), Vector{Action(G)}}
-  return Sym[]
+    symmetries(::Type{G}, board) where {G <: AbstractGame}
+
+Return the vector of all pairs `(b, σ)` where
+  - `b` is the image of `board` by a nonidentical symmetry
+  - `σ` is the associated actions permutation, as an integer vector of
+     size `num_actions(Game)`.
+"""
+function symmetries(::Type{G}, board) where {G <: AbstractGame}
+  return Tuple{Board(G), Vector{Int}}[]
+end
+
+function test_symmetry(Game, board, (symboard, aperm))
+  syms = symmetries
+  mask = actions_mask(Game(board))
+  symmask = actions_mask(Game(symboard))
+  v = falses(length(symmask))
+  v[mask] .= true
+  v = v[aperm]
+  return all(v[symmask]) && !any(v[.~symmask])
 end
 
 #####
@@ -171,35 +211,6 @@ end
 Return a vectorized representation of a board.
 """
 function vectorize_board(::Type{<:AbstractGame}, board)
-  @unimplemented
-end
-
-"""
-    num_actions(::Type{<:AbstractGame}) :: Int
-
-Return the total number of actions for a game.
-"""
-function num_actions(::Type{<:AbstractGame})
-  @unimplemented
-end
-
-"""
-    action_id(G::Type{<:AbstractGame}, action) :: Int
-
-Map each action to a unique number in the range `1:num_actions(G)`.
-"""
-function action_id(::Type{<:AbstractGame}, action)
-  @unimplemented
-end
-
-"""
-    action(::Type{<:AbstractGame}, Int)
-
-Inverse function of [`action_id`](@ref GameInterface.action_id).
-
-Map an action identifier to an actual action.
-"""
-function action(::Type{<:AbstractGame}, id)
   @unimplemented
 end
 
@@ -251,16 +262,9 @@ end
 
 game_terminated(state) = !isnothing(white_reward(state))
 
-board_dim(::Type{G}) where G = size(vectorize_board(G, board(G())))
+num_actions(::Type{G}) where G = length(actions(G))
 
-function actions_mask(::Type{G}, available_actions) where G
-  nactions = num_actions(G)
-  mask = falses(nactions)
-  for a in available_actions
-    mask[action_id(G, a)] = true
-  end
-  return mask
-end
+board_dim(::Type{G}) where G = size(vectorize_board(G, board(G())))
 
 function canonical_board(state)
   white_playing(state) ? board(state) : board_symmetric(state)
@@ -269,6 +273,8 @@ end
 function board_memsize(::Type{G}) where G
   return Base.summarysize(board(G()))
 end
+
+symmetric_reward(r::Real) = -r
 
 end
 

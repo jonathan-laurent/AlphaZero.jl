@@ -1,6 +1,5 @@
 import AlphaZero.GI
 
-using Printf
 using Crayons
 using StaticArrays
 
@@ -26,7 +25,7 @@ mutable struct Game <: GI.AbstractGame
   curplayer :: Player
   finished :: Bool
   winner :: Player
-  actions :: Vector{Int}
+  amask :: Vector{Bool} # actions mask
   # Actions history, which uniquely identifies the current board position
   # Used by external solvers
   history :: Union{Nothing, Vector{Int}}
@@ -37,17 +36,21 @@ function Game()
   curplayer = WHITE
   finished = false
   winner = 0x00
-  actions = collect(1:NUM_COLS)
+  amask = trues(NUM_COLS)
   history = Int[]
-  Game(board, curplayer, finished, winner, actions, history)
+  Game(board, curplayer, finished, winner, amask, history)
 end
 
 GI.Board(::Type{Game}) = Board
 GI.Action(::Type{Game}) = Int
 
+const ACTIONS = collect(1:NUM_COLS)
+
+GI.actions(::Type{Game}) = ACTIONS
+
 function Base.copy(g::Game)
   history = isnothing(g.history) ? nothing : copy(g.history)
-  Game(g.board, g.curplayer, g.finished, g.winner, copy(g.actions), history)
+  Game(g.board, g.curplayer, g.finished, g.winner, copy(g.amask), history)
 end
 
 history(g::Game) = g.history
@@ -64,13 +67,13 @@ function first_free(board, col)
   return row
 end
 
-function update_available_actions!(g::Game)
-  g.actions = filter(1:NUM_COLS) do col
+function update_actions_mask!(g::Game)
+  g.amask = map(ACTIONS) do col
     first_free(g.board, col) <= NUM_ROWS
   end
 end
 
-GI.available_actions(g::Game) = g.actions
+GI.actions_mask(g::Game) = g.amask
 
 valid_pos((col, row)) = 1 <= col <= NUM_COLS && 1 <= row <= NUM_ROWS
 
@@ -100,12 +103,12 @@ end
 
 # Update the game status assuming g.curplayer just played at pos=(col, row)
 function update_status!(g::Game, pos)
-  update_available_actions!(g)
+  update_actions_mask!(g)
   if winning_pattern_at(g.board, g.curplayer, pos)
     g.winner = g.curplayer
     g.finished = true
   else
-    g.finished = isempty(g.actions)
+    g.finished = !any(g.amask)
   end
 end
 
@@ -122,8 +125,8 @@ function Game(board::Board; white_playing=true)
   g.history = nothing
   g.board = board
   g.curplayer = white_playing ? WHITE : BLACK
-  update_available_actions!(g)
-  isempty(g.actions) && (g.finished = true)
+  update_actions_mask!(g)
+  any(g.amask) || (g.finished = true)
   for col in 1:NUM_COLS
     top = first_free(g.board, col)
     top == 1 && continue
@@ -192,39 +195,33 @@ const ALIGNMENTS = [
   alignments_with((0,  1));
   alignments_with((1,  0))]
 
-  function alignment_value_for(g::Game, player, alignment)
-    γ = 0.1
-    N = 0
-    for pos in alignment
-      cell = g.board[pos...]
-      if cell == player
-        N += 1
-      elseif cell == other(player)
-        return 0.
-      end
+function alignment_value_for(g::Game, player, alignment)
+  γ = 0.1
+  N = 0
+  for pos in alignment
+    cell = g.board[pos...]
+    if cell == player
+      N += 1
+    elseif cell == other(player)
+      return 0.
     end
-    return γ ^ (TO_CONNECT - 1 - N)
   end
+  return γ ^ (TO_CONNECT - 1 - N)
+end
 
-  function heuristic_value_for(g::Game, player)
-    return sum(alignment_value_for(g, player, al) for al in ALIGNMENTS)
-  end
+function heuristic_value_for(g::Game, player)
+  return sum(alignment_value_for(g, player, al) for al in ALIGNMENTS)
+end
 
-  function GI.heuristic_value(g::Game)
-    mine = heuristic_value_for(g, g.curplayer)
-    yours = heuristic_value_for(g, other(g.curplayer))
-    return mine - yours
-  end
+function GI.heuristic_value(g::Game)
+  mine = heuristic_value_for(g, g.curplayer)
+  yours = heuristic_value_for(g, other(g.curplayer))
+  return mine - yours
+end
 
 #####
 ##### ML interface
 #####
-
-GI.num_actions(::Type{Game}) = NUM_COLS
-
-GI.action_id(::Type{Game}, col) = col
-
-GI.action(::Type{Game}, id) = id
 
 function GI.vectorize_board(::Type{Game}, board)
   return Float32[
@@ -232,6 +229,21 @@ function GI.vectorize_board(::Type{Game}, board)
     for col in 1:NUM_COLS,
         row in 1:NUM_ROWS,
         c in [EMPTY, WHITE, BLACK]]
+end
+
+#####
+##### Symmetries
+#####
+
+function flipped_board(board)
+  return @SMatrix[board[col, row]
+    for col in reverse(1:NUM_COLS), row in 1:NUM_ROWS]
+end
+
+function GI.symmetries(::Type{Game}, board)
+  symb = flipped_board(board)
+  σ = reverse(collect(1:NUM_COLS))
+  return [(symb, σ)]
 end
 
 #####

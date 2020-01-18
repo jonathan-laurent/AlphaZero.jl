@@ -149,7 +149,11 @@ function learning!(env::Env, handler)
   epochs = Report.Epoch[]
   checkpoints = Report.Checkpoint[]
   tloss, teval, ttrain = 0., 0., 0.
-  trainer, tconvert = @timed Trainer(env.bestnn, get(env.memory), lp)
+  experience = get(env.memory)
+  if env.params.use_symmetries
+    experience = augment_with_symmetries(GameType(env), experience)
+  end
+  trainer, tconvert = @timed Trainer(env.bestnn, experience, lp)
   init_status = learning_status(trainer)
   Handlers.learning_started(handler, init_status)
   # Loop state variables

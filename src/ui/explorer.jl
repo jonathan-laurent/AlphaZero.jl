@@ -27,7 +27,7 @@ mutable struct StateStats{Action}
 end
 
 player_reward(state, white_reward) =
-  GI.white_playing(state) ? r : MCTS.symmetric_reward(white_reward)
+  GI.white_playing(state) ? r : GI.symmetric_reward(white_reward)
 
 function evaluate_vnet(oracle::MCTS.Oracle, state)
   r = GI.white_reward(state)
@@ -45,7 +45,7 @@ function evaluate_qnet(oracle::MCTS.Oracle, state, action)
   GI.play!(next, action)
   q = evaluate_vnet(oracle, next)
   pswitch = (GI.white_playing(state) != GI.white_playing(next))
-  return pswitch ? MCTS.symmetric_reward(q) : q
+  return pswitch ? GI.symmetric_reward(q) : q
 end
 
 player_oracle(p) = nothing

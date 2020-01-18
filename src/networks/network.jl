@@ -5,7 +5,7 @@ module Network
 
 export AbstractNetwork, OptimiserSpec, Nesterov, CyclicNesterov
 
-import ..MCTS, ..GameInterface, ..Util
+import ..MCTS, ..GI, ..Util
 
 using Base: @kwdef
 using ..Util: @unimplemented
@@ -250,7 +250,7 @@ function mean_weight(nn::AbstractNetwork)
 end
 
 """
-    evaluate(network::AbstractNetwork, boards, action_masks)
+    evaluate(network::AbstractNetwork, boards, actions_mask)
 
 Evaluate a batch of board positions. This function is a wrapper
 on [`forward`](@ref) that puts a zero weight on invalid actions.
@@ -258,7 +258,7 @@ on [`forward`](@ref) that puts a zero weight on invalid actions.
 # Arguments
 
   - `boards` is a tensor whose last dimension has size `bach_size`
-  - `action_masks` is a binary matrix of size `(num_actions, batch_size)`
+  - `actions_mask` is a binary matrix of size `(num_actions, batch_size)`
 
 # Return
 
@@ -281,25 +281,22 @@ function evaluate(nn::AbstractNetwork, board, actions_mask)
   return (p, v, p_invalid)
 end
 
-to_singleton_batch(x) = reshape(x, size(x)..., 1)
-from_singleton_batch(x) = reshape(x, size(x)[1:end-1])
+to_singletons(x) = reshape(x, size(x)..., 1)
+from_singletons(x) = reshape(x, size(x)[1:end-1])
 
-function MCTS.evaluate(nn::AbstractNetwork{G}, board, available_actions) where G
-  x = GameInterface.vectorize_board(G, board)
-  a = GameInterface.actions_mask(G, available_actions)
-  xnet, anet = to_singleton_batch.(convert_input_tuple(nn, (x, Float32.(a))))
-  p, v, _ = from_singleton_batch.(
-    convert_output_tuple(nn, evaluate(nn, xnet, anet)))
-  return (p[a], v[1])
+function MCTS.evaluate(nn::AbstractNetwork{Game}, board) where Game
+  actions_mask = GI.actions_mask(Game(board))
+  x = GI.vectorize_board(Game, board)
+  a = Float32.(actions_mask)
+  xnet, anet = to_singletons.(convert_input_tuple(nn, (x, a)))
+  net_output = evaluate(nn, xnet, anet)
+  p, v, _ = from_singletons.(convert_output_tuple(nn, net_output))
+  return (p[actions_mask], v[1])
 end
 
-function MCTS.evaluate_batch(nn::AbstractNetwork{G}, batch) where G
-  X = Util.superpose((
-    GameInterface.vectorize_board(G, b)
-    for (b, as) in batch))
-  A = Util.superpose((
-    GameInterface.actions_mask(G, as)
-    for (b, as) in batch))
+function MCTS.evaluate_batch(nn::AbstractNetwork{Game}, batch) where Game
+  X = Util.superpose((GI.vectorize_board(Game, b) for b in batch))
+  A = Util.superpose((GI.actions_mask(Game(b)) for b in batch))
   Xnet, Anet = convert_input_tuple(nn, (X, Float32.(A)))
   P, V, _ = convert_output_tuple(nn, evaluate(nn, Xnet, Anet))
   return [(P[A[:,i],i], V[1,i]) for i in eachindex(batch)]

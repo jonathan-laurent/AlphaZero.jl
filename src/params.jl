@@ -235,8 +235,9 @@ The AlphaZero parameters.
 | `arena`                    | [`ArenaParams`](@ref)               |  -        |
 | `memory_analysis`          | `Union{Nothing, MemAnalysisParams}` | `nothing` |
 | `num_iters`                | `Int`                               |  -        |
-| `mem_buffer_size`          | `PLSchedule{Int}`                   |  -        |
+| `use_symmetries`           | `Bool`                              | `false`   |
 | `ternary_rewards`          | `Bool`                              | `false`   |
+| `mem_buffer_size`          | `PLSchedule{Int}`                   |  -        |
 
 # Explanation
 
@@ -246,18 +247,20 @@ iteration can be decomposed into a self-play phase
 (see [`LearningParams`](@ref)).
 
   - `ternary_rewards`: set to `true` if the rewards issued by
-    the game environment always belong to ``\\{-1, 0, 1\\}`` so that
-    the logging and profiling tools can take advantage of this property.
+     the game environment always belong to ``\\{-1, 0, 1\\}`` so that
+     the logging and profiling tools can take advantage of this property.
+  - `use_symmetries`: if set to `true`, board symmetries are used for
+     data augmentation before learning.
   - `mem_buffer_size`: size schedule of the memory buffer, in terms of number
-    of samples. It is typical to start with a small memory buffer that is grown
-    progressively so as to wash out the initial low-quality self-play data
-    more quickly.
+     of samples. It is typical to start with a small memory buffer that is grown
+     progressively so as to wash out the initial low-quality self-play data
+     more quickly.
 
 # AlphaGo Zero Parameters
 
 In the original AlphaGo Zero paper:
-+ About 5 millions games of self-play are played across 200 iterations.
-+ The memory buffer contains 500K games, which makes about 100M samples
+- About 5 millions games of self-play are played across 200 iterations.
+- The memory buffer contains 500K games, which makes about 100M samples
   as an average game of Go lasts about 200 turns.
 """
 @kwdef struct Params
@@ -266,8 +269,9 @@ In the original AlphaGo Zero paper:
   learning :: LearningParams
   arena :: ArenaParams
   num_iters :: Int
-  mem_buffer_size :: PLSchedule{Int}
+  use_symmetries :: Bool = false
   ternary_rewards :: Bool = false
+  mem_buffer_size :: PLSchedule{Int}
 end
 
 for T in [MctsParams, ArenaParams, SelfPlayParams, LearningParams, Params]
