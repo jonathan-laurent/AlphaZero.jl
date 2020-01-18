@@ -1,7 +1,7 @@
 Network = ResNet
 
 netparams = ResNetHP(
-  num_filters=64,
+  num_filters=128,
   num_blocks=7,
   conv_kernel_size=(3, 3),
   num_policy_head_filters=4,
@@ -37,9 +37,9 @@ learning = LearningParams(
   batch_size=1024,
   loss_computation_batch_size=1024,
   optimiser=CyclicNesterov(
-    lr_base=5e-3,
-    lr_high=5e-2,
-    lr_low=5e-4,
+    lr_base=1e-2,
+    lr_high=1e-1,
+    lr_low=1e-3,
     momentum_high=0.9,
     momentum_low=0.7),
   l2_regularization=1e-4,
