@@ -3,7 +3,7 @@ A generic, framework agnostic interface for neural networks.
 """
 module Network
 
-export AbstractNetwork, OptimiserSpec, Nesterov, CyclicNesterov
+export AbstractNetwork, OptimiserSpec, Nesterov, CyclicNesterov, Adam
 
 import ..MCTS, ..GI, ..Util
 
@@ -200,6 +200,15 @@ SGD optimiser with a cyclic learning rate and cyclic Nesterov momentum.
   lr_low  :: Float32
   momentum_low :: Float32
   momentum_high :: Float32
+end
+
+"""
+    Adam(;lr)
+
+Adam optimiser.
+"""
+@kwdef struct Adam <: OptimiserSpec
+  lr :: Float32
 end
 
 """

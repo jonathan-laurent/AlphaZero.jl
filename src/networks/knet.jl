@@ -114,6 +114,13 @@ function Network.train!(callback, nn::KNetwork, opt::CyclicNesterov, loss, data)
   end
 end
 
+function Network.train!(callback, nn::KNetwork, opt::Adam, loss, data)
+  optimiser = Knet.Adam(lr=opt.lr)
+  for (i, l) in enumerate(Knet.minimize(loss, data, optimiser))
+    callback(i, l)
+  end
+end
+
 function Network.gc(::KNetwork)
   GPU_AVAILABLE || return
   GC.gc(true)
