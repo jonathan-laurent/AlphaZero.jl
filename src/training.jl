@@ -62,7 +62,8 @@ and sometimes a second argment `r` that consists in a report.
 | `self_play_finished(h, r)`  | sends report: [`Report.SelfPlay`](@ref)        |
 | `memory_analyzed(h, r)`     | sends report: [`Report.Memory`](@ref)          |
 | `learning_started(h, r)`    | sends report: [`Report.LearningStatus`](@ref)  |
-| `learning_epoch(h, r)`      | sends report: [`Report.Epoch`](@ref)           |
+| `updates_started(h)`        | called before each series of batch updates     |
+| `updates_finished(h, r)`    | sends report: [`Report.LearningStatus`](@ref)  |
 | `checkpoint_started(h)`     | called before a checkpoint evaluation starts   |
 | `checkpoint_game_played(h)` | called after each arena game                   |
 | `checkpoint_finished(h, r)` | sends report: [`Report.Checkpoint`](@ref)      |
@@ -80,7 +81,8 @@ module Handlers
   function self_play_finished(h, r)  return end
   function memory_analyzed(h, r)     return end
   function learning_started(h, r)    return end
-  function learning_epoch(h, r)      return end
+  function updates_started(h)        return end
+  function updates_finished(h, r)    return end
   function checkpoint_started(h)     return end
   function checkpoint_game_played(h) return end
   function checkpoint_finished(h, r) return end
@@ -134,8 +136,9 @@ function evaluate_network(baseline, contender, params, handler)
   contender = MctsPlayer(contender, params.mcts)
   ngames = params.num_games
   rec = Recorder{GameType(baseline)}()
-  rp = params.reset_mcts_every
-  avgz = pit(contender, baseline, ngames; reset_every=rp, memory=rec) do i, z
+  avgz = pit(contender, baseline, ngames; memory=rec,
+      reset_every=params.reset_mcts_every,
+      flip_probability=params.flip_probability) do i, z
     Handlers.checkpoint_game_played(handler)
   end
   redundancy = compute_redundancy(rec)
@@ -143,11 +146,10 @@ function evaluate_network(baseline, contender, params, handler)
 end
 
 function learning!(env::Env, handler)
-  # Initialize the training process
   ap = env.params.arena
   lp = env.params.learning
-  epochs = Report.Epoch[]
   checkpoints = Report.Checkpoint[]
+  losses = Float32[]
   tloss, teval, ttrain = 0., 0., 0.
   experience = get(env.memory)
   if env.params.use_symmetries
@@ -156,42 +158,48 @@ function learning!(env::Env, handler)
   trainer, tconvert = @timed Trainer(env.bestnn, experience, lp)
   init_status = learning_status(trainer)
   Handlers.learning_started(handler, init_status)
+  # Compute the number of batches between each checkpoint
+  nbatches = lp.max_batches_per_checkpoint
+  if !iszero(lp.min_checkpoints_per_epoch)
+    ntotal = num_batches_total(trainer)
+    nbatches = min(nbatches, ntotal ÷ lp.min_checkpoints_per_epoch)
+  end
   # Loop state variables
   best_evalz = ap.update_threshold
   nn_replaced = false
-  # Loop over epochs
-  for k in 1:maximum(lp.checkpoints)
-    # Execute learning epoch
-    losses, dttrain = @timed training_epoch!(trainer)
+
+  for k in 1:lp.num_checkpoints
+    # Execute a series of batch updates
+    Handlers.updates_started(handler)
+    dlosses, dttrain = @timed batch_updates!(trainer, nbatches)
     status, dtloss = @timed learning_status(trainer)
+    Handlers.updates_finished(handler, status)
     tloss += dtloss
     ttrain += dttrain
-    epoch_report = Report.Epoch(status, losses)
-    push!(epochs, epoch_report)
-    Handlers.learning_epoch(handler, epoch_report)
-    # Make checkpoints at fixed times
-    if k ∈ lp.checkpoints
-      Handlers.checkpoint_started(handler)
-      cur_nn = get_trained_network(trainer)
-      (evalz, redundancy), dteval =
-        @timed evaluate_network(env.bestnn, cur_nn, ap, handler)
-      teval += dteval
-      # If eval is good enough, replace network
-      success = evalz >= best_evalz
-      if success
-        nn_replaced = true
-        env.bestnn = cur_nn
-        env.randnn = false
-        best_evalz = evalz
-      end
-      checkpoint_report = Report.Checkpoint(k, evalz, redundancy, success)
-      push!(checkpoints, checkpoint_report)
-      Handlers.checkpoint_finished(handler, checkpoint_report)
+    append!(losses, dlosses)
+    # Run a checkpoint evaluation
+    Handlers.checkpoint_started(handler)
+    cur_nn = get_trained_network(trainer)
+    (evalz, redundancy), dteval =
+      @timed evaluate_network(env.bestnn, cur_nn, ap, handler)
+    teval += dteval
+    # If eval is good enough, replace network
+    success = (evalz >= best_evalz)
+    if success
+      nn_replaced = true
+      env.bestnn = cur_nn
+      env.randnn = false
+      best_evalz = evalz
     end
+    checkpoint_report = Report.Checkpoint(
+      k * nbatches, status, evalz, redundancy, success)
+    push!(checkpoints, checkpoint_report)
+    Handlers.checkpoint_finished(handler, checkpoint_report)
   end
+
   report = Report.Learning(
     tconvert, tloss, ttrain, teval,
-    init_status, epochs, checkpoints, nn_replaced)
+    init_status, losses, checkpoints, nn_replaced)
   Handlers.learning_finished(handler, report)
   return report
 end

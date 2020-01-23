@@ -56,8 +56,7 @@ function state_statistics(state, player, memory=nothing)
   @assert !GI.game_terminated(state)
   cboard = GI.canonical_board(state)
   # Make the player think
-  turn = 1 # TODO
-  actions, π = think(player, state, turn)
+  actions, π = think(player, state, exp.turn)
   report = StateStats(actions)
   for i in eachindex(actions)
     report.actions[i][2].P = π[i]
@@ -133,8 +132,10 @@ function print_state_statistics(::Type{G}, stats::StateStats) where G
     ("Qnet",  val,    r -> r[2].Qnet)],
     header_style=Log.BOLD)
   logger = Logger()
-  Log.table(logger, btable, [stats])
-  Log.sep(logger)
+  if !all(isnothing, [stats.Nmcts, stats.Nmem, stats.Vmem, stats.Vnet])
+    Log.table(logger, btable, [stats])
+    Log.sep(logger)
+  end
   Log.table(logger, atable, stats.actions)
   Log.sep(logger)
 end
@@ -159,11 +160,12 @@ mutable struct Explorer{Game}
   history :: Stack{Game}
   player :: AbstractPlayer{Game}
   memory :: Option{MemoryBuffer}
+  turn :: Int
   function Explorer(player::AbstractPlayer, state=nothing; memory=nothing)
     Game = GameType(player)
     isnothing(state) && (state = Game())
     history = Stack{Game}()
-    new{Game}(state, history, player, memory)
+    new{Game}(state, history, player, memory, 0)
   end
 end
 
@@ -181,6 +183,7 @@ function restart!(exp::Explorer)
   reset_player!(exp.player)
   empty!(exp.history)
   exp.state = GameType(exp)()
+  exp.turn = 0
 end
 
 save_state!(exp::Explorer) = push!(exp.history, copy(exp.state))
@@ -192,6 +195,7 @@ function interpret!(exp::Explorer, stats, cmd, args=[])
     if !isnothing(st)
       save_state!(exp)
       exp.state = st
+      exp.turn = 0
       return true
     end
   elseif cmd == "restart"
@@ -200,6 +204,7 @@ function interpret!(exp::Explorer, stats, cmd, args=[])
   elseif cmd == "undo"
     if !isempty(exp.history)
       exp.state = pop!(exp.history)
+      exp.turn -= 1
       return true
     end
   elseif cmd == "do"
@@ -214,6 +219,11 @@ function interpret!(exp::Explorer, stats, cmd, args=[])
     end
     save_state!(exp)
     GI.play!(exp.state, a)
+    exp.turn += 1
+    return true
+  elseif cmd == "flip"
+    save_state!(exp)
+    exp.state = GI.random_symmetric_state(exp.state)
     return true
   elseif cmd == "explore"
     isa(exp.player, MctsPlayer) || (return false)

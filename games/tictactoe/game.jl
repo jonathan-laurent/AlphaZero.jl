@@ -127,6 +127,29 @@ function GI.vectorize_board(::Type{Game}, board)
 end
 
 #####
+##### Symmetries
+#####
+
+function generate_dihedral_symmetries()
+  N = BOARD_SIDE
+  rot((x, y)) = (y, N - x + 1) # 90° rotation
+  flip((x, y)) = (x, N - y + 1) # flip along vertical axis
+  ap(f) = p -> pos_of_xy(f(xy_of_pos(p)))
+  sym(f) = map(ap(f), collect(1:NUM_POSITIONS))
+  rot2 = rot ∘ rot
+  rot3 = rot2 ∘ rot
+  return [
+    sym(rot), sym(rot2), sym(rot3),
+    sym(flip), sym(flip ∘ rot), sym(flip ∘ rot2), sym(flip ∘ rot3)]
+end
+
+const SYMMETRIES = generate_dihedral_symmetries()
+
+function GI.symmetries(::Type{Game}, board)
+  return [(board[sym], sym) for sym in SYMMETRIES]
+end
+
+#####
 ##### Interaction API
 #####
 

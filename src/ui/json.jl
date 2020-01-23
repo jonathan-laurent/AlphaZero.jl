@@ -6,7 +6,7 @@ import JSON3
 
 for T in [
     # Reports
-    Report.Loss, Report.LearningStatus, Report.Checkpoint, Report.Epoch,
+    Report.Loss, Report.LearningStatus, Report.Checkpoint,
     Report.Learning, Report.Samples, Report.StageSamples, Report.Memory,
     Report.SelfPlay, Report.Perfs, Report.Iteration, Report.Initial,
     # Benchmarks

@@ -81,12 +81,15 @@ Specify a duel that consists in `num_games` games between
 struct Duel
   num_games :: Int
   reset_every :: Union{Nothing, Int}
+  flip_probability :: Float64
   color_policy :: ColorPolicy
   player :: Player
   baseline :: Player
   function Duel(player, baseline;
-      num_games, reset_every=nothing, color_policy=ALTERNATE_COLORS)
-    return new(num_games, reset_every, color_policy, player, baseline)
+      num_games, reset_every=nothing,
+      color_policy=ALTERNATE_COLORS, flip_probability=0.)
+    return new(
+      num_games, reset_every, flip_probability, color_policy, player, baseline)
   end
 end
 
@@ -105,7 +108,9 @@ function run(env::Env{G}, duel::Duel, progress=nothing) where G
   let games = Vector{Float64}(undef, duel.num_games)
     avgz, time = @timed begin
       pit(player, baseline, duel.num_games, memory=rec,
-          reset_every=duel.reset_every, color_policy=duel.color_policy) do i, z
+          flip_probability=duel.flip_probability,
+          reset_every=duel.reset_every,
+          color_policy=duel.color_policy) do i, z
         games[i] = z
         isnothing(progress) || next!(progress)
       end

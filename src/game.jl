@@ -19,7 +19,8 @@ Abstract base type for a game state.
 
 # Constructors
 
-Any subtype `Game` must implement the following constructors:
+Any subtype `Game` must implement `Base.copy` along with
+the following constructors:
 
     Game()
 
@@ -69,11 +70,6 @@ function actions(::Type{<:AbstractGame})
   @unimplemented
 end
 
-"""
-    Base.copy(::AbstractGame)
-
-Return a fresh copy of a game state.
-"""
 function Base.copy(::AbstractGame)
   @unimplemented
 end
@@ -137,8 +133,10 @@ end
 """
     available_actions(state::AbstractGame)
 
-Return the vector of all available actions. A default implementation is
-provided based on [`actions`](@ref) and [`actions_mask`](@ref).
+Return the vector of all available actions.
+
+A default implementation is provided based on
+[`actions`](@ref) and [`actions_mask`](@ref).
 """
 function available_actions(state::AbstractGame)
   Game = typeof(state)
@@ -182,7 +180,7 @@ end
 """
     symmetries(::Type{G}, board) where {G <: AbstractGame}
 
-Return the vector of all pairs `(b, σ)` where
+Return the vector of all pairs `(b, σ)` where:
   - `b` is the image of `board` by a nonidentical symmetry
   - `σ` is the associated actions permutation, as an integer vector of
      size `num_actions(Game)`.
@@ -267,7 +265,7 @@ num_actions(::Type{G}) where G = length(actions(G))
 board_dim(::Type{G}) where G = size(vectorize_board(G, board(G())))
 
 function canonical_board(state)
-  white_playing(state) ? board(state) : board_symmetric(state)
+  return white_playing(state) ? board(state) : board_symmetric(state)
 end
 
 function board_memsize(::Type{G}) where G
@@ -275,6 +273,11 @@ function board_memsize(::Type{G}) where G
 end
 
 symmetric_reward(r::Real) = -r
+
+function random_symmetric_state(state::Game) where {Game <: AbstractGame}
+  bsym, _ = rand(symmetries(Game, board(state)))
+  return Game(bsym, white_playing(state))
+end
 
 end
 

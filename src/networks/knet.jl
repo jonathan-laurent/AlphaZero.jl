@@ -96,8 +96,8 @@ Network.convert_input(nn::KNetwork, x) =
 Network.convert_output(::KNetwork, x) = x
 Network.convert_output(::KNetwork, x::Knet.KnetArray) = Array(x)
 
-function Network.train!(callback, nn::KNetwork, opt::CyclicNesterov, loss, data)
-  n = length(data)
+function Network.train!(
+    callback, nn::KNetwork, opt::CyclicNesterov, loss, data, n)
   lr = CyclicSchedule(
     opt.lr_base,
     opt.lr_high,
@@ -114,7 +114,7 @@ function Network.train!(callback, nn::KNetwork, opt::CyclicNesterov, loss, data)
   end
 end
 
-function Network.train!(callback, nn::KNetwork, opt::Adam, loss, data)
+function Network.train!(callback, nn::KNetwork, opt::Adam, loss, data, n)
   optimiser = Knet.Adam(lr=opt.lr)
   for (i, l) in enumerate(Knet.minimize(loss, data, optimiser))
     callback(i, l)

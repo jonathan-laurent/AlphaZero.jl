@@ -51,7 +51,9 @@ end
 
 Report generated after a checkpoint evaluation.
 
-- `epoch_id`: number of epochs after which the checkpoint was computed
+- `batch_id`: number of batches after which the checkpoint was computed
+- `status_after`: learning status at the checkpoint, as an object of type
+   [`Report.LearningStatus`](@ref)
 - `reward`: average reward collected by the contender network
 - `redundancy`: ratio of duplicate positions encountered during the evaluation,
    not counting the initial position. If this number is too high, you may
@@ -60,24 +62,11 @@ Report generated after a checkpoint evaluation.
    the checkpoint
 """
 struct Checkpoint
-  epoch_id :: Int
+  batch_id :: Int
+  status_after :: LearningStatus
   reward :: Float64
   redundancy :: Float64
   nn_replaced :: Bool
-end
-
-"""
-    Report.Epoch
-
-Report generated after each learning epoch.
-
-- `status_after`: learning status after the epoch, as an object of type
-    [`Report.LearningStatus`](@ref)
-- `losses`: loss value on each minibatch
-"""
-struct Epoch
-  status_after :: LearningStatus
-  losses :: Vector{Float32}
 end
 
 """
@@ -91,7 +80,7 @@ Report generated at the end of the learning phase of an iteration.
     respectively
 - `initial_status`: status before the learning phase, as an object of type
     [`Report.LearningStatus`](@ref)
-- `epochs`: vector of [`Report.Epoch`](@ref) reports
+- `losses`: loss value on each minibatch
 - `checkpoints`: vector of [`Report.Checkpoint`](@ref) reports
 - `nn_replaced`: true if the best neural network was replaced
 """
@@ -101,7 +90,7 @@ struct Learning
   time_train :: Float64
   time_eval :: Float64
   initial_status :: LearningStatus
-  epochs :: Vector{Epoch}
+  losses :: Vector{Float32}
   checkpoints :: Vector{Checkpoint}
   nn_replaced :: Bool
 end

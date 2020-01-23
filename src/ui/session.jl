@@ -72,8 +72,9 @@ const NET_PARAMS_FILE  =  "netparams.json"
 const BENCHMARK_FILE   =  "benchmark.json"
 const LOG_FILE         =  "log.txt"
 const PLOTS_DIR        =  "plots"
+const ITERS_DIR        =  "iterations"
 
-iterdir(dir, i) = joinpath(dir, "$i")
+iterdir(dir, i) = joinpath(dir, ITERS_DIR, "$i")
 
 function valid_session_dir(dir)
   !isnothing(dir) &&
@@ -195,8 +196,9 @@ autosave_enabled(s::Session) = s.autosave && !isnothing(s.dir)
 function save_increment!(session::Session, bench, itrep=nothing)
   push!(session.report.benchmark, bench)
   isnothing(itrep) || push!(session.report.iterations, itrep)
+  itc = session.env.itc
   if autosave_enabled(session)
-    idir = iterdir(session.dir, session.env.itc)
+    idir = iterdir(session.dir, itc)
     isdir(idir) || mkpath(idir)
     # Save the environment state,
     # both at the root and in the last iteration folder
@@ -206,8 +208,8 @@ function save_increment!(session::Session, bench, itrep=nothing)
     save_report_increment(session, bench, itrep, idir)
     # Do the plotting
     params = session.env.params
-    isnothing(itrep) || plot_iteration(itrep, params, idir)
     plotsdir = joinpath(session.dir, PLOTS_DIR)
+    isnothing(itrep) || plot_iteration(itrep, params, plotsdir, itc)
     plot_training(params, session.report.iterations, plotsdir)
     plot_benchmark(params, session.report.benchmark, plotsdir)
   end
@@ -440,8 +442,8 @@ function Handlers.learning_started(session::Session, initial_status)
   Report.print(session.logger, initial_status, style=Log.BOLD)
 end
 
-function Handlers.learning_epoch(session::Session, report)
-  Report.print(session.logger, report.status_after)
+function Handlers.updates_finished(session::Session, report)
+  Report.print(session.logger, report)
 end
 
 function Handlers.checkpoint_started(session::Session)

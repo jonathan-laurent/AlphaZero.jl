@@ -65,6 +65,7 @@ a new neural network to the current best.
 |:---------------------|:----------------------|:---------------|
 | `mcts`               | [`MctsParams`](@ref)  |  -             |
 | `num_games`          | `Int`                 |  -             |
+| `flip_probability`   | `Float64`             | `0.`           |
 | `reset_mcts_every`   | `Union{Int, Nothing}` | `nothing`      |
 | `update_threshold`   | `Float64`             |  -             |
 
@@ -77,6 +78,8 @@ a new neural network to the current best.
   average collected reward is greater or equal than `update_threshold`.
 + To avoid running out of memory, the MCTS trees of both player are
   reset every `reset_mcts_every` games (or never if `nothing` is passed).
++ Before every game turn, the game board is "flipped" according to a symmetric
+  transformation with probability `flip_probability`, to add randomization.
 
 # Remarks
 
@@ -91,6 +94,7 @@ and the `update_threshold` parameter is set to a value that corresponds to a
 @kwdef struct ArenaParams
   num_games :: Int
   reset_mcts_every :: Union{Nothing, Int} = nothing
+  flip_probability :: Float64 = 0.
   mcts :: MctsParams
   update_threshold :: Float64
 end
@@ -150,21 +154,28 @@ the neural network is updated to fit the data in the memory buffer.
 | Parameter                     | Type                            | Default    |
 |:------------------------------|:--------------------------------|:-----------|
 | `use_gpu`                     | `Bool`                          | `true`     |
-| `gc_every`                    | `Union{Nothing, Int}`           | `nothing`  |
 | `samples_weighing_policy`     | [`SamplesWeighingPolicy`](@ref) |  -         |
 | `optimiser`                   | [`OptimiserSpec`](@ref)         |  -         |
 | `l2_regularization`           | `Float32`                       |  -         |
 | `nonvalidity_penalty`         | `Float32`                       | `1f0`      |
 | `batch_size`                  | `Int`                           |  -         |
 | `loss_computation_batch_size` | `Int`                           |  -         |
-| `checkpoints`                 | `Vector{Int}`                   |  -         |
+| `min_checkpoints_per_epoch`   | `Float64`                       |  -         |
+| `max_batches_per_checkpoint`  | `Int`                           |  -         |
+| `num_checkpoints`             | `Int`                           |  -         |
 
 # Description
 
-The neural network gets to see the whole content of the memory buffer at each
-learning epoch, for `maximum(checkpoints)` epochs in total. After each epoch
-whose number is in `checkpoints`, the current network is evaluated against
-the best network so far (see [`ArenaParams`](@ref)).
+The neural network goes through `num_checkpoints` series of `n` updates using
+batches of size `batch_size` drawn from memory, where `n` is defined as follows:
+
+```
+n = min(max_batches_per_checkpoint, ntotal ÷ min_checkpoints_per_epoch)
+```
+
+with `ntotal` the total number of batches in memory. Between each series,
+the current network is evaluated against the best network so far
+(see [`ArenaParams`](@ref)).
 
 + `nonvalidity_penalty` is the multiplicative constant of a loss term that
    corresponds to the average probability weight that the network puts on
@@ -186,14 +197,15 @@ In the original AlphaGo Zero paper:
 """
 @kwdef struct LearningParams
   use_gpu :: Bool = true
-  gc_every :: Union{Nothing, Int} = nothing
   samples_weighing_policy :: SamplesWeighingPolicy
   optimiser :: OptimiserSpec
   l2_regularization :: Float32
   nonvalidity_penalty :: Float32 = 1f0
   batch_size :: Int
   loss_computation_batch_size :: Int
-  checkpoints :: Vector{Int}
+  min_checkpoints_per_epoch :: Int
+  max_batches_per_checkpoint :: Int
+  num_checkpoints :: Int
 end
 
 """

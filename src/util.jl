@@ -76,18 +76,12 @@ function random_batches(
   return (convert.(b) for b in batchs)
 end
 
-function periodic_gc(gc, batchs, period)
-  n = 0
-  function process(b)
-    n += size(b[1])[end]
-    if period > 0 && n >= period
-      n = 0
-      gc()
-    end
-    return b
-  end
-  period > 0 && gc()
-  return (process(b) for b in batchs)
+# Generate a stateful infinite sequence of random batches
+function random_batches_stream(convert, data::Tuple, batchsize)
+  partial = size(data[1])[end] < batchsize
+  return Iterators.Stateful(Iterators.flatten((
+    random_batches(convert, data, batchsize, partial=partial)
+    for _ in Iterators.repeated(nothing))))
 end
 
 # Print uncaught exceptions
@@ -133,6 +127,17 @@ end
 function rand_categorical(π)
   π = fix_probvec(π)
   return rand(Categorical(π))
+end
+
+function momentum_smoothing(x, μ)
+  sx = similar(x)
+  isempty(x) && return x
+  v = x[1]
+  for i in eachindex(x)
+    v = μ * x[i] + (1-μ) * v
+    sx[i] = v
+  end
+  return sx
 end
 
 end

@@ -5,9 +5,12 @@
 function plot_losses(getlosses, range, title)
   fields = fieldnames(Report.Loss)
   labels = [string(f) for _ in 1:1, f in fields]
-  data = [[getfield(getlosses(i), f) for i in range] for f in fields]
-  return Plots.plot(range, data,
-    label=labels, title=title, ylims=(0, Inf))
+  data = [(getlosses(i)..., f) for i in range, f in fields]
+  xs = map(d -> d[1], data)
+  ys = map(d -> getfield(d[2], d[3]), data)
+  xlims = (minimum(xs), maximum(xs))
+  return Plots.plot(xs, ys,
+    label=labels, title=title, xlims=xlims, ylims=(0, Inf))
 end
 
 #####
@@ -15,21 +18,26 @@ end
 #####
 
 function learning_iter_plot(rep::Report.Learning, params::Params)
-  losses_plot = plot_losses(0:length(rep.epochs), "Losses") do i
+  n = length(rep.checkpoints)
+  nbatches = rep.checkpoints[end].batch_id
+  losses_plot = plot_losses(0:n, "Losses") do i
     if i == 0
-      rep.initial_status.loss
+      (0, rep.initial_status.loss)
     else
-      rep.epochs[i].status_after.loss
+      (rep.checkpoints[i].batch_id, rep.checkpoints[i].status_after.loss)
     end
   end
   checkpoints_plot = Plots.hline(
     [0, params.arena.update_threshold],
     title="Checkpoints")
   Plots.plot!(checkpoints_plot,
-    [c.epoch_id for c in rep.checkpoints],
+    [c.batch_id for c in rep.checkpoints],
     [c.reward for c in rep.checkpoints],
+    ylims=(-1.0, 1.0),
     t=:scatter,
     legend=:none)
+  Plots.xlims!(losses_plot, (0, nbatches))
+  Plots.xlims!(checkpoints_plot, (0, nbatches))
   return Plots.plot(losses_plot, checkpoints_plot, layout=(2, 1))
 end
 
@@ -69,22 +77,27 @@ end
 function plot_iteration(
     report::Report.Iteration,
     params::Params,
-    dir::String)
-  isdir(dir) || mkpath(dir)
-  # Learning plot
-  lplot = learning_iter_plot(report.learning, params)
-  Plots.savefig(lplot, joinpath(dir, "summary"))
+    dir::String,
+    itc::Int)
+  # Summary plot
+  splot = learning_iter_plot(report.learning, params)
   # Performances plot
   pplot = performances_plot(report)
-  Plots.savefig(pplot, joinpath(dir, "performances"))
   # Losses plot
-  losses = [l for e in report.learning.epochs for l in e.losses]
+  losses = Util.momentum_smoothing(report.learning.losses, 0.1)
   lplot = Plots.plot(collect(eachindex(losses)), losses,
     title="Loss on Minibatches",
     ylims=(0, Inf),
     legend=nothing,
     xlabel="Batch number")
-  Plots.savefig(lplot, joinpath(dir, "loss"))
+  # Saving everything
+  plots = [splot, pplot, lplot]
+  names = ["iter_summary", "iter_perfs", "iter_loss"]
+  for (plot, name) in zip(plots, names)
+    pdir = joinpath(dir, name)
+    isdir(pdir) || mkdir(pdir)
+    Plots.savefig(plot, joinpath(pdir, "$itc"))
+  end
 end
 
 #####
@@ -178,13 +191,13 @@ function plot_training(
   # Loss on the full memory after an iteration
   lfmt = "Loss on Full Memory (when iteration starts)"
   losses_fullmem = plot_losses(1:n, lfmt) do i
-    iterations[i].learning.initial_status.loss
+    (i, iterations[i].learning.initial_status.loss)
   end
   # Plots related to the memory analysis
   if all(it -> !isnothing(it.memory), iterations)
     # Loss on last batch
     losses_last = plot_losses(1:n, "Loss on Last Batch") do i
-      iterations[i].memory.latest_batch.status.loss
+      (i, iterations[i].memory.latest_batch.status.loss)
     end
     # Loss per game stage
     nstages = minimum(length(it.memory.per_game_stage) for it in iterations)

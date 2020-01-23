@@ -79,6 +79,7 @@ struct Trainer
   samples
   Wmean
   Hp
+  batches_stream # infinite stateful iterator of training batches
   function Trainer(
     network::AbstractNetwork{G},
     examples::AbstractVector{<:TrainingSample},
@@ -90,27 +91,27 @@ struct Trainer
     W, X, A, P, V = samples
     Wmean = mean(W)
     Hp = entropy_wmean(P, W)
-    return new(network, examples, params, samples, Wmean, Hp)
+    batches_stram = Util.random_batches_stream(samples, params.batch_size) do x
+      Network.convert_input(network, x)
+    end
+    return new(network, examples, params, samples, Wmean, Hp, batches_stram)
   end
+end
+
+function num_batches_total(tr::Trainer)
+  return size(tr.samples[1])[end] ÷ tr.params.batch_size
 end
 
 function get_trained_network(tr::Trainer)
   Network.copy(tr.network, on_gpu=false, test_mode=true)
 end
 
-function training_epoch!(tr::Trainer)
+function batch_updates!(tr::Trainer, n)
   loss(batch...) = losses(
     tr.network, tr.params, tr.Wmean, tr.Hp, batch)[1]
-  data = Util.random_batches(tr.samples, tr.params.batch_size) do x
-    Network.convert_input(tr.network, x)
-  end
-  if !isnothing(tr.params.gc_every)
-    data = Util.periodic_gc(data, tr.params.gc_every) do
-      Network.gc(tr.network)
-    end
-  end
+  data = Iterators.take(tr.batches_stream, n)
   ls = Vector{Float32}()
-  Network.train!(tr.network, tr.params.optimiser, loss, data) do i, l
+  Network.train!(tr.network, tr.params.optimiser, loss, data, n) do i, l
     push!(ls, l)
   end
   Network.gc(tr.network)
@@ -150,11 +151,6 @@ function learning_status(tr::Trainer)
   partial = size(tr.samples[1])[end] < batch_size
   batches = Util.random_batches(tr.samples, batch_size, partial=partial) do x
     Network.convert_input(tr.network, x)
-  end
-  if !isnothing(tr.params.gc_every)
-    batches = Util.periodic_gc(batches, tr.params.gc_every) do
-      Network.gc(tr.network)
-    end
   end
   reports = [learning_status(tr, batch) for batch in batches]
   Network.gc(tr.network)

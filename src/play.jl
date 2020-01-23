@@ -220,12 +220,15 @@ end
 Play a game between two [`AbstractPlayer`](@ref) and return the reward
 obtained by `white`.
 
-If the `memory` argument is provided, samples are automatically collected
-from this game (see [`MemoryBuffer`](@ref)).
+- If the `memory` argument is provided, samples are automatically collected
+  from this game (see [`MemoryBuffer`](@ref)).
+- If the `flip_probability` argument is provided, the board
+  is _flipped_ randomly at every turn with the given probability,
+  using [`GI.random_symmetric_state`](@ref)
 """
 function play(
-    white::AbstractPlayer{Game}, black::AbstractPlayer{Game}, memory=nothing
-  ) :: Float64 where Game
+    white::AbstractPlayer{Game}, black::AbstractPlayer{Game},
+    memory=nothing; flip_probability=0.) :: Float64 where Game
   state = Game()
   nturns = 0
   while true
@@ -233,6 +236,9 @@ function play(
     if !isnothing(z)
       isnothing(memory) || push_game!(memory, z, nturns)
       return z
+    end
+    if !iszero(flip_probability) && rand() < flip_probability
+      state = GI.random_symmetric_state(state)
     end
     player = GI.white_playing(state) ? white : black
     actions, π = think(player, state, nturns)
@@ -281,16 +287,18 @@ Evaluate two `AbstractPlayer` against each other on a series of games.
   - `color_policy`: determine the [`ColorPolicy`](@ref),
      which is `ALTERNATE_COLORS` by default
   - `memory=nothing`: memory to use to record samples
+  - `flip_probability=0.`: see [`play`](@ref)
 """
 function pit(
     handler, contender::AbstractPlayer, baseline::AbstractPlayer, num_games;
-    reset_every=nothing, color_policy=ALTERNATE_COLORS, memory=nothing)
+    reset_every=nothing, color_policy=ALTERNATE_COLORS,
+    memory=nothing, flip_probability=0.)
   baseline_white = (color_policy != CONTENDER_WHITE)
   zsum = 0.
   for i in 1:num_games
     white = baseline_white ? baseline : contender
     black = baseline_white ? contender : baseline
-    z = play(white, black, memory)
+    z = play(white, black, memory, flip_probability=flip_probability)
     baseline_white && (z = -z)
     zsum += z
     handler(i, z)

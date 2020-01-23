@@ -93,7 +93,8 @@ function apply_symmetry(::Type{Game}, sample, (symboard, aperm)) where Game
   π = π[aperm]
   @assert iszero(π[.~symmask])
   π = π[symmask]
-  return TrainingSample(symboard, π, sample.z, sample.t, sample.n)
+  return TrainingSample{typeof(sample.b)}(
+    symboard, π, sample.z, sample.t, sample.n)
 end
 
 function augment_with_symmetries(Game, samples)

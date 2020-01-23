@@ -120,7 +120,7 @@ function GI.play!(g::Game, col)
   g.curplayer = other(g.curplayer)
 end
 
-function Game(board::Board; white_playing=true)
+function Game(board::Board, white_playing=true)
   g = Game()
   g.history = nothing
   g.board = board
@@ -318,7 +318,7 @@ function GI.read_state(::Type{Game})
     else
       return nothing
     end
-    return Game(Board(board), white_playing=wp)
+    return Game(Board(board), wp)
   catch e
     return nothing
   end

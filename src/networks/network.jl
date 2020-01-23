@@ -212,16 +212,17 @@ Adam optimiser.
 end
 
 """
-    train!(callback, ::AbstractNetwork, opt::OptimiserSpec, loss, data)
+    train!(callback, ::AbstractNetwork, opt::OptimiserSpec, loss, batches, n)
 
 Update a given network to fit some data.
   - [`opt`](@ref OptimiserSpec) specifies which optimiser to use
   - `loss` is a function that maps a batch of samples to a tracked real
   - `data` is an iterator over minibatches
+  - `n` is the number of minibatches
   - `callback(i, loss)` is called at each step with the batch number `i`
      and the loss on last batch
 """
-function train!(handle, ::AbstractNetwork, opt::OptimiserSpec, loss, data)
+function train!(handle, ::AbstractNetwork, opt::OptimiserSpec, loss, data, n)
   @unimplemented
 end
 

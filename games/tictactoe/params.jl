@@ -21,6 +21,7 @@ arena = ArenaParams(
   num_games=100,
   reset_mcts_every=1,
   update_threshold=0.00,
+  flip_probability=0.5,
   mcts = MctsParams(
     self_play.mcts,
     temperature=StepSchedule(0.3),
@@ -38,7 +39,9 @@ learning = LearningParams(
   batch_size=32,
   loss_computation_batch_size=2048,
   nonvalidity_penalty=1.,
-  checkpoints=[20])
+  min_checkpoints_per_epoch=0,
+  max_batches_per_checkpoint=5_000,
+  num_checkpoints=1)
 
 params = Params(
   arena=arena,
@@ -48,14 +51,17 @@ params = Params(
   memory_analysis=MemAnalysisParams(
     num_game_stages=4),
   ternary_rewards=true,
+  use_symmetries=true,
   mem_buffer_size=PLSchedule(80_000))
 
 benchmark = [
   Benchmark.Duel(
     Benchmark.Full(self_play.mcts),
     Benchmark.MctsRollouts(self_play.mcts),
-    num_games=400),
+    num_games=400,
+    flip_probability=0.5),
   Benchmark.Duel(
     Benchmark.NetworkOnly(),
     Benchmark.MinMaxTS(depth=6, τ=1.),
-    num_games=400)]
+    num_games=400,
+    flip_probability=0.5)]
