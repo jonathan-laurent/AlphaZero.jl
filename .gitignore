@@ -6,6 +6,7 @@
 /docs/build/
 /docs/site/
 
+COMMANDS.md
 TODO.md
 inference-speedup.png
 inference_time_ratio.png

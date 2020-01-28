@@ -1,7 +1,7 @@
 Network = ResNet
 
 netparams = ResNetHP(
-  num_filters=128,
+  num_filters=64,
   num_blocks=7,
   conv_kernel_size=(3, 3),
   num_policy_head_filters=4,
@@ -9,7 +9,7 @@ netparams = ResNetHP(
   batch_norm_momentum=0.1)
 
 self_play = SelfPlayParams(
-  num_games=6_000,
+  num_games=4_000,
   reset_mcts_every=1,
   mcts=MctsParams(
     use_gpu=true,
@@ -19,7 +19,7 @@ self_play = SelfPlayParams(
     temperature=StepSchedule(
       start=1.0,
       change_at=[10],
-      values=[0.2]),
+      values=[0.4]),
     dirichlet_noise_ϵ=0.25,
     dirichlet_noise_α=1.0))
 
@@ -30,19 +30,19 @@ arena = ArenaParams(
   update_threshold=0.10,
   mcts=MctsParams(
     self_play.mcts,
-    temperature=StepSchedule(0.05),
+    temperature=StepSchedule(0.1),
     dirichlet_noise_ϵ=0.05))
 
 learning = LearningParams(
   samples_weighing_policy=LOG_WEIGHT,
-  batch_size=512,
+  batch_size=1024,
   loss_computation_batch_size=1024,
   optimiser=Adam(lr=1e-3),
   l2_regularization=1e-4,
   nonvalidity_penalty=1.,
-  min_checkpoints_per_epoch=3,
+  min_checkpoints_per_epoch=1,
   max_batches_per_checkpoint=1000,
-  num_checkpoints=6)
+  num_checkpoints=2)
 
 params = Params(
   arena=arena,
