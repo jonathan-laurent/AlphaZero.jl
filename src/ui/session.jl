@@ -63,7 +63,8 @@ end
 ##### Save and load environments
 #####
 
-const NET_FILE         =  "net.data"
+const BESTNN_FILE      =  "bestnn.data"
+const CURNN_FILE       =  "curnn.data"
 const MEM_FILE         =  "mem.data"
 const ITC_FILE         =  "iter.txt"
 const REPORT_FILE      =  "report.json"
@@ -79,7 +80,8 @@ iterdir(dir, i) = joinpath(dir, ITERS_DIR, "$i")
 function valid_session_dir(dir)
   !isnothing(dir) &&
   isfile(joinpath(dir, PARAMS_FILE)) &&
-  isfile(joinpath(dir, NET_FILE)) &&
+  isfile(joinpath(dir, BESTNN_FILE)) &&
+  isfile(joinpath(dir, CURNN_FILE)) &&
   isfile(joinpath(dir, MEM_FILE)) &&
   isfile(joinpath(dir, ITC_FILE))
 end
@@ -94,11 +96,28 @@ function save_env(env::Env, dir)
     JSON2.pretty(io, JSON3.write(Network.hyperparams(env.bestnn)))
   end
   # Saving state
-  serialize(joinpath(dir, NET_FILE), env.bestnn)
+  serialize(joinpath(dir, BESTNN_FILE), env.bestnn)
+  serialize(joinpath(dir, CURNN_FILE), env.curnn)
   serialize(joinpath(dir, MEM_FILE), get(env.memory))
   open(joinpath(dir, ITC_FILE), "w") do io
     JSON3.write(io, env.itc)
   end
+end
+
+function load_network(net_file)
+  # Try to load network or otherwise network params
+  netparams_file = joinpath(dir, NET_PARAMS_FILE)
+  if isfile(net_file)
+    network = deserialize(net_file)
+    Log.print(logger, "Loading network from: $(net_file)")
+  else
+    Log.print(logger, Crayon.RED, "No network file: $(net_file)")
+    network = open(netparams_file, "r") do io
+      params = JSON3.read(io, HyperParams(Network))
+      Network(params)
+    end
+  end
+  return network
 end
 
 function load_env(
@@ -113,18 +132,9 @@ function load_env(
     end
     Log.print(logger, "Loading parameters from: $(params_file)")
   end
-  # Try to load network or otherwise network params
-  net_file = joinpath(dir, NET_FILE)
-  netparams_file = joinpath(dir, NET_PARAMS_FILE)
-  if isfile(net_file)
-    network = deserialize(net_file)
-    Log.print(logger, "Loading network from: $(net_file)")
-  else
-    network = open(netparams_file, "r") do io
-      params = JSON3.read(io, HyperParams(Network))
-      Network(params)
-    end
-  end
+  # Load the neural networks
+  bestnn = load_network(joinpath(dir, BESTNN_FILE))
+  curnn = load_network(joinpath(dir, CURNN_FILE))
   # Load memory
   mem_file = joinpath(dir, MEM_FILE)
   if isfile(mem_file)
@@ -145,7 +155,7 @@ function load_env(
     itc = 0
     Log.print(logger, Crayon.RED, "File not found: $(itc_file)")
   end
-  return Env{Game}(params, network, experience, itc)
+  return Env{Game}(params, curnn, bestnn, experience, itc)
 end
 
 #####

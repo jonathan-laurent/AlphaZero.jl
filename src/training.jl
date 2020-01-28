@@ -7,34 +7,36 @@
 
 Type for an AlphZero environment.
 
-The environment features the current best neural network, a memory buffer
+The environment features the current neural network, the best neural network
+seen so far that is used for data generation, a memory buffer
 and an iteration counter.
 
 # Constructor
 
-    Env{Game}(params, network, experience=[], itc=0)
+    Env{Game}(params, curnn, bestnn=copy(curnn), experience=[], itc=0)
 
 Construct a new AlphaZero environment.
 - `Game` is the type of the game being played
 - `params` has type [`Params`](@ref)
-- `network` is the initial neural network and has type [`AbstractNetwork`](@ref)
+- `curnn` is the current neural network and has type [`AbstractNetwork`](@ref)
+- `bestnn` is the best neural network so far, which is used for data generation
 - `experience` is the initial content of the memory buffer
    as a vector of [`TrainingSample`](@ref)
 - `itc` is the value of the iteration counter (0 at the start of training)
 """
 mutable struct Env{Game, Network, Board}
   params :: Params
+  curnn  :: Network
   bestnn :: Network
   memory :: MemoryBuffer{Board}
   itc    :: Int
-  randnn :: Bool # true if `bestnn` has random weights
-  function Env{Game}(params, network, experience=[], itc=0) where Game
+  function Env{Game}(
+      params, curnn, bestnn=copy(curnn), experience=[], itc=0) where Game
     Board = GI.Board(Game)
     msize = max(params.mem_buffer_size[itc], length(experience))
     memory = MemoryBuffer{Board}(msize, experience)
-    randnn = itc == 0
-    return new{Game, typeof(network), Board}(
-      params, network, memory, itc, randnn)
+    return new{Game, typeof(curnn), Board}(
+      params, curnn, bestnn, memory, itc)
   end
 end
 
@@ -113,9 +115,9 @@ Return a report summarizing the configuration of agent before training starts,
 as an object of type [`Report.Initial`](@ref).
 """
 function initial_report(env::Env)
-  num_network_parameters = Network.num_parameters(env.bestnn)
-  num_reg_params = Network.num_regularized_parameters(env.bestnn)
-  player = MctsPlayer(env.bestnn, env.params.self_play.mcts)
+  num_network_parameters = Network.num_parameters(env.curnn)
+  num_reg_params = Network.num_regularized_parameters(env.curnn)
+  player = MctsPlayer(env.curnn, env.params.self_play.mcts)
   mcts_footprint_per_node = MCTS.memory_footprint_per_node(player.mcts)
   return Report.Initial(
     num_network_parameters, num_reg_params, mcts_footprint_per_node)
@@ -131,9 +133,9 @@ function resize_memory!(env::Env{G,N,B}, n) where {G,N,B}
   return
 end
 
-function evaluate_network(baseline, contender, params, handler)
-  baseline = MctsPlayer(baseline, params.mcts)
+function evaluate_network(contender, baseline, params, handler)
   contender = MctsPlayer(contender, params.mcts)
+  baseline = MctsPlayer(baseline, params.mcts)
   ngames = params.num_games
   rec = Recorder{GameType(baseline)}()
   avgz = pit(contender, baseline, ngames; memory=rec,
@@ -155,7 +157,7 @@ function learning!(env::Env, handler)
   if env.params.use_symmetries
     experience = augment_with_symmetries(GameType(env), experience)
   end
-  trainer, tconvert = @timed Trainer(env.bestnn, experience, lp)
+  trainer, tconvert = @timed Trainer(env.curnn, experience, lp)
   init_status = learning_status(trainer)
   Handlers.learning_started(handler, init_status)
   # Compute the number of batches between each checkpoint
@@ -179,16 +181,15 @@ function learning!(env::Env, handler)
     append!(losses, dlosses)
     # Run a checkpoint evaluation
     Handlers.checkpoint_started(handler)
-    cur_nn = get_trained_network(trainer)
+    env.curnn = get_trained_network(trainer)
     (evalz, redundancy), dteval =
-      @timed evaluate_network(env.bestnn, cur_nn, ap, handler)
+      @timed evaluate_network(env.curnn, env.bestnn, ap, handler)
     teval += dteval
     # If eval is good enough, replace network
     success = (evalz >= best_evalz)
     if success
       nn_replaced = true
-      env.bestnn = cur_nn
-      env.randnn = false
+      env.bestnn = copy(env.curnn)
       best_evalz = evalz
     end
     checkpoint_report = Report.Checkpoint(
@@ -213,9 +214,7 @@ end
 
 function self_play!(env::Env{G}, handler) where G
   params = env.params.self_play
-  player = env.randnn ?
-    RandomMctsPlayer(G, params.mcts) :
-    MctsPlayer(env.bestnn, params.mcts)
+  player = MctsPlayer(env.bestnn, params.mcts)
   new_batch!(env.memory)
   Handlers.self_play_started(handler)
   mem_footprint = 0
@@ -251,7 +250,7 @@ function memory_report(env::Env, handler)
     return nothing
   else
     report = memory_report(
-      env.memory, env.bestnn, env.params.learning, env.params.memory_analysis)
+      env.memory, env.curnn, env.params.learning, env.params.memory_analysis)
     Handlers.memory_analyzed(handler, report)
     return report
   end
