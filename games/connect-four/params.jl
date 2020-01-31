@@ -37,7 +37,12 @@ learning = LearningParams(
   samples_weighing_policy=LOG_WEIGHT,
   batch_size=1024,
   loss_computation_batch_size=1024,
-  optimiser=Adam(lr=1e-3),
+  optimiser=CyclicNesterov(
+    lr_base=1e-2,
+    lr_high=1e-1,
+    lr_low=1e-3,
+    momentum_high=0.9,
+    momentum_low=0.8),
   l2_regularization=1e-4,
   nonvalidity_penalty=1.,
   min_checkpoints_per_epoch=1,
