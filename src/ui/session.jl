@@ -104,9 +104,8 @@ function save_env(env::Env, dir)
   end
 end
 
-function load_network(net_file)
+function load_network(logger, net_file, netparams_file)
   # Try to load network or otherwise network params
-  netparams_file = joinpath(dir, NET_PARAMS_FILE)
   if isfile(net_file)
     network = deserialize(net_file)
     Log.print(logger, "Loading network from: $(net_file)")
@@ -133,8 +132,9 @@ function load_env(
     Log.print(logger, "Loading parameters from: $(params_file)")
   end
   # Load the neural networks
-  bestnn = load_network(joinpath(dir, BESTNN_FILE))
-  curnn = load_network(joinpath(dir, CURNN_FILE))
+  netparams_file = joinpath(dir, NET_PARAMS_FILE)
+  bestnn = load_network(logger, joinpath(dir, BESTNN_FILE), netparams_file)
+  curnn = load_network(logger, joinpath(dir, CURNN_FILE), netparams_file)
   # Load memory
   mem_file = joinpath(dir, MEM_FILE)
   if isfile(mem_file)
