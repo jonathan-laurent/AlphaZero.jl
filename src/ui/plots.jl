@@ -205,10 +205,16 @@ function plot_training(
     losses_ps = Plots.plot(
       title="Loss per Game Stage", ylims=(0, Inf), xlabel="Iteration number")
     for s in 1:nstages
+      tmin = minimum([
+        it.memory.per_game_stage[s].min_remaining_length
+        for it in iterations])
+      tmax = maximum([
+        it.memory.per_game_stage[s].max_remaining_length
+        for it in iterations])
       Plots.plot!(losses_ps, 1:n, [
           it.memory.per_game_stage[s].samples_stats.status.loss.L
           for it in iterations],
-        label="$s",
+        label="$tmin to $tmax turns left",
         color=colors[s])
     end
     append!(plots, [losses_last, losses_ps])

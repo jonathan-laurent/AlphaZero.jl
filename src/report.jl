@@ -113,6 +113,7 @@ struct Samples
   status :: LearningStatus
 end
 
+#TODO: update doc
 """
     Report.StageSamples
 
@@ -125,7 +126,8 @@ as collected during memory analysis.
     [`Report.Samples`](@ref)
 """
 struct StageSamples
-  mean_remaining_length :: Float64
+  min_remaining_length :: Int
+  max_remaining_length :: Int
   samples_stats :: Samples
 end
 
@@ -279,10 +281,11 @@ function print(logger::Logger, stats::Report.Memory)
   push!(comments, ["latest batch"])
   # Per game stage
   for stage in stats.per_game_stage
-    rem = fmt(".1f", stage.mean_remaining_length)
+    minrem = stage.min_remaining_length
+    maxrem = stage.max_remaining_length
     push!(content, stage.samples_stats)
     push!(styles, Log.NO_STYLE)
-    push!(comments, ["$rem turns left"])
+    push!(comments, ["$minrem to $maxrem turns left"])
   end
   Log.table(
     logger, SAMPLES_STATS_TABLE, content, styles=styles, comments=comments)

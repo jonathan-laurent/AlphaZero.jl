@@ -43,7 +43,7 @@ function convert_samples(Game, wp, es::Vector{<:TrainingSample})
 end
 
 #####
-##### Learning procedure
+##### Loss Function
 #####
 
 # Surprisingly, Flux does not like the following code (scalar operations):
@@ -72,46 +72,48 @@ function losses(nn, params, Wmean, Hp, (W, X, A, P, V))
   return (L, Lp, Lv, Lreg, Linv)
 end
 
+#####
+##### Trainer Utility
+#####
+
 struct Trainer
-  network
-  examples
-  params
-  samples
-  Wmean
-  Hp
+  network :: AbstractNetwork
+  samples :: Vector{<:TrainingSample}
+  params :: LearningParams
+  data :: Tuple # (W, X, A, P, V) tuple obtained after converting `samples`
+  Wmean :: Float32
+  Hp :: Float32
   batches_stream # infinite stateful iterator of training batches
-  function Trainer(
-    network::AbstractNetwork{G},
-    examples::AbstractVector{<:TrainingSample},
-    params::LearningParams
-  ) where G
-    examples = merge_by_board(examples)
-    samples = convert_samples(G, params.samples_weighing_policy, examples)
-    network = Network.copy(network, on_gpu=params.use_gpu, test_mode=false)
-    W, X, A, P, V = samples
+  function Trainer(network, samples, params; test_mode=false)
+    if params.use_position_averaging
+      samples = merge_by_board(samples)
+    end
+    Game = GameType(network)
+    data = convert_samples(Game, params.samples_weighing_policy, samples)
+    network = Network.copy(network, on_gpu=params.use_gpu, test_mode=test_mode)
+    W, X, A, P, V = data
     Wmean = mean(W)
     Hp = entropy_wmean(P, W)
-    batches_stram = Util.random_batches_stream(samples, params.batch_size) do x
+    batches_stream = Util.random_batches_stream(data, params.batch_size) do x
       Network.convert_input(network, x)
     end
-    return new(network, examples, params, samples, Wmean, Hp, batches_stram)
+    return new(network, samples, params, data, Wmean, Hp, batches_stream)
   end
 end
 
-function num_batches_total(tr::Trainer)
-  return size(tr.samples[1])[end] ÷ tr.params.batch_size
-end
+data_weights(tr::Trainer) = tr.data[1] # Return the W tensor
+
+num_batches_total(tr::Trainer) = length(data_weights(tr)) ÷ tr.params.batch_size
 
 function get_trained_network(tr::Trainer)
-  Network.copy(tr.network, on_gpu=false, test_mode=true)
+  return Network.copy(tr.network, on_gpu=false, test_mode=true)
 end
 
 function batch_updates!(tr::Trainer, n)
-  loss(batch...) = losses(
-    tr.network, tr.params, tr.Wmean, tr.Hp, batch)[1]
+  L(batch...) = losses(tr.network, tr.params, tr.Wmean, tr.Hp, batch)[1]
   data = Iterators.take(tr.batches_stream, n)
   ls = Vector{Float32}()
-  Network.train!(tr.network, tr.params.optimiser, loss, data, n) do i, l
+  Network.train!(tr.network, tr.params.optimiser, L, data, n) do i, l
     push!(ls, l)
   end
   Network.gc(tr.network)
@@ -122,14 +124,14 @@ end
 ##### Generating debugging reports
 #####
 
-function mean_learning_status(reports::Vector{Report.LearningStatus})
-  L     = mean(r.loss.L     for r in reports)
-  Lp    = mean(r.loss.Lp    for r in reports)
-  Lv    = mean(r.loss.Lv    for r in reports)
-  Lreg  = mean(r.loss.Lreg  for r in reports)
-  Linv  = mean(r.loss.Linv  for r in reports)
-  Hpnet = mean(r.Hpnet      for r in reports)
-  Hp    = mean(r.Hp         for r in reports)
+function mean_learning_status(reports::Vector{Report.LearningStatus}, ws)
+  L     = wmean([r.loss.L     for r in reports], ws)
+  Lp    = wmean([r.loss.Lp    for r in reports], ws)
+  Lv    = wmean([r.loss.Lv    for r in reports], ws)
+  Lreg  = wmean([r.loss.Lreg  for r in reports], ws)
+  Linv  = wmean([r.loss.Linv  for r in reports], ws)
+  Hpnet = wmean([r.Hpnet      for r in reports], ws)
+  Hp    = wmean([r.Hp         for r in reports], ws)
   return Report.LearningStatus(Report.Loss(L, Lp, Lv, Lreg, Linv), Hp, Hpnet)
 end
 
@@ -147,31 +149,34 @@ end
 
 function learning_status(tr::Trainer)
   batch_size = tr.params.loss_computation_batch_size
-  # If there are less samples
-  partial = size(tr.samples[1])[end] < batch_size
-  batches = Util.random_batches(tr.samples, batch_size, partial=partial) do x
+  partial = length(data_weights(tr)) < batch_size
+  batches = Util.random_batches(tr.data, batch_size, partial=partial) do x
     Network.convert_input(tr.network, x)
   end
-  reports = [learning_status(tr, batch) for batch in batches]
   Network.gc(tr.network)
-  return mean_learning_status(reports)
+  reports = [learning_status(tr, batch) for batch in batches]
+  ws = [sum(data_weights(tr)) for batch in batches]
+  return mean_learning_status(reports, ws)
 end
 
 function samples_report(tr::Trainer)
   status = learning_status(tr)
-  num_examples = sum(e.n for e in tr.examples)
-  num_boards = length(tr.examples)
-  Wtot = num_boards * tr.Wmean
-  return Report.Samples(num_examples, num_boards, Wtot, status)
+  # Samples in `tr.samples` can be merged by board or not
+  num_samples = sum(e.n for e in tr.samples)
+  num_boards = length(merge_by_board(tr.samples))
+  Wtot = sum(data_weights(tr))
+  return Report.Samples(num_samples, num_boards, Wtot, status)
 end
 
 function memory_report(
     mem::MemoryBuffer,
-    nn::AbstractNetwork{G},
+    nn::AbstractNetwork,
     learning_params::LearningParams,
     params::MemAnalysisParams
-    ) where G
-  Tr(es) = Trainer(nn, es, learning_params)
+  )
+  # It is important to load the neural network in test mode so as to not
+  # overwrite the batch norm statistics based on biased data.
+  Tr(samples) = Trainer(nn, samples, learning_params, test_mode=true)
   all_samples = samples_report(Tr(get(mem)))
   latest_batch = isempty(last_batch(mem)) ?
     all_samples :
@@ -182,9 +187,9 @@ function memory_report(
     csize = ceil(Int, length(es) / params.num_game_stages)
     stages = collect(Iterators.partition(es, csize))
     map(stages) do es
-      t = mean(e.t for e in es)
+      ts = [e.t for e in es]
       stats = samples_report(Tr(es))
-      Report.StageSamples(t, stats)
+      Report.StageSamples(minimum(ts), maximum(ts), stats)
     end
   end
   return Report.Memory(latest_batch, all_samples, per_game_stage)

@@ -154,6 +154,7 @@ the neural network is updated to fit the data in the memory buffer.
 | Parameter                     | Type                            | Default    |
 |:------------------------------|:--------------------------------|:-----------|
 | `use_gpu`                     | `Bool`                          | `true`     |
+| `use_position_averaging`      | `Bool`                          | `true`     |
 | `samples_weighing_policy`     | [`SamplesWeighingPolicy`](@ref) |  -         |
 | `optimiser`                   | [`OptimiserSpec`](@ref)         |  -         |
 | `l2_regularization`           | `Float32`                       |  -         |
@@ -197,6 +198,7 @@ In the original AlphaGo Zero paper:
 """
 @kwdef struct LearningParams
   use_gpu :: Bool = true
+  use_position_averaging :: Bool = true
   samples_weighing_policy :: SamplesWeighingPolicy
   optimiser :: OptimiserSpec
   l2_regularization :: Float32
