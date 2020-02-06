@@ -14,5 +14,5 @@ end
 
 @testset "Dummy Runs" begin
   @test dummy_run(Tictactoe)
-  @test dummy_run(ConnectFour)
+  #@test dummy_run(ConnectFour) # Takes a bit too long for Travis
 end
