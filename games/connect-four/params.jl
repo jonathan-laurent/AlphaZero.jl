@@ -4,13 +4,13 @@ netparams = ResNetHP(
   num_filters=64,
   num_blocks=7,
   conv_kernel_size=(3, 3),
-  num_policy_head_filters=4,
+  num_policy_head_filters=32,
   num_value_head_filters=32,
   batch_norm_momentum=0.1)
 
 self_play = SelfPlayParams(
   num_games=4_000,
-  reset_mcts_every=1,
+  reset_mcts_every=1_000,
   mcts=MctsParams(
     use_gpu=true,
     num_workers=64,
@@ -19,7 +19,7 @@ self_play = SelfPlayParams(
     temperature=StepSchedule(
       start=1.0,
       change_at=[10],
-      values=[0.4]),
+      values=[0.5]),
     dirichlet_noise_ϵ=0.25,
     dirichlet_noise_α=1.0))
 
@@ -27,22 +27,18 @@ arena = ArenaParams(
   num_games=200,
   reset_mcts_every=nothing,
   flip_probability=0.5,
-  update_threshold=0.10,
+  update_threshold=0.08,
   mcts=MctsParams(
     self_play.mcts,
     temperature=StepSchedule(0.1),
     dirichlet_noise_ϵ=0.05))
 
 learning = LearningParams(
+  use_position_averaging=true,
   samples_weighing_policy=LOG_WEIGHT,
   batch_size=1024,
   loss_computation_batch_size=1024,
-  optimiser=CyclicNesterov(
-    lr_base=1e-2,
-    lr_high=1e-1,
-    lr_low=1e-3,
-    momentum_high=0.9,
-    momentum_low=0.8),
+  optimiser=Adam(lr=1e-3),
   l2_regularization=1e-4,
   nonvalidity_penalty=1.,
   min_checkpoints_per_epoch=1,
