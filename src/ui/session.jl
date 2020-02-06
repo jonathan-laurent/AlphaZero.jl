@@ -110,7 +110,7 @@ function load_network(logger, net_file, netparams_file)
     network = deserialize(net_file)
     Log.print(logger, "Loading network from: $(net_file)")
   else
-    Log.print(logger, Crayon.RED, "No network file: $(net_file)")
+    Log.print(logger, Log.RED, "No network file: $(net_file)")
     network = open(netparams_file, "r") do io
       params = JSON3.read(io, HyperParams(Network))
       Network(params)
@@ -142,7 +142,7 @@ function load_env(
     Log.print(logger, "Loading memory from: $(mem_file)")
   else
     experience = []
-    Log.print(logger, Crayon.RED, "Starting with an empty memory")
+    Log.print(logger, Log.RED, "Starting with an empty memory")
   end
   # Load instructions counter
   itc_file = joinpath(dir, ITC_FILE)
@@ -153,7 +153,7 @@ function load_env(
     Log.print(logger, "Loaded iteration counter from: $(itc_file)")
   else
     itc = 0
-    Log.print(logger, Crayon.RED, "File not found: $(itc_file)")
+    Log.print(logger, Log.RED, "File not found: $(itc_file)")
   end
   return Env{Game}(params, curnn, bestnn, experience, itc)
 end
