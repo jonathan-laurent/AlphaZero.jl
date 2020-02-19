@@ -1,14 +1,21 @@
 # [Game Interface](@id game_interface)
 
 ```@meta
-CurrentModule = AlphaZero.GameInterface
+CurrentModule = AlphaZero
 ```
 
 ```@docs
 GameInterface
+GameType
 ```
 
-## Types
+```@meta
+CurrentModule = AlphaZero.GameInterface
+```
+
+## Mandatory Interface
+
+### Types
 
 ```@docs
 AbstractGame
@@ -16,7 +23,7 @@ Board
 Action
 ```
 
-## Game Functions
+### Game Functions
 
 ```@docs
 white_playing
@@ -25,14 +32,13 @@ board
 board_symmetric
 actions
 actions_mask
-available_actions
 play!
 heuristic_value
 vectorize_board
 symmetries
 ```
 
-## Interface for Interactive Tools
+### Interface for Interactive Tools
 
 ```@docs
 action_string
@@ -41,12 +47,12 @@ read_state
 print_state
 ```
 
-```@meta
-CurrentModule = AlphaZero
-```
-
-## Utilities
+## Derived Functions
 
 ```@docs
-GameType
+game_terminated
+num_actions
+available_actions
+board_dim
+random_symmetric_state
 ```

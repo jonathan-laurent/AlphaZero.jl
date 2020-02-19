@@ -14,7 +14,6 @@ Report
 Report.Loss
 Report.LearningStatus
 Report.Checkpoint
-Report.Epoch
 Report.Learning
 ```
 

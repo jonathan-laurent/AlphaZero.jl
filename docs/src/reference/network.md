@@ -70,4 +70,5 @@ copy(::AbstractNetwork)
 ```@docs
 OptimiserSpec
 CyclicNesterov
+Adam
 ```

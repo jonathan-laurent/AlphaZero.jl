@@ -113,17 +113,16 @@ struct Samples
   status :: LearningStatus
 end
 
-#TODO: update doc
 """
     Report.StageSamples
 
 Statistics for the samples corresponding to a particular game stage,
 as collected during memory analysis.
 
-- `mean_remaining_length`: average number of remaining moves until the
-    end of the game; this quantity defines a *game stage*
-- `samples_stats`: samples statistics, as an object of type
-    [`Report.Samples`](@ref)
+The samples whose statistics are collected in the
+[`samples_stats`](@ref Report.Samples) field correspond to historical positions
+where the number of remaining moves until the end of the game was in the range
+defined by the `min_remaining_length` and `max_remaining_length` fields.
 """
 struct StageSamples
   min_remaining_length :: Int

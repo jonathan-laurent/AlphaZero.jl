@@ -131,20 +131,6 @@ function actions_mask(state::AbstractGame)
 end
 
 """
-    available_actions(state::AbstractGame)
-
-Return the vector of all available actions.
-
-A default implementation is provided based on
-[`actions`](@ref) and [`actions_mask`](@ref).
-"""
-function available_actions(state::AbstractGame)
-  Game = typeof(state)
-  mask = actions_mask(state)
-  return actions(Game)[mask]
-end
-
-"""
     play!(state::AbstractGame, action)
 
 Update the game state by making the current player perform `action`.
@@ -184,6 +170,8 @@ Return the vector of all pairs `(b, σ)` where:
   - `b` is the image of `board` by a nonidentical symmetry
   - `σ` is the associated actions permutation, as an integer vector of
      size `num_actions(Game)`.
+
+A default implementation is provided that returns an empty vector.
 """
 function symmetries(::Type{G}, board) where {G <: AbstractGame}
   return Tuple{Board(G), Vector{Int}}[]
@@ -258,14 +246,51 @@ end
 ##### Derived functions
 #####
 
+"""
+    game_terminated(::AbstractGame)
+
+Return a boolean indicating whether or not a game is in a terminal state.
+"""
 game_terminated(state) = !isnothing(white_reward(state))
 
+"""
+    num_actions(::Type{G})
+
+Return the total number of actions associated with a game.
+"""
 num_actions(::Type{G}) where G = length(actions(G))
 
+"""
+    available_actions(state::AbstractGame)
+
+Return the vector of all available actions in a given state.
+"""
+function available_actions(state::AbstractGame)
+  Game = typeof(state)
+  mask = actions_mask(state)
+  return actions(Game)[mask]
+end
+
+"""
+    board_dim(::Type{G})
+
+Return a tuple that indicates the shape of a vectorized board representation.
+"""
 board_dim(::Type{G}) where G = size(vectorize_board(G, board(G())))
 
 function canonical_board(state)
   return white_playing(state) ? board(state) : board_symmetric(state)
+end
+
+"""
+    random_symmetric_state(::AbstractGame)
+
+Return a fresh new state that is the image of the given state by a random
+symmetry (see [`symmetries`](@ref)).
+"""
+function random_symmetric_state(state::Game) where {Game <: AbstractGame}
+  bsym, _ = rand(symmetries(Game, board(state)))
+  return Game(bsym, white_playing(state))
 end
 
 function board_memsize(::Type{G}) where G
@@ -273,11 +298,6 @@ function board_memsize(::Type{G}) where G
 end
 
 symmetric_reward(r::Real) = -r
-
-function random_symmetric_state(state::Game) where {Game <: AbstractGame}
-  bsym, _ = rand(symmetries(Game, board(state)))
-  return Game(bsym, white_playing(state))
-end
 
 end
 
