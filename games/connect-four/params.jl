@@ -10,11 +10,11 @@ netparams = ResNetHP(
 
 self_play = SelfPlayParams(
   num_games=4_000,
-  reset_mcts_every=1_000,
+  reset_mcts_every=100,
   mcts=MctsParams(
     use_gpu=true,
     num_workers=64,
-    num_iters_per_turn=320,
+    num_iters_per_turn=600,
     cpuct=2.0,
     temperature=StepSchedule(
       start=1.0,
@@ -27,7 +27,7 @@ arena = ArenaParams(
   num_games=200,
   reset_mcts_every=nothing,
   flip_probability=0.5,
-  update_threshold=0.08,
+  update_threshold=0.1,
   mcts=MctsParams(
     self_play.mcts,
     temperature=StepSchedule(0.1),
@@ -36,8 +36,8 @@ arena = ArenaParams(
 learning = LearningParams(
   use_position_averaging=true,
   samples_weighing_policy=LOG_WEIGHT,
-  batch_size=1024,
-  loss_computation_batch_size=1024,
+  batch_size=2048,
+  loss_computation_batch_size=2048,
   optimiser=Adam(lr=1e-3),
   l2_regularization=1e-4,
   nonvalidity_penalty=1.,
@@ -49,14 +49,14 @@ params = Params(
   arena=arena,
   self_play=self_play,
   learning=learning,
-  num_iters=120,
+  num_iters=80,
   ternary_rewards=true,
   use_symmetries=true,
   memory_analysis=MemAnalysisParams(
     num_game_stages=4),
   mem_buffer_size=PLSchedule(
   [      0,        60],
-  [360_000, 1_800_000]))
+  [400_000, 2_000_000]))
 
 baselines = [
   Benchmark.MctsRollouts(
@@ -72,7 +72,7 @@ make_duel(baseline) =
   Benchmark.Duel(
     Benchmark.Full(arena.mcts),
     baseline,
-    num_games=100,
+    num_games=200,
     flip_probability=0.5,
     color_policy=CONTENDER_WHITE)
 
