@@ -52,11 +52,11 @@ player_oracle(p) = nothing
 player_oracle(p::MctsPlayer) = p.mcts.oracle
 player_oracle(p::NetworkPlayer) = p.network
 
-function state_statistics(state, player, memory=nothing)
+function state_statistics(state, player, turn, memory=nothing)
   @assert !GI.game_terminated(state)
   cboard = GI.canonical_board(state)
   # Make the player think
-  actions, π = think(player, state, exp.turn)
+  actions, π = think(player, state, turn)
   report = StateStats(actions)
   for i in eachindex(actions)
     report.actions[i][2].P = π[i]
@@ -143,7 +143,7 @@ end
 # Return the stats
 function compute_and_print_state_statistics(exp)
   if !GI.game_terminated(exp.state)
-    stats = state_statistics(exp.state, exp.player, exp.memory)
+    stats = state_statistics(exp.state, exp.player, exp.turn, exp.memory)
     print_state_statistics(GameType(exp), stats)
     return stats
   else
