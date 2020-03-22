@@ -233,38 +233,43 @@ win_rate(z) = round(Int, 100 * (z + 1) / 2)
 
 percentage(x, total) = round(Int, 100 * (x / total))
 
-function show_space_after_progress_bar(session)
-  Log.console_only(session.logger) do
-    Log.sep(session.logger, force=true)
+function show_space_after_progress_bar(logger)
+  Log.console_only(logger) do
+    Log.sep(logger, force=true)
   end
+end
+
+function run_duel(env, logger, duel)
+  player_name = Benchmark.name(duel.player)
+  baseline_name = Benchmark.name(duel.baseline)
+  legend = "$player_name against $baseline_name"
+  Log.section(logger, 2, "Running benchmark: $legend")
+  progress = Log.Progress(logger, duel.num_games)
+  outcome = Benchmark.run(env, duel, progress)
+  show_space_after_progress_bar(logger)
+  z = fmt("+.2f", outcome.avgz)
+  if env.params.ternary_rewards
+    stats = Benchmark.TernaryOutcomeStatistics(outcome)
+    n = length(outcome.rewards)
+    pwon = percentage(stats.num_won, n)
+    pdraw = percentage(stats.num_draw, n)
+    plost = percentage(stats.num_lost, n)
+    details = "$pwon% won, $pdraw% draw, $plost% lost"
+  else
+    wr = win_rate(outcome.avgz)
+    details = "win rate of $wr%"
+  end
+  red = fmt(".1f", 100 * outcome.redundancy)
+  msg = "Average reward: $z ($details), redundancy: $red%"
+  Log.print(logger, msg)
+  return outcome
 end
 
 function run_benchmark(session)
   report = Benchmark.Report()
   for duel in session.benchmark
-    player_name = Benchmark.name(duel.player)
-    baseline_name = Benchmark.name(duel.baseline)
-    legend = "$player_name against $baseline_name"
-    Log.section(session.logger, 2, "Running benchmark: $legend")
-    progress = Log.Progress(session.logger, duel.num_games)
-    outcome = Benchmark.run(session.env, duel, progress)
+    outcome = run_duel(session.env, session.logger, duel)
     push!(report, outcome)
-    show_space_after_progress_bar(session)
-    z = fmt("+.2f", outcome.avgz)
-    if session.env.params.ternary_rewards
-      stats = Benchmark.TernaryOutcomeStatistics(outcome)
-      n = length(outcome.rewards)
-      pwon = percentage(stats.num_won, n)
-      pdraw = percentage(stats.num_draw, n)
-      plost = percentage(stats.num_lost, n)
-      details = "$pwon% won, $pdraw% draw, $plost% lost"
-    else
-      wr = win_rate(outcome.avgz)
-      details = "win rate of $wr%"
-    end
-    red = fmt(".1f", 100 * outcome.redundancy)
-    msg = "Average reward: $z ($details), redundancy: $red%"
-    Log.print(session.logger, msg)
   end
   return report
 end
@@ -436,7 +441,7 @@ function Handlers.game_played(session::Session)
 end
 
 function Handlers.self_play_finished(session::Session, report)
-  show_space_after_progress_bar(session)
+  show_space_after_progress_bar(session.logger)
   Report.print(session.logger, report)
   session.progress = nothing
 end
@@ -467,7 +472,7 @@ function Handlers.checkpoint_game_played(session::Session)
 end
 
 function Handlers.checkpoint_finished(session::Session, report)
-  show_space_after_progress_bar(session)
+  show_space_after_progress_bar(session.logger)
   avgz = fmt("+.2f", report.reward)
   wr = win_rate(report.reward)
   red = fmt(".1f", report.redundancy * 100)
@@ -493,35 +498,44 @@ function Handlers.training_finished(session::Session)
 end
 
 #####
-##### Replay training
+##### Launch new experiments on an existing session
 #####
 
-function walk_iterations(::Type{G}, ::Type{N}, dir::String) where {G, N}
-  n = 0
-  while valid_session_dir(iterdir(dir, n))
-    n += 1
-  end
-  return (load_env(G, N, Logger(devnull), iterdir(dir, i)) for i in 0:n-1)
+function run_duel(
+    ::Type{G}, ::Type{N}, dir::String, duel::Benchmark.Duel;
+    params=nothing) where {G, N}
+  logger = Logger()
+  env = load_env(G, N, logger, dir, params=params)
+  run_duel(env, logger, duel)
 end
 
 function run_new_benchmark(
-    session::Session{<:Env{G, N}}, name, benchmark
-  ) where {G,N}
-  old_env = session.env
-  Log.section(session.logger, 1, "Computing new benchmark: $name")
+  ::Type{G}, ::Type{N}, session_dir, name, benchmark;
+  params=nothing, itcmax=nothing) where {G, N}
+  outdir = joinpath(session_dir, name)
+  isdir(outdir) || mkpath(outdir)
+  logger = Logger()
+  Log.section(logger, 1, "Computing new benchmark: $name")
+  itc = 0
   reports = Benchmark.Report[]
-  @assert !isnothing(session.dir)
-  for env in walk_iterations(G, N, session.dir)
-    session.env = env
-    push!(reports, run_benchmark(session))
+  while valid_session_dir(iterdir(session_dir, itc))
+    !isnothing(itcmax) && itc > itcmax && break
+    Log.section(logger, 1, "Iteration: $itc")
+    itdir = iterdir(session_dir, itc)
+    env = load_env(G, N, logger, itdir, params=params)
+    report = [run_duel(env, logger, duel) for duel in benchmark]
+    push!(reports, report)
+    # Save the intermediate reports
+    open(joinpath(outdir, BENCHMARK_FILE), "w") do io
+      JSON2.pretty(io, JSON3.write(reports))
+    end
+    plot_benchmark(env.params, reports, outdir)
+    itc += 1
   end
-  session.env = old_env
-  # Save and plot
-  dir = joinpath(session.dir, name)
-  isdir(dir) || mkpath(dir)
-  open(joinpath(dir, BENCHMARK_FILE), "w") do io
-    JSON2.pretty(io, JSON3.write(reports))
-  end
-  plot_benchmark(session.env.params, reports, dir)
-  return
+end
+
+function regenerate_plots(session::Session, dir=nothing)
+  isnothing(dir) && (dir = joinpath(session.dir, PLOTS_DIR))
+  plot_training(session.env.params, session.report.iterations, dir)
+  plot_benchmark(session.env.params, session.report.benchmark, dir)
 end

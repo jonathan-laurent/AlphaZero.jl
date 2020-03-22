@@ -30,6 +30,9 @@ argstab = ArgParseSettings()
   "explore"
     action = :command
     help = "Use the interactive exploration system"
+  "--save-intermediate"
+    action = :store_true
+    help = "Save all intermediate states during training"
 end
 args = parse_args(isempty(ARGS) ? ["train"] : ARGS, argstab)
 !isnothing(args["game"]) && (ENV["GAME"] = args["game"])
@@ -62,7 +65,7 @@ end
 
 session = Session(
   Game, Training.Network{Game}, params, netparams, benchmark=benchmark,
-  dir=SESSION_DIR, autosave=true, save_intermediate=true)
+  dir=SESSION_DIR, autosave=true, save_intermediate=args["save-intermediate"])
 
 if cmd == "train"
   resume!(session)
