@@ -31,7 +31,7 @@ game directory's name in upper snake case. Also:
 
 Finally, to register your game, just add `"your-game"` to `AVAILABLE_GAMES`
 in `scripts/games.jl`. If you've done everything correctly, you should be
-able to run a training session for your game by running:
+able to launch a training session for your game by running:
 
 ```sh
 julia --project --color=yes scripts/alphazero.jl --game your-game train

@@ -8,21 +8,10 @@ CurrentModule = AlphaZero
 Report
 ```
 
-## Learning Phase
-
 ```@docs
-Report.Loss
-Report.LearningStatus
-Report.Checkpoint
-Report.Learning
-```
-
-## Memory Analysis Phase
-
-```@docs
-Report.Samples
-Report.StageSamples
-Report.Memory
+Report.Initial
+Report.Iteration
+Report.Perfs
 ```
 
 ## Self-Play Phase
@@ -31,10 +20,19 @@ Report.Memory
 Report.SelfPlay
 ```
 
-## Training
+## Memory Analysis Phase
 
 ```@docs
-Report.Initial
-Report.Iteration
-Report.Perfs
+Report.Memory
+Report.Samples
+Report.StageSamples
+```
+
+## Learning Phase
+
+```@docs
+Report.Learning
+Report.Checkpoint
+Report.LearningStatus
+Report.Loss
 ```

@@ -39,7 +39,20 @@ abstract type AbstractGame end
 
 Return the board type corresponding to `Game`.
 
-Board objects must be persistent or appear as such.
+Board objects must be persistent or appear as such as they are stored into
+the MCTS tree without copying.
+
+# Remark
+
+A game state (of type [`AbstractGame`](@ref)) is characterized by two pieces
+of information: the board state and the identity of the player to play next.
+There are two reasons for having a separate `Board` type:
+
+  - This separation allows the `Game` object to store redundant state
+    information, typically for caching expensive computations.
+  - This separation enables leveraging the symmetry between players by
+    storing every board in the MCTS tree from the perspective of the current
+    player (as if white were to play next).
 """
 function Board(::Type{<:AbstractGame})
   @unimplemented
@@ -192,7 +205,7 @@ end
 #####
 
 """
-    vectorize_board(::Type{<:AbstractGame}, board) :: Vector{Float32}
+    vectorize_board(::Type{<:AbstractGame}, board) :: Array{Float32}
 
 Return a vectorized representation of a board.
 """
@@ -304,7 +317,8 @@ end
 """
     GameType(T)
 
-Return the `Game` type associated with an object.
+Return the `Game` type associated with an object
+(such as a network, a player, an MCTS environment...)
 """
 function GameType(T)
   @unimplemented

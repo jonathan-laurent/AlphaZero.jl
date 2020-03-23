@@ -5,7 +5,7 @@
 """
     SessionReport
 
-The full collection of benchmarks and statistics
+The full collection of statistics and benchmark results 
 collected during a training session.
 
 # Fields
@@ -324,13 +324,15 @@ it already exists.
 - `load_saved_params=false`: if set to `true`, load the training parameters from
     the session directory (if present) rather than using the `params`
     argument
-- `save_intermediate=true`: if set along with `autosave`, all intermediate
-    training environments are saved on disk
+- `save_intermediate=false`: if set to true (along with `autosave`), all
+    intermediate training environments are saved on disk so that
+    the whole training process can be analyzed later. This can
+    consume a lot of disk space.
 """
 function Session(
     ::Type{Game}, ::Type{Net}, params, netparams;
     dir=nothing, autosave=true, nostdout=false, benchmark=[],
-    load_saved_params=false, save_intermediate=true
+    load_saved_params=false, save_intermediate=false
   ) where {Game, Net}
   logger = session_logger(dir, nostdout, autosave)
   if valid_session_dir(dir)
@@ -358,11 +360,11 @@ end
 Load an existing session from a directory.
 
 This constructor accepts the optional keyword arguments
-`autosave`, `nostdout` and `benchmark`.
+`autosave`, `nostdout`, `benchmark` and `save_intermediate`.
 """
 function Session(
     ::Type{Game}, ::Type{Network}, dir::String;
-    autosave=true, nostdout=false, benchmark=[], save_intermediate
+    autosave=true, nostdout=false, benchmark=[], save_intermediate=false
   ) where {Game, Network}
   @assert valid_session_dir(dir)
   logger = session_logger(dir, nostdout, autosave)
@@ -379,11 +381,11 @@ Create a session from an initial environment.
 - If a session directory is provided, this directory must not exist yet
 
 This constructor features the optional keyword arguments
-`autosave`, `save_intermediate`, `nostdout` and `benchmark`.
+`autosave`, `nostdout`, `benchmark` and `save_intermediate`.
 """
 function Session(
     env::Env, dir=nothing; autosave=true, nostdout=false, benchmark=[],
-    save_intermediate=true)
+    save_intermediate=false)
   @assert isnothing(dir) || !isdir(dir)
   @assert env.itc == 0
   logger = session_logger(dir, nostdout, autosave)

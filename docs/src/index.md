@@ -11,6 +11,10 @@ Deepmind's AlphaZero algorithm:
   written in Python, this implementation enables to solve nontrivial games on
   a standard desktop computer with a GPU.
 
+`AlphaZero.jl` comes with _batteries included_. it features utilities for
+logging, profiling, benchmarking and model exploration that are ready to work
+on any game.
+
 ### Why should I care about AlphaZero?
 
 Beyond its much publicized success in attaining superhuman level at games

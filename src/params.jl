@@ -17,17 +17,17 @@ Parameters of an MCTS player.
 
 # Explanation
 
-An MCTS player picks actions as follows. Given a game state, it launches
+An MCTS player picks an action as follows. Given a game state, it launches
 `num_iters_per_turn` MCTS iterations that are executed asynchronously on
 `num_workers` workers, with UCT exploration constant `cpuct`.
 
 Then, an action is picked according to the distribution ``π`` where
-``π_i ∝ n_i^τ`` with ``n_i`` the number of time that the ``i^{\\text{th}}``
+``π_i ∝ n_i^τ`` with ``n_i`` the number of times that the ``i^{\\text{th}}``
 action was visited and ``τ`` the `temperature` parameter.
 
 It is typical to use a high value of the temperature parameter ``τ``
 during the first moves of a game to increase exploration and then switch to
-a small value. Therefore, `temperature` has type [`StepSchedule`](@ref).
+a small value. Therefore, `temperature` is a [`StepSchedule`](@ref).
 
 For information on parameters `cpuct`, `dirichlet_noise_ϵ` and
 `dirichlet_noise_α`, see [`MCTS.Env`](@ref).
@@ -59,7 +59,8 @@ end
     ArenaParams
 
 Parameters that govern the evaluation process that compares
-a new neural network to the current best.
+the current neural network with the best one seen so far
+(which is used to generate data).
 
 | Parameter            | Type                  | Default        |
 |:---------------------|:----------------------|:---------------|
@@ -72,14 +73,14 @@ a new neural network to the current best.
 # Explanation
 
 + The two competing networks are instantiated into two MCTS players
-  of parameter `mcts` and then play `num_games` games, exchanging color
+  of parameter `mcts` and then play `num_games` games, switching color
   after each game.
-+ The new network is to replace the current best one if its
++ The evaluated network is to replace the current best if its
   average collected reward is greater or equal than `update_threshold`.
-+ To avoid running out of memory, the MCTS trees of both player are
++ The MCTS trees of both players are
   reset every `reset_mcts_every` games (or never if `nothing` is passed).
-+ Before every game turn, the game board is "flipped" according to a symmetric
-  transformation with probability `flip_probability`, to add randomization.
++ To add randomization and before every game turn, the game board is "flipped"
+  according to a symmetric transformation with probability `flip_probability`.
 
 # Remarks
 
@@ -116,12 +117,12 @@ Parameters governing self-play.
 + The `gc_every` field, when set, forces a full garbage collection
   and an emptying of the GPU memory pool periodically, the period being
   specified in terms of a fixed number of games.
-+ To avoid running out of memory, the MCTS tree is
-  reset every `reset_mcts_every` games (or never if `nothing` is passed).
++ The MCTS tree is reset every `reset_mcts_every` games
+  (or never if `nothing` is passed).
 
 # AlphaGo Zero Parameters
 
-In the original AlphaGo Zero paper, `num_games = 25_000` (5 millions games
+In the original AlphaGo Zero paper, `num_games=25_000` (5 millions games
 of self-play across 200 iterations).
 """
 @kwdef struct SelfPlayParams
@@ -135,7 +136,7 @@ end
     SamplesWeighingPolicy
 
 During self-play, early board positions are possibly encountered many
-times across several games. The corresponding samples are then merged
+times across several games. The corresponding samples can be merged
 together and given a weight ``W`` that is a nondecreasing function of the
 number ``n`` of merged samples:
 
@@ -184,6 +185,9 @@ the current network is evaluated against the best network so far
 + `batch_size` is the batch size used for gradient descent.
 + `loss_computation_batch_size` is the batch size that is used to compute
   the loss between each epochs.
++ If `use_position_averaging` is set to true, samples in memory that correspond
+  to the same board position are averaged together. The merged sample is
+  reweighted according to `samples_weighing_policy`.
 
 # AlphaGo Zero Parameters
 
@@ -269,6 +273,9 @@ iteration can be decomposed into a self-play phase
      of samples. It is typical to start with a small memory buffer that is grown
      progressively so as to wash out the initial low-quality self-play data
      more quickly.
+  - `memory_analysis`: parameters for the memory analysis step that is
+     performed at each iteration (see [`MemAnalysisParams`](@ref)), or
+     `nothing` if no analysis is to be performed.
 
 # AlphaGo Zero Parameters
 

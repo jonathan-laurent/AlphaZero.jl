@@ -40,11 +40,17 @@ Guidelines for adding support for new games are available [here](@ref add_game).
 
 #### Help with hyperparameter tuning
 
-Because a single training session can take hours or days, it is hard for a
-single person to fine-tune AlphaZero's many hyperparameters.
+A good place to start would be to experiment with the parameters of
+the Connect Four agent discussed in the [tutorial](@ref connect_four),
+as it went through little tuning and can probably be improved
+significantly. Any kind of hyperparameters study would be extremely valuable
+in getting a better understanding of AlphaZero's training process.
+
+More generally, as a single training session can take hours or days,
+it is hard for a single person to fine-tune AlphaZero's many hyperparameters.
 In an effort to tackle more and more ambitious games, it would be useful
 to develop a collaborative process for running tuning experiments and share
-the resulting wisdom.
+the resulting insights.
 
 ---
 
@@ -58,8 +64,8 @@ might be nice.
 
 To add a new interface, we recommend that you proceed as follows:
   1. Create a new folder in `src/ui` to put all your code.
-  2. Create a new module that exports an equivalent of the
-     [`AlphaZero.Session`](@ref) type.
+  2. Create a new module that exports a type similar to
+     [`AlphaZero.Session`](@ref).
 
 ---
 

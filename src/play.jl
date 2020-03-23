@@ -222,9 +222,9 @@ obtained by `white`.
 
 - If the `memory` argument is provided, samples are automatically collected
   from this game (see [`MemoryBuffer`](@ref)).
-- If the `flip_probability` argument is provided, the board
-  is _flipped_ randomly at every turn with the given probability,
-  using [`GI.random_symmetric_state`](@ref)
+- If the `flip_probability` argument is set to ``p``, the board
+  is _flipped_ randomly at every turn with probability ``p``,
+  using [`GI.random_symmetric_state`](@ref).
 """
 function play(
     white::AbstractPlayer{Game}, black::AbstractPlayer{Game},
@@ -273,7 +273,7 @@ Policy for attributing colors in a duel between a baseline and a contender.
 """
     pit(handler, contender, baseline, ngames)
 
-Evaluate two `AbstractPlayer` against each other on a series of games.
+Evaluate two `AbstractPlayer` against each other in a series of games.
 
 # Arguments
 
@@ -284,7 +284,7 @@ Evaluate two `AbstractPlayer` against each other on a series of games.
 
 # Optional keyword arguments
   - `reset_every`: if set, players are reset every `reset_every` games
-  - `color_policy`: determine the [`ColorPolicy`](@ref),
+  - `color_policy`: determines the [`ColorPolicy`](@ref),
      which is `ALTERNATE_COLORS` by default
   - `memory=nothing`: memory to use to record samples
   - `flip_probability=0.`: see [`play`](@ref)

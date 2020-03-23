@@ -2,7 +2,8 @@
 Utilities to evaluate players against one another.
 
 Typically, between each training iteration, different players
-relying on the current neural network compete against a set of baselines.
+that possibly depend on the current neural network
+compete against a set of baselines.
 """
 module Benchmark
 

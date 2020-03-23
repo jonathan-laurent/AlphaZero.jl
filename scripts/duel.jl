@@ -19,4 +19,4 @@ AlphaZero.run_duel(Game, Training.Network{Game}, SESSION_DIR,
     num_games=200,
     flip_probability=0.5,
     color_policy=CONTENDER_WHITE),
-  params=Training.params)
+  params=nothing)#Training.params)
