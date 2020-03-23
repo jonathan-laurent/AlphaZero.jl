@@ -1,4 +1,4 @@
-# [Contributions Guide](@id contributions_guide)
+# [Contribution Guide](@id contributions_guide)
 
 Contributions to `AlphaZero.jl` are most welcome. Here are some contribution
 ideas:

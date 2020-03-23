@@ -15,7 +15,7 @@ macro unimplemented()
   end
 end
 
-# concat_cols(cols) == hcat(cols...)
+# concat_cols(cols) == hcat(cols...) but faster
 function concat_columns(cols)
   @assert !isempty(cols)
   nsamples = length(cols)
@@ -28,7 +28,7 @@ function concat_columns(cols)
   return arr
 end
 
-# superpose(xs) == cat(xs..., dims=ndims(first(xs))+1)
+# superpose(xs) == cat(xs..., dims=ndims(first(xs))+1) but faster
 function superpose(arrays)
   n = length(arrays)
   @assert n > 0
@@ -46,44 +46,6 @@ end
 
 infinity(::Type{R}) where R <: Real = one(R) / zero(R)
 
-function batches(X, batchsize; partial=false)
-  n = size(X)[end]
-  b = batchsize
-  nbatches = n ÷ b
-  # The call to `copy` after selectdim is important because Flux does not
-  # deal well with views.
-  select(a, b) = copy(selectdim(X, ndims(X), a:b))
-  batches = [select(1+b*(i-1), b*i) for i in 1:nbatches]
-  if partial && n % b > 0
-    # If the number of samples is not a multiple of the batch size
-    push!(batches, select(b*nbatches+1, n))
-  end
-  return batches
-end
-
-function batches_tests()
-  @assert batches(collect(1:5), 2, partial=true) == [[1, 2], [3, 4], [5]]
-end
-
-function random_batches(
-  convert, data::Tuple, batchsize; partial=false)
-  n = size(data[1])[end]
-  perm = Random.randperm(n)
-  batchs = map(data) do x
-    batches(selectdim(x, ndims(x), perm), batchsize, partial=partial)
-  end
-  batchs = collect(zip(batchs...))
-  return (convert.(b) for b in batchs)
-end
-
-# Generate a stateful infinite sequence of random batches
-function random_batches_stream(convert, data::Tuple, batchsize)
-  partial = size(data[1])[end] < batchsize
-  return Iterators.Stateful(Iterators.flatten((
-    random_batches(convert, data, batchsize, partial=partial)
-    for _ in Iterators.repeated(nothing))))
-end
-
 # Print uncaught exceptions
 # In response to: https://github.com/JuliaLang/julia/issues/10405
 macro printing_errors(expr)
@@ -96,6 +58,19 @@ macro printing_errors(expr)
   end
 end
 
+# This function generates a new constructor that enables updating some fields
+# of a persistent structure while leaving the others unchanged.
+# For example, given the following struct:
+#
+#    struct Point
+#      x :: Int
+#      y :: Int
+#    end
+#
+# then `generate_update_constructor(Point)` generates code equivalent to:
+#
+#    Point(pt; x=pt.x, y=pt.y) = Point(x, y)
+#
 function generate_update_constructor(T)
   fields = fieldnames(T)
   Tname = Symbol(split(string(T), ".")[end])
@@ -129,6 +104,8 @@ function rand_categorical(π)
   return rand(Categorical(π))
 end
 
+# Same smoothing function that is used by Temsorboard to smooth
+# loss curves.
 function momentum_smoothing(x, μ)
   sx = similar(x)
   isempty(x) && return x
@@ -138,6 +115,55 @@ function momentum_smoothing(x, μ)
     sx[i] = v
   end
   return sx
+end
+
+# Takes a data tensor `X` and split it into batches of fixed size along the
+# last dimension of `X`. If `partial=true` and the number of samples in `X` is
+# not a multiple of `batchsize`, then an additional smaller batch is added
+# at the end (otherwise, it is discarded).
+function batches(X, batchsize; partial=false)
+  n = size(X)[end]
+  b = batchsize
+  nbatches = n ÷ b
+  # The call to `copy` after selectdim is important because Flux does not
+  # deal well with views.
+  select(a, b) = copy(selectdim(X, ndims(X), a:b))
+  batches = [select(1+b*(i-1), b*i) for i in 1:nbatches]
+  if partial && n % b > 0
+    # If the number of samples is not a multiple of the batch size
+    push!(batches, select(b*nbatches+1, n))
+  end
+  return batches
+end
+
+function batches_tests()
+  @assert batches(collect(1:5), 2, partial=true) == [[1, 2], [3, 4], [5]]
+end
+
+# Takes a tuple of data tensors, shuffles its samples according to a random
+# permutation and splits them into a sequence of minibatches.
+# The result is a lazy iterator that calls `convert` on the tensors of each
+# new batch right before returning it. The `convert` function is typically
+# used to transfer data onto the GPU.
+function random_batches(
+  convert, data::Tuple, batchsize; partial=false)
+  n = size(data[1])[end]
+  perm = Random.randperm(n)
+  batchs = map(data) do x
+    batches(selectdim(x, ndims(x), perm), batchsize, partial=partial)
+  end
+  batchs = collect(zip(batchs...))
+  return (convert.(b) for b in batchs)
+end
+
+# Generate an infinite stateful iterator of random batches by calling
+# `random_batches` repeatedly. Every sample is guaranteed to be drawn
+# exactly once per epoch.
+function random_batches_stream(convert, data::Tuple, batchsize)
+  partial = size(data[1])[end] < batchsize
+  return Iterators.Stateful(Iterators.flatten((
+    random_batches(convert, data, batchsize, partial=partial)
+    for _ in Iterators.repeated(nothing))))
 end
 
 end
