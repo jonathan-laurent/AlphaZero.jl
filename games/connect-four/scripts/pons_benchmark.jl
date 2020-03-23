@@ -220,7 +220,7 @@ end
 
 function plot_results(results)
   plts = [sub_plot(BENCHMARKS, results, n) for n in eachindex(BENCHMARKS)]
-  return Plots.plot(plts..., layout=(3, 2), dpi=200)
+  return Plots.plot(plts..., layout=(3, 2))
 end
 
 plot = plot_results(data)
