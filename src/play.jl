@@ -257,7 +257,7 @@ end
 
 Play a game against oneself while collecting samples.
 """
-self_play!(player, memory) = play(player, player, memory)
+self_play!(player, memory=nothing) = play(player, player, memory)
 
 #####
 ##### Evaluate two players against each other
