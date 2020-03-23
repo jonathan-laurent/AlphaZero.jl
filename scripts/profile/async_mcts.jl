@@ -19,7 +19,7 @@ GAME = get(ENV, "GAME", "connect-four")
 SelectedGame = GAME_MODULE[GAME]
 using .SelectedGame: Game, Training
 
-NUM_GAMES = 50
+NUM_GAMES = 10
 MAX_LOG_NWORKERS = 8 # 2^8 = 256
 
 TIME_FIG = "mcts_speed"

@@ -2,10 +2,12 @@
 ##### Session management
 #####
 
+import AlphaZero: Handlers, initial_report, get_experience
+
 """
     SessionReport
 
-The full collection of statistics and benchmark results 
+The full collection of statistics and benchmark results
 collected during a training session.
 
 # Fields
@@ -59,6 +61,8 @@ mutable struct Session{Env}
   end
 end
 
+AlphaZero.GameType(::Session{<:Env{G}}) where {G} = G
+
 #####
 ##### Save and load environments
 #####
@@ -98,7 +102,7 @@ function save_env(env::Env, dir)
   # Saving state
   serialize(joinpath(dir, BESTNN_FILE), env.bestnn)
   serialize(joinpath(dir, CURNN_FILE), env.curnn)
-  serialize(joinpath(dir, MEM_FILE), get(env.memory))
+  serialize(joinpath(dir, MEM_FILE), get_experience(env))
   open(joinpath(dir, ITC_FILE), "w") do io
     JSON3.write(io, env.itc)
   end
@@ -277,7 +281,7 @@ end
 function zeroth_iteration!(session::Session)
   @assert session.env.itc == 0
   Log.section(session.logger, 2, "Initial report")
-  Report.print(session.logger, initial_report(session.env))
+  print_report(session.logger, initial_report(session.env))
   bench = run_benchmark(session)
   save_increment!(session, bench)
 end
@@ -398,6 +402,12 @@ end
 ##### Public interface
 #####
 
+"""
+    resume!(session::Session)
+
+Resume a previously created or loaded session. The user can interrupt training
+by sending a SIGKILL signal.
+"""
 function resume!(session::Session)
   try
     train!(session.env, session)
@@ -407,20 +417,119 @@ function resume!(session::Session)
   end
 end
 
+"""
+    save(session::Session)
+
+Save a session on disk.
+
+This function is called automatically by [`resume!`](@ref) after each
+training iteration if the session was created with `autosave=true`.
+"""
 function save(session::Session, dir=session.dir)
   save_env(session.env, dir)
 end
 
-function explore(session::Session{<:Env{Game}}) where Game
+"""
+    start_explorer(session::Session)
+
+Start an explorer session for the current environment. See [`Explorer`](@ref).
+"""
+function start_explorer(session::Session)
   Log.section(session.logger, 1, "Starting interactive exploration")
   explorer = Explorer(session.env)
-  explore(explorer)
+  start_explorer(explorer)
 end
 
-function play_game(session::Session{<:Env{Game}}) where Game
-  net = Network.copy(session.env.bestnn, on_gpu=true, test_mode=true)
-  mcts = MCTS.Env{Game}(net, nworkers=64)
-  GI.interactive!(Game(), MCTS.AI(mcts, timeout=5.0), GI.Human())
+"""
+    play_interactive_game(session::Session; timeout=2.)
+
+Start an interactive game against AlphaZero, allowing it
+`timeout` seconds of thinking time for each move.
+"""
+function play_interactive_game(session::Session; timeout=2.)
+  Game = GameType(session)
+  player = MctsPlayer(
+    session.env.bestnn,
+    session.env.params.arena.mcts,
+    timeout=timeout)
+  interactive!(Game(), player, Human{Game}())
+end
+
+#####
+##### Utilities for printing reports
+#####
+
+const NUM_COL = Log.ColType(7, x -> fmt(".4f", x))
+const BIGINT_COL = Log.ColType(10, n -> format(ceil(Int, n), commas=true))
+
+const LEARNING_STATUS_TABLE = Log.Table([
+  ("Loss",   NUM_COL,     s -> s.loss.L),
+  ("Lv",     NUM_COL,     s -> s.loss.Lv),
+  ("Lp",     NUM_COL,     s -> s.loss.Lp),
+  ("Lreg",   NUM_COL,     s -> s.loss.Lreg),
+  ("Linv",   NUM_COL,     s -> s.loss.Linv),
+  ("Hp",     NUM_COL,     s -> s.Hp),
+  ("Hpnet",  NUM_COL,     s -> s.Hpnet)])
+
+const SAMPLES_STATS_TABLE = Log.Table([
+  ("Loss",   NUM_COL,     s -> s.status.loss.L),
+  ("Lv",     NUM_COL,     s -> s.status.loss.Lv),
+  ("Lp",     NUM_COL,     s -> s.status.loss.Lp),
+  ("Lreg",   NUM_COL,     s -> s.status.loss.Lreg),
+  ("Linv",   NUM_COL,     s -> s.status.loss.Linv),
+  ("Hpnet",  NUM_COL,     s -> s.status.Hpnet),
+  ("Hp",     NUM_COL,     s -> s.status.Hp),
+  ("Wtot",   BIGINT_COL,  s -> s.Wtot),
+  ("Nb",     BIGINT_COL,  s -> s.num_boards),
+  ("Ns",     BIGINT_COL,  s -> s.num_samples)])
+
+function print_report(logger::Logger, status::Report.LearningStatus; kw...)
+  Log.table_row(logger, LEARNING_STATUS_TABLE, status; kw...)
+end
+
+function print_report(logger::Logger, stats::Report.Memory)
+  content, styles, comments = [], [], []
+  # All samples
+  push!(content, stats.all_samples)
+  push!(styles, Log.BOLD)
+  push!(comments, ["all samples"])
+  # Latest batch
+  push!(content, stats.latest_batch)
+  push!(styles, Log.BOLD)
+  push!(comments, ["latest batch"])
+  # Per game stage
+  for stage in stats.per_game_stage
+    minrem = stage.min_remaining_length
+    maxrem = stage.max_remaining_length
+    push!(content, stage.samples_stats)
+    push!(styles, Log.NO_STYLE)
+    push!(comments, ["$minrem to $maxrem turns left"])
+  end
+  Log.table(
+    logger, SAMPLES_STATS_TABLE, content, styles=styles, comments=comments)
+end
+
+function print_report(logger::Logger, report::Report.SelfPlay)
+  t = round(Int, 100 * report.inference_time_ratio)
+  Log.print(logger, "Time spent on inference: $(t)%")
+  sspeed = format(round(Int, report.samples_gen_speed), commas=true)
+  Log.print(logger, "Generating $(sspeed) samples per second on average")
+  avgdepth = fmt(".1f", report.average_exploration_depth)
+  Log.print(logger, "Average exploration depth: $avgdepth")
+  memf = format(report.mcts_memory_footprint, autoscale=:metric, precision=2)
+  Log.print(logger, "MCTS memory footprint: $(memf)B")
+  mems = format(report.memory_size, commas=true)
+  memd = format(report.memory_num_distinct_boards, commas=true)
+  Log.print(logger, "Experience buffer size: $(mems) ($(memd) distinct boards)")
+end
+
+function print_report(logger::Logger, report::Report.Initial)
+  nnparams = format(report.num_network_parameters, commas=true)
+  Log.print(logger, "Number of network parameters: $nnparams")
+  nnregparams = format(report.num_network_regularized_parameters, commas=true)
+  Log.print(logger, "Number of regularized network parameters: $nnregparams")
+  mfpn = report.mcts_footprint_per_node
+  Log.print(logger, "Memory footprint per MCTS node: $(mfpn) bytes")
 end
 
 #####
@@ -444,23 +553,23 @@ end
 
 function Handlers.self_play_finished(session::Session, report)
   show_space_after_progress_bar(session.logger)
-  Report.print(session.logger, report)
+  print_report(session.logger, report)
   session.progress = nothing
 end
 
 function Handlers.memory_analyzed(session::Session, report)
   Log.section(session.logger, 2, "Memory Analysis")
-  Report.print(session.logger, report)
+  print_report(session.logger, report)
 end
 
 function Handlers.learning_started(session::Session, initial_status)
   Log.section(session.logger, 2, "Starting learning")
   Log.section(session.logger, 3, "Optimizing the loss")
-  Report.print(session.logger, initial_status, style=Log.BOLD)
+  print_report(session.logger, initial_status, style=Log.BOLD)
 end
 
 function Handlers.updates_finished(session::Session, report)
-  Report.print(session.logger, report)
+  print_report(session.logger, report)
 end
 
 function Handlers.checkpoint_started(session::Session)

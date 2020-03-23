@@ -7,7 +7,7 @@ const SESSION_DIR = "sessions/connect-four"
 const SAVE_FILE = "pons-benchmark-results.json"
 const PLOT_FILE = "pons-benchmark-results.png"
 const ITC_STRIDE = 5
-const DEBUG_MODE = false # Launches a quick run on a tiny dataset to help debug
+const DEBUG_MODE = true # Launches a quick run on a tiny dataset to help debug
 
 # A benchmark to evaluate connect-four agents is available at:
 #   http://blog.gamesolver.org/solving-connect-four/02-test-protocol/
@@ -124,7 +124,7 @@ function test_player(player)
 end
 
 function load_alphazero_player(dir)
-  env = AlphaZero.load_env(
+  env = AlphaZero.UserInterface.load_env(
     Game, Training.Network{Game},
     AlphaZero.Log.Logger(devnull), dir, params=Training.params)
   mcts_params = MctsParams(env.params.arena.mcts,
@@ -162,7 +162,7 @@ function generate_data(session_dir)
   itc = 0
   while true
     itdir = joinpath(session_dir, "iterations", "$itc")
-    AlphaZero.valid_session_dir(itdir) || break
+    AlphaZero.UserInterface.valid_session_dir(itdir) || break
     DEBUG_MODE && itc > 10 && break
     println("Iteration $itc")
     player = load_alphazero_player(itdir)

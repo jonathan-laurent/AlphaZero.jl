@@ -1,6 +1,6 @@
 #####
 ##### AlphaZero.jl
-##### Jonathan Laurent, Carnegie Mellon University (2019)
+##### Jonathan Laurent, Carnegie Mellon University (2019-2020)
 #####
 
 module AlphaZero
@@ -13,7 +13,8 @@ export MctsParams, MemAnalysisParams
 export SamplesWeighingPolicy, CONSTANT_WEIGHT, LOG_WEIGHT, LINEAR_WEIGHT
 export AbstractSchedule, PLSchedule, StepSchedule
 # Players and games
-export AbstractGame, AbstractPlayer, play_game, interactive!
+export AbstractGame, AbstractPlayer
+export think, select_move, reset_player!, play_game, interactive!
 export MctsPlayer, RandomPlayer, EpsilonGreedyPlayer, NetworkPlayer, Human
 export ColorPolicy, ALTERNATE_COLORS, BASELINE_WHITE, CONTENDER_WHITE
 # Networks
@@ -21,10 +22,10 @@ export AbstractNetwork, OptimiserSpec, Nesterov, CyclicNesterov, Adam
 export SimpleNet, SimpleNetHP, ResNet, ResNetHP
 # Training environments
 export Env, train!, get_experience
-# Sessions
-export Session, resume!, save, play_game, run_new_benchmark
-# Explorer
-export Explorer, explore
+# User interface
+export UserInterface
+export Session, resume!, save, play_interactive_game
+export Explorer, start_explorer
 
 include("util.jl")
 import .Util
@@ -40,21 +41,8 @@ import .MCTS
 include("networks/network.jl")
 using .Network
 
-include("ui/log.jl")
-using .Log
-
-import Plots
-import Colors
-import JSON2
-import JSON3
-
-using Formatting
-using Crayons
-using Colors: @colorant_str
-using ProgressMeter
 using Base: @kwdef
-using Serialization: serialize, deserialize
-using DataStructures: Stack, CircularBuffer
+using DataStructures: CircularBuffer
 using Distributions: Categorical, Dirichlet
 using Statistics: mean
 
@@ -72,10 +60,13 @@ import .MinMax
 include("benchmark.jl")
 using .Benchmark
 
-# We support Flux and Knet
-const USE_KNET = true
+# We provide a library of predefined network architectures for convenience.
+# Right now, it is included in the main AlphaZero.jl package. In the future,
+# we may want to separate it so as to drop the Knet and Flux dependencies.
 
-if USE_KNET
+const USE_KNET_FOR_NETLIB = true # The Flux stdlib is currently broken
+
+if USE_KNET_FOR_NETLIB
   @eval begin
     include("networks/knet.jl")
     using .KNets
@@ -87,9 +78,11 @@ else
   end
 end
 
-include("ui/explorer.jl")
-include("ui/plots.jl")
-include("ui/json.jl")
-include("ui/session.jl")
+# The default user interface is included here for convenience but it could be
+# replaced or separated from the main AlphaZero.jl package (which would also
+# enable dropping some dependencies such as Crayons or JSON3).
+
+include("ui/ui.jl")
+using .UserInterface
 
 end

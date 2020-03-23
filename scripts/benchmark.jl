@@ -25,7 +25,7 @@ make_duel(baseline) =
 
 benchmark = make_duel.(Training.baselines)
 
-run_new_benchmark(
+AlphaZero.UserInterface.run_new_benchmark(
   Game, Training.Network{Game}, SESSION_DIR,
   "netonly", benchmark,
   params=Training.params, itcmax=nothing)

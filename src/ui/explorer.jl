@@ -2,6 +2,9 @@
 ##### Computing board statistics
 #####
 
+using DataStructures: Stack
+import AlphaZero: MemoryBuffer
+
 # All state statistics and are expressed with respect to the current player
 
 @kwdef mutable struct StateActionStats
@@ -77,7 +80,7 @@ function state_statistics(state, player, turn, memory=nothing)
   end
   # Collect memory statistics
   if !isnothing(memory)
-    mem = merge_by_board(get(memory))
+    mem = AlphaZero.merge_by_board(get_experience(memory))
     relevant = findall((ex -> ex.b == cboard), mem)
     if !isempty(relevant)
       @assert length(relevant) == 1
@@ -155,6 +158,40 @@ end
 ##### Interactive exploration of the environment
 #####
 
+"""
+    Explorer{Game}
+
+A command interpreter to explore the internals of a player
+through interactive play.
+
+# Constructors
+
+    Explorer(player::AbstractPlayer, state=nothing; memory=nothing)
+
+Build an explorer to investigate the behavior of `player` from a given `state`
+(by default, the initial state). Optionally, a reference to a memory buffer
+can be provided, in which case additional state statistics
+will be displayed.
+
+    Explorer(env::Env, state=nothing; arena_mode=false)
+
+Build an explorer for the MCTS player based on neural network `env.bestnn`
+and on parameters `env.params.self_play.mcts` or `env.params.arena.mcts`
+(depending on the value of `arena_mode`).
+
+# Commands
+
+The following commands are currently implemented:
+
+  - `do [action]`: make the current player perform `action`.
+    By default, the action of highest score is played.
+  - `explore [num_sims]`: run `num_sims` MCTS simulations from the current
+    state (for MCTS players only).
+  - `go`: query the user for a state description and go to this state.
+  - `flip`: flip the board according to a random symmetry.
+  - `undo`: undo the effect of the previous command.
+  - `restart`: restart the explorer.
+"""
 mutable struct Explorer{Game}
   state :: Game
   history :: Stack{Game}
@@ -243,7 +280,12 @@ function interpret!(exp::Explorer, stats, cmd, args=[])
   return false
 end
 
-function explore(exp::Explorer)
+"""
+    start_explorer(exp::Explorer)
+
+Start an interactive explorer session.
+"""
+function start_explorer(exp::Explorer)
   while true
     # Print the state
     GI.print_state(exp.state)

@@ -106,7 +106,7 @@ import .Handlers
 Return the content of the agent's memory as a
 vector of [`TrainingSample`](@ref).
 """
-get_experience(env::Env) = get(env.memory)
+get_experience(env::Env) = get_experience(env.memory)
 
 """
     initial_report(env::Env)
@@ -128,7 +128,7 @@ end
 #####
 
 function resize_memory!(env::Env{G,N,B}, n) where {G,N,B}
-  exp = get(env.memory)
+  exp = get_experience(env.memory)
   env.memory = MemoryBuffer{B}(n, exp)
   return
 end
@@ -153,7 +153,7 @@ function learning_step!(env::Env, handler)
   checkpoints = Report.Checkpoint[]
   losses = Float32[]
   tloss, teval, ttrain = 0., 0., 0.
-  experience = get(env.memory)
+  experience = get_experience(env.memory)
   if env.params.use_symmetries
     experience = augment_with_symmetries(GameType(env), experience)
   end

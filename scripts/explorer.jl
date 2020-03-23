@@ -12,5 +12,4 @@ session = Session(
   Training.params, Training.netparams, benchmark=Training.benchmark,
   dir=SESSION_DIR, autosave=false, save_intermediate=false)
 
-explorer = Explorer(session.env)
-explore(explorer)
+start_explorer(session)

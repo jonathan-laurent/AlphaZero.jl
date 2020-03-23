@@ -12,7 +12,7 @@ using .SelectedGame: Game, Training
 
 SESSION_DIR = "sessions/$GAME"
 
-AlphaZero.run_duel(Game, Training.Network{Game}, SESSION_DIR,
+AlphaZero.UserInterface.run_duel(Game, Training.Network{Game}, SESSION_DIR,
   Benchmark.Duel(
     Benchmark.NetworkOnly(),
     Benchmark.MinMaxTS(depth=5, τ=0.2),

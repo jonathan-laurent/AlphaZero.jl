@@ -72,7 +72,7 @@ resume!(session)
 The first line configures CuArrays to use a splitting memory pool, which
 performs better than the default binned pool on AlphaZero's workload as it
 does not require to run the garbage collector as frequently. Then, a new
-AlphaZero [session](@ref sessions) is created with the following arguments:
+AlphaZero [session](@ref ui) is created with the following arguments:
 
 | Argument             | Description                                                                     |
 |:---------------------|:--------------------------------------------------------------------------------|

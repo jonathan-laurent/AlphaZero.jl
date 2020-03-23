@@ -62,11 +62,6 @@ We would be interested in seeing alternative user interfaces being developed.
 In particular, using something like TensorBoard for logging and/or profiling
 might be nice.
 
-To add a new interface, we recommend that you proceed as follows:
-  1. Create a new folder in `src/ui` to put all your code.
-  2. Create a new module that exports a type similar to
-     [`AlphaZero.Session`](@ref).
-
 ---
 
 #### Develop support for a more general game interface

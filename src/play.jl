@@ -115,7 +115,7 @@ Construct a player from an MCTS environment. When computing each move:
 The temperature parameter `τ` can be either a real number or a
 [`StepSchedule`](@ref).
 
-    MctsPlayer(oracle::MCTS.Oracle, params::MctsParams)
+    MctsPlayer(oracle::MCTS.Oracle, params::MctsParams; timeout=nothing)
 
 Construct an MCTS player from an oracle and an [`MctsParams`](@ref) structure.
 If the oracle is a network, this constructor handles copying it, putting it
@@ -139,7 +139,8 @@ struct MctsPlayer{G, M} <: AbstractPlayer{G}
 end
 
 # Alternative constructor
-function MctsPlayer(oracle::MCTS.Oracle{G}, params::MctsParams) where G
+function MctsPlayer(
+    oracle::MCTS.Oracle{G}, params::MctsParams; timeout=nothing) where G
   fill_batches = false
   if isa(oracle, AbstractNetwork)
     oracle = Network.copy(oracle, on_gpu=params.use_gpu, test_mode=true)
@@ -153,7 +154,8 @@ function MctsPlayer(oracle::MCTS.Oracle{G}, params::MctsParams) where G
     noise_α=params.dirichlet_noise_α)
   return MctsPlayer(mcts,
     niters=params.num_iters_per_turn,
-    τ=params.temperature)
+    τ=params.temperature,
+    timeout=timeout)
 end
 
 # MCTS with random oracle

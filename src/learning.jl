@@ -177,12 +177,12 @@ function memory_report(
   # It is important to load the neural network in test mode so as to not
   # overwrite the batch norm statistics based on biased data.
   Tr(samples) = Trainer(nn, samples, learning_params, test_mode=true)
-  all_samples = samples_report(Tr(get(mem)))
+  all_samples = samples_report(Tr(get_experience(mem)))
   latest_batch = isempty(last_batch(mem)) ?
     all_samples :
     samples_report(Tr(last_batch(mem)))
   per_game_stage = begin
-    es = get(mem)
+    es = get_experience(mem)
     sort!(es, by=(e->e.t))
     csize = ceil(Int, length(es) / params.num_game_stages)
     stages = collect(Iterators.partition(es, csize))

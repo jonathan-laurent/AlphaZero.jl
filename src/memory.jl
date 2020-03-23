@@ -103,7 +103,7 @@ function augment_with_symmetries(Game, samples)
   return [samples ; symsamples]
 end
 
-get(buf::MemoryBuffer) = buf.mem[:]
+get_experience(buf::MemoryBuffer) = buf.mem[:]
 
 last_batch(buf::MemoryBuffer) = buf.mem[end-last_batch_size(buf)+1:end]
 

@@ -60,6 +60,7 @@ benchmark = Training.benchmark
 include("lib/dummy_run.jl")
 
 if get(ENV, "DUMMY_RUN", "false") == "true"
+  @warn "Running dummy run"
   params, benchmark = dummy_run_params(Training.params, Training.benchmark)
 end
 
@@ -70,7 +71,7 @@ session = Session(
 if cmd == "train"
   resume!(session)
 elseif cmd == "explore"
-  explore(session)
+  start_explorer(session)
 elseif cmd == "play"
-  play_game(session)
+  play_interactive_game(session)
 end

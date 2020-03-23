@@ -25,8 +25,8 @@ makedocs(
       "reference/memory.md",
       "reference/environment.md",
       "reference/benchmark.md",
-      "reference/session.md",
       "reference/reports.md",
+      "reference/ui.md"
     ],
     "Contributing" => [
       "contributing/guide.md",
