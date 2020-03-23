@@ -7,7 +7,7 @@ const SESSION_DIR = "sessions/connect-four"
 const SAVE_FILE = "pons-benchmark-results.json"
 const PLOT_FILE = "pons-benchmark-results.png"
 const ITC_STRIDE = 5
-const DEBUG_MODE = true # Launches a quick run on a tiny dataset to help debug
+const DEBUG_MODE = false # Launches a quick run on a tiny dataset to help debug
 
 # A benchmark to evaluate connect-four agents is available at:
 #   http://blog.gamesolver.org/solving-connect-four/02-test-protocol/

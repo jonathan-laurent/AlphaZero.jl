@@ -18,7 +18,7 @@ include("games.jl")
 
 using ArgParse
 argstab = ArgParseSettings()
-@add_arg_table argstab begin
+@add_arg_table! argstab begin
   "--game"
     help = "Select a game ($(join(AVAILABLE_GAMES, "/")))"
   "train"
