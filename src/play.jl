@@ -215,7 +215,7 @@ end
 #####
 
 """
-    play(white, black, memory=nothing)
+    play_game(white, black, memory=nothing)
 
 Play a game between two [`AbstractPlayer`](@ref) and return the reward
 obtained by `white`.
@@ -226,7 +226,7 @@ obtained by `white`.
   is _flipped_ randomly at every turn with probability ``p``,
   using [`GI.random_symmetric_state`](@ref).
 """
-function play(
+function play_game(
     white::AbstractPlayer{Game}, black::AbstractPlayer{Game},
     memory=nothing; flip_probability=0.) :: Float64 where Game
   state = Game()
@@ -251,13 +251,6 @@ function play(
     nturns += 1
   end
 end
-
-"""
-    self_play!(player, memory) = play(player, player, memory)
-
-Play a game against oneself while collecting samples.
-"""
-self_play!(player, memory=nothing) = play(player, player, memory)
 
 #####
 ##### Evaluate two players against each other
@@ -287,7 +280,7 @@ Evaluate two `AbstractPlayer` against each other in a series of games.
   - `color_policy`: determines the [`ColorPolicy`](@ref),
      which is `ALTERNATE_COLORS` by default
   - `memory=nothing`: memory to use to record samples
-  - `flip_probability=0.`: see [`play`](@ref)
+  - `flip_probability=0.`: see [`play_game`](@ref)
 """
 function pit(
     handler, contender::AbstractPlayer, baseline::AbstractPlayer, num_games;
@@ -298,7 +291,7 @@ function pit(
   for i in 1:num_games
     white = baseline_white ? baseline : contender
     black = baseline_white ? contender : baseline
-    z = play(white, black, memory, flip_probability=flip_probability)
+    z = play_game(white, black, memory, flip_probability=flip_probability)
     baseline_white && (z = -z)
     zsum += z
     handler(i, z)
@@ -318,7 +311,7 @@ end
 #####
 
 # This type implements the interface of `MemoryBuffer` so that it can be
-# passed as the `memory` argument of `play` to record games.
+# passed as the `memory` argument of `play_game` to record games.
 # Currently, this is only used to compute redundancy statistics
 struct Recorder{Game, Board}
   boards :: Vector{Board}

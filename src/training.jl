@@ -147,7 +147,7 @@ function evaluate_network(contender, baseline, params, handler)
   return avgz, redundancy
 end
 
-function learning!(env::Env, handler)
+function learning_step!(env::Env, handler)
   ap = env.params.arena
   lp = env.params.learning
   checkpoints = Report.Checkpoint[]
@@ -212,7 +212,7 @@ function simple_memory_stats(env)
   return nsamples, ndistinct
 end
 
-function self_play!(env::Env{G}, handler) where G
+function self_play_step!(env::Env{G}, handler) where G
   params = env.params.self_play
   player = MctsPlayer(env.bestnn, params.mcts)
   new_batch!(env.memory)
@@ -220,7 +220,7 @@ function self_play!(env::Env{G}, handler) where G
   mem_footprint = 0
   elapsed = @elapsed begin
     for i in 1:params.num_games
-      self_play!(player, env.memory)
+      play_game(player, player, env.memory)
       Handlers.game_played(handler)
       reset_every = params.reset_mcts_every
       if (!isnothing(reset_every) && i % reset_every == 0) ||
@@ -268,9 +268,9 @@ function train!(env::Env, handler=nothing)
   while env.itc < env.params.num_iters
     Handlers.iteration_started(handler)
     resize_memory!(env, env.params.mem_buffer_size[env.itc])
-    sprep, spperfs = Report.@timed self_play!(env, handler)
+    sprep, spperfs = Report.@timed self_play_step!(env, handler)
     mrep, mperfs = Report.@timed memory_report(env, handler)
-    lrep, lperfs = Report.@timed learning!(env, handler)
+    lrep, lperfs = Report.@timed learning_step!(env, handler)
     rep = Report.Iteration(spperfs, mperfs, lperfs, sprep, mrep, lrep)
     env.itc += 1
     Handlers.iteration_finished(handler, rep)

@@ -33,7 +33,7 @@ function profile(nworkers, ngames)
   GC.gc(true)
   time = @elapsed begin
     @showprogress for i in 1:ngames
-      AlphaZero.self_play!(player)
+      AlphaZero.play_game(player, player)
     end
   end
   return time, MCTS.inference_time_ratio(player.mcts)

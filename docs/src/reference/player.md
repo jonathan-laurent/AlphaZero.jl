@@ -25,8 +25,7 @@ EpsilonGreedyPlayer
 ## Derived Functions
 
 ```@docs
-play
-self_play!
+play_game
 pit
 ColorPolicy
 interactive!

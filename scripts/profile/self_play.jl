@@ -13,7 +13,7 @@ const REPEAT = 200
 function profile_self_play(network, params, n)
   player = AlphaZero.MctsPlayer(network, params)
   time = @elapsed for i in 1:n
-    AlphaZero.play(player, player)
+    AlphaZero.play_game(player, player)
   end
   itr = MCTS.inference_time_ratio(player.mcts)
   aed = MCTS.average_exploration_depth(player.mcts)

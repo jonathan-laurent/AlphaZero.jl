@@ -9,7 +9,15 @@ is still a great challenge for reinforcement learning.[^1]
 [^1]:
     To the best of our knowledge, none of the many existing Python
     implementations of AlphaZero are able to learn a player that beats a
-    minmax baseline that plans at depth 2 on a single desktop computer.
+    minmax baseline that plans at depth 2 (on a single desktop computer).
+
+In this tutorial, we are going to:
+
+  1. Show you how to train a Connect Four agent on your own machine using
+     `AlphaZero.jl`.
+  2. Analyze the  
+
+## Running a Training Session
 
 ## Hyperparameters
 

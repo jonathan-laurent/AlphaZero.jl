@@ -5,18 +5,25 @@
 
 module AlphaZero
 
+# Submodules
 export MCTS, MinMax, GameInterface, GI, Report, Network, Benchmark
+# AlphaZero parameters
 export Params, SelfPlayParams, LearningParams, ArenaParams
 export MctsParams, MemAnalysisParams
-export Env, train!, learning!, self_play!, get_experience
-export AbstractGame, AbstractPlayer, interactive!
-export MctsPlayer, RandomPlayer, EpsilonGreedyPlayer, NetworkPlayer, Human
 export SamplesWeighingPolicy, CONSTANT_WEIGHT, LOG_WEIGHT, LINEAR_WEIGHT
+export AbstractSchedule, PLSchedule, StepSchedule
+# Players and games
+export AbstractGame, AbstractPlayer, play_game, interactive!
+export MctsPlayer, RandomPlayer, EpsilonGreedyPlayer, NetworkPlayer, Human
 export ColorPolicy, ALTERNATE_COLORS, BASELINE_WHITE, CONTENDER_WHITE
+# Networks
 export AbstractNetwork, OptimiserSpec, Nesterov, CyclicNesterov, Adam
 export SimpleNet, SimpleNetHP, ResNet, ResNetHP
-export AbstractSchedule, PLSchedule, StepSchedule
+# Training environments
+export Env, train!, get_experience
+# Sessions
 export Session, resume!, save, play_game, run_new_benchmark
+# Explorer
 export Explorer, explore
 
 include("util.jl")

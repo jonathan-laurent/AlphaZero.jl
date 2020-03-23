@@ -2,7 +2,7 @@ function generate_boards(::Type{Game}, n) where Game
   player = RandomPlayer{Game}()
   rec = AlphaZero.Recorder{Game}()
   for i in 1:n
-    self_play!(player, rec)
+    play_game(player, player, rec)
   end
   return Set(rec.boards)
 end
