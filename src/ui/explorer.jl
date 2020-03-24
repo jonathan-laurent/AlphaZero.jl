@@ -30,7 +30,7 @@ mutable struct StateStats{Action}
 end
 
 player_reward(state, white_reward) =
-  GI.white_playing(state) ? r : GI.symmetric_reward(white_reward)
+  GI.white_playing(state) ? white_reward : GI.symmetric_reward(white_reward)
 
 function evaluate_vnet(oracle::MCTS.Oracle, state)
   r = GI.white_reward(state)
