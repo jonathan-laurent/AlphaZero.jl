@@ -1,3 +1,30 @@
+Each training iteration is decomposed into a self-play phase and a learning
+phase. During the self-play phase, the AlphaZero agent plays a series of
+4000 games against itself, running 600 MCTS simulations for each move [^2]
+(see [`SelfPlayParams`](@ref)).
+Doing so, it records training samples in the memory buffer ( [`AlphaZero.MemoryBuffer`](@ref)).
+Then, during the learning phase, the neural network is updated to fit data in memory ([`LearningParams`](@ref)). The current neural network is evaluated periodically against the best one seen so far and replaces it to generate
+self-play data if it achieves a sufficiently high win rate ( [`ArenaParams`](@ref)).
+
+
+
+```
+bootstrap/
+├── css/
+│   ├── bootstrap.css
+│   ├── bootstrap.min.css
+│   ├── bootstrap-theme.css
+│   └── bootstrap-theme.min.css
+├── js/
+│   ├── bootstrap.js
+│   └── bootstrap.min.js
+└── fonts/
+    ├── glyphicons-halflings-regular.eot
+    ├── glyphicons-halflings-regular.svg
+    ├── glyphicons-halflings-regular.ttf
+    └── glyphicons-halflings-regular.woff
+```
+
 # Learning to Play Connect Four
 
 In this section, we discuss how to use `AlphaZero.jl` to learn to play

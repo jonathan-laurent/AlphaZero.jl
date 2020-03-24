@@ -52,3 +52,11 @@ This gain comes mostly from two sources:
   as it enables to perform neural-network inference on large batches rather
   than evaluating board positions separately, thereby maximizing the GPU
   utilization.
+
+### Acknowledgements
+
+This material is based upon work supported by the United States Air Force and
+DARPA under Contract No. FA8750-18-C-0092. Any opinions, findings and
+conclusions or recommendations expressed in this material are those of the
+author(s) and do not necessarily reflect the views of the United States
+Air Force and DARPA.

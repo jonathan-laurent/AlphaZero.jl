@@ -64,7 +64,7 @@ using .Benchmark
 # Right now, it is included in the main AlphaZero.jl package. In the future,
 # we may want to separate it so as to drop the Knet and Flux dependencies.
 
-const USE_KNET_FOR_NETLIB = true # The Flux stdlib is currently broken
+const USE_KNET_FOR_NETLIB = true # The Flux netlib is currently broken
 
 if USE_KNET_FOR_NETLIB
   @eval begin

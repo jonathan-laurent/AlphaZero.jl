@@ -16,6 +16,11 @@ CurrentModule = AlphaZero.UserInterface
 
 ```@docs
 Session
+```
+
+![Session CLI (first iteration)](../assets/img/ui-first-iter.png)
+
+```@docs
 Session(::Env) # Strangely, this includes all constructors...
 resume!
 save
@@ -28,5 +33,10 @@ SessionReport
 
 ```@docs
 Explorer
+```
+
+![Explorer](../assets/img/explorer.png)
+
+```@docs
 start_explorer(::Explorer)
 ```

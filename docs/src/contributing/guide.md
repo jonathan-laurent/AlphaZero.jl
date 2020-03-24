@@ -23,7 +23,7 @@ ML projects. Here are a few examples:
   - Implement the alternate training target proposed [here](https://medium.com/oracledevs/lessons-from-alphazero-part-4-improving-the-training-target-6efba2e71628)
 
 Please do not hesitate to open a Github
-[issue](https://github.com/jonathan-laurent/AlphaZero.jl/issues) to share any
+[issue](https://github.com/jonathan-laurent/AlphaZero.jl/issues) to share
 any idea, feedback or suggestion.
 
 ---
@@ -46,10 +46,10 @@ as it went through little tuning and can probably be improved
 significantly. Any kind of hyperparameters study would be extremely valuable
 in getting a better understanding of AlphaZero's training process.
 
-More generally, as a single training session can take hours or days,
+More generally, as a training session can take hours or days,
 it is hard for a single person to fine-tune AlphaZero's many hyperparameters.
-In an effort to tackle more and more ambitious games, it would be useful
-to develop a collaborative process for running tuning experiments and share
+In an effort to tackle more and more ambitious games, it would be useful to
+come up with a collaborative process for running tuning experiments and share
 the resulting insights.
 
 ---
