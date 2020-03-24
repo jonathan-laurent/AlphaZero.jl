@@ -17,6 +17,8 @@ we recommend that you read a high-level introduction such as
 if you are not already familiar with AlphaZero.
 In this tutorial, we are going to:
 
+  1. Show you how to train a Connect Four agent on your own machine using
+     the `AlphaZero.jl` package.
   1. Give instructions to launch a training session on your machine
   2. Discuss hyperparameters tuning
   3. Analyze the results
@@ -35,53 +37,6 @@ processor and an Nvidia RTX 2070 GPU.
     [critical feature](https://github.com/JuliaLang/julia/pull/33448)
     that enables `CuArrays` to force incremental GC collections.
 
-To download `AlphaZero.jl` and start a new training session,
-just run the following:
-
-```sh
-git clone https://github.com/jonathan-laurent/AlphaZero.jl.git
-cd AlphaZero.jl
-julia --project -e "import Pkg; Pkg.instantiate()"
-julia --project --color=yes scripts/alphazero.jl --game connect-four train
-```
-
-Instead of using the the `alphazero.jl` script, one can also run the following
-into the Julia REPL:
-
-```julia
-ENV["CUARRAYS_MEMORY_POOL"] = "split"
-
-using AlphaZero
-
-include("games/connect-four/main.jl")
-using .ConnectFour: Game, Training
-
-const SESSION_DIR = "sessions/connect-four"
-
-session = AlphaZero.Session(
-    Game,
-    Training.Network{ConnectFour.Game},
-    Training.params,
-    Training.netparams,
-    benchmark=Training.benchmark,
-    dir=SESSION_DIR)
-
-resume!(session)
-```
-
-The first line configures CuArrays to use a splitting memory pool, which
-performs better than the default binned pool on AlphaZero's workload as it
-does not require to run the garbage collector as frequently. Then, a new
-AlphaZero [session](@ref ui) is created with the following arguments:
-
-| Argument             | Description                                                                     |
-|:---------------------|:--------------------------------------------------------------------------------|
-| `Game`               | Game type, which implements the [game interface](@ref game_interface).          |
-| `Training.Network`   | Network type, which implements the [network interface](@ref network_interface). |
-| `Training.params`    | Training [parameters](@ref params).                                             |
-| `Training.netparams` | Network hyperparameters.                                                        |
-| `Training.benchmark` | [Benchmark](@ref benchmark) that is run between training iterations.            |
-| `SESSION_DIR`        | Directory in which all session files are saved.                                 |
 
 In the following sections, we discuss some of those arguments in more details.
 
@@ -109,6 +64,7 @@ Here, we simulate 5000 games of
 | `AlphaZero.jl` |               5,000 |             30 |           400 |             x1 |
 | Python impl    |                 100 |             30 |            25 |             x1 |
 
-## Results
+## Hyperparameters
 
-![Session CLI](../assets/img/session-ui-short.png)
+Depending on your available computing power, you may want to adjust
+some of these hyperparameters.

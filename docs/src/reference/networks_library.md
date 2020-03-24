@@ -17,7 +17,7 @@ KNets.TwoHeadNetwork
 
 ## Networks Library
 
-### Convolutional ResNet
+### [Convolutional ResNet](@id conv_resnet)
 
 ```@docs
 KNets.ResNet
