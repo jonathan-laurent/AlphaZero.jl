@@ -1,3 +1,21 @@
+
+The `scripts/profile/async_mcts.jl` script can be used to measure the resulting
+speedup for self-play data generation as a function of the number of asynchronous
+workers. We obtain the following on our hardware:
+
+![Async speedup](../assets/img/connect-four/async-profiling/mcts_speed.png)
+
+This package provides a _generic_, _simple_ and _fast_ implementation of
+Deepmind's AlphaZero algorithm:
+
+* The core algorithm is only 2,000 lines of pure, hackable Julia code.
+* Generic interfaces make it easy to add support for
+  [new games](@ref game_interface) or new
+  [learning frameworks](@ref network_interface).
+* Being between one and two orders of magnitude faster than its Python alternatives,
+  this implementation enables learning decent players for nontrivial games on
+  a standard desktop computer with a GPU.
+
 `AlphaZero.jl` comes with _batteries included_. It features utilities for
 logging, profiling, benchmarking and model exploration that are ready to work
 with any new game.
@@ -89,3 +107,40 @@ Here, we simulate 5000 games of
 
 Depending on your available computing power, you may want to adjust
 some of these hyperparameters.
+
+
+Virtual Loss
+https://blogs.oracle.com/developers/lessons-from-alpha-zero-part-5:-performance-optimization
+
+
+A key aspect of making
+
+A key feature of `AlphaZero.jl` that is responsible
+
+
+performances comes from its asynchronous
+MCTS implementation, by enabling
+
+
+A key aspect in speeding up MCTS is to enable several workers to explore
+the search tree asynchronously. This is a huge win even on a single machine,
+as it enables to perform neural-network inference on large batches rather
+than evaluating board positions separately, thereby maximizing the GPU
+utilization.
+
+We benchmarked
+
+
+
+In turn, half of this time is spent doing network inference to evaluate game positions.[^4]
+
+[^4]:
+  When using larger neural networks, the cost of inference quickly comes to
+  dominate, which is why DeepMind's AlphaGo Zero was trained on 64 GPUs.
+
+
+Package overview:
+  - async mcts
+
+  - Features: extensible memory (discussed in the tutorial)
+    * symmetries, growing memory, cyclic learning rates...

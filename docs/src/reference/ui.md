@@ -12,7 +12,7 @@ UserInterface
 CurrentModule = AlphaZero.UserInterface
 ```
 
-## Session
+## [Session](@id session)
 
 ```@docs
 Session
@@ -29,7 +29,7 @@ start_explorer(::Session)
 SessionReport
 ```
 
-## Explorer
+## [Explorer](@id explorer)
 
 ```@docs
 Explorer

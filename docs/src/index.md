@@ -7,8 +7,8 @@ Deepmind's AlphaZero algorithm:
 * Generic interfaces make it easy to add support for
   [new games](@ref game_interface) or new
   [learning frameworks](@ref network_interface).
-* Being about two orders of magnitude faster than competing alternatives
-  written in Python, this implementation enables to solve nontrivial games on
+* Being between one and two orders of magnitude faster than its Python alternatives,
+  this implementation enables solving nontrivial games on
   a standard desktop computer with a GPU.
 
 ### Why should I care about AlphaZero?
@@ -35,7 +35,7 @@ features a _random_ baseline, along with a _greedy_ baseline that
 does not appear to be significantly stronger.
 
 `AlphaZero.jl` is designed to be as simple as those Python implementations.
-In addition, it is about two orders of magnitude faster, making it possible
+In addition, it is between one and two orders of magnitude faster, making it possible
 to solve nontrivial games on a standard desktop computer with a GPU.
 This gain comes mostly from two sources:
 - **Julia's inherent speed:** most machine learning algorithms do not suffer
@@ -47,7 +47,7 @@ This gain comes mostly from two sources:
   search tree asynchronously. This is a huge win even on a single machine,
   as it enables to perform neural-network inference on large batches rather
   than evaluating board positions separately, thereby maximizing the GPU
-  utilization.
+  utilization (see [speedup benchmark](@ref async_bench)).
 
 ### Acknowledgements
 
