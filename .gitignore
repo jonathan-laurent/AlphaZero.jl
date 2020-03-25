@@ -1,18 +1,13 @@
+.DS_Store
+
 *.jl.*.cov
 *.jl.cov
 *.jl.mem
-.DS_Store
-/dev/
+*.data
+*~
+
 /docs/build/
 /docs/site/
 
-COMMANDS.md
-TODO.md
-inference-speedup.png
-inference_time_ratio.png
-mcts_speed.png
 sessions
 archive
-
-*~
-*.data
