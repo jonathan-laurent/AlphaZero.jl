@@ -60,12 +60,12 @@ function performances_plot(rep::Report.Iteration)
       rep.perfs_self_play.gc_time / rep.perfs_self_play.time
     let itratio = rep.self_play.inference_time_ratio
       Plots.pie(
-        ["Inference", "MCTS", "GC"],
+        ["MCTS (inference)", "MCTS (other)", "GC"],
         [(1 - gcratio) * itratio, (1 - gcratio) * (1 - itratio), gcratio],
         title="Self Play") end end
   # Learning details
   learning = Plots.pie(
-    ["Samples conversion", "Loss computation", "Optimization", "Evaluation"],
+    ["Samples conversion", "Loss computation", "Optimization", "Arena (MCTS)"],
     [ rep.learning.time_convert,
       rep.learning.time_loss,
       rep.learning.time_train,
@@ -189,7 +189,7 @@ function plot_training(
     xlabel="Iteration number")
   Plots.hline!(arena, [0, params.arena.update_threshold])
   # Loss on the full memory after an iteration
-  lfmt = "Loss on Full Memory (when iteration starts)"
+  lfmt = "Loss on Full Memory"
   losses_fullmem = plot_losses(1:n, lfmt) do i
     (i, iterations[i].learning.initial_status.loss)
   end

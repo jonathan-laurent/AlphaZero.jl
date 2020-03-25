@@ -645,8 +645,11 @@ function run_new_benchmark(
   end
 end
 
-function regenerate_plots(session::Session, dir=nothing)
-  isnothing(dir) && (dir = joinpath(session.dir, PLOTS_DIR))
-  plot_training(session.env.params, session.report.iterations, dir)
-  plot_benchmark(session.env.params, session.report.benchmark, dir)
+function regenerate_plots(session::Session)
+  plotsdir = joinpath(session.dir, PLOTS_DIR)
+  plot_training(session.env.params, session.report.iterations, plotsdir)
+  plot_benchmark(session.env.params, session.report.benchmark, plotsdir)
+  for (itc, itrep) in enumerate(session.report.iterations)
+    plot_iteration(itrep, session.env.params, plotsdir, itc)
+  end
 end

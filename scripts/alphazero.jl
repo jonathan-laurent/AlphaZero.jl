@@ -30,6 +30,9 @@ argstab = ArgParseSettings()
   "explore"
     action = :command
     help = "Use the interactive exploration system"
+  "replot"
+    action = :command
+    help = "Regenerate all the session plots from the JSON reports"
   "--save-intermediate"
     action = :store_true
     help = "Save all intermediate states during training"
@@ -74,4 +77,6 @@ elseif cmd == "explore"
   start_explorer(session)
 elseif cmd == "play"
   play_interactive_game(session)
+elseif cmd == "replot"
+  AlphaZero.UserInterface.regenerate_plots(session)
 end
