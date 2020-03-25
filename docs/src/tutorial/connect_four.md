@@ -36,7 +36,7 @@ julia --project --color=yes scripts/alphazero.jl --game connect-four train
 ```
 
 Instead of using `scripts/alphazero.jl`, one can also run the
-following into the Julia REPL:
+following using the Julia REPL:
 
 ```julia
 ENV["CUARRAYS_MEMORY_POOL"] = "split"
@@ -195,7 +195,7 @@ encountered states, excluding the initial state and counting duplicates (see
 !!! note "On leveraging symmetries"
     Another trick that we use to add randomization is to leverage the symmetry
     of the Connect Four board with respect to its central vertical axis: at each turn,
-    the board is _flipped_ along its central vertical axis with a fixed probability (see [`flip_probability`](@ref)).
+    the board is _flipped_ along its central vertical axis with a fixed probability (see [`flip_probability`](@ref Params)).
 
     This is one of two ways in which `AlphaZero.jl` takes advantage of
     board symmetries, the other one being data augmentation (see [`use_symmetries`](@ref Params)).
@@ -204,7 +204,7 @@ encountered states, excluding the initial state and counting duplicates (see
 As you can see, the AlphaZero agent can win a few games with a randomly
 initialized network, by relying on search alone for very short term tactical decisions.
 
-## Training iterations
+### Training iterations
 
 After the initial benchmarks are done, the first training iteration can
 start. Each training iteration took between 60 and 90 minutes on our hardware.
@@ -213,13 +213,13 @@ terminate more quickly and the memory buffer has yet to reach its final size.
 
 ![Session CLI (first iteration)](../assets/img/ui-first-iter.png)
 
-Each training iteration is decomposed into a **self-play phase** and a **learning
+Each training iteration is composed of a **self-play phase** and of a **learning
 phase**. During the self-play phase, the AlphaZero agent plays a series of
 4000 games against itself, running 600 MCTS simulations for each move.[^2]
 Doing so, it records training samples in the memory buffer.
-Then, during the learning phase, the neural network is updated to fit data in memory. The current neural network is evaluated periodically against the best one seen so far, and replaces it to generate
+Then, during the learning phase, the neural network is updated to fit data in memory. The current neural network is evaluated periodically against the best one seen so far, and replaces it for generating
 self-play data if it achieves a sufficiently high win rate. For more details,
-see [`SelfPlayParams`](@ref), [`LearningParams`](@ref) and [`ArenaParams`](@ref).
+see [`SelfPlayParams`](@ref), [`LearningParams`](@ref) and [`ArenaParams`](@ref) respectively.
 
 [^2]:
     Compare those numbers with those of a popular
@@ -227,39 +227,52 @@ see [`SelfPlayParams`](@ref), [`LearningParams`](@ref) and [`ArenaParams`](@ref)
     which achieves iterations of similar duration when training its Othello
     agent but only runs 100 games and 25 MCTS simulations per move.
 
+Between the self-play and learning phase, we perform an **analysis of the memory
+buffer** by partitioning samples according to how many moves remained until
+the end of the game when they were taken.
+This is useful to monitor how well the neural network performs at different
+game stages. Separate statistics are also computed for the last batch of
+collected samples. A description of the different measured metrics can be found
+in [Training Reports](@ref reports).
 
 At the end of every iteration, benchmarks are run, summary plots are generated
 and the state of the current environment is saved on disk. This way, if training
 is interrupted for any reason, it can be resumed from the last saved state
-by simply rerunning `scripts/alphazero.jl`.
+by simply running `scripts/alphazero.jl` again.
+
+All summary plots generated during the training of our agent can be downloaded
+[here](../assets/download/c4-plots.zip).
+
+### On the performances of asynchronous MCTS
+
+By far, the bottleneck when training an AlphaZero agent is **not** to perform
+gradient descent updates on the network but rather to generate training data via
+self-play. This appears clearly when looking at the profiling reports that
+are automatically generated after each iteration. For example, looking
+at the report for iteration 80:
+
+![Perfs at iter 80](../assets/img/connect-four/plots/iter_perfs/80.png)
+
+We can see that ``\frac{7}{8}``th of the time is spent running MCTS.
+
+![Async speedup](../assets/img/connect-four/async-profiling/mcts_speed.png)
+![Time ratio spent doing inference](../assets/img/connect-four/async-profiling/inference_time_ratio.png)
 
 ## Experimental results
 
-
-![Win rate evolution (AlphaZero)](../assets/img/connect-four/training/benchmark_won_games.png)
+![Win rate evolution (AlphaZero)](../assets/img/connect-four/plots/benchmark_won_games.png)
 ![Win rate evolution (network only)](../assets/img/connect-four/net-only/benchmark_won_games.png)
-![Arena results](../assets/img/connect-four/training/arena.png)
-![Loss on full memory](../assets/img/connect-four/training/loss.png)
-![Exploration depth](../assets/img/connect-four/training/exploration_depth.png)
-![Policy entropy](../assets/img/connect-four/training/entropies.png)
-![Number of training samples](../assets/img/connect-four/training/nsamples.png)
-![Loss on last batch](../assets/img/connect-four/training/loss_last_batch.png)
-![Loss per game stage](../assets/img/connect-four/training/loss_per_stage.png)
-
-### Per iter
-
-![Loss evolution during first iteration](../assets/img/connect-four/first-iter/loss.png)
-![Profiling for first teration](../assets/img/connect-four/first-iter/perfs.png)
-![Summary of first iteration](../assets/img/connect-four/first-iter/summary.png)
+![Arena results](../assets/img/connect-four/plots/arena.png)
+![Loss on full memory](../assets/img/connect-four/plots/loss.png)
+![Exploration depth](../assets/img/connect-four/plots/exploration_depth.png)
+![Policy entropy](../assets/img/connect-four/plots/entropies.png)
+![Number of training samples](../assets/img/connect-four/plots/nsamples.png)
+![Loss on last batch](../assets/img/connect-four/plots/loss_last_batch.png)
+![Loss per game stage](../assets/img/connect-four/plots/loss_per_stage.png)
 
 ### Pons Benchmark
 
 ![Pons benchark](../assets/img/connect-four/pons-benchmark-results.png)
-
-### Async Profiling
-
-![Async speedup](../assets/img/connect-four/async-profiling/mcts_speed.png)
-![Time ratio spent doing inference](../assets/img/connect-four/async-profiling/inference_time_ratio.png)
 
 ### Explorer
 

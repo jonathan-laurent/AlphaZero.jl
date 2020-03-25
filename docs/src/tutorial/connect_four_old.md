@@ -1,12 +1,6 @@
-Each training iteration is decomposed into a self-play phase and a learning
-phase. During the self-play phase, the AlphaZero agent plays a series of
-4000 games against itself, running 600 MCTS simulations for each move [^2]
-(see [`SelfPlayParams`](@ref)).
-Doing so, it records training samples in the memory buffer ( [`AlphaZero.MemoryBuffer`](@ref)).
-Then, during the learning phase, the neural network is updated to fit data in memory ([`LearningParams`](@ref)). The current neural network is evaluated periodically against the best one seen so far and replaces it to generate
-self-play data if it achieves a sufficiently high win rate ( [`ArenaParams`](@ref)).
-
-
+`AlphaZero.jl` comes with _batteries included_. It features utilities for
+logging, profiling, benchmarking and model exploration that are ready to work
+with any new game.
 
 ```
 bootstrap/
