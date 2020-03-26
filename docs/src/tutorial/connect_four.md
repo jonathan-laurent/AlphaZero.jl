@@ -16,7 +16,7 @@ is still a great challenge for reinforcement learning.[^1]
 To run the experiments in this tutorial, we recommend having a CUDA
 compatible GPU with 4GB of memory or more. A 2GB GPU should work fine
 but you may have to reduce batch size. Each training iteration took about
-one hour and a half on a standard desktop computer with an Intel Core i5 9600K
+one hour and a half on a desktop computer with an Intel Core i5 9600K
 processor and an 8GB Nvidia RTX 2070 GPU.
 
 !!! note
@@ -178,18 +178,27 @@ julia --project --color=yes scripts/alphazero.jl --game connect-four play
 
 ### Training plots
 
+Here, we plot the evolution of the win rate of our AlphaZero agent against our
+two baselines:
+
 ![Win rate evolution (AlphaZero)](../assets/img/connect-four/plots/benchmark_won_games.png)
+
+It is important to note that the AlphaZero agent is never exposed to those
+baselines during training and therefore cannot learn from them.
+
+
+We also evaluated the performances of the neural network alone against the
+same baselines: instead of plugging it into MCTS, we just play the action
+that is assigned the highest prior probability at each state.
+
 ![Win rate evolution (network only)](../assets/img/connect-four/net-only/benchmark_won_games.png)
-![Arena results](../assets/img/connect-four/plots/arena.png)
-![Loss on full memory](../assets/img/connect-four/plots/loss.png)
-![Exploration depth](../assets/img/connect-four/plots/exploration_depth.png)
-![Policy entropy](../assets/img/connect-four/plots/entropies.png)
-![Number of training samples](../assets/img/connect-four/plots/nsamples.png)
-![Loss on last batch](../assets/img/connect-four/plots/loss_last_batch.png)
-![Loss per game stage](../assets/img/connect-four/plots/loss_per_stage.png)
+
+Unsurprisingly, the network is initially unable to win a single game. However,
+it ends up being competitive with the minmax baseline despite not being able
+to perform any search.
 
 All summary plots generated during the training of our agent can be downloaded
-[here](../assets/download/c4-plots.zip). Also, you can use
+[here](../assets/download/c4-plots.zip).
 
 ### [Asynchronous MCTS speedup](@id async_bench)
 
@@ -215,7 +224,7 @@ workers. Using `scripts/profile/async_mcts.jl` on our machine, we get the follow
 
 As you can see, we measure a 20x performance gain for 64 workers.
 
-### Pons Benchmark
+### Benchmark against a perfect solver
 
 ![Pons benchark](../assets/img/connect-four/pons-benchmark-results.png)
 

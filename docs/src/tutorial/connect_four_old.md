@@ -144,3 +144,18 @@ Package overview:
 
   - Features: extensible memory (discussed in the tutorial)
     * symmetries, growing memory, cyclic learning rates...
+
+
+
+#### Arena results
+
+![Arena results](../assets/img/connect-four/plots/arena.png)
+
+#### Exploration depth and policy entropy
+
+![Exploration depth](../assets/img/connect-four/plots/exploration_depth.png)
+
+#### Loss evolution
+
+![Loss on full memory](../assets/img/connect-four/plots/loss.png)
+![Loss per game stage](../assets/img/connect-four/plots/loss_per_stage.png)
