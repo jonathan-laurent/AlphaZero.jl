@@ -15,7 +15,11 @@ macro unimplemented()
   end
 end
 
-# concat_cols(cols) == hcat(cols...) but faster
+infinity(::Type{R}) where R <: Real = one(R) / zero(R)
+
+"""
+    concat_columns(cols) == hcat(cols...) # but faster
+"""
 function concat_columns(cols)
   @assert !isempty(cols)
   nsamples = length(cols)
@@ -28,7 +32,9 @@ function concat_columns(cols)
   return arr
 end
 
-# superpose(xs) == cat(xs..., dims=ndims(first(xs))+1) but faster
+"""
+    superpose(xs) == cat(xs..., dims=ndims(first(xs))+1) # but faster
+"""
 function superpose(arrays)
   n = length(arrays)
   @assert n > 0
@@ -44,10 +50,14 @@ function superpose(arrays)
   return dest
 end
 
-infinity(::Type{R}) where R <: Real = one(R) / zero(R)
+"""
+    @printing_errors expr
 
-# Print uncaught exceptions
-# In response to: https://github.com/JuliaLang/julia/issues/10405
+Evaluate expression `expr` while printing any uncaught exception on `stderr`.
+
+This is useful to avoid silent falure of concurrent tasks, as explained in
+[this issue](https://github.com/JuliaLang/julia/issues/10405).
+"""
 macro printing_errors(expr)
   return quote
     try
@@ -58,19 +68,23 @@ macro printing_errors(expr)
   end
 end
 
-# This function generates a new constructor that enables updating some fields
-# of a persistent structure while leaving the others unchanged.
-# For example, given the following struct:
-#
-#    struct Point
-#      x :: Int
-#      y :: Int
-#    end
-#
-# then `generate_update_constructor(Point)` generates code equivalent to:
-#
-#    Point(pt; x=pt.x, y=pt.y) = Point(x, y)
-#
+"""
+    generate_update_constructor(T)
+
+Generate a new constructor for immutable type `T` that enables copying
+an existing structure while only updating a subset of its fields.
+
+For example, given the following struct:
+
+    struct Point
+      x :: Int
+      y :: Int
+    end
+
+Th generated code is equivalent to:
+
+    Point(pt; x=pt.x, y=pt.y) = Point(x, y)
+"""
 function generate_update_constructor(T)
   fields = fieldnames(T)
   Tname = Symbol(split(string(T), ".")[end])
@@ -83,8 +97,15 @@ function generate_update_constructor(T)
   end
 end
 
-# Categorical uses `isprobvec`, which tends to be picky when receiving a
-# Vector{Float64} argument
+"""
+    fix_probvec(π)
+
+Convert probability vector `π` to type `Vector{Float32}` and renormalize it
+if necessary.
+  
+This is useful as `Distributions.isprobvec` can be picky about its
+input when it does not sum to one due to numerical errors.
+"""
 function fix_probvec(π)
   π = convert(Vector{Float32}, π)
   s = sum(π)
@@ -99,13 +120,18 @@ function fix_probvec(π)
   return π
 end
 
+"""
+Draw a sample from a categorical distribution represented as a probability vector.
+See [`fix_probvec`](@ref).
+"""
 function rand_categorical(π)
   π = fix_probvec(π)
   return rand(Categorical(π))
 end
 
-# Same smoothing function that is used by Temsorboard to smooth
-# loss curves.
+"""
+Same smoothing function that is used by Temsorboard to smooth time series.
+"""
 function momentum_smoothing(x, μ)
   sx = similar(x)
   isempty(x) && return x
@@ -117,10 +143,16 @@ function momentum_smoothing(x, μ)
   return sx
 end
 
-# Takes a data tensor `X` and split it into batches of fixed size along the
-# last dimension of `X`. If `partial=true` and the number of samples in `X` is
-# not a multiple of `batchsize`, then an additional smaller batch is added
-# at the end (otherwise, it is discarded).
+"""
+    batches(X, batchsize; partial=false)
+
+Take a data tensor `X` and split it into batches of fixed size along the
+last dimension of `X`.
+
+If `partial=true` and the number of samples in `X` is
+not a multiple of `batchsize`, then an additional smaller batch is added
+at the end (otherwise, it is discarded).  
+"""
 function batches(X, batchsize; partial=false)
   n = size(X)[end]
   b = batchsize
@@ -140,11 +172,21 @@ function batches_tests()
   @assert batches(collect(1:5), 2, partial=true) == [[1, 2], [3, 4], [5]]
 end
 
-# Takes a tuple of data tensors, shuffles its samples according to a random
-# permutation and splits them into a sequence of minibatches.
-# The result is a lazy iterator that calls `convert` on the tensors of each
-# new batch right before returning it. The `convert` function is typically
-# used to transfer data onto the GPU.
+"""
+    random_batches(convert, data::Tuple, batchsize; partial=false)
+
+Take a tuple of data tensors, shuffle its samples according to a random
+permutation and split them into a sequence of minibatches.
+
+The result is a lazy iterator that calls `convert` on the tensors of each
+new batch right before returning it. The `convert` function is typically
+used to transfer data onto the GPU.
+
+!!! note
+    In the future, it may be good to deprecate this function along with
+    [`random_batches_stream`](@ref) and use a standard solution instead,
+    such as `Flux.DataLoader`.
+"""
 function random_batches(
   convert, data::Tuple, batchsize; partial=false)
   n = size(data[1])[end]
@@ -156,9 +198,13 @@ function random_batches(
   return (convert.(b) for b in batchs)
 end
 
-# Generate an infinite stateful iterator of random batches by calling
-# `random_batches` repeatedly. Every sample is guaranteed to be drawn
-# exactly once per epoch.
+"""
+    random_batches_stream(convert, data::Tuple, batchsize)
+
+Generate an infinite stateful iterator of random batches by calling
+[`random_batches`](@ref) repeatedly. Every sample is guaranteed to be drawn
+exactly once per epoch.
+"""
 function random_batches_stream(convert, data::Tuple, batchsize)
   partial = size(data[1])[end] < batchsize
   return Iterators.Stateful(Iterators.flatten((

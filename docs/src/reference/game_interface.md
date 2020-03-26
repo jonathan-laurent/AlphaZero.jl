@@ -6,7 +6,6 @@ CurrentModule = AlphaZero
 
 ```@docs
 GameInterface
-GameType
 ```
 
 ```@meta

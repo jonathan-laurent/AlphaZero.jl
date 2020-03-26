@@ -223,7 +223,7 @@ Play a game between two [`AbstractPlayer`](@ref) and return the reward
 obtained by `white`.
 
 - If the `memory` argument is provided, samples are automatically collected
-  from this game (see [`MemoryBuffer`](@ref)).
+  from this game in the given [`MemoryBuffer`](@ref).
 - If the `flip_probability` argument is set to ``p``, the board
   is _flipped_ randomly at every turn with probability ``p``,
   using [`GI.random_symmetric_state`](@ref).
