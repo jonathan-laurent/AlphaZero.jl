@@ -1,5 +1,9 @@
 """
 A generic interface for two-players, symmetric, zero-sum games.
+
+We call a game _symmetric_ when the rules are the same for both players.
+Said differently, it is always possible to swap the players' colors along
+with the color of every piece on the board without affecting the game.
 """
 module GameInterface
 
@@ -63,11 +67,10 @@ end
 
 Return the action type corresponding to `Game`.
 
-Actions must be "symmetric" in the following sense:
+Actions must be _colorblind_ in the following sense:
 
 ```
-available_actions(s) ==
-  available_actions(Game(board_symmetric(s), !white_playing(s)))
+available_actions(s) == available_actions(state_symmetric(s))
 ```
 """
 function Action(::Type{<:AbstractGame})
@@ -122,8 +125,11 @@ end
 """
     board_symmetric(state::AbstractGame)
 
-Return the symmetric of the game board
-(where the roles of black and white are swapped).
+Return the symmetric of the game board, where the players'
+colors are swapped.
+
+The white player must have opposite values in
+`state` and `state_symmetric(state)`.
 """
 function board_symmetric(::AbstractGame)
   @unimplemented
@@ -136,8 +142,8 @@ Return a boolean mask indicating what actions are available from `state`.
 
 The following identities must hold:
 
-    game_terminated(state) || any(actions_mask(state))
-    length(actions_mask(state)) == length(actions(typeof(state)))
+  - `game_terminated(state) || any(actions_mask(state))`
+  - `length(actions_mask(state)) == length(actions(typeof(state)))`
 """
 function actions_mask(state::AbstractGame)
   @unimplemented
@@ -158,11 +164,9 @@ end
 Return a heuristic estimate of the state value for the current player.
 
 The given state must be nonfinal and returned values must belong to the
-``(-∞, ∞)`` interval. Also, implementations of this function must be
-antisymmetric in the sense that:
+``(-∞, ∞)`` interval. Also, the following must hold:
 ```
-heuristic_value(s) ==
-  - heuristic_value(Game(board_symmetric(s), white_playing(s)))
+heuristic_value(s) == heuristic_value(state_symmetric(s))
 ```
 
 This function is not needed by AlphaZero but it is useful for building
@@ -185,6 +189,17 @@ Return the vector of all pairs `(b, σ)` where:
      size `num_actions(Game)`.
 
 A default implementation is provided that returns an empty vector.
+
+# Note
+
+This function should not be confused with [`board_symmetric`](@ref).
+
+  - `board_symmetric` only deals with _color symmetry_ (the rules of the
+     game are the same for both players). Its implementation is mandatory and
+     leveraged by MCTS.
+  - `symmetries` can be used to declare additional symmetries,
+     typically about board geometry (ie. a tictactoe grid is invariant
+     by rotation).
 """
 function symmetries(::Type{G}, board) where {G <: AbstractGame}
   return Tuple{Board(G), Vector{Int}}[]
@@ -258,6 +273,16 @@ end
 #####
 ##### Derived functions
 #####
+
+"""
+    state_symmetric(state)
+
+Return a fresh symmetric state where the players' colors are swapped.
+See [`board_symmetric`](@ref).
+"""
+function state_symmetric(s::Game) where {Game <: AbstractGame}
+  return Game(board_symmetric(s), !white_playing(s))
+end
 
 """
     game_terminated(::AbstractGame)

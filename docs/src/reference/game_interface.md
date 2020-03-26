@@ -49,6 +49,7 @@ print_state
 ## Derived Functions
 
 ```@docs
+state_symmetric
 game_terminated
 num_actions
 available_actions
