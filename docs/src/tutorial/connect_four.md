@@ -200,29 +200,6 @@ to perform any search.
 All summary plots generated during the training of our agent can be downloaded
 [here](../assets/download/c4-plots.zip).
 
-### [Asynchronous MCTS speedup](@id async_bench)
-
-Most of the time spent training an AlphaZero agent is spent within MCTS,
-either generating self-play data or pitting networks against one another. For example, looking
-at the generated profiling report for iteration 80, we can see that a bit more than
-7/8th of training is spent in MCTS.
-
-![Perfs at iter 80](../assets/img/connect-four/plots/iter_perfs/80.png)
-
-A key MCTS optimization that is implemented in `AlphaZero.jl` is to allow
-several workers to explore the search tree asynchronously. This is a huge win even on a single machine
-and with no parallelism,
-as it enables to perform neural-network inference on large batches rather
-than evaluating board positions separately, thereby maximizing the GPU
-utilization.
-
-To evaluate the resulting performance gain, we plot the resulting speedup on self-play
-data generation as a function of the number of asynchronous
-workers. Using `scripts/profile/async_mcts.jl` on our machine, we get the following:
-
-![Async speedup](../assets/img/connect-four/async-profiling/mcts_speed.png)
-
-As you can see, we measure a 20x performance gain for 64 workers.
 
 ### Benchmark against a perfect solver
 

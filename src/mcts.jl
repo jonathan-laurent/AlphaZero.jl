@@ -1,7 +1,11 @@
 """
-A generic, standalone implementation of asynchronous Monte Carlo Tree Search.
+A generic, standalone implementation of Monte Carlo Tree Search.
 It can be used on any game that implements `GameInterface`
 and with any external oracle.
+
+Both a synchronous and an asynchronous version are implemented, which
+share most of their code. When browsing the sources for the first time,
+we recommend that you study the sychronous version first.
 """
 module MCTS
 

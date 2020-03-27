@@ -12,8 +12,8 @@ makedocs(
     "Home" => "index.md",
     "Tutorial" => [
       "tutorial/alphazero_intro.md",
+      "tutorial/package_overview.md",
       "tutorial/connect_four.md"
-      #"tutorial/codebase_overview.md"
     ],
     "Reference" => [
       "reference/params.md",

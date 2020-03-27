@@ -6,7 +6,7 @@ ideas:
   - [Add support for a new game](@ref)
   - [Help with hyperparameter tuning](@ref)
   - [Improve the user interface](@ref)
-  - [Develop support for a more general game interface](@ref)
+  - [Develop support for a more general game interface](@ref contrib_generalize)
   - Write tutorials or other learning resources based on this package
   - Design a logo
 
@@ -64,12 +64,12 @@ might be nice.
 
 ---
 
-#### Develop support for a more general game interface
+#### [Develop support for a more general game interface](@id contrib_generalize)
 
-A first step may be to add support for nonsymmetric games. Then, a more
-ambitious goal would be to add support for games with imperfect information.
-Note that how to best adapt the AlphaZero approach to those games is pretty much
-an open question though.
+A first step may be to add support for nonsymmetric games and games with more than two players.
+A more ambitious goal would be to add support for games with imperfect
+information. Note that how to best adapt the AlphaZero approach to those games
+is pretty much an open question though.
 
 On the engineering side, it may be nice to replace the current
 [game interface](@ref game_interface) by something more standard such as
