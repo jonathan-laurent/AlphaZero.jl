@@ -10,7 +10,7 @@ makedocs(
   modules = [AlphaZero],
   pages = [
     "Home" => "index.md",
-    "Tutorial" => [
+    "Guided Tour" => [
       "tutorial/alphazero_intro.md",
       "tutorial/package_overview.md",
       "tutorial/connect_four.md"

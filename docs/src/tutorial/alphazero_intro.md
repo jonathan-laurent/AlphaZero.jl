@@ -1,12 +1,11 @@
 # [Introduction to AlphaZero](@id alphazero_intro)
 
-AlphaZero elegantly combines _search_ and _learning_, which are described
-in Rich Sutton's essay
-  ["The Bitter Lesson"](http://incompleteideas.net/IncIdeas/BitterLesson.html)
-as the two fundamental pillars of AI.
-It augments a tree search procedure with two learnt heuristics: one to
-evaluate board positions and one to concentrate branching on moves that are
-not obviously wrong.
+The AlphaZero algorithm elegantly combines _search_ and _learning_, which are
+described in Rich Sutton's essay ["The Bitter
+Lesson"](http://incompleteideas.net/IncIdeas/BitterLesson.html) as the two
+fundamental pillars of AI. It augments a tree search procedure with two learnt
+heuristics: one to evaluate board positions and one to concentrate branching on
+moves that are not obviously wrong.
 
 When training starts, both heuristics are initialized randomly and tree search
 has only access to a meaningful signal at the level of final states, where the

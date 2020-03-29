@@ -24,7 +24,7 @@ KNets.ResNet
 KNets.ResNetHP
 ```
 
-### Simple Network
+### [Simple Network](@id simplenet)
 
 ```@docs
 KNets.SimpleNet

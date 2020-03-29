@@ -5,7 +5,7 @@ ideas:
 
   - [Add support for a new game](@ref)
   - [Help with hyperparameter tuning](@ref)
-  - [Improve the user interface](@ref)
+  - [Improve the user interface](@ref improve_ui)
   - [Develop support for a more general game interface](@ref contrib_generalize)
   - Write tutorials or other learning resources based on this package
   - Design a logo
@@ -54,7 +54,7 @@ the resulting insights.
 
 ---
 
-#### Improve the user interface
+#### [Improve the user interface](@id improve_ui)
 
 An effort has been made in designing `AlphaZero.jl` to separate the
 user interface code from the core logic (see [`AlphaZero.Handlers`](@ref)).
