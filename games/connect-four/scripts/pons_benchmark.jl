@@ -3,6 +3,10 @@
 ##### on the standard benchmark from Pascal Pons
 #####
 
+const SOLVER_ERROR =
+  "To use this script, you should install Pascal Pons' Connect Four Solver.\n" *
+  "See games/connect-four/solver/README.md for instructions."
+
 const SESSION_DIR = "sessions/connect-four"
 const SAVE_FILE = "pons-benchmark-results.json"
 const PLOT_FILE = "pons-benchmark-results.png"
@@ -175,6 +179,11 @@ end
 #####
 ##### Main
 #####
+
+if !isdir(Solver.DEFAULT_SOLVER_DIR)
+  println(stderr, SOLVER_ERROR)
+  exit()
+end
 
 using JSON2
 using JSON3

@@ -10,10 +10,12 @@ module Solver
 import ..Game, ..history, ..WHITE, ..NUM_CELLS
 import AlphaZero: GI, GameInterface, Benchmark, AbstractPlayer, think
 
+const DEFAULT_SOLVER_DIR = joinpath(@__DIR__, "solver", "connect4")
+
 struct Player <: AbstractPlayer{Game}
   process :: Base.Process
   function Player(;
-      solver_dir=joinpath(@__DIR__, "solver", "connect4"),
+      solver_dir=DEFAULT_SOLVER_DIR,
       solver_name="c4solver",
       disable_stderr=true)
     cmd = Cmd(`./$solver_name`, dir=solver_dir)
