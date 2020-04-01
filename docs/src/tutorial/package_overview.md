@@ -27,8 +27,9 @@ maximizing the GPU utilization.
 
 We plot below the resulting speedup on self-play data generation for our
 [connect four agent](@ref connect_four) as a function of the number of
-asynchronous workers. Using `scripts/profile/async_mcts.jl` on our machine, we
-obtain a 25x speedup for 128 workers:
+asynchronous workers. Using `scripts/profile/async_mcts.jl` on our machine (a
+desktop computer with an Intel Core i5 9600K processor and an 8GB Nvidia RTX
+2070 GPU), we obtain a 25x speedup for 128 workers:
 
 ![Async speedup](../assets/img/connect-four/async-profiling/mcts_speed.png)
 
