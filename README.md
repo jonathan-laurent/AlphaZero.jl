@@ -11,10 +11,31 @@ Deepmind's AlphaZero algorithm:
 * The core algorithm is only 2,000 lines of pure, hackable Julia code.
 * Generic interfaces make it easy to add support for new games or new learning
   frameworks.
-* Being about two orders of magnitude faster than competing alternatives written
-  in Python, this implementation enables to solve nontrivial games on a standard
-  desktop computer with a GPU.
+* Being between one and two orders of magnitude faster than competing
+  alternatives written in Python, this implementation enables to solve
+  nontrivial games on a standard desktop computer with a GPU.
 
+### Why should I care about AlphaZero?
+
+Beyond its much publicized success in attaining superhuman level at games
+such as Chess and Go, DeepMind's AlphaZero algorithm illustrates a more
+general methodology of combining learning and search to explore large
+combinatorial spaces effectively. We believe that this methodology can
+have exciting applications in many different research areas.
+
+### Why should I care about this implementation?
+
+Because AlphaZero is resource-hungry, successful open-source
+implementations (such as [Leela Zero](https://github.com/leela-zero/leela-zero))
+are written in low-level languages (such as C++) and optimized for highly
+distributed computing environments.
+This makes them hardly accessible for students, researchers and hackers.
+
+The motivation for this project is to provide an implementation of
+AlphaZero that is simple enough to be widely accessible, while also being
+sufficiently powerful and fast to enable meaningful experiments on limited
+computing resources.
+We found the [Julia language](https://julialang.org/) to be instrumental in achieving this goal.
 
 ### Training a Connect Four Agent
 
@@ -26,6 +47,16 @@ cd AlphaZero.jl
 julia --project -e "import Pkg; Pkg.instantiate()"
 julia --project --color=yes scripts/alphazero.jl --game connect-four train
 ```
+
+<div>
+<img src="./docs/src/assets/img/ui-first-iter-cut.png" width="48%" />
+<img src="./docs/src/assets/img/explorer.png" width="48%" />
+</div>
+<!--
+<img 
+  src="./docs/src/assets/img/ui-first-iter.png"
+  width="100%"/>
+  -->
 
 Each training iteration takes between 60 and 90 minutes on a desktop
 computer with an Intel Core i5 9600K processor and an 8GB Nvidia RTX
