@@ -2,7 +2,7 @@
 ##### Loss Plot
 #####
 
-function plot_losses(getlosses, range, title)
+function plot_losses(getlosses, range, title, xlabel=:none)
   fields = fieldnames(Report.Loss)
   labels = [string(f) for _ in 1:1, f in fields]
   data = [(getlosses(i)..., f) for i in range, f in fields]
@@ -10,7 +10,7 @@ function plot_losses(getlosses, range, title)
   ys = map(d -> getfield(d[2], d[3]), data)
   xlims = (minimum(xs), maximum(xs))
   return Plots.plot(xs, ys,
-    label=labels, title=title, xlims=xlims, ylims=(0, Inf))
+    label=labels, title=title, xlims=xlims, ylims=(0, Inf), xlabel=xlabel)
 end
 
 #####
@@ -190,13 +190,14 @@ function plot_training(
   Plots.hline!(arena, [0, params.arena.update_threshold])
   # Loss on the full memory after an iteration
   lfmt = "Loss on Full Memory"
-  losses_fullmem = plot_losses(1:n, lfmt) do i
+  losses_fullmem = plot_losses(1:n, lfmt, "Iteration number") do i
     (i, iterations[i].learning.initial_status.loss)
   end
   # Plots related to the memory analysis
   if all(it -> !isnothing(it.memory), iterations)
     # Loss on last batch
-    losses_last = plot_losses(1:n, "Loss on Last Batch") do i
+    losses_last = plot_losses(
+      1:n, "Loss on Last Batch", "Iteration number") do i
       (i, iterations[i].memory.latest_batch.status.loss)
     end
     # Loss per game stage

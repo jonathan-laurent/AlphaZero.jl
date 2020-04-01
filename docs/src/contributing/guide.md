@@ -1,6 +1,6 @@
 # [Contribution Guide](@id contributions_guide)
 
-Contributions to `AlphaZero.jl` are most welcome. Here are some contribution
+Contributions to AlphaZero.jl are most welcome. Here are some contribution
 ideas:
 
   - [Add support for a new game](@ref)
@@ -10,7 +10,15 @@ ideas:
   - Write tutorials or other learning resources based on this package
   - Design a logo
 
-Also, there are many small improvements and variations that
+We also believe that AlphaZero.jl can be made significantly faster
+without adding too much complexity to the codebase.
+Here are suggestions to make this happen:
+  - Accelerate network inference using Int8 quantization
+  - Add support for multiple GPUs
+  - Enable data generation, network updates and checkpoint evaluations
+    to be run in parallel
+
+Finally, there are many small improvements and variations that
 can be built on top of this implementation and that would make for nice
 ML projects. Here are a few examples:
 
@@ -30,7 +38,7 @@ any idea, feedback or suggestion.
 
 #### Add support for a new game
 
-The simplest way to contribute to `AlphaZero.jl` is to demonstrate it on
+The simplest way to contribute to AlphaZero.jl is to demonstrate it on
 new games. Interesting candidates include:
 Othello, [Gobblet](https://en.wikipedia.org/wiki/Gobblet), Go 9x9, Chess...
 
@@ -56,7 +64,7 @@ the resulting insights.
 
 #### [Improve the user interface](@id improve_ui)
 
-An effort has been made in designing `AlphaZero.jl` to separate the
+An effort has been made in designing AlphaZero.jl to separate the
 user interface code from the core logic (see [`AlphaZero.Handlers`](@ref)).
 We would be interested in seeing alternative user interfaces being developed.
 In particular, using something like TensorBoard for logging and/or profiling
@@ -75,5 +83,5 @@ On the engineering side, it may be nice to replace the current
 [game interface](@ref game_interface) by something more standard such as
 [OpenSpiel](https://github.com/deepmind/open_spiel), for which a Julia
 [wrapper](https://github.com/JuliaReinforcementLearning/OpenSpiel.jl) is
-currently being developed. Doing so would give `AlphaZero.jl` access to many
+currently being developed. Doing so would give AlphaZero.jl access to many
 interesting game environments for free.

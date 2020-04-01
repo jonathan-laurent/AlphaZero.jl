@@ -244,7 +244,7 @@ end
 """
     Params
 
-The AlphaZero parameters.
+The AlphaZero training hyperparameters.
 
 | Parameter                  | Type                                | Default   |
 |:---------------------------|:------------------------------------|:----------|

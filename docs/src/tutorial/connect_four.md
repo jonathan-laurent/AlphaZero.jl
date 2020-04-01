@@ -1,6 +1,6 @@
 # [Training a Connect Four Agent](@id connect_four)
 
-In this section, we demonstrate AlphaZero.jl by training a _Connect Four_
+In this tutorial, we demonstrate AlphaZero.jl by training a _Connect Four_
 agent without any form of supervision or prior knowledge. Although the game has
 been [solved](https://connect4.gamesolver.org/) exactly with Alpha-beta pruning
 using domain-specific heuristics and optimizations, it is still a great
@@ -10,7 +10,7 @@ challenge for reinforcement learning.[^1]
     implementations of AlphaZero are able to learn a player that beats a minmax
     baseline that plans at depth 2 (on a single desktop computer).
 
-### Setup
+## Setup and Training
 
 To run the experiments in this tutorial, we recommend having a CUDA compatible
 GPU with 4GB of memory or more. A 2GB GPU should work fine but you may have to
@@ -61,16 +61,35 @@ not require to run the garbage collector as frequently. Then, a new AlphaZero
 |:---------------------|:--------------------------------------------------------------------------------|
 | `Game`               | Game type, which implements the [game interface](@ref game_interface).          |
 | `Training.Network`   | Network type, which implements the [network interface](@ref network_interface). |
-| `Training.params`    | AlphaZero [parameters](@ref params).                                            |
+| `Training.params`    | AlphaZero [hyperparameters](@ref params).                                            |
 | `Training.netparams` | Network [hyperparameters](@ref conv_resnet).                                    |
 | `Training.benchmark` | [Benchmark](@ref benchmark) that is run between training iterations.            |
 | `SESSION_DIR`        | Directory in which all session files are saved.                                 |
 
-The `ConnectFour.Training` module specifies some default parameters and
-benchmarks for the Connect Four game. Its content can be examined in file
-`games/connect-four/params.jl`. We copy it [here](@ref c4-config) for reference
-but the most important parts will be discussed specifically in the rest of this
-tutorial.
+The `ConnectFour.Training` module specifies the hyperparameters and
+benchmarks that are used in this tutorial. Its content can be examined in file
+`games/connect-four/params.jl`. We copy it for reference [at the end of this
+tutorial](@ref c4-config). Here are some highlights:
+
+- We use a [two-headed convolutional ResNet](@ref conv_resnet) similar to the
+  one introduced in the AlphaGo Zero paper, although much smaller. Its tower
+  consists of 7 residual blocks with 64 convolutional filters per layer, for a
+  total of about 600K parameters (in contrast, the neural network from the
+  AlphaGo Zero paper has about 100M parameters).
+- During each iteration, the current agent plays 4000 games against itself,
+  running 600 MCTS simulations to plan each move.[^2] The move selection
+  temperature is set to 1.0 during the first ten moves of every game and then
+  decreased to 0.5.
+- Self-play data is accumulated in a memory buffer whose capacity grows from
+  400K samples (initially) to 2M samples (at iteration 60). For reference,
+  assuming an average game duration of 35 moves, about 35 x 4000 = 140K
+  new samples are generated at each iteration.
+
+[^2]:
+    Compare those numbers with those of a popular [Python
+    implementation](https://github.com/suragnair/alpha-zero-general), which
+    achieves iterations of similar duration when training its Othello agent but
+    only runs 100 games and 25 MCTS simulations per move.
 
 ### Initial Benchmarks
 
@@ -91,9 +110,9 @@ tutorial, we use two baselines:
 Comparing two deterministic players is challenging as deterministic players will
 always play the same game repeatedly given a unique initial state. To add
 randomization, all players are instantiated with a small but nonzero move
-selection temperature.[^2]
+selection temperature.[^3]
 
-[^2]: Note, however, that the minmax baseline is guaranteed to play a winning
+[^3]: Note, however, that the minmax baseline is guaranteed to play a winning
     move whenever it sees one and to avoid moves it can prove to be losing
     within 5 steps (see [`MinMax.Player`](@ref)).
 
@@ -125,34 +144,23 @@ Each training iteration took between 60 and 90 minutes on our hardware. The
 first iterations are typically on the shorter end, as games of self-play
 terminate more quickly and the memory buffer has yet to reach its final size.
 
-![Session CLI (first iteration)](../assets/img/ui-first-iter-full.png)
+![Session CLI (first iteration)](../assets/img/ui-first-iter.png)
 
-Each training iteration is composed of a **self-play phase** and of a **learning
-phase**. During the self-play phase, the AlphaZero agent plays a series of 4000
-games against itself, running 600 MCTS simulations for each move.[^3] Doing so,
-it records training samples in the memory buffer. Then, during the learning
-phase, the neural network is updated to fit data in memory. The current neural
-network is evaluated periodically against the best one seen so far, and replaces
-it for generating self-play data if it achieves a sufficiently high win rate.
-For more details, see [`SelfPlayParams`](@ref), [`LearningParams`](@ref) and
-[`ArenaParams`](@ref) respectively.
+Between the self-play and learning phase of each iteration, we perform an
+**analysis of the memory buffer** by partitioning samples according to how many
+moves remained until the end of the game when they were recorded. This is useful to
+monitor how well the neural network performs at different game stages. Separate
+statistics are also computed for the last batch of collected samples.
 
-[^3]: Compare those numbers with those of a popular [Python
-    implementation](https://github.com/suragnair/alpha-zero-general), which
-    achieves iterations of similar duration when training its Othello agent but
-    only runs 100 games and 25 MCTS simulations per move.
-
-Between the self-play and learning phase, we perform an **analysis of the memory
-buffer** by partitioning samples according to how many moves remained until the
-end of the game when they were taken. This is useful to monitor how well the
-neural network performs at different game stages. Separate statistics are also
-computed for the last batch of collected samples. A description of all measured
-metrics can be found in [Training Reports](@ref reports).
+A description of all reported metrics can be found in [Training Reports](@ref reports).
 
 At the end of every iteration, benchmarks are run, summary plots are generated
 and the state of the current environment is saved on disk. This way, if training
 is interrupted for any reason, it can be resumed from the last saved state by
 simply running `scripts/alphazero.jl` again.
+
+All summary plots generated during the training of our agent can be downloaded
+[here](../assets/download/c4-plots.zip).
 
 ### Examining the current agent
 
@@ -165,15 +173,12 @@ julia --project --color=yes scripts/alphazero.jl --game connect-four explore
 
 ![Explorer](../assets/img/explorer.png)
 
-If you just want to play, use the `play` mode instead:
+If you just want to play and not be bothered with metrics, you can substitute `explore` by
+`play` in the command above.
 
-```
-julia --project --color=yes scripts/alphazero.jl --game connect-four play
-```
+## Experimental Results
 
-## Experimental results
-
-Here, we plot the evolution of the win rate of our AlphaZero agent against our
+We plot below the evolution of the win rate of our AlphaZero agent against our
 two baselines:
 
 ![Win rate evolution
@@ -182,7 +187,6 @@ two baselines:
 It is important to note that the AlphaZero agent is never exposed to those
 baselines during training and therefore cannot learn from them.
 
-
 We also evaluate the performances of the neural network alone against the same
 baselines: instead of plugging it into MCTS, we just play the action that is
 assigned the highest prior probability at each state.
@@ -190,10 +194,9 @@ assigned the highest prior probability at each state.
 ![Win rate evolution (network
 only)](../assets/img/connect-four/net-only/benchmark_won_games.png)
 
-Unsurprisingly, the network is initially unable to win a single game. However,
-it ends up being competitive with the minmax baseline despite not being able to
-perform any search.
-
+Unsurprisingly, the network alone is initially unable to win a single game.
+However, it ends up being competitive with the minmax baseline despite not being
+able to perform any search.
 
 ### Benchmark against a perfect solver
 
@@ -229,13 +232,48 @@ This experiment can be replicated using the script at `games/connect-four/script
 As you can see, while our AlphaZero agent learns to make very few mistakes that
 could be detected by planning up to 14 moves ahead, it is still imperfect at
 making longer term strategical decisions. In particular, it does not learn
-significantly better overtures compared to the minmax baseline.
+significantly better overtures compared to the minmax baseline.[^4]
 
-The Connect Four game remains to be solved using AlphaZero.jl!
+[^4]:
+    This also indicates that the heuristic we implemented for the minmax
+    baseline is not too bad.
 
-## You can do better!
+### You can do better!
 
-## [Full training configuration](@id c4-config)
+The AlphaZero agent that is demonstrated in this tutorial went through little
+hyperparameters tuning and it can certainly be improved significantly. We encourage you to make your own tuning
+experiments and
+[share](https://gitter.im/alphazero-jl/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
+the results.
+
+The [Oracle
+series](https://medium.com/oracledevs/lessons-from-alpha-zero-part-6-hyperparameter-tuning-b1cfcbe4ca9a)
+discusses hyperparameters tuning for a Connect Four agent. However, their
+configuration is optimized for more powerful hardware than is targeted by this
+tutorial [^5] In particular, they use a network that is about ten times larger
+and generate twice as much training data per iteration.
+
+Our current configuration results from an attempt at downscaling Oracle's setup.
+Doing so is not trivial as hyperparameters are interrelated in a complex
+fashion. For example, we found that reducing exploration slightly results in
+faster training for our downscaled agent. Also:
+
+  - We chose to use the Adam optimizer instead of SGD with cyclical rates, as it
+    introduces less hyperparameters and is generally more forgiving.
+  - Raising the number of MCTS simulations per move from 300 to its current
+    value of 600 resulted in faster learning, despite the additional
+    computational cost per iteration.
+
+Apart from that, most hyperparameters are the result of a single guess.
+We are looking forward to seeing how you can improve our Connect Four agent, with or without the help of better hardware!
+
+[^5]:
+    Their closed-source C++ implementation of AlphaZero is also faster. A big
+    part of the difference is apparently coming from them using Int8 quantization to
+    accelerate network inference. See [Contributions Guide](@ref contributions_guide).
+
+
+## [Full Training Configuration](@id c4-config)
 
 Here, we copy the full content of the configuration file
 `games/connect-four/params.jl` for reference.
