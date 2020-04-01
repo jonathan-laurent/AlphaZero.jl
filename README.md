@@ -58,29 +58,34 @@ julia --project --color=yes scripts/alphazero.jl --game connect-four train
   width="100%"/>
   -->
 
+<br/>
+
 Each training iteration takes between 60 and 90 minutes on a desktop
 computer with an Intel Core i5 9600K processor and an 8GB Nvidia RTX
 2070 GPU. We plot below the evolution of the win rate of our AlphaZero agent against two baselines (a vanilla MCTS baseline and a minmax agent that plans at depth 5 using a handcrafted heuristic):
 
+<br/>
 <div align="center">
 <img 
   src="./docs/src/assets/img/connect-four/plots/benchmark_won_games.png"
   width="60%"/>
 </div>
+<br/>
 
 Note that the AlphaZero agent is not exposed to the baselines during training and
 learns purely from self-play, without any form of supervision or prior knowledge.
-
 
 We also evaluate the performances of the neural network alone against the same
 baselines. Instead of plugging it into MCTS, we play the action that is
 assigned the highest prior probability at each state:
 
+<br/>
 <div align="center">
 <img 
   src="./docs/src/assets/img/connect-four/net-only/benchmark_won_games.png"
   width="60%"/>
 </div>
+<br/>
 
 Unsurprisingly, the network alone is initially unable to win a single game.
 However, it ends up being competitive with the minmax agent despite not being
