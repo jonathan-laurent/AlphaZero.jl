@@ -134,15 +134,15 @@ end
 #####
 
 struct ActionStats
-  P :: Float32
-  W :: Float64
-  N :: Int
+  P :: Float32 # Prior probability as given by the oracle
+  W :: Float64 # Cumulated reward for the action
+  N :: Int # Number of times the action has been visited
   nworkers :: UInt16 # Number of workers currently exploring this branch
 end
 
 struct BoardInfo
   stats :: Vector{ActionStats}
-  Vest  :: Float32
+  Vest  :: Float32 # Value estimate given by the oracle
 end
 
 Ntot(b::BoardInfo) = sum(s.N for s in b.stats)
@@ -197,7 +197,7 @@ mutable struct Env{Game, Board, Oracle}
   oracle :: Oracle
   # Workers
   workers :: Vector{Worker{Board}}
-  global_lock :: ReentrantLock
+  global_lock :: ReentrantLock # This impl. is asynchronous but sequential
   remaining :: Int # counts the number of remaining simulations to do
   # Parameters
   fill_batches :: Bool
@@ -245,7 +245,8 @@ function init_board_info(P, V)
   return BoardInfo(stats, V)
 end
 
-# Returns statistics for the current player, true if new node
+# Returns statistics for the current player, along with a boolean indicating
+# whether or not a new node has been created.
 # Synchronous version
 function board_info_sync(env, worker, board)
   if haskey(env.tree, board)
@@ -304,6 +305,8 @@ function uct_scores(info::BoardInfo, cpuct, ϵ, η)
   end
 end
 
+# Push a (board, white_is_playing, action_id) triple on the stack
+# and update the virtual loss of the corresponding node. Used in `select!`.
 function push_board_action!(env, worker, (b, wp, aid))
   push!(worker.stack, (b, wp, aid))
   stats = env.tree[b].stats
@@ -312,6 +315,10 @@ function push_board_action!(env, worker, (b, wp, aid))
     astats.P, astats.W, astats.N + 1, astats.nworkers + 1)
 end
 
+# Starting from `state`, traverse the tree up to its frontier or to a leaf,
+# pushing the traversed path on the worker's stack.
+# Return the collected reward for the white player (obtained either from the
+# oracle or from the game environment if a leaf is reached).
 function select!(env, worker, state, η)
   state = copy(state)
   env.total_simulations += 1
@@ -336,6 +343,8 @@ function select!(env, worker, state, η)
   end
 end
 
+# Backpropagate `white_reward` along the followed path, cancelling the virtual
+# loss terms for the traversed nodes.
 function backprop!(env, worker, white_reward)
   while !isempty(worker.stack)
     board, white_playing, action_id = pop!(worker.stack)
@@ -361,6 +370,7 @@ function worker_yield!(env::Env, worker::Worker)
   end
 end
 
+# Run a single MCTS simulation, by calling `select!` and then `backprop!`.
 function worker_explore!(env::Env, worker::Worker, state, η)
   @assert isempty(worker.stack)
   worker.queried = false
@@ -373,14 +383,14 @@ end
 function inference_server(env::Env{G, B, A}) where {G, B, A}
   to_watch = env.workers
   while true
-    # Updating the list of workers to watch
+    # Update the list of workers to watch (the ones that are not done)
     requests = [take!(w.send) for w in to_watch]
     done = [isa(r, Done) for r in requests]
     active = .~ done
     any(active) || break
     to_watch = to_watch[active]
     requests = requests[active]
-    # Gathering queries
+    # Gather a batch of queries and evaluate them
     batch = [q.board for q in requests if isa(q, Query)]
     if isempty(batch)
       answers, time = EvaluationResult{Float32}[], 0.
@@ -394,8 +404,10 @@ function inference_server(env::Env{G, B, A}) where {G, B, A}
       end
       answers, time = @timed evaluate_batch(env.oracle, batch)
     end
-    dummy_answer = (Float32[], 0f0)
     env.inference_time += time
+    # Send responses to all workers. Workers that sent `NoQuery` receive
+    # a dummy answer, which they ignore.
+    dummy_answer = (Float32[], 0f0)
     for (i, q) in enumerate(requests)
       if isa(q, Query)
         put!(to_watch[i].recv, popfirst!(answers))
@@ -420,6 +432,8 @@ function explore_sync!(env::Env, state, nsims)
   env.total_time += elapsed
 end
 
+# Spawn an inference server along with `env.nworkers` workers.
+# Each worker runs simulations in a loop until `env.remaining` reaches zero.
 function explore_async!(env::Env, state, nsims)
   env.remaining = nsims
   η = dirichlet_noise(state, env.noise_α)
