@@ -82,7 +82,7 @@ function qvalue(player, game, action)
   return pswitch ? - nextv : nextv
 end
 
-function think(p::Player, g, turn=nothing)
+function think(p::Player, g)
   as = GI.available_actions(g)
   qs = [qvalue(p, g, a) for a in as]
   maxq = maximum(qs)

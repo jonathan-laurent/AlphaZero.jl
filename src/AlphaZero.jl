@@ -14,7 +14,8 @@ export SamplesWeighingPolicy, CONSTANT_WEIGHT, LOG_WEIGHT, LINEAR_WEIGHT
 export AbstractSchedule, PLSchedule, StepSchedule
 # Players and games
 export AbstractGame, AbstractPlayer
-export think, select_move, reset_player!, play_game, interactive!
+export think, select_move, reset_player!, player_temperature, apply_temperature
+export play_game, interactive!
 export MctsPlayer, RandomPlayer, EpsilonGreedyPlayer, NetworkPlayer, Human
 export ColorPolicy, ALTERNATE_COLORS, BASELINE_WHITE, CONTENDER_WHITE
 # Networks

@@ -60,6 +60,8 @@ function state_statistics(state, player, turn, memory=nothing)
   cboard = GI.canonical_board(state)
   # Make the player think
   actions, π = think(player, state, turn)
+  τ = player_temperature(player, turn)
+  π = apply_temperature(π, τ)
   report = StateStats(actions)
   for i in eachindex(actions)
     report.actions[i][2].P = π[i]

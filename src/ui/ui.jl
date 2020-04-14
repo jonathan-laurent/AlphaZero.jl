@@ -11,7 +11,7 @@ module UserInterface
   export Session, resume!, save, play_interactive_game
 
   using AlphaZero
-  import AlphaZero: Util, GameType
+  import AlphaZero: Util, GameType, apply_temperature
   using AlphaZero.Util: Option, @unimplemented
 
   import Plots

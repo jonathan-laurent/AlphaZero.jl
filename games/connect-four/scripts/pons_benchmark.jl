@@ -96,8 +96,7 @@ end
 
 function optimal_on(solver, player, e)
   s = state_of_string(e[1])
-  turn = 1 # We don't bother computing a meaningful value as it is not used.
-  as, π = AlphaZero.think(player, s, turn)
+  as, π = AlphaZero.think(player, s)
   api = argmax(π)
   qs = [Solver.qvalue(solver, s, a) for a in as]
   return sign(qs[api]) == maximum(sign, qs)

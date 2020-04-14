@@ -469,16 +469,14 @@ function explore!(env::Env, state, nsims)
 end
 
 """
-    MCTS.policy(env, state; τ=1.)
+    MCTS.policy(env, state)
 
-Return the recommended stochastic policy on `state`,
-with temperature parameter equal to `τ`. If `τ` is zero, all the weight
-goes to the action with the highest visits count.
+Return the recommended stochastic policy on `state`.
 
 A call to this function must always be preceded by
 a call to [`MCTS.explore!`](@ref).
 """
-function policy(env::Env, state; τ=1.0)
+function policy(env::Env, state)
   actions = GI.available_actions(state)
   board = GI.canonical_board(state)
   info =
@@ -490,17 +488,9 @@ function policy(env::Env, state; τ=1.0)
         rethrow(e)
       end
     end
-  if iszero(τ)
-    best = argmax([a.N for a in info.stats])
-    π = zeros(length(actions))
-    π[best] = 1.0
-    return actions, π
-  else
-    τinv = 1 / τ
-    Ntot = sum(a.N for a in info.stats)
-    π = [(a.N / Ntot) ^ τinv for a in info.stats]
-    π ./= sum(π)
-  end
+  Ntot = sum(a.N for a in info.stats)
+  π = [a.N / Ntot for a in info.stats]
+  π ./= sum(π)
   return actions, π
 end
 

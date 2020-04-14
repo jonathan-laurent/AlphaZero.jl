@@ -79,7 +79,7 @@ struct Player{G} <: AbstractPlayer{G}
   Player{G}(;depth, τ=0.) where G = new{G}(depth, τ)
 end
 
-function think(p::Player, game, turn=nothing)
+function think(p::Player, game)
   actions = GI.available_actions(game)
   n = length(actions)
   qs = [qvalue(game, a, p.depth) for a in actions]

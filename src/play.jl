@@ -9,17 +9,14 @@ Abstract type for a player of `Game`.
 """
 abstract type AbstractPlayer{Game} end
 
+GameType(::AbstractPlayer{Game}) where Game = Game
+
 """
-    think(::AbstractPlayer, state, turn=nothing)
+    think(::AbstractPlayer, state)
 
 Return a probability distribution over actions as a `(actions, π)` pair.
-
-The `turn` argument, if provided, indicates the number of actions that have
-been played before by both players in the current game.
-It is useful as during self-play, AlphaZero typically drops its temperature
-parameter after a fixed number of turns.
 """
-function think(::AbstractPlayer, state, turn=nothing)
+function think(::AbstractPlayer, state)
   @unimplemented
 end
 
@@ -34,17 +31,50 @@ function reset_player!(::AbstractPlayer)
 end
 
 """
-    select_move(player::AbstractPlayer, state, turn=nothing)
+    player_temperature(::AbstractPlayer, turn_number)
 
-Return a single action. A default implementation is provided that samples
-an action according to the distribution computed by [`think`](@ref).
+Return the player temperature, given the number of actions that have
+been played before by both players in the current game.
+
+A default implementation is provided that always returns 1.
 """
-function select_move(player::AbstractPlayer, state, turn=nothing)
-  actions, π = think(player, state, turn)
-  return actions[Util.rand_categorical(π)]
+function player_temperature(::AbstractPlayer, turn)
+  return 1.0
 end
 
-GameType(::AbstractPlayer{Game}) where Game = Game
+"""
+    apply_temperature(π, τ)
+
+Apply temperature `τ` to probability distribution `π`.
+Handle the limit case where `τ=0`.
+"""
+function apply_temperature(π, τ)
+  if isone(τ)
+    return π
+  elseif iszero(τ)
+    res = zeros(eltype(π), length(π))
+    res[argmax(π)] = 1
+    return res
+  else
+    res = π .^ inv(τ)
+    res ./= sum(res)
+    return res
+  end
+end
+
+"""
+    select_move(player::AbstractPlayer, state, turn_number)
+
+Return a single action. A default implementation is provided that samples
+an action according to the distribution computed by [`think`](@ref), with a
+temperature given by [`player_temperature`](@ref).
+"""
+function select_move(player::AbstractPlayer, state, turn_number)
+  actions, π = think(player, state)
+  τ = player_temperature(player, turn_number)
+  π = apply_temperature(π, τ)
+  return actions[Util.rand_categorical(π)]
+end
 
 #####
 ##### Random Player
@@ -57,7 +87,7 @@ A player that picks actions uniformly at random.
 """
 struct RandomPlayer{Game} <: AbstractPlayer{Game} end
 
-function think(player::RandomPlayer, state, turn=nothing)
+function think(player::RandomPlayer, state)
   actions = GI.available_actions(state)
   n = length(actions)
   π = ones(n) ./ length(actions)
@@ -82,8 +112,8 @@ struct EpsilonGreedyPlayer{G, P} <: AbstractPlayer{G}
   end
 end
 
-function think(p::EpsilonGreedyPlayer, state, turn=nothing)
-  actions, π = think(p.player, state, turn)
+function think(p::EpsilonGreedyPlayer, state)
+  actions, π = think(p.player, state)
   n = length(actions)
   η = ones(n) ./ n
   return actions, (1 - p.ϵ) * π + p.ϵ * η
@@ -171,7 +201,7 @@ function RandomMctsPlayer(::Type{G}, params::MctsParams) where G
     τ=params.temperature)
 end
 
-function think(p::MctsPlayer, state, turn)
+function think(p::MctsPlayer, state)
   if isnothing(p.timeout) # Fixed number of MCTS simulations
     MCTS.explore!(p.mcts, state, p.niters)
   else # Run simulations until timeout
@@ -180,7 +210,11 @@ function think(p::MctsPlayer, state, turn)
       MCTS.explore!(p.mcts, state, p.niters)
     end
   end
-  return MCTS.policy(p.mcts, state, τ=p.τ[turn])
+  return MCTS.policy(p.mcts, state)
+end
+
+function player_temperature(p::MctsPlayer, turn)
+  return p.τ[turn]
 end
 
 function reset_player!(player::MctsPlayer)
@@ -205,7 +239,7 @@ struct NetworkPlayer{G, N} <: AbstractPlayer{G}
   end
 end
 
-function think(p::NetworkPlayer, state, turn)
+function think(p::NetworkPlayer, state)
   actions = GI.available_actions(state)
   board = GI.canonical_board(state)
   π, _ = MCTS.evaluate(p.network, board)
@@ -243,11 +277,13 @@ function play_game(
       state = GI.random_symmetric_state(state)
     end
     player = GI.white_playing(state) ? white : black
-    actions, π = think(player, state, nturns)
-    a = actions[Util.rand_categorical(π)]
+    actions, π_target = think(player, state)
+    τ = player_temperature(player, nturns)
+    π_sample = apply_temperature(π_target, τ)
+    a = actions[Util.rand_categorical(π_sample)]
     if !isnothing(memory)
       cboard = GI.canonical_board(state)
-      push_sample!(memory, cboard, π, GI.white_playing(state), nturns)
+      push_sample!(memory, cboard, π_target, GI.white_playing(state), nturns)
     end
     GI.play!(state, a)
     nturns += 1
@@ -349,7 +385,7 @@ struct Human{Game} <: AbstractPlayer{Game} end
 
 struct Quit <: Exception end
 
-function select_move(::Human, game, turn=nothing)
+function select_move(::Human, game, turn)
   a = nothing
   while isnothing(a) || a ∉ GI.available_actions(game)
     print("> ")
