@@ -131,7 +131,7 @@ function load_alphazero_player(dir)
     Game, Training.Network{Game},
     AlphaZero.Log.Logger(devnull), dir, params=Training.params)
   mcts_params = MctsParams(env.params.arena.mcts,
-    temperature=StepSchedule(0.),
+    temperature=ConstSchedule(0.),
     dirichlet_noise_ϵ=0.)
   return MctsPlayer(env.bestnn, mcts_params)
 end

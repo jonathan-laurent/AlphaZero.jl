@@ -16,7 +16,7 @@ self_play = SelfPlayParams(
     num_workers=64,
     num_iters_per_turn=320,
     cpuct=4,
-    temperature=StepSchedule(1.),
+    temperature=ConstSchedule(1.),
     dirichlet_noise_ϵ=0))
 
 arena = ArenaParams(
@@ -24,7 +24,7 @@ arena = ArenaParams(
   reset_mcts_every=100,
   update_threshold=(2 * 0.58 - 1),
   mcts=MctsParams(self_play.mcts,
-    temperature=StepSchedule(0.3),
+    temperature=ConstSchedule(0.3),
     dirichlet_noise_ϵ=0.05))
 
 learning = LearningParams(

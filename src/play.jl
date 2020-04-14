@@ -143,7 +143,7 @@ Construct a player from an MCTS environment. When computing each move:
 - otherwise, `niters` MCTS simulations are run
 
 The temperature parameter `τ` can be either a real number or a
-[`StepSchedule`](@ref).
+[`AbstractSchedule`](@ref).
 
     MctsPlayer(oracle::MCTS.Oracle, params::MctsParams; timeout=nothing)
 
@@ -155,15 +155,10 @@ struct MctsPlayer{G, M} <: AbstractPlayer{G}
   mcts :: M
   niters :: Int
   timeout :: Union{Float64, Nothing}
-  τ :: StepSchedule{Float64} # Temperature
+  τ :: AbstractSchedule{Float64} # Temperature
   function MctsPlayer(mcts::MCTS.Env{G}; τ, niters, timeout=nothing) where G
     @assert niters > 0
     @assert isnothing(timeout) || timeout > 0
-    if isa(τ, Number)
-      τ = StepSchedule(Float64(τ))
-    else
-      @assert isa(τ, StepSchedule)
-    end
     new{G, typeof(mcts)}(mcts, niters, timeout, τ)
   end
 end

@@ -11,7 +11,7 @@ export MCTS, MinMax, GameInterface, GI, Report, Network, Benchmark
 export Params, SelfPlayParams, LearningParams, ArenaParams
 export MctsParams, MemAnalysisParams
 export SamplesWeighingPolicy, CONSTANT_WEIGHT, LOG_WEIGHT, LINEAR_WEIGHT
-export AbstractSchedule, PLSchedule, StepSchedule
+export AbstractSchedule, ConstSchedule, PLSchedule, StepSchedule
 # Players and games
 export AbstractGame, AbstractPlayer
 export think, select_move, reset_player!, player_temperature, apply_temperature

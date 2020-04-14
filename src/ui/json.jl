@@ -19,7 +19,7 @@ for T in [
     # Optimisers
     CyclicNesterov, Adam,
     # Schedules
-    PLSchedule, StepSchedule
+    ConstSchedule, PLSchedule, StepSchedule
   ]
   @eval JSON3.StructType(::Type{<:$T}) = JSON3.Struct()
 end
@@ -34,7 +34,7 @@ JSON3.subtypes(::Type{OptimiserSpec}) =
 JSON3.StructType(::Type{<:AbstractSchedule}) = JSON3.AbstractType()
 JSON3.subtypekey(::Type{<:AbstractSchedule}) = :type
 JSON3.subtypes(::Type{<:AbstractSchedule}) =
-  (piecewise_linear=PLSchedule, step=StepSchedule)
+  (piecewise_linear=PLSchedule, step=StepSchedule, constant=ConstSchedule)
 
 # TODO: for the subtypes of abstract types above, the `subtypekey` field
 # is missing so deserialization won't work.

@@ -16,6 +16,19 @@ function Base.getindex(s::AbstractSchedule, i::Int)
 end
 
 #####
+##### Constant Schedule
+#####
+
+struct ConstSchedule{R} <: AbstractSchedule{R}
+  value :: R
+end
+
+Base.getindex(s::ConstSchedule, i::Int) = s.value
+
+Base.convert(::Type{ConstSchedule{R}}, x::R) where {R <: Number} =
+  ConstSchedule(x)
+
+#####
 ##### Piecewise linar schedule
 #####
 
@@ -88,11 +101,7 @@ end
 
 Type for step function schedules.
 
-# Constructors
-
-    StepSchedule(cst)
-
-Return a schedule with a constant value `cst`.
+# Constructor
 
     StepSchedule(;start, change_at, values)
 
@@ -111,8 +120,6 @@ end
 
 StepSchedule(; start, change_at, values) =
   StepSchedule{typeof(start)}(start, change_at, values)
-
-StepSchedule(cst) = StepSchedule{typeof(cst)}(cst, [], [])
 
 function Base.getindex(s::StepSchedule, i::Int)
    idx = findlast(x -> x <= i, s.xs)

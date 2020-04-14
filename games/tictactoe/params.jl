@@ -13,7 +13,7 @@ self_play = SelfPlayParams(
     num_workers=1,
     num_iters_per_turn=400,
     cpuct=1.0,
-    temperature=StepSchedule(1.0),
+    temperature=ConstSchedule(1.0),
     dirichlet_noise_ϵ=0.2,
     dirichlet_noise_α=1.0))
 
@@ -24,7 +24,7 @@ arena = ArenaParams(
   flip_probability=0.5,
   mcts = MctsParams(
     self_play.mcts,
-    temperature=StepSchedule(0.3),
+    temperature=ConstSchedule(0.3),
     dirichlet_noise_ϵ=0.1))
 
 learning = LearningParams(
