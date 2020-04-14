@@ -11,6 +11,8 @@ AbstractPlayer
 think
 select_move
 reset_player!
+player_temperature
+apply_temperature
 ```
 
 ## Player Instances
