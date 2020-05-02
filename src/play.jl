@@ -43,26 +43,6 @@ function player_temperature(::AbstractPlayer, turn)
 end
 
 """
-    apply_temperature(π, τ)
-
-Apply temperature `τ` to probability distribution `π`.
-Handle the limit case where `τ=0`.
-"""
-function apply_temperature(π, τ)
-  if isone(τ)
-    return π
-  elseif iszero(τ)
-    res = zeros(eltype(π), length(π))
-    res[argmax(π)] = 1
-    return res
-  else
-    res = π .^ inv(τ)
-    res ./= sum(res)
-    return res
-  end
-end
-
-"""
     select_move(player::AbstractPlayer, state, turn_number)
 
 Return a single action. A default implementation is provided that samples
@@ -123,6 +103,39 @@ function reset!(p::EpsilonGreedyPlayer)
   reset!(p.player)
 end
 
+function player_temperature(p::EpsilonGreedyPlayer, turn)
+  return player_temperature(p.player, turn)
+end
+
+#####
+##### Player with a custom temperature
+#####
+
+"""
+    PlayerWithTemperature{Game, Player} <: AbstractPlayer{Game}
+
+A wrapper on a player that enables overwriting the temperature schedule.
+"""
+struct PlayerWithTemperature{G, P} <: AbstractPlayer{G}
+  player :: P
+  temperature :: AbstractSchedule{Float64}
+  function PlayerWithTemperature(p::AbstractPlayer{G}, τ) where G
+    return new{G, typeof(p)}(p, τ)
+  end
+end
+
+function think(p::PlayerWithTemperature, state)
+  return think(p.player, state)
+end
+
+function reset!(p::PlayerWithTemperature)
+  reset!(p.player)
+end
+
+function player_temperature(p::PlayerWithTemperature, turn)
+  return p.temperature[turn]
+end
+
 #####
 ##### An MCTS-based player
 #####
@@ -176,7 +189,8 @@ function MctsPlayer(
     fill_batches=fill_batches,
     cpuct=params.cpuct,
     noise_ϵ=params.dirichlet_noise_ϵ,
-    noise_α=params.dirichlet_noise_α)
+    noise_α=params.dirichlet_noise_α,
+    prior_temperature=params.prior_temperature)
   return MctsPlayer(mcts,
     niters=params.num_iters_per_turn,
     τ=params.temperature,

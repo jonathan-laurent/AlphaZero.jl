@@ -30,7 +30,7 @@ export Explorer, start_explorer
 
 include("util.jl")
 import .Util
-using .Util: Option, @unimplemented
+using .Util: Option, @unimplemented, apply_temperature
 
 include("game.jl")
 using .GameInterface

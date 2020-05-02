@@ -102,7 +102,7 @@ end
 
 Convert probability vector `π` to type `Vector{Float32}` and renormalize it
 if necessary.
-  
+
 This is useful as `Distributions.isprobvec` can be picky about its
 input when it does not sum to one due to numerical errors.
 """
@@ -130,6 +130,26 @@ function rand_categorical(π)
 end
 
 """
+    apply_temperature(π, τ)
+
+Apply temperature `τ` to probability distribution `π`.
+Handle the limit case where `τ=0`.
+"""
+function apply_temperature(π, τ)
+  if isone(τ)
+    return π
+  elseif iszero(τ)
+    res = zeros(eltype(π), length(π))
+    res[argmax(π)] = 1
+    return res
+  else
+    res = π .^ inv(τ)
+    res ./= sum(res)
+    return res
+  end
+end
+
+"""
 Same smoothing function that is used by Temsorboard to smooth time series.
 """
 function momentum_smoothing(x, μ)
@@ -151,7 +171,7 @@ last dimension of `X`.
 
 If `partial=true` and the number of samples in `X` is
 not a multiple of `batchsize`, then an additional smaller batch is added
-at the end (otherwise, it is discarded).  
+at the end (otherwise, it is discarded).
 """
 function batches(X, batchsize; partial=false)
   n = size(X)[end]

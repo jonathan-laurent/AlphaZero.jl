@@ -14,6 +14,7 @@ Parameters of an MCTS player.
 | `temperature`          | `AbstractSchedule{Float64}`  | `ConstSchedule(1.)` |
 | `dirichlet_noise_ϵ`    | `Float64`                    |  -                  |
 | `dirichlet_noise_α`    | `Float64`                    |  -                  |
+| `prior_temperature`    | `Float64`                    | `1.`                |
 
 # Explanation
 
@@ -29,8 +30,8 @@ It is typical to use a high value of the temperature parameter ``τ``
 during the first moves of a game to increase exploration and then switch to
 a small value. Therefore, `temperature` is am [`AbstractSchedule`](@ref).
 
-For information on parameters `cpuct`, `dirichlet_noise_ϵ` and
-`dirichlet_noise_α`, see [`MCTS.Env`](@ref).
+For information on parameters `cpuct`, `dirichlet_noise_ϵ`,
+`dirichlet_noise_α` and `prior_temperature`, see [`MCTS.Env`](@ref).
 
 # AlphaGo Zero Parameters
 
@@ -53,6 +54,7 @@ In the original AlphaGo Zero paper:
   temperature :: AbstractSchedule{Float64} = ConstSchedule(1.)
   dirichlet_noise_ϵ :: Float64
   dirichlet_noise_α :: Float64
+  prior_temperature :: Float64 = 1.
 end
 
 """

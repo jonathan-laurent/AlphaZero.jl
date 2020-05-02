@@ -12,7 +12,7 @@ module MCTS
 using DataStructures: Stack
 using Distributions: Categorical, Dirichlet
 
-using ..Util: @printing_errors, @unimplemented
+using ..Util: @printing_errors, @unimplemented, apply_temperature
 import ..GI, ..GameType
 
 #####
@@ -164,6 +164,8 @@ Create and initialize an MCTS environment with a given `oracle`.
   - `cpuct=1.`: exploration constant in the UCT formula
   - `noise_ϵ=0., noise_α=1.`: parameters for the dirichlet exploration noise
      (see below)
+  - `prior_temperature=1.`: temperature to apply to the oracle's output
+     to get the prior probability vector used by MCTS.
 
 ## Asynchronous MCTS
 
@@ -204,6 +206,7 @@ mutable struct Env{Game, Board, Oracle}
   cpuct :: Float64
   noise_ϵ :: Float64
   noise_α :: Float64
+  prior_temperature :: Float64
   # Performance statistics
   total_time :: Float64
   inference_time :: Float64
@@ -212,7 +215,7 @@ mutable struct Env{Game, Board, Oracle}
 
   function Env{G}(oracle;
       nworkers=1, fill_batches=false,
-      cpuct=1., noise_ϵ=0., noise_α=1.) where G
+      cpuct=1., noise_ϵ=0., noise_α=1., prior_temperature=1.) where G
     B = GI.Board(G)
     tree = Dict{B, BoardInfo}()
     total_time = 0.
@@ -224,7 +227,7 @@ mutable struct Env{Game, Board, Oracle}
     workers = [Worker{B}(i) for i in 1:nworkers]
     new{G, B, typeof(oracle)}(
       tree, oracle, workers, lock, remaining, fill_batches,
-      cpuct, noise_ϵ, noise_α,
+      cpuct, noise_ϵ, noise_α, prior_temperature,
       total_time, inference_time, total_simulations, total_nodes_traversed)
   end
 end
@@ -240,7 +243,8 @@ NoQuery(::Env{G,B}) where {G,B} = NoQuery{B}()
 ##### Access and initialize board information
 #####
 
-function init_board_info(P, V)
+function init_board_info(P, V, prior_temperature)
+  P = apply_temperature(P, prior_temperature)
   stats = [ActionStats(p, 0, 0, 0) for p in P]
   return BoardInfo(stats, V)
 end
@@ -254,7 +258,7 @@ function board_info_sync(env, worker, board)
   else
     (P, V), time = @timed evaluate(env.oracle, board)
     env.inference_time += time
-    info = init_board_info(P, V)
+    info = init_board_info(P, V, env.prior_temperature)
     env.tree[board] = info
     return (info, true)
   end
@@ -274,7 +278,7 @@ function board_info_async(env, worker, board)
     # Another worker may have sent the same request and initialized
     # the node before. Therefore, we have to test membership again.
     if !haskey(env.tree, board)
-      info = init_board_info(P, V)
+      info = init_board_info(P, V, env.prior_temperature)
       env.tree[board] = info
       return (info, true)
     else

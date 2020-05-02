@@ -12,6 +12,7 @@ import ..AbstractNetwork, ..MinMax, ..GI
 import ..Env, ..MCTS, ..MctsParams, ..pit, ..compute_redundancy, ..Recorder
 import ..ColorPolicy, ..ALTERNATE_COLORS
 import ..AbstractPlayer, ..EpsilonGreedyPlayer, ..NetworkPlayer, ..MctsPlayer
+import ..PlayerWithTemperature, ..ConstSchedule
 
 using ProgressMeter
 
@@ -184,19 +185,23 @@ name(::Full) = "AlphaZero"
 instantiate(p::Full, nn) = MctsPlayer(nn, p.params)
 
 """
-    Benchmark.NetworkOnly(;use_gpu=true) <: Benchmark.Player
+    Benchmark.NetworkOnly(;use_gpu=true, τ=1.0) <: Benchmark.Player
 
 Player that uses the policy output by the learnt network directly,
 instead of relying on MCTS.
 """
 struct NetworkOnly <: Player
   use_gpu :: Bool
-  NetworkOnly(;use_gpu=true) = new(use_gpu)
+  τ :: Float64
+  NetworkOnly(;use_gpu=true, τ=1.0) = new(use_gpu, τ)
 end
 
 name(::NetworkOnly) = "Network Only"
 
-instantiate(p::NetworkOnly, nn) = NetworkPlayer(nn, use_gpu=p.use_gpu)
+function instantiate(p::NetworkOnly, nn)
+  player = NetworkPlayer(nn, use_gpu=p.use_gpu)
+  return PlayerWithTemperature(player, ConstSchedule(p.τ))
+end
 
 """
     Benchmark.MinMaxTS(;depth, τ=0.) <: Benchmark.Player
