@@ -12,7 +12,6 @@ think
 select_move
 reset_player!
 player_temperature
-apply_temperature
 ```
 
 ## Player Instances
@@ -22,6 +21,7 @@ MctsPlayer
 RandomPlayer
 NetworkPlayer
 EpsilonGreedyPlayer
+PlayerWithTemperature
 ```
 
 ## Derived Functions

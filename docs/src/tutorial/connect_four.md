@@ -14,7 +14,7 @@ challenge for reinforcement learning.[^1]
 
 To run the experiments in this tutorial, we recommend having a CUDA compatible
 GPU with 4GB of memory or more. A 2GB GPU should work fine but you may have to
-reduce batch size. Each training iteration took about one hour and a half on a
+reduce batch size. Each training iteration took between one and two hours on a
 desktop computer with an Intel Core i5 9600K processor and an 8GB Nvidia RTX
 2070 GPU.
 
@@ -140,7 +140,7 @@ decisions.
 ### Training
 
 After the initial benchmarks are done, the first training iteration can start.
-Each training iteration took between 60 and 90 minutes on our hardware. The
+Each training iteration took between one and two hours on our hardware. The
 first iterations are typically on the shorter end, as games of self-play
 terminate more quickly and the memory buffer has yet to reach its final size.
 
@@ -195,8 +195,8 @@ assigned the highest prior probability at each state.
 only)](../assets/img/connect-four/net-only/benchmark_won_games.png)
 
 Unsurprisingly, the network alone is initially unable to win a single game.
-However, it ends up being competitive with the minmax baseline despite not being
-able to perform any search.
+However, it ends up significantly stronger than the minmax baseline despite not
+being able to perform any search.
 
 ### Benchmark against a perfect solver
 
@@ -229,14 +229,10 @@ This experiment can be replicated using the script at `games/connect-four/script
 
 ![Pons benchark](../assets/img/connect-four/pons-benchmark-results.png)
 
-As you can see, while our AlphaZero agent learns to make very few mistakes that
+As you can see, while our AlphaZero agent makes very few mistakes that
 could be detected by planning up to 14 moves ahead, it is still imperfect at
-making longer term strategical decisions. In particular, it does not learn
-significantly better overtures compared to the minmax baseline.[^4]
+making longer term strategical decisions and playing overtures.
 
-[^4]:
-    This also indicates that the heuristic we implemented for the minmax
-    baseline is not too bad.
 
 ### You can do better!
 
@@ -250,7 +246,7 @@ The [Oracle
 series](https://medium.com/oracledevs/lessons-from-alpha-zero-part-6-hyperparameter-tuning-b1cfcbe4ca9a)
 discusses hyperparameters tuning for a Connect Four agent. However, their
 configuration is optimized for more powerful hardware than is targeted by this
-tutorial [^5] In particular, they use a network that is about ten times larger
+tutorial [^4] In particular, they use a network that is about ten times larger
 and generate twice as much training data per iteration.
 
 Our current configuration results from an attempt at downscaling Oracle's setup.
@@ -263,11 +259,19 @@ faster training for our downscaled agent. Also:
   - Raising the number of MCTS simulations per move from 300 to its current
     value of 600 resulted in faster learning, despite the additional
     computational cost per iteration.
+  - To tune the MCTS hyperparameters, we trained a first version of AlphaZero
+    based on an initial guess. Then, we ran a grid-search by plugging different
+    MCTS parameters into the resulting agent and optimizing its score against
+    the minmax baseline. We iterated again with a second training session and a
+    second grid-search to get the current parameters.
+    Notably, tuning the [`prior_temperature`](@ref MctsParams)
+    parameter (which does not exist in the original version of AlphaZero and
+    was introduced by LeelaZero) resulted in a significant improvement.
 
 Apart from that, most hyperparameters are the result of a single guess.
 We are looking forward to seeing how you can improve our Connect Four agent, with or without the help of better hardware!
 
-[^5]:
+[^4]:
     Their closed-source C++ implementation of AlphaZero is also faster. A big
     part of the difference is apparently coming from them using Int8 quantization to
     accelerate network inference. See [Contributions Guide](@ref contributions_guide).
@@ -299,24 +303,22 @@ self_play = SelfPlayParams(
   reset_mcts_every=100,
   mcts=MctsParams(
     use_gpu=true,
-    num_workers=64,
+    num_workers=32,
     num_iters_per_turn=600,
-    cpuct=2.0,
-    temperature=StepSchedule(
-      start=1.0,
-      change_at=[10],
-      values=[0.5]),
-    dirichlet_noise_ϵ=0.25,
+    cpuct=3.0,
+    prior_temperature=0.7,
+    temperature=PLSchedule([0, 20], [1.0, 0.3]),
+    dirichlet_noise_ϵ=0.15,
     dirichlet_noise_α=1.0))
 
 arena = ArenaParams(
   num_games=200,
   reset_mcts_every=nothing,
   flip_probability=0.5,
-  update_threshold=0.1,
+  update_threshold=0.05,
   mcts=MctsParams(
     self_play.mcts,
-    temperature=StepSchedule(0.1),
+    temperature=ConstSchedule(0.1),
     dirichlet_noise_ϵ=0.05))
 
 learning = LearningParams(
@@ -335,7 +337,7 @@ params = Params(
   arena=arena,
   self_play=self_play,
   learning=learning,
-  num_iters=80,
+  num_iters=50,
   ternary_rewards=true,
   use_symmetries=true,
   memory_analysis=MemAnalysisParams(

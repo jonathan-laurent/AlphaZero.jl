@@ -53,20 +53,20 @@ julia --project --color=yes scripts/alphazero.jl --game connect-four train
 <img src="./docs/src/assets/img/explorer.png" width="48%" />
 </div>
 <!--
-<img 
+<img
   src="./docs/src/assets/img/ui-first-iter.png"
   width="100%"/>
   -->
 
 <br/>
 
-Each training iteration takes between 60 and 90 minutes on a desktop
+Each training iteration takes between one and two hours on a desktop
 computer with an Intel Core i5 9600K processor and an 8GB Nvidia RTX
 2070 GPU. We plot below the evolution of the win rate of our AlphaZero agent against two baselines (a vanilla MCTS baseline and a minmax agent that plans at depth 5 using a handcrafted heuristic):
 
 <br/>
 <div align="center">
-<img 
+<img
   src="./docs/src/assets/img/connect-four/plots/benchmark_won_games.png"
   width="60%"/>
 </div>
@@ -81,15 +81,15 @@ assigned the highest prior probability at each state:
 
 <br/>
 <div align="center">
-<img 
+<img
   src="./docs/src/assets/img/connect-four/net-only/benchmark_won_games.png"
   width="60%"/>
 </div>
 <br/>
 
 Unsurprisingly, the network alone is initially unable to win a single game.
-However, it ends up being competitive with the minmax agent despite not being
-able to perform any search.
+However, it ends up significantly stronger than the minmax baseline despite not
+being able to perform any search.
 
 For more information on training a Connect Four agent using AlphaZero.jl, see our full [tutorial](https://jonathan-laurent.github.io/AlphaZero.jl/dev/tutorial/connect_four/).
 

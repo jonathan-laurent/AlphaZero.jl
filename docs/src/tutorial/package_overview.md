@@ -35,8 +35,8 @@ desktop computer with an Intel Core i5 9600K processor and an 8GB Nvidia RTX
 
 Note that the virtual loss induces an exploration bias that can become
 significant when the number of workers gets too close to the total number of
-MCTS simulations performed. For this reason, we only use 64 workers in our
-[connect four experiment](@ref connect_four) and settle for a 20x speedup.
+MCTS simulations performed. For this reason, we only use 32 workers in our
+[connect four experiment](@ref connect_four) and settle for a 14x speedup.
 
 We implemented MCTS (both synchronous and asynchronous) in a standalone
 [module](@ref mcts). Thanks to Julia's great support for
