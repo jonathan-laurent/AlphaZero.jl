@@ -211,8 +211,9 @@ function sub_plot(benchs, results, n)
   azt = results.alphazero_training
   xs = [itc for (itc, _) in azt]
   ys = [100 * errs[n] for (itc, errs) in azt]
+  y_minmax = 100 * results.minmax[n]
   #ymax = max(5, maximum(ys))
-  ymax = maximum(ys)
+  ymax = max(maximum(ys), y_minmax)
   plt = Plots.plot(
     xs, ys, ylims=(0, ymax),
     # xlabel="Training Iteration",
@@ -222,7 +223,7 @@ function sub_plot(benchs, results, n)
     titlefontsize=10,
     xguidefontsize=8,
     yguidefontsize=8)
-  Plots.hline!(plt, [100 * results.minmax[n]])
+  Plots.hline!(plt, [y_minmax])
   return plt
 end
 

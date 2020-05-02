@@ -22,6 +22,7 @@ const LOGGER = Log.Logger()
   τ :: Float64
   ϵ :: Float64
   α :: Float64
+  p :: Float64 # prior temperature
 end
 
 Util.generate_update_constructor(Config) |> eval
@@ -31,7 +32,9 @@ function Base.string(conf::Config)
   τ = fmt(".2f", conf.τ)
   ϵ = fmt(".2f", conf.ϵ)
   α = fmt(".2f", conf.α)
-  return "$(conf.n) simulations, $(conf.w) workers; c=$c, τ=$τ, ϵ=$ϵ, α=$α"
+  p = fmt(".2f", conf.p)
+  return "$(conf.n) simulations, $(conf.w) workers; " *
+    "c=$c, τ=$τ, ϵ=$ϵ, α=$α, p=$p"
 end
 
 #####
@@ -89,7 +92,8 @@ function run_experiments(network, baseline, configs)
       cpuct=config.c,
       temperature=ConstSchedule(config.τ),
       dirichlet_noise_ϵ=config.ϵ,
-      dirichlet_noise_α=config.α)
+      dirichlet_noise_α=config.α,
+      prior_temperature=config.p)
     evaluate_player(network, params, baseline, 1) # Compilation
     rep = evaluate_player(network, params, baseline, NUM_GAMES)
     print_report(rep, string(config))
@@ -113,13 +117,14 @@ session = Session(
   dir=SESSION_DIR, autosave=false, save_intermediate=false)
 
 configs = [
-  Config(n=n, w=w, c=c, τ=τ, ϵ=ϵ, α=α)
+  Config(n=n, w=w, c=c, τ=τ, ϵ=ϵ, α=α, p=p)
   for τ in [1.0, 0.5, 0.1]
   for n in [400, 600]
   for w in [8, 16, 32]
   for ϵ in [0.1, 0.2]
   for c in [3.0]
   for α in [1.0]
+  for p in [1.0]
 ]
 
 network = session.env.bestnn
