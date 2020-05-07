@@ -12,7 +12,7 @@ using Plots
 
 # Do NOT run this from the REPL!
 
-ENV["CUARRAYS_MEMORY_POOL"] = "split"
+ENV["JULIA_CUDA_MEMORY_POOL"] = "split"
 
 include("../games.jl")
 GAME = get(ENV, "GAME", "connect-four")

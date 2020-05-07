@@ -1,4 +1,4 @@
-ENV["CUARRAYS_MEMORY_POOL"] = "split" # "binned" / "split"
+ENV["JULIA_CUDA_MEMORY_POOL"] = "split" # "binned" / "split"
 
 using AlphaZero
 using AlphaZero.Log
