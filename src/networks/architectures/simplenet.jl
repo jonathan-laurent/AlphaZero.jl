@@ -51,7 +51,7 @@ function SimpleNet{G}(hyper::SimpleNetHP) where G
   hsize = hyper.width
   hlayers(depth) = [make_dense(hsize, hsize) for i in 1:depth]
   common = Chain(
-    linearize,
+    flatten,
     make_dense(indim, hsize),
     hlayers(hyper.depth_common)...)
   vhead = Chain(

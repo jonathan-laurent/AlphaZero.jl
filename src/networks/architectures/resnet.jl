@@ -80,13 +80,13 @@ function ResNet{G}(hyper::ResNetHP) where G
   phead = Chain(
     Conv((1, 1), nf=>npf),
     BatchNorm(npf, relu, momentum=bnmom),
-    linearize,
+    flatten,
     Dense(bsize[1] * bsize[2] * npf, outdim),
     softmax)
   vhead = Chain(
     Conv((1, 1), nf=>nvf),
     BatchNorm(nvf, relu, momentum=bnmom),
-    linearize,
+    flatten,
     Dense(bsize[1] * bsize[2] * nvf, nf, relu),
     Dense(nf, 1, tanh))
   ResNet{G}(hyper, common, vhead, phead)

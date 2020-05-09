@@ -110,6 +110,6 @@ end
 
 using Knet: relu
 
-linearize(x) = reshape(x, :, size(x)[end])
+flatten(x) = reshape(x, :, size(x)[end])
 
 softmax(x) = Knet.softmax(x, dims=1)

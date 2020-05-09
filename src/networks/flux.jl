@@ -8,8 +8,7 @@ export SimpleNet, SimpleNetHP, ResNet, ResNetHP
 
 using ..Network
 using Base: @kwdef
-import ..GameInterface
-import ..Util
+import ..GameInterface, ..Util, ..CyclicSchedule
 
 using CUDAapi
 
@@ -17,7 +16,6 @@ using CUDAapi
 if has_cuda()
   try
     using CuArrays
-    @show CuArrays.usage_limit[]
     @eval const CUARRAYS_IMPORTED = true
   catch ex
     @warn(
@@ -44,13 +42,27 @@ else
   end
 end
 
-using Flux: relu, softmax
+using Flux: relu, softmax, flatten
 using Flux: Chain, Dense, Conv, BatchNorm, SkipConnection
+import Zygote
 
 #####
 ##### Flux Networks
 #####
 
+"""
+    FluxNetwork{Game} <: AbstractNetwork{Game}
+
+Abstract type for neural networks implemented using the _Flux_ framework.
+
+The `regularized_params_` function must be overrided for all layers containing
+parameters that are subject to regularization.
+
+Provided that the above holds, `FluxNetwork` implements the full
+network interface with the following exceptions:
+[`Network.HyperParams`](@ref), [`Network.hyperparams`](@ref),
+[`Network.forward`](@ref) and [`Network.on_gpu`](@ref).
+"""
 abstract type FluxNetwork{Game} <: AbstractNetwork{Game} end
 
 function Base.copy(nn::Net) where Net <: FluxNetwork
@@ -67,11 +79,8 @@ function Network.to_gpu(nn::FluxNetwork)
   return Flux.gpu(nn)
 end
 
-# TODO: dirty hack to cope with the fact that Flux 0.10 removed Flux.testmode!
-const TEST_MODE = IdDict()
-
 function Network.set_test_mode!(nn::FluxNetwork, mode)
-  TEST_MODE[nn] = mode
+  Flux.testmode!(nn, mode)
 end
 
 Network.convert_input(nn::FluxNetwork, x) =
@@ -81,14 +90,51 @@ Network.convert_output(nn::FluxNetwork, x) = Flux.cpu(x)
 
 Network.params(nn::FluxNetwork) = Flux.params(nn)
 
-function Network.train!(nn::FluxNetwork, loss, data, lr)
-  optimizer = Flux.ADAM(lr)
-  Flux.train!(loss, Flux.params(nn), data, optimizer)
+# This should be included in Flux
+function lossgrads(f, args...)
+  val, back = Zygote.pullback(f, args...)
+  grad = back(Zygote.sensitivity(val))
+  return val, grad
 end
 
-regularized_child_leaves(l) = []
-regularized_child_leaves(l::Flux.Dense) = [l.W]
-regularized_child_leaves(l::Flux.Conv) = [l.weight]
+function Network.train!(callback, nn::FluxNetwork, opt::Adam, loss, data, n)
+  optimiser = Flux.ADAM(opt.lr)
+  params = Flux.params(nn)
+  for (i, d) in enumerate(data)
+    l, grads = lossgrads(params) do
+      loss(d...)
+    end
+    Flux.update!(optimiser, params, grads)
+    callback(i, l)
+  end
+end
+
+function Network.train!(
+    callback, nn::FluxNetwork, opt::CyclicNesterov, loss, data, n)
+  lr = CyclicSchedule(
+    opt.lr_base,
+    opt.lr_high,
+    opt.lr_low, n=n)
+  momentum = CyclicSchedule(
+    opt.momentum_high,
+    opt.momentum_low,
+    opt.momentum_high, n=n)
+  optimiser = Flux.Nesterov(opt.lr_low, opt.momentum_high)
+  params = Flux.params(nn)
+  for (i, d) in enumerate(data)
+    l, grads = lossgrads(params) do
+      loss(d...)
+    end
+    Flux.update!(optimiser, params, grads)
+    optimiser.eta = lr[i]
+    optimiser.rho = momentum[i]
+    callback(i, l)
+  end
+end
+
+regularized_params_(l) = []
+regularized_params_(l::Flux.Dense) = [l.W]
+regularized_params_(l::Flux.Conv) = [l.weight]
 
 # Reimplementation of what used to be Flux.prefor, does not visit leafs
 function foreach_flux_node(f::Function, x, seen = IdDict())
@@ -104,7 +150,7 @@ end
 function Network.regularized_params(net::FluxNetwork)
   ps = Flux.Params()
   foreach_flux_node(net) do p
-    for r in regularized_child_leaves(p)
+    for r in regularized_params_(p)
       any(x -> x === r, ps) || push!(ps, r)
     end
   end
@@ -114,18 +160,27 @@ end
 function Network.gc(::FluxNetwork)
   CUARRAYS_IMPORTED || return
   GC.gc(true)
-  CuArrays.reclaim()
+  # CuArrays.reclaim()
 end
 
 #####
 ##### Common functions between two-head neural networks
 #####
 
+"""
+    TwoHeadNetwork{Game} <: FluxNetwork{G}
+
+An abstract type for two-head neural networks implemented with Flux.
+
+Subtypes are assumed to have fields
+`hyper`, `common`, `vhead` and `phead`. Based on those, an implementation
+is provided for [`Network.hyperparams`](@ref), [`Network.forward`](@ref) and
+[`Network.on_gpu`](@ref), leaving only [`Network.HyperParams`](@ref) to
+be implemented.
+"""
 abstract type TwoHeadNetwork{G} <: FluxNetwork{G} end
 
 function Network.forward(nn::TwoHeadNetwork, board)
-  # TODO: eliminate this horror when Flux catches up
-  # @eval Flux.istraining() = $(!get(TEST_MODE, nn, false))
   c = nn.common(board)
   v = nn.vhead(c)
   p = nn.phead(c)
@@ -142,12 +197,6 @@ end
 Network.hyperparams(nn::TwoHeadNetwork) = nn.hyper
 
 Network.on_gpu(nn::TwoHeadNetwork) = on_gpu(nn.vhead[end].b)
-
-#####
-##### Utilities for the networks library
-#####
-
-linearize(x) = reshape(x, :, size(x)[end])
 
 #####
 ##### Include networks library
