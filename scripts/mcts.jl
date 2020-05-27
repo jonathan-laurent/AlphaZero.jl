@@ -7,7 +7,7 @@ using .SelectedGame: Game
 
 game = Game()
 env = MCTS.Env{Game}(MCTS.RolloutOracle{Game}(), nworkers=1)
-computer = MctsPlayer(env, niters=100, timeout=1.0, τ=0.5)
+computer = MctsPlayer(env, niters=100, timeout=1.0, τ=ConstSchedule(0.5))
 
 interactive!(game, computer, Human{Game}())
 #start_explorer(Explorer(computer))
