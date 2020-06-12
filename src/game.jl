@@ -1,11 +1,18 @@
 """
-A generic interface for two-players, symmetric, zero-sum games.
+A generic interface for two-players, zero-sum games.
 
 We call a game _symmetric_ when the rules are the same for both players.
 Said differently, it is always possible to swap the players' colors along
 with the color of every piece on the board without affecting the game.
 """
 module GameInterface
+
+"""
+player: there is white and black.
+or only white.
+rewards are expressed w.r.t white
+play! returns a reward.
+"""
 
 export AbstractPlayer
 
@@ -91,12 +98,12 @@ Return `true` if white is to play and `false` otherwise.
 function white_playing end
 
 """
-    white_reward(state::AbstractGame)
+    terminal_white_reward(state::AbstractGame)
 
 Return `nothing` if the game hasn't ended. Otherwise, return a
 reward for the white player as a number between -1 and 1.
 """
-function white_reward end
+function terminal_white_reward end
 
 """
     board(state::AbstractGame)
@@ -254,7 +261,7 @@ end
 
 Return a boolean indicating whether or not a game is in a terminal state.
 """
-game_terminated(state) = !isnothing(white_reward(state))
+game_terminated(state) = !isnothing(terminal_white_reward(state))
 
 """
     num_actions(::Type{G})

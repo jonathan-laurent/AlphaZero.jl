@@ -70,7 +70,7 @@ struct RolloutOracle{Game} <: Oracle{Game} end
 
 function rollout!(state, board)
   while true
-    reward = GI.white_reward(state)
+    reward = GI.terminal_white_reward(state)
     isnothing(reward) || (return reward)
     action = rand(GI.available_actions(state))
     GI.play!(state, action)
@@ -326,7 +326,7 @@ function select!(env, worker, state, η)
   env.total_simulations += 1
   isroot = true
   while true
-    wr = GI.white_reward(state)
+    wr = GI.terminal_white_reward(state)
     isnothing(wr) || (return wr)
     wp = GI.white_playing(state)
     board = GI.canonical_board(state)

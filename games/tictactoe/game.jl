@@ -72,7 +72,7 @@ end
 
 GI.white_playing(g::Game) = g.curplayer
 
-function GI.white_reward(g::Game)
+function GI.terminal_white_reward(g::Game)
   isempty(GI.available_actions(g)) && return 0.
   has_won(g, WHITE) && return 1.
   has_won(g, BLACK) && return -1.

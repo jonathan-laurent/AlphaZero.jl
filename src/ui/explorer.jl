@@ -33,7 +33,7 @@ player_reward(state, white_reward) =
   GI.white_playing(state) ? white_reward : GI.symmetric_reward(white_reward)
 
 function evaluate_vnet(oracle::MCTS.Oracle, state)
-  r = GI.white_reward(state)
+  r = GI.terminal_white_reward(state)
   if !isnothing(r)
     return player_reward(state, r)
   else

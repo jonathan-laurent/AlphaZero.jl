@@ -275,7 +275,7 @@ function play_game(
   state = Game()
   nturns = 0
   while true
-    z = GI.white_reward(state)
+    z = GI.terminal_white_reward(state)
     if !isnothing(z)
       isnothing(memory) || push_game!(memory, z, nturns)
       return z
@@ -415,7 +415,7 @@ function interactive!(game, white, black)
   try
   GI.print_state(game)
   turn = 0
-  while isnothing(GI.white_reward(game))
+  while isnothing(GI.terminal_white_reward(game))
     player = GI.white_playing(game) ? white : black
     action = select_move(player, game, turn)
     GI.play!(game, action)

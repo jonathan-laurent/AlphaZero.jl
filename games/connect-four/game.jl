@@ -157,7 +157,7 @@ GI.white_playing(g::Game) = g.curplayer == WHITE
 ##### Reward shaping
 #####
 
-function GI.white_reward(g::Game)
+function GI.terminal_white_reward(g::Game)
   if g.finished
     g.winner == WHITE && (return  1.)
     g.winner == BLACK && (return -1.)

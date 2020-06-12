@@ -22,7 +22,7 @@ end
 
 # Return the value of a state for the player playing
 function value(game, depth)
-  wr = GI.white_reward(game)
+  wr = GI.terminal_white_reward(game)
   wp = GI.white_playing(game)
   if isnothing(wr)
     if depth == 0
@@ -37,7 +37,7 @@ function value(game, depth)
 end
 
 function qvalue(game, action, depth)
-  @assert isnothing(GI.white_reward(game))
+  @assert isnothing(GI.terminal_white_reward(game))
   next = copy(game)
   GI.play!(next, action)
   pswitch = GI.white_playing(game) != GI.white_playing(next)

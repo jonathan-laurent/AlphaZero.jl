@@ -59,7 +59,7 @@ function remaining_stones(game, player)
 end
 
 function value(player, game)
-  z = GI.white_reward(game)
+  z = GI.terminal_white_reward(game)
   if isnothing(z)
     return query_solver(player, game).score
   elseif iszero(z)
@@ -73,7 +73,7 @@ function value(player, game)
 end
 
 function qvalue(player, game, action)
-  @assert isnothing(GI.white_reward(game))
+  @assert isnothing(GI.terminal_white_reward(game))
   wp = GI.white_playing(game)
   game = copy(game)
   GI.play!(game, action)
