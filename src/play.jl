@@ -16,9 +16,7 @@ GameType(::AbstractPlayer{Game}) where Game = Game
 
 Return a probability distribution over actions as a `(actions, π)` pair.
 """
-function think(::AbstractPlayer, state)
-  @unimplemented
-end
+function think end
 
 """
     reset_player!(::AbstractPlayer)

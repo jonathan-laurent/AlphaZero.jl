@@ -1,19 +1,11 @@
 module Util
 
-export Option, @unimplemented
+export Option
 
 import Random
 using Distributions: Categorical
 
 const Option{T} = Union{T, Nothing}
-
-struct Unimplemented <: Exception end
-
-macro unimplemented()
-  return quote
-    throw(Unimplemented())
-  end
-end
 
 infinity(::Type{R}) where R <: Real = one(R) / zero(R)
 

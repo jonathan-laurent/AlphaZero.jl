@@ -12,7 +12,7 @@ module MCTS
 using DataStructures: Stack
 using Distributions: Categorical, Dirichlet
 
-using ..Util: @printing_errors, @unimplemented, apply_temperature
+using ..Util: @printing_errors, apply_temperature
 import ..GI, ..GameType
 
 #####
@@ -37,9 +37,7 @@ Return a pair `(P, V)` where:
   - `P` is a probability vector on `GI.available_actions(Game(board))`
   - `V` is a scalar estimating the value or win probability for white.
 """
-function evaluate(oracle::Oracle, board)
-  @unimplemented
-end
+function evaluate end
 
 """
     MCTS.evaluate_batch(oracle::Oracle, boards)

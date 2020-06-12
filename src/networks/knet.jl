@@ -20,7 +20,8 @@ include("knet/layers.jl")
 
 children(x) = ()
 
-mapchildren(f, x) = Util.@unimplemented
+# mapchildren(f, x) = x'
+function mapchildren end
 
 function traverse!(f, model, seen=IdDict())
   haskey(seen, model) && return

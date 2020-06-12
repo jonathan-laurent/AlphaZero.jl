@@ -7,13 +7,9 @@
 
 Abstract type for a parameter schedule, which represents a function from
 nonnegative integers to numbers of type `R`. Subtypes must implement the
-`getindex` operator.
+`getindex(s::AbstractSchedule, i::Int)` operator.
 """
 abstract type AbstractSchedule{R} end
-
-function Base.getindex(s::AbstractSchedule, i::Int)
-  @unimplemented
-end
 
 #####
 ##### Constant Schedule

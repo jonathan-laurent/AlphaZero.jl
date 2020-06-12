@@ -7,7 +7,6 @@ compete against a set of baselines.
 """
 module Benchmark
 
-import ..Util.@unimplemented
 import ..AbstractNetwork, ..MinMax, ..GI
 import ..Env, ..MCTS, ..MctsParams, ..pit, ..compute_redundancy, ..Recorder
 import ..ColorPolicy, ..ALTERNATE_COLORS
@@ -60,13 +59,11 @@ Subtypes must implement the following functions:
 """
 abstract type Player end
 
-function instantiate(player::Player, nn)
-  @unimplemented
-end
+# instantiate(::Player, nn)
+function instantiate end
 
-function name(::Player) :: String
-  @unimplemented
-end
+# name(::Player) :: String
+function name end
 
 """
     Benchmark.Duel(player, baseline; num_games)
@@ -231,9 +228,8 @@ struct Solver <: Player
 end
 
 # Return the type of the perfect player for a given type of game
-function PerfectPlayer(::Type{<:GI.AbstractGame})
-  @unimplemented
-end
+# PerfectPlayer(::Type{<:GI.AbstractGame})
+function PerfectPlayer end
 
 name(p::Solver) = "Perfect Player ($(round(Int, 100 * p.ϵ))% random)"
 

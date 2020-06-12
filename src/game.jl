@@ -10,7 +10,6 @@ module GameInterface
 export AbstractPlayer
 
 import ..Util
-using ..Util: @unimplemented
 
 #####
 ##### Types
@@ -58,9 +57,7 @@ There are two reasons for having a separate `Board` type:
     storing every board in the MCTS tree from the perspective of the current
     player (as if white were to play next).
 """
-function Board(::Type{<:AbstractGame})
-  @unimplemented
-end
+function Board end
 
 """
     Action(Game::Type{<:AbstractGame})
@@ -73,22 +70,14 @@ Actions must be _colorblind_ in the following sense:
 available_actions(s) == available_actions(state_symmetric(s))
 ```
 """
-function Action(::Type{<:AbstractGame})
-  @unimplemented
-end
+function Action end
 
 """
     actions(::Type{<:AbstractGame})
 
 Return the vector of all game actions.
 """
-function actions(::Type{<:AbstractGame})
-  @unimplemented
-end
-
-function Base.copy(::AbstractGame)
-  @unimplemented
-end
+function actions end
 
 #####
 ##### Game functions
@@ -99,9 +88,7 @@ end
 
 Return `true` if white is to play and `false` otherwise.
 """
-function white_playing(::AbstractGame)
-  @unimplemented
-end
+function white_playing end
 
 """
     white_reward(state::AbstractGame)
@@ -109,18 +96,14 @@ end
 Return `nothing` if the game hasn't ended. Otherwise, return a
 reward for the white player as a number between -1 and 1.
 """
-function white_reward(::AbstractGame)
-  @unimplemented
-end
+function white_reward end
 
 """
     board(state::AbstractGame)
 
 Return the game board.
 """
-function board(::AbstractGame)
-  @unimplemented
-end
+function board end
 
 """
     board_symmetric(state::AbstractGame)
@@ -131,9 +114,7 @@ colors are swapped.
 The white player must have opposite values in
 `state` and `state_symmetric(state)`.
 """
-function board_symmetric(::AbstractGame)
-  @unimplemented
-end
+function board_symmetric end
 
 """
     actions_mask(state::AbstractGame)
@@ -145,18 +126,14 @@ The following identities must hold:
   - `game_terminated(state) || any(actions_mask(state))`
   - `length(actions_mask(state)) == length(actions(typeof(state)))`
 """
-function actions_mask(state::AbstractGame)
-  @unimplemented
-end
+function actions_mask end
 
 """
     play!(state::AbstractGame, action)
 
 Update the game state by making the current player perform `action`.
 """
-function play!(state::AbstractGame, action)
-  @unimplemented
-end
+function play! end
 
 """
     heuristic_value(state::AbstractGame)
@@ -172,9 +149,7 @@ heuristic_value(s) == heuristic_value(state_symmetric(s))
 This function is not needed by AlphaZero but it is useful for building
 baselines such as minmax players.
 """
-function heuristic_value(state::AbstractGame)
-  @unimplemented
-end
+function heuristic_value end
 
 #####
 ##### Symmetries
@@ -224,9 +199,7 @@ end
 
 Return a vectorized representation of a board.
 """
-function vectorize_board(::Type{<:AbstractGame}, board)
-  @unimplemented
-end
+function vectorize_board end
 
 #####
 ##### Interface for interactive exploratory tools
@@ -237,9 +210,7 @@ end
 
 Return a human-readable string representing the provided action.
 """
-function action_string(::Type{<:AbstractGame}, action)
-  @unimplemented
-end
+function action_string end
 
 """
     parse_action(::Type{<:AbstractGame}, str::String)
@@ -247,9 +218,7 @@ end
 Return the action described by string `str` or `nothing`
 if `str` does not denote a valid action.
 """
-function parse_action(::Type{<:AbstractGame}, ::String)
-  @unimplemented
-end
+function parse_action end
 
 """
     read_state(::Type{G}) where G <: AbstractGame :: Union{G, Nothing}
@@ -257,18 +226,14 @@ end
 Read a state description from the standard input.
 Return the corresponding state or `nothing` in case of an invalid input.
 """
-function read_state(::Type{<:AbstractGame})
-  @unimplemented
-end
+function read_state end
 
 """
     print_state(state::AbstractGame)
 
 Print a state on the standard output.
 """
-function print_state(::AbstractGame)
-  @unimplemented
-end
+function print_state end
 
 #####
 ##### Derived functions
@@ -345,6 +310,4 @@ end
 Return the `Game` type associated with an object
 (such as a network, a player, an MCTS environment...)
 """
-function GameType(T)
-  @unimplemented
-end
+function GameType end
