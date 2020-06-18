@@ -50,6 +50,7 @@ using Statistics: mean
 include("schedule.jl")
 include("params.jl")
 include("report.jl")
+include("trace.jl")
 include("memory.jl")
 include("learning.jl")
 include("play.jl")

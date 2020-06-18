@@ -11,16 +11,17 @@ const BLACK = false
 const Cell = Union{Nothing, Player}
 const Board = SVector{NUM_POSITIONS, Cell}
 const INITIAL_BOARD = Board(repeat([nothing], NUM_POSITIONS))
+const INITIAL_STATE = (board=INITIAL_BOARD, curplayer=WHITE)
 
 mutable struct Game <: GI.AbstractGame
   board :: Board
   curplayer :: Player
-  function Game(board=INITIAL_BOARD, player=WHITE)
-    new(board, player)
+  function Game(state=INITIAL_STATE)
+    new(state.board, state.curplayer)
   end
 end
 
-GI.Board(::Type{Game}) = Board
+GI.State(::Type{Game}) = typeof(INITIAL_STATE)
 
 GI.Action(::Type{Game}) = Int
 
@@ -58,25 +59,24 @@ const ACTIONS = collect(1:NUM_POSITIONS)
 
 GI.actions(::Type{Game}) = ACTIONS
 
-Base.copy(g::Game) = Game(g.board, g.curplayer)
-
 GI.actions_mask(g::Game) = map(isnothing, g.board)
 
-GI.board(g::Game) = g.board
+GI.current_state(g::Game) = (board=g.board, curplayer=g.curplayer)
 
-function GI.board_symmetric(g::Game)
-  symmetric(c::Cell) = isnothing(c) ? nothing : !c
-  # Inference fails when using `map`
-  @SVector Cell[symmetric(g.board[i]) for i in 1:NUM_POSITIONS]
-end
+GI.white_playing(::Type{Game}, state) = state.curplayer
 
-GI.white_playing(g::Game) = g.curplayer
-
-function GI.terminal_white_reward(g::Game)
+function terminal_white_reward(g::Game)
   isempty(GI.available_actions(g)) && return 0.
   has_won(g, WHITE) && return 1.
   has_won(g, BLACK) && return -1.
   return nothing
+end
+
+GI.game_terminated(g::Game) = !isnothing(terminal_white_reward(g))
+
+function GI.white_reward(g)
+  z = terminal_white_reward(g)
+  return isnothing(z) ? 0. : z
 end
 
 function GI.play!(g::Game, pos)
@@ -116,10 +116,19 @@ end
 ##### Machine Learning API
 #####
 
+function flip_colors(board)
+  flip(cell) = isnothing(cell) ? nothing : !cell
+  # Inference fails when using `map`
+  return @SVector Cell[flip(board[i]) for i in 1:NUM_POSITIONS]
+end
+
 # Vectorized representation: 3x3x3 array
 # Channels: free, white, black
-function GI.vectorize_board(::Type{Game}, board)
-  Float32[
+# The board is represented from the perspective of white
+# (as if white were to play next)
+function GI.vectorize_state(::Type{Game}, state)
+  board = white_playing(state) ? state.board : flip_colors(state.board)
+  return Float32[
     board[pos_of_xy((x, y))] == c
     for x in 1:BOARD_SIDE,
         y in 1:BOARD_SIDE,
@@ -145,8 +154,9 @@ end
 
 const SYMMETRIES = generate_dihedral_symmetries()
 
-function GI.symmetries(::Type{Game}, board)
-  return [(board[sym], sym) for sym in SYMMETRIES]
+function GI.symmetries(::Type{Game}, s)
+  return
+    [((board=s.board[sym], curplayer=s.curplayer), sym) for sym in SYMMETRIES]
 end
 
 #####
@@ -181,11 +191,11 @@ function GI.read_state(::Type{Game})
   nw = count(==(WHITE), b)
   nb = count(==(BLACK), b)
   if nw == nb
-    Game(b, WHITE)
+    return (board=b, curplayer=WHITE)
   elseif nw == nb + 1
-    Game(b, BLACK)
+    return (board=b, curplayer=BLACK)
   else
-    nothing
+    return nothing
   end
 end
 
@@ -195,7 +205,7 @@ player_color(p) = p == WHITE ? crayon"light_red" : crayon"light_blue"
 player_name(p)  = p == WHITE ? "Red" : "Blue"
 player_mark(p)  = p == WHITE ? "o" : "x"
 
-function GI.print_state(g::Game; with_position_names=true, botmargin=true)
+function GI.render(g::Game; with_position_names=true, botmargin=true)
   pname = player_name(g.curplayer)
   pcol = player_color(g.curplayer)
   print(pcol, pname, " plays:", crayon"reset", "\n\n")

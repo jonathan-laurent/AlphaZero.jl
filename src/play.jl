@@ -254,47 +254,72 @@ function think(p::NetworkPlayer, state)
 end
 
 #####
+##### Merging different policies into a single player
+#####
+
+struct MixedPlayer{G, W, B} <: AbstractPlayer{G}
+  white :: W
+  black :: B
+  function MixedPlayer(white, black)
+    G = GameType(white)
+    @assert G == GameType(black)
+    return new{G, typeof(white), typeof(black)}(white, black)
+  end
+end
+
+function think(p::MixedPlayer, game)
+  if GI.white_playing(game)
+    return think(p.white, game)
+  else
+    return think(p.black, game)
+  end
+end
+
+function reset!(p::MixedPlayer)
+  reset!(p.white)
+  reset!(p.black)
+end
+
+function player_temperature(p::MixedPlayer, turn)
+  return player_temperature(p.player, turn)
+end
+
+#####
 ##### Players can play against each other
 #####
 
 """
-    play_game(white, black, memory=nothing)
+    play_game(white, black, memory=nothing) :: Trace
 
-Play a game between two [`AbstractPlayer`](@ref) and return the reward
+Play a game between using an [`AbstractPlayer`](@ref) and return the reward
 obtained by `white`.
 
-- If the `memory` argument is provided, samples are automatically collected
-  from this game in the given [`MemoryBuffer`](@ref).
 - If the `flip_probability` argument is set to ``p``, the board
   is _flipped_ randomly at every turn with probability ``p``,
-  using [`GI.random_symmetric_state`](@ref).
+  using [`GI.apply_random_symmetry`](@ref).
 """
-function play_game(
-    white::AbstractPlayer{Game}, black::AbstractPlayer{Game},
-    memory=nothing; flip_probability=0.) :: Float64 where Game
-  state = Game()
-  nturns = 0
+function play_game(player::AbstractPlayer{Game}, flip_probability=0.) where Game
+  game = Game()
+  trace = Trace(GI.current_state(game))
   while true
-    z = GI.terminal_white_reward(state)
-    if !isnothing(z)
-      isnothing(memory) || push_game!(memory, z, nturns)
-      return z
+    if GI.game_terminated(game)
+      return trace
     end
     if !iszero(flip_probability) && rand() < flip_probability
-      state = GI.random_symmetric_state(state)
+      game = GI.apply_random_symmetry(game)
     end
-    player = GI.white_playing(state) ? white : black
-    actions, π_target = think(player, state)
-    τ = player_temperature(player, nturns)
+    actions, π_target = think(player, game)
+    τ = player_temperature(player, length(trace))
     π_sample = apply_temperature(π_target, τ)
     a = actions[Util.rand_categorical(π_sample)]
-    if !isnothing(memory)
-      cboard = GI.canonical_board(state)
-      push_sample!(memory, cboard, π_target, GI.white_playing(state), nturns)
-    end
-    GI.play!(state, a)
-    nturns += 1
+    GI.play!(game, a)
+    push!(trace, GI.current_state(game), GI.white_reward(game))
   end
+end
+
+function play_game(
+    white::AbstractPlayer, black::AbstractPlayer, flip_probability=0.)
+  return play_game(MixedPlayer(white, black), flip_probability)
 end
 
 #####
@@ -356,22 +381,24 @@ end
 #####
 
 # This type implements the interface of `MemoryBuffer` so that it can be
-# passed as the `memory` argument of `play_game` to record games.
+# passed as the `memory` argument of `play_game` to record states.
 # Currently, this is only used to compute redundancy statistics
-struct Recorder{Game, Board}
-  boards :: Vector{Board}
+struct Recorder{Game, State}
+  states :: Vector{State}
   function Recorder{G}() where G
-    B = GI.Board(G)
-    return new{G, B}([])
+    S = GI.State(G)
+    return new{G, S}([])
   end
 end
 
 push_game!(r::Recorder, wr, gl) = nothing
-push_sample!(r::Recorder, b, π, wp, t) = push!(r.boards, b)
+push_sample!(r::Recorder, s, π, wp, t) = push!(r.states, s)
 
 function compute_redundancy(rec::Recorder{Game}) where Game
-  initb = GI.board(Game())
-  noninit = filter(!=(initb), rec.boards)
+  # TODO: Excluding the inial state from redundancy statistics
+  # only makes sense for deterministic games.
+  init_state = GI.current_state(Game())
+  noninit = filter(!=(init_state), rec.states)
   unique = Set(noninit)
   return 1. - length(unique) / length(noninit)
 end
