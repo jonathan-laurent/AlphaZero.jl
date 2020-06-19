@@ -77,3 +77,5 @@ include("../games/connect-four/main.jl")
 
 test(Tictactoe.Game, 20)
 test(ConnectFour.Game, 20)
+
+#interactive!(ConnectFour.Game())

@@ -275,6 +275,14 @@ function think(p::MixedPlayer, game)
   end
 end
 
+function select_move(p::MixedPlayer, game, turn)
+  if GI.white_playing(game)
+    return select_move(p.white, game, turn)
+  else
+    return select_move(p.black, game, turn)
+  end
+end
+
 function reset!(p::MixedPlayer)
   reset!(p.white)
   reset!(p.black)
@@ -438,15 +446,14 @@ Launch an interactive session for `game::AbstractGame` between players
 `white` and `black`. Both players have type `AbstractPlayer` and one of them
 is typically [`Human`](@ref).
 """
-function interactive!(game, white, black)
+function interactive!(game, player)
   try
-  GI.print_state(game)
+  GI.render(game)
   turn = 0
-  while isnothing(GI.terminal_white_reward(game))
-    player = GI.white_playing(game) ? white : black
+  while !GI.game_terminated(game)
     action = select_move(player, game, turn)
     GI.play!(game, action)
-    GI.print_state(game)
+    GI.render(game)
     turn += 1
   end
   catch e
@@ -454,5 +461,7 @@ function interactive!(game, white, black)
     return
   end
 end
+
+interactive!(game, white, black) = interactive!(game, MixedPlayer(white, black))
 
 interactive!(game::G) where G = interactive!(game, Human{G}(), Human{G}())
