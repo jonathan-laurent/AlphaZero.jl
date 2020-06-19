@@ -1,7 +1,8 @@
-using AlphaZero
-using Juno
+#####
+##### GameInterface Tests
+#####
 
-include("../games/tictactoe/main.jl")
+using AlphaZero
 
 function generate_states(::Type{Game}, n) where Game
   traces = []
@@ -24,7 +25,7 @@ function test(Game, n=100)
   end
   @assert all(GI.white_playing(Game()) for _ in 1:n)
   deterministic = true
-  for state in generate_states(Tictactoe.Game, n)
+  for state in generate_states(Game, n)
     game = Game(state)
     @assert isa(game, Game)
     @assert isa(GI.current_state(game), GI.State(Game))
@@ -65,4 +66,14 @@ function test(Game, n=100)
   end
 end
 
+#####
+##### Main
+#####
+
+using Juno
+
+include("../games/tictactoe/main.jl")
+include("../games/connect-four/main.jl")
+
 test(Tictactoe.Game, 20)
+test(ConnectFour.Game, 20)
