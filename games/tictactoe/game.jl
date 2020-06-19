@@ -127,7 +127,7 @@ end
 # The board is represented from the perspective of white
 # (as if white were to play next)
 function GI.vectorize_state(::Type{Game}, state)
-  board = white_playing(state) ? state.board : flip_colors(state.board)
+  board = GI.white_playing(Game, state) ? state.board : flip_colors(state.board)
   return Float32[
     board[pos_of_xy((x, y))] == c
     for x in 1:BOARD_SIDE,
@@ -155,8 +155,9 @@ end
 const SYMMETRIES = generate_dihedral_symmetries()
 
 function GI.symmetries(::Type{Game}, s)
-  return
-    [((board=s.board[sym], curplayer=s.curplayer), sym) for sym in SYMMETRIES]
+  return [
+    ((board=Board(s.board[sym]), curplayer=s.curplayer), sym)
+    for sym in SYMMETRIES]
 end
 
 #####
