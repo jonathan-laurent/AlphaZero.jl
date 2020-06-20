@@ -32,6 +32,7 @@ arena = ArenaParams(
     dirichlet_noise_ϵ=0.05))
 
 learning = LearningParams(
+  use_gpu=true,
   use_position_averaging=true,
   samples_weighing_policy=LOG_WEIGHT,
   batch_size=2048,

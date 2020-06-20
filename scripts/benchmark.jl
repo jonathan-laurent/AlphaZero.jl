@@ -17,7 +17,7 @@ SESSION_DIR = "sessions/$GAME"
 
 make_duel(baseline) =
   Benchmark.Duel(
-    Benchmark.NetworkOnly(τ=0.5),
+    Benchmark.NetworkOnly(τ=0.5, use_gpu=true),
     baseline,
     num_games=200,
     flip_probability=0.5,

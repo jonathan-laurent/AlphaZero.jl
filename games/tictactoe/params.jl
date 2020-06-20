@@ -28,6 +28,7 @@ arena = ArenaParams(
     dirichlet_noise_ϵ=0.1))
 
 learning = LearningParams(
+  use_gpu=false,
   samples_weighing_policy=LOG_WEIGHT,
   l2_regularization=1e-4,
   optimiser=CyclicNesterov(

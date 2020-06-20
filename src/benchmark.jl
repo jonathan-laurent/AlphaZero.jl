@@ -193,7 +193,7 @@ instead of relying on MCTS.
 struct NetworkOnly <: Player
   use_gpu :: Bool
   τ :: Float64
-  NetworkOnly(;use_gpu=true, τ=1.0) = new(use_gpu, τ)
+  NetworkOnly(;use_gpu=false, τ=1.0) = new(use_gpu, τ)
 end
 
 name(::NetworkOnly) = "Network Only"
