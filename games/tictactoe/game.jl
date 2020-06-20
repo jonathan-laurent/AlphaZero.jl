@@ -74,7 +74,7 @@ end
 
 GI.game_terminated(g::Game) = !isnothing(terminal_white_reward(g))
 
-function GI.white_reward(g)
+function GI.white_reward(g::Game)
   z = terminal_white_reward(g)
   return isnothing(z) ? 0. : z
 end
