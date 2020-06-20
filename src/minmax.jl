@@ -11,41 +11,39 @@ module MinMax
 
 import ..GI, ..GameInterface, ..AbstractPlayer, ..think
 
-function current_player_value(white_reward, white_playing) :: Float64
-  if iszero(white_reward)
+amplify(r) = iszero(r) ? r : Inf * sign(r)
+
+# Return the value of the current state for the player playing
+function value(player, game, depth)
+  if GI.game_terminated(game)
     return 0.
+  elseif depth == 0
+    return GI.heuristic_value(game)
   else
-    v = Inf * sign(white_reward)
-    return white_playing ? v : - v
+    qs = [qvalue(player, game, a, depth) for a in GI.available_actions(game)]
+    return maximum(qs)
   end
 end
 
-# Return the value of a state for the player playing
-function value(game, depth)
-  wr = GI.terminal_white_reward(game)
-  wp = GI.white_playing(game)
-  if isnothing(wr)
-    if depth == 0
-      return GI.heuristic_value(game)
-    else
-      return maximum(qvalue(game, a, depth)
-        for a in GI.available_actions(game))
-    end
-  else
-    return current_player_value(wr, wp)
-  end
-end
-
-function qvalue(game, action, depth)
-  @assert isnothing(GI.terminal_white_reward(game))
+function qvalue(player, game, action, depth)
+  @assert !GI.game_terminated(game)
   next = copy(game)
   GI.play!(next, action)
-  pswitch = GI.white_playing(game) != GI.white_playing(next)
-  nextv = value(next, depth - 1)
-  return pswitch ? - nextv : nextv
+  wr = GI.white_reward(next)
+  r = GI.white_playing(game) ? wr : -wr
+  if player.amplify_rewards
+    r = amplify(r)
+  end
+  nextv = value(player, next, depth - 1)
+  if GI.white_playing(game) != GI.white_playing(next)
+    nextv = -nextv
+  end
+  return r + player.gamma * nextv
 end
 
-minmax(game, actions, depth) = argmax([qvalue(game, a, depth) for a in actions])
+function minmax(player, game, actions, depth)
+  return argmax([qvalue(player, game, a, player.depth) for a in actions])
+end
 
 """
     MinMax.Player{Game} <: AbstractPlayer{Game}
@@ -75,14 +73,18 @@ Otherwise,
 """
 struct Player{G} <: AbstractPlayer{G}
   depth :: Int
+  amplify_rewards :: Bool
   τ :: Float64
-  Player{G}(;depth, τ=0.) where G = new{G}(depth, τ)
+  gamma :: Float64
+  function Player{G}(;depth, amplify_rewards, τ=0., γ=1.) where G
+    return new{G}(depth, amplify_rewards, τ, γ)
+  end
 end
 
 function think(p::Player, game)
   actions = GI.available_actions(game)
   n = length(actions)
-  qs = [qvalue(game, a, p.depth) for a in actions]
+  qs = [qvalue(p, game, a, p.depth) for a in actions]
   winning = findall(==(Inf), qs)
   if isempty(winning)
     notlosing = findall(>(-Inf), qs)
