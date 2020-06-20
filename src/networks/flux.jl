@@ -12,14 +12,14 @@ import ..GameInterface, ..Util, ..CyclicSchedule
 
 using CUDAapi
 
-# Import CuArrays only if CUDA is installed
+# Import CUDA only if CUDA is installed
 if has_cuda()
   try
-    using CuArrays
+    using CUDA
     @eval const CUARRAYS_IMPORTED = true
   catch ex
     @warn(
-      "CUDA is installed, but CuArrays.jl fails to load.",
+      "CUDA is installed, but CUDA.jl fails to load.",
       exception=(ex,catch_backtrace()))
     @eval const CUARRAYS_IMPORTED = false
   end
@@ -31,7 +31,7 @@ import Flux
 
 if CUARRAYS_IMPORTED
   @eval begin
-    CuArrays.allowscalar(false)
+    CUDA.allowscalar(false)
     on_gpu(::Type{<:Array}) = false
     on_gpu(::Type{<:CuArray}) = true
     on_gpu(x) = on_gpu(typeof(x))
@@ -75,7 +75,7 @@ end
 Network.to_cpu(nn::FluxNetwork) = Flux.cpu(nn)
 
 function Network.to_gpu(nn::FluxNetwork)
-  CUARRAYS_IMPORTED && CuArrays.allowscalar(false)
+  CUARRAYS_IMPORTED && CUDA.allowscalar(false)
   return Flux.gpu(nn)
 end
 
@@ -160,7 +160,7 @@ end
 function Network.gc(::FluxNetwork)
   CUARRAYS_IMPORTED || return
   GC.gc(true)
-  # CuArrays.reclaim()
+  # CUDA.reclaim()
 end
 
 #####
