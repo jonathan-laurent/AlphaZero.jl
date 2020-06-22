@@ -263,7 +263,7 @@ from_singletons(x) = reshape(x, size(x)[1:end-1])
 
 function MCTS.evaluate(nn::AbstractNetwork{Game}, board) where Game
   actions_mask = GI.actions_mask(Game(board))
-  x = GI.vectorize_board(Game, board)
+  x = GI.vectorize_state(Game, board)
   a = Float32.(actions_mask)
   xnet, anet = to_singletons.(convert_input_tuple(nn, (x, a)))
   net_output = evaluate(nn, xnet, anet)
@@ -272,7 +272,7 @@ function MCTS.evaluate(nn::AbstractNetwork{Game}, board) where Game
 end
 
 function MCTS.evaluate_batch(nn::AbstractNetwork{Game}, batch) where Game
-  X = Util.superpose((GI.vectorize_board(Game, b) for b in batch))
+  X = Util.superpose((GI.vectorize_state(Game, b) for b in batch))
   A = Util.superpose((GI.actions_mask(Game(b)) for b in batch))
   Xnet, Anet = convert_input_tuple(nn, (X, Float32.(A)))
   P, V, _ = convert_output_tuple(nn, evaluate(nn, Xnet, Anet))

@@ -62,7 +62,7 @@ baselines = [
       arena.mcts,
       num_iters_per_turn=1000,
       cpuct=1.)),
-  Benchmark.MinMaxTS(depth=5, τ=0.2)]
+  Benchmark.MinMaxTS(depth=5, amplify_rewards=true, τ=0.2)]
 
 # push!(baselines, Benchmark.Solver(ϵ=0.05))
 

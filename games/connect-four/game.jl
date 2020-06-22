@@ -43,7 +43,10 @@ function Game()
 end
 
 GI.State(::Type{Game}) = typeof(INITIAL_STATE)
+
 GI.Action(::Type{Game}) = Int
+
+GI.two_players(::Type{Game}) = true
 
 const ACTIONS = collect(1:NUM_COLS)
 

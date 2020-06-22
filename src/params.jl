@@ -10,6 +10,7 @@ Parameters of an MCTS player.
 | `num_workers`          | `Int`                        | `1`                 |
 | `use_gpu`              | `Bool`                       | `false`             |
 | `num_iters_per_turn`   | `Int`                        |  -                  |
+| `gamma`                | `Float64`                    | `1.`                |
 | `cpuct`                | `Float64`                    | `1.`                |
 | `temperature`          | `AbstractSchedule{Float64}`  | `ConstSchedule(1.)` |
 | `dirichlet_noise_ϵ`    | `Float64`                    |  -                  |
@@ -49,6 +50,7 @@ In the original AlphaGo Zero paper:
 @kwdef struct MctsParams
   num_workers :: Int = 1
   use_gpu :: Bool = false
+  gamma :: Float64 = 1.
   cpuct :: Float64 = 1.
   num_iters_per_turn :: Int
   temperature :: AbstractSchedule{Float64} = ConstSchedule(1.)
@@ -254,6 +256,7 @@ The AlphaZero training hyperparameters.
 | `learning`                 | [`LearningParams`](@ref)            |  -        |
 | `arena`                    | [`ArenaParams`](@ref)               |  -        |
 | `memory_analysis`          | `Union{Nothing, MemAnalysisParams}` | `nothing` |
+| `gamma`                    | `Float64`                           | `1.`      |
 | `num_iters`                | `Int`                               |  -        |
 | `use_symmetries`           | `Bool`                              | `false`   |
 | `ternary_rewards`          | `Bool`                              | `false`   |
@@ -288,6 +291,7 @@ In the original AlphaGo Zero paper:
 """
 @kwdef struct Params
   self_play :: SelfPlayParams
+  gamma :: Float64 = 1.
   memory_analysis :: Union{Nothing, MemAnalysisParams} = nothing
   learning :: LearningParams
   arena :: ArenaParams

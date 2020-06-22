@@ -62,6 +62,6 @@ benchmark = [
     flip_probability=0.5),
   Benchmark.Duel(
     Benchmark.NetworkOnly(),
-    Benchmark.MinMaxTS(depth=6, τ=1.),
+    Benchmark.MinMaxTS(depth=6, amplify_rewards=true, τ=1.),
     num_games=400,
     flip_probability=0.5)]

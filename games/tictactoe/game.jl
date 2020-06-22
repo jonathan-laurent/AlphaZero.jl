@@ -25,6 +25,8 @@ GI.State(::Type{Game}) = typeof(INITIAL_STATE)
 
 GI.Action(::Type{Game}) = Int
 
+GI.two_players(::Type{Game}) = true
+
 #####
 ##### Defining winning conditions
 #####

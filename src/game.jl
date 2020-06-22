@@ -36,6 +36,13 @@ function Base.copy(env::Game) where {Game <: AbstractGame}
 end
 
 """
+    two_players(::Type{<:AbstractGame}) :: Bool
+
+Return whether or not a game is a two-players game.
+"""
+function two_players end
+
+"""
     State(Game::Type{<:AbstractGame})
 
 Return the state type corresponding to `Game`.
