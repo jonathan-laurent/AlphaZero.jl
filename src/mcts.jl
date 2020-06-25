@@ -12,7 +12,7 @@ module MCTS
 using DataStructures: Stack
 using Distributions: Categorical, Dirichlet
 
-using ..Util: @printing_errors, @unimplemented, apply_temperature
+using ..Util: @printing_errors, apply_temperature
 import ..GI, ..GameType
 
 #####
@@ -28,31 +28,29 @@ Abstract base type for an oracle. Oracles must implement
 abstract type Oracle{Game} end
 
 """
-    MCTS.evaluate(oracle::Oracle, board)
+    MCTS.evaluate(oracle::Oracle, state)
 
-Evaluate a single board position (assuming white is playing).
+Evaluate a single state from the current player's perspective.
 
 Return a pair `(P, V)` where:
 
-  - `P` is a probability vector on `GI.available_actions(Game(board))`
+  - `P` is a probability vector on `GI.available_actions(Game(state))`
   - `V` is a scalar estimating the value or win probability for white.
 """
-function evaluate(oracle::Oracle, board)
-  @unimplemented
-end
+function evaluate end
 
 """
-    MCTS.evaluate_batch(oracle::Oracle, boards)
+    MCTS.evaluate_batch(oracle::Oracle, states)
 
-Evaluate a batch of board positions.
+Evaluate a batch of states.
 
-Expect a vector of boards and return a vector of `(P, V)` pairs.
+Expect a vector of states and return a vector of `(P, V)` pairs.
 
 A default implementation is provided that calls [`MCTS.evaluate`](@ref)
 sequentially on each position.
 """
-function evaluate_batch(oracle::Oracle, boards)
-  return [evaluate(oracle, b) for b in boards]
+function evaluate_batch(oracle::Oracle, states)
+  return [evaluate(oracle, b) for b in states]
 end
 
 GameType(::Oracle{Game}) where Game = Game
@@ -62,35 +60,41 @@ GameType(::Oracle{Game}) where Game = Game
 #####
 
 """
-    MCTS.RolloutOracle{Game} <: MCTS.Oracle{Game}
+    MCTS.RolloutOracle{Game}(γ=1.) <: MCTS.Oracle{Game}
 
 This oracle estimates the value of a position by simulating a random game
 from it (a rollout). Moreover, it puts a uniform prior on available actions.
 Therefore, it can be used to implement the "vanilla" MCTS algorithm.
 """
-struct RolloutOracle{Game} <: Oracle{Game} end
-
-function rollout!(state, board)
-  while true
-    reward = GI.white_reward(state)
-    isnothing(reward) || (return reward)
-    action = rand(GI.available_actions(state))
-    GI.play!(state, action)
-   end
+struct RolloutOracle{Game} <: Oracle{Game}
+  gamma :: Float64
+  RolloutOracle{G}(γ=1.) where G = new{G}(γ)
 end
 
-function evaluate(::RolloutOracle{Game}, board) where Game
-  state = Game(board)
-  n = length(GI.available_actions(state))
+function rollout!(game, γ=1.)
+  r = 0.
+  while !GI.game_terminated(game)
+    action = rand(GI.available_actions(game))
+    GI.play!(game, action)
+    r = γ * r + GI.white_reward(game)
+  end
+  return r
+end
+
+function evaluate(r::RolloutOracle{Game}, state) where Game
+  game = Game(state)
+  wp = GI.white_playing(game)
+  n = length(GI.available_actions(game))
   P = ones(n) ./ n
-  V = rollout!(state, board)
+  wr = rollout!(game, r.gamma)
+  V = wp ? wr : -wr
   return P, V
 end
 
 struct RandomOracle{Game} <: Oracle{Game} end
 
-function evaluate(::RandomOracle{Game}, board) where Game
-  s = Game(board)
+function evaluate(::RandomOracle{Game}, state) where Game
+  s = Game(state)
   n = length(GI.available_actions(s))
   P = ones(n) ./ n
   V = 0.
@@ -107,45 +111,43 @@ end
 # - NoQuery: the worker finished an MCTS simulation without sending
 #   an evaluation query (see `worker_yield!` for why this matters)
 
-abstract type Message{B} end
-struct Done{B} <: Message{B} end
-struct NoQuery{B} <: Message{B} end
-struct Query{B} <: Message{B} board :: B end
-const AnyMessage{B} = Union{Done{B}, NoQuery{B}, Query{B}}
+abstract type Message{S} end
+struct Done{S} <: Message{S} end
+struct NoQuery{S} <: Message{S} end
+struct Query{S} <: Message{S} state :: S end
+const AnyMessage{S} = Union{Done{S}, NoQuery{S}, Query{S}}
 const EvaluationResult{R} = Tuple{Vector{R}, R}
 
-mutable struct Worker{Board}
-  id    :: Int # useful for debugging purposes
-  stack :: Stack{Tuple{Board, Bool, Int}} # board, white_playing, action_number
-  send  :: Channel{AnyMessage{Board}}
-  recv  :: Channel{EvaluationResult{Float32}}
+mutable struct Worker{State}
+  id :: Int # useful for debugging purposes
+  send :: Channel{AnyMessage{State}}
+  recv :: Channel{EvaluationResult{Float32}}
   queried :: Bool # the worker queried the server during the current simulation
 
-  function Worker{B}(id) where B
-    stack = Stack{Tuple{B, Bool, Int}}()
-    send = Channel{AnyMessage{B}}(1)
+  function Worker{S}(id) where S
+    send = Channel{AnyMessage{S}}(1)
     recv = Channel{EvaluationResult{Float32}}(1)
-    new{B}(id, stack, send, recv, false)
+    new{S}(id, send, recv, false)
   end
 end
 
 #####
-##### Board Statistics
+##### State Statistics
 #####
 
 struct ActionStats
   P :: Float32 # Prior probability as given by the oracle
-  W :: Float64 # Cumulated reward for the action
+  W :: Float64 # Cumulated Q-value for the action (Q = W/N)
   N :: Int # Number of times the action has been visited
   nworkers :: UInt16 # Number of workers currently exploring this branch
 end
 
-struct BoardInfo
+struct StateInfo
   stats :: Vector{ActionStats}
   Vest  :: Float32 # Value estimate given by the oracle
 end
 
-Ntot(b::BoardInfo) = sum(s.N for s in b.stats)
+Ntot(b::StateInfo) = sum(s.N for s in b.stats)
 
 #####
 ##### MCTS Environment
@@ -161,6 +163,7 @@ Create and initialize an MCTS environment with a given `oracle`.
   - `nworkers=1`: numbers of asynchronous workers (see below)
   - `fill_batches=false`: if true, a constant batch size is enforced for
      evaluation requests, by completing batches with dummy entries if necessary
+  - `gamma=1.`: the reward discount factor
   - `cpuct=1.`: exploration constant in the UCT formula
   - `noise_ϵ=0., noise_α=1.`: parameters for the dirichlet exploration noise
      (see below)
@@ -173,7 +176,7 @@ Create and initialize an MCTS environment with a given `oracle`.
     invoked through [`MCTS.evaluate`](@ref).
 
   - If `nworkers > 1`, `nworkers` asynchronous workers are spawned,
-    along with an additional task to serve board evaluation requests.
+    along with an additional task to serve state evaluation requests.
     Such requests are processed by batches of
     size `nworkers` using [`MCTS.evaluate_batch`](@ref).
 
@@ -192,17 +195,18 @@ by the neural network in the UCT formula, one uses ``(1-ϵ)p + ϵη`` where ``η
 is drawn once per call to [`MCTS.explore!`](@ref) from a Dirichlet distribution
 of parameter ``α``.
 """
-mutable struct Env{Game, Board, Oracle}
+mutable struct Env{Game, State, Oracle}
   # Store (nonterminal) state statistics assuming player one is to play
-  tree :: Dict{Board, BoardInfo}
+  tree :: Dict{State, StateInfo}
   # External oracle to evaluate positions
   oracle :: Oracle
   # Workers
-  workers :: Vector{Worker{Board}}
+  workers :: Vector{Worker{State}}
   global_lock :: ReentrantLock # This impl. is asynchronous but sequential
   remaining :: Int # counts the number of remaining simulations to do
   # Parameters
   fill_batches :: Bool
+  gamma :: Float64 # Discount factor
   cpuct :: Float64
   noise_ϵ :: Float64
   noise_α :: Float64
@@ -214,19 +218,19 @@ mutable struct Env{Game, Board, Oracle}
   total_nodes_traversed :: Int64
 
   function Env{G}(oracle;
-      nworkers=1, fill_batches=false,
+      nworkers=1, fill_batches=false, gamma=1.,
       cpuct=1., noise_ϵ=0., noise_α=1., prior_temperature=1.) where G
-    B = GI.Board(G)
-    tree = Dict{B, BoardInfo}()
+    S = GI.State(G)
+    tree = Dict{S, StateInfo}()
     total_time = 0.
     inference_time = 0.
     total_simulations = 0
     total_nodes_traversed = 0
     lock = ReentrantLock()
     remaining = 0
-    workers = [Worker{B}(i) for i in 1:nworkers]
-    new{G, B, typeof(oracle)}(
-      tree, oracle, workers, lock, remaining, fill_batches,
+    workers = [Worker{S}(i) for i in 1:nworkers]
+    new{G, S, typeof(oracle)}(
+      tree, oracle, workers, lock, remaining, fill_batches, gamma,
       cpuct, noise_ϵ, noise_α, prior_temperature,
       total_time, inference_time, total_simulations, total_nodes_traversed)
   end
@@ -236,70 +240,70 @@ asynchronous(env::Env) = length(env.workers) > 1
 
 GameType(::Env{Game}) where Game = Game
 
-Done(::Env{G,B}) where {G,B} = Done{B}()
-NoQuery(::Env{G,B}) where {G,B} = NoQuery{B}()
+Done(::Env{G,S}) where {G,S} = Done{S}()
+NoQuery(::Env{G,S}) where {G,S} = NoQuery{S}()
 
 #####
-##### Access and initialize board information
+##### Access and initialize state information
 #####
 
-function init_board_info(P, V, prior_temperature)
+function init_state_info(P, V, prior_temperature)
   P = apply_temperature(P, prior_temperature)
   stats = [ActionStats(p, 0, 0, 0) for p in P]
-  return BoardInfo(stats, V)
+  return StateInfo(stats, V)
 end
 
 # Returns statistics for the current player, along with a boolean indicating
 # whether or not a new node has been created.
 # Synchronous version
-function board_info_sync(env, worker, board)
-  if haskey(env.tree, board)
-    return (env.tree[board], false)
+function state_info_sync(env, worker, state)
+  if haskey(env.tree, state)
+    return (env.tree[state], false)
   else
-    (P, V), time = @timed evaluate(env.oracle, board)
+    (P, V), time = @timed evaluate(env.oracle, state)
     env.inference_time += time
-    info = init_board_info(P, V, env.prior_temperature)
-    env.tree[board] = info
+    info = init_state_info(P, V, env.prior_temperature)
+    env.tree[state] = info
     return (info, true)
   end
 end
 
-# Equivalent of `board_info_sync` for asynchronous MCTS
-function board_info_async(env, worker, board)
-  if haskey(env.tree, board)
-    return (env.tree[board], false)
+# Equivalent of `state_info_sync` for asynchronous MCTS
+function state_info_async(env, worker, state)
+  if haskey(env.tree, state)
+    return (env.tree[state], false)
   else
     # Send a request to the inference server
-    put!(worker.send, Query(board))
+    put!(worker.send, Query(state))
     unlock(env.global_lock)
     P, V = take!(worker.recv)
     lock(env.global_lock)
     worker.queried = true
     # Another worker may have sent the same request and initialized
     # the node before. Therefore, we have to test membership again.
-    if !haskey(env.tree, board)
-      info = init_board_info(P, V, env.prior_temperature)
-      env.tree[board] = info
+    if !haskey(env.tree, state)
+      info = init_state_info(P, V, env.prior_temperature)
+      env.tree[state] = info
       return (info, true)
     else
       # The inference result is ignored and we proceed as if
       # the node was already in the tree.
-      return (env.tree[board], false)
+      return (env.tree[state], false)
     end
   end
 end
 
-function board_info(env, worker, board)
+function state_info(env, worker, state)
   asynchronous(env) ?
-    board_info_async(env, worker, board) :
-    board_info_sync(env, worker, board)
+    state_info_async(env, worker, state) :
+    state_info_sync(env, worker, state)
 end
 
 #####
 ##### Main algorithm
 #####
 
-function uct_scores(info::BoardInfo, cpuct, ϵ, η)
+function uct_scores(info::StateInfo, cpuct, ϵ, η)
   @assert iszero(ϵ) || length(η) == length(info.stats)
   sqrtNtot = sqrt(Ntot(info))
   return map(enumerate(info.stats)) do (i, a)
@@ -309,57 +313,24 @@ function uct_scores(info::BoardInfo, cpuct, ϵ, η)
   end
 end
 
-# Push a (board, white_is_playing, action_id) triple on the stack
-# and update the virtual loss of the corresponding node. Used in `select!`.
-function push_board_action!(env, worker, (b, wp, aid))
-  push!(worker.stack, (b, wp, aid))
-  stats = env.tree[b].stats
-  astats = stats[aid]
-  stats[aid] = ActionStats(
+function current_player_reward(game)
+  wr = GI.white_reward(game)
+  return GI.white_playing(game) ? wr : -wr
+end
+
+function increment_visit_counter!(env, state, action_id)
+  stats = env.tree[state].stats
+  astats = stats[action_id]
+  stats[action_id] = ActionStats(
     astats.P, astats.W, astats.N + 1, astats.nworkers + 1)
 end
 
-# Starting from `state`, traverse the tree up to its frontier or to a leaf,
-# pushing the traversed path on the worker's stack.
-# Return the collected reward for the white player (obtained either from the
-# oracle or from the game environment if a leaf is reached).
-function select!(env, worker, state, η)
-  state = copy(state)
-  env.total_simulations += 1
-  isroot = true
-  while true
-    wr = GI.white_reward(state)
-    isnothing(wr) || (return wr)
-    wp = GI.white_playing(state)
-    board = GI.canonical_board(state)
-    actions = GI.available_actions(state)
-    let (info, new_node) = board_info(env, worker, board)
-      new_node && (return info.Vest)
-      ϵ = isroot ? env.noise_ϵ : 0.
-      scores = uct_scores(info, env.cpuct, ϵ, η)
-      best_action_id = argmax(scores)
-      best_action = actions[best_action_id]
-      push_board_action!(env, worker, (board, wp, best_action_id))
-      GI.play!(state, best_action)
-      env.total_nodes_traversed += 1
-      isroot = false
-    end
-  end
-end
-
-# Backpropagate `white_reward` along the followed path, cancelling the virtual
-# loss terms for the traversed nodes.
-function backprop!(env, worker, white_reward)
-  while !isempty(worker.stack)
-    board, white_playing, action_id = pop!(worker.stack)
-    reward = white_playing ?
-      white_reward :
-      GI.symmetric_reward(white_reward)
-    stats = env.tree[board].stats
-    astats = stats[action_id]
-    stats[action_id] = ActionStats(
-      astats.P, astats.W + reward, astats.N, astats.nworkers - 1)
-  end
+# Also decreases the visit count
+function update_state_info!(env, state, action_id, q)
+  stats = env.tree[state].stats
+  astats = stats[action_id]
+  stats[action_id] = ActionStats(
+    astats.P, astats.W + q, astats.N, astats.nworkers - 1)
 end
 
 # It is important to guarantee that a worker sends one request to the
@@ -374,17 +345,47 @@ function worker_yield!(env::Env, worker::Worker)
   end
 end
 
-# Run a single MCTS simulation, by calling `select!` and then `backprop!`.
-function worker_explore!(env::Env, worker::Worker, state, η)
-  @assert isempty(worker.stack)
-  worker.queried = false
-  white_reward = select!(env, worker, state, η)
-  worker_yield!(env, worker)
-  backprop!(env, worker, white_reward)
-  @assert isempty(worker.stack)
+# Run a single MCTS simulation, updating the statistics of all traversed states.
+# Return the estimated Q-value for the current player.
+# Leave the game unchanged (a copy is made while visiting the root).
+function worker_explore!(env::Env, worker::Worker, game, η, root=true)
+  if root
+    worker.queried = false
+    env.total_simulations += 1
+    game = copy(game)
+  end
+  if GI.game_terminated(game)
+    worker_yield!(env, worker)
+    return 0.
+  else
+    state = GI.current_state(game)
+    actions = GI.available_actions(game)
+    info, new_node = state_info(env, worker, state)
+    if new_node
+      worker_yield!(env, worker)
+      return info.Vest
+    else
+      ϵ = root ? env.noise_ϵ : 0.
+      scores = uct_scores(info, env.cpuct, ϵ, η)
+      action_id = argmax(scores)
+      action = actions[action_id]
+      wp = GI.white_playing(game)
+      GI.play!(game, action)
+      wr = GI.white_reward(game)
+      r = wp ? wr : -wr
+      pswitch = wp != GI.white_playing(game)
+      increment_visit_counter!(env, state, action_id)
+      qnext = worker_explore!(env, worker, game, η, false)
+      qnext = pswitch ? -qnext : qnext
+      q = r + env.gamma * qnext
+      update_state_info!(env, state, action_id, q)
+      env.total_nodes_traversed += 1
+      return q
+    end
+  end
 end
 
-function inference_server(env::Env{G, B, A}) where {G, B, A}
+function inference_server(env::Env{G, S, A}) where {G, S, A}
   to_watch = env.workers
   while true
     # Update the list of workers to watch (the ones that are not done)
@@ -395,7 +396,7 @@ function inference_server(env::Env{G, B, A}) where {G, B, A}
     to_watch = to_watch[active]
     requests = requests[active]
     # Gather a batch of queries and evaluate them
-    batch = [q.board for q in requests if isa(q, Query)]
+    batch = [q.state for q in requests if isa(q, Query)]
     if isempty(batch)
       answers, time = EvaluationResult{Float32}[], 0.
     else
@@ -422,25 +423,25 @@ function inference_server(env::Env{G, B, A}) where {G, B, A}
   end
 end
 
-function dirichlet_noise(state, α)
-  actions = GI.available_actions(state)
+function dirichlet_noise(game, α)
+  actions = GI.available_actions(game)
   n = length(actions)
   return rand(Dirichlet(n, α))
 end
 
-function explore_sync!(env::Env, state, nsims)
-  η = dirichlet_noise(state, env.noise_α)
+function explore_sync!(env::Env, game, nsims)
+  η = dirichlet_noise(game, env.noise_α)
   elapsed = @elapsed for i in 1:nsims
-    worker_explore!(env, env.workers[1], state, η)
+    worker_explore!(env, env.workers[1], game, η)
   end
   env.total_time += elapsed
 end
 
 # Spawn an inference server along with `env.nworkers` workers.
 # Each worker runs simulations in a loop until `env.remaining` reaches zero.
-function explore_async!(env::Env, state, nsims)
+function explore_async!(env::Env, game, nsims)
   env.remaining = nsims
-  η = dirichlet_noise(state, env.noise_α)
+  η = dirichlet_noise(game, env.noise_α)
   elapsed = @elapsed begin
     @sync begin
       @async @printing_errors inference_server(env)
@@ -449,7 +450,7 @@ function explore_async!(env::Env, state, nsims)
           lock(env.global_lock)
           while env.remaining > 0
             env.remaining -= 1
-            worker_explore!(env, w, state, η)
+            worker_explore!(env, w, game, η)
           end
           put!(w.send, Done(env))
           unlock(env.global_lock)
@@ -462,29 +463,29 @@ function explore_async!(env::Env, state, nsims)
 end
 
 """
-    MCTS.explore!(env, state, nsims)
+    MCTS.explore!(env, game, nsims)
 
-Run `nsims` MCTS simulations from `state`.
+Run `nsims` MCTS simulations from the current state.
 """
-function explore!(env::Env, state, nsims)
+function explore!(env::Env, game, nsims)
   asynchronous(env) ?
-    explore_async!(env, state, nsims) :
-    explore_sync!(env, state, nsims)
+    explore_async!(env, game, nsims) :
+    explore_sync!(env, game, nsims)
 end
 
 """
-    MCTS.policy(env, state)
+    MCTS.policy(env, game)
 
-Return the recommended stochastic policy on `state`.
+Return the recommended stochastic policy on the current state.
 
 A call to this function must always be preceded by
 a call to [`MCTS.explore!`](@ref).
 """
-function policy(env::Env, state)
-  actions = GI.available_actions(state)
-  board = GI.canonical_board(state)
+function policy(env::Env, game)
+  actions = GI.available_actions(game)
+  state = GI.current_state(game)
   info =
-    try env.tree[board]
+    try env.tree[state]
     catch e
       if isa(e, KeyError)
         error("MCTS.explore! must be called before MCTS.policy")
@@ -542,9 +543,9 @@ of the MCTS tree (in bytes).
 """
 function memory_footprint_per_node(env::Env{G}) where G
   # The hashtable is at most twice the number of stored elements
-  # For every element, a board and a pointer are stored
-  size_key = 2 * (GI.board_memsize(G) + sizeof(Int))
-  dummy_stats = BoardInfo([
+  # For every element, a state and a pointer are stored
+  size_key = 2 * (GI.state_memsize(G) + sizeof(Int))
+  dummy_stats = StateInfo([
     ActionStats(0, 0, 0, 0) for i in 1:GI.num_actions(G)], 0)
   size_stats = Base.summarysize(dummy_stats)
   return size_key + size_stats

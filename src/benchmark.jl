@@ -7,9 +7,8 @@ compete against a set of baselines.
 """
 module Benchmark
 
-import ..Util.@unimplemented
 import ..AbstractNetwork, ..MinMax, ..GI
-import ..Env, ..MCTS, ..MctsParams, ..pit, ..compute_redundancy, ..Recorder
+import ..Env, ..MCTS, ..MctsParams, ..pit, ..compute_redundancy
 import ..ColorPolicy, ..ALTERNATE_COLORS
 import ..AbstractPlayer, ..EpsilonGreedyPlayer, ..NetworkPlayer, ..MctsPlayer
 import ..PlayerWithTemperature, ..ConstSchedule
@@ -60,13 +59,11 @@ Subtypes must implement the following functions:
 """
 abstract type Player end
 
-function instantiate(player::Player, nn)
-  @unimplemented
-end
+# instantiate(::Player, nn)
+function instantiate end
 
-function name(::Player) :: String
-  @unimplemented
-end
+# name(::Player) :: String
+function name end
 
 """
     Benchmark.Duel(player, baseline; num_games)
@@ -106,21 +103,22 @@ after each simulated game.
 function run(env::Env{G}, duel::Duel, progress=nothing) where G
   player = instantiate(duel.player, env.bestnn)
   baseline = instantiate(duel.baseline, env.bestnn)
-  rec = Recorder{G}()
-  let games = Vector{Float64}(undef, duel.num_games)
-    avgz, time = @timed begin
-      pit(player, baseline, duel.num_games, memory=rec,
-          flip_probability=duel.flip_probability,
-          reset_every=duel.reset_every,
-          color_policy=duel.color_policy) do i, z
-        games[i] = z
-        isnothing(progress) || next!(progress)
-      end
+  outcomes = []
+  states = []
+  avgz, time = @timed begin
+    pit(player, baseline, duel.num_games,
+        gamma=env.params.self_play.mcts.gamma,
+        flip_probability=duel.flip_probability,
+        reset_every=duel.reset_every,
+        color_policy=duel.color_policy) do i, z, t
+      push!(outcomes, z)
+      append!(states, t.states)
+      isnothing(progress) || next!(progress)
     end
-    red = compute_redundancy(rec)
-    return DuelOutcome(
-      name(duel.player), name(duel.baseline), avgz, red, games, time)
   end
+  red = compute_redundancy(G, states)
+  return DuelOutcome(
+    name(duel.player), name(duel.baseline), avgz, red, outcomes, time)
 end
 
 #####
@@ -210,14 +208,16 @@ Minmax baseline, which relies on [`MinMax.Player`](@ref).
 """
 struct MinMaxTS <: Player
   depth :: Int
+  amplify_rewards :: Bool
   τ :: Float64
-  MinMaxTS(;depth, τ=0.) = new(depth, τ)
+  MinMaxTS(;depth, amplify_rewards, τ=0.) = new(depth, amplify_rewards, τ)
 end
 
 name(p::MinMaxTS) = "MinMax (depth $(p.depth))"
 
 function instantiate(p::MinMaxTS, ::AbstractNetwork{G}) where G
-  return MinMax.Player{G}(depth=p.depth, τ=p.τ)
+  return MinMax.Player{G}(
+    depth=p.depth, amplify_rewards=p.amplify_rewards, τ=p.τ)
 end
 
 """
@@ -231,9 +231,8 @@ struct Solver <: Player
 end
 
 # Return the type of the perfect player for a given type of game
-function PerfectPlayer(::Type{<:GI.AbstractGame})
-  @unimplemented
-end
+# PerfectPlayer(::Type{<:GI.AbstractGame})
+function PerfectPlayer end
 
 name(p::Solver) = "Perfect Player ($(round(Int, 100 * p.ϵ))% random)"
 

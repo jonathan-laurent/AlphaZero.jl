@@ -23,8 +23,8 @@ function convert_sample(Game, wp, e::TrainingSample)
     @assert wp == LINEAR_WEIGHT
     w = Float32[n]
   end
-  x = GI.vectorize_board(Game, e.b)
-  a = GI.actions_mask(Game(e.b))
+  x = GI.vectorize_state(Game, e.s)
+  a = GI.actions_mask(Game(e.s))
   p = zeros(size(a))
   p[a] = e.π
   v = [e.z]
@@ -86,7 +86,7 @@ struct Trainer
   batches_stream # infinite stateful iterator of training batches
   function Trainer(network, samples, params; test_mode=false)
     if params.use_position_averaging
-      samples = merge_by_board(samples)
+      samples = merge_by_state(samples)
     end
     Game = GameType(network)
     data = convert_samples(Game, params.samples_weighing_policy, samples)
@@ -163,7 +163,7 @@ function samples_report(tr::Trainer)
   status = learning_status(tr)
   # Samples in `tr.samples` can be merged by board or not
   num_samples = sum(e.n for e in tr.samples)
-  num_boards = length(merge_by_board(tr.samples))
+  num_boards = length(merge_by_state(tr.samples))
   Wtot = sum(data_weights(tr))
   return Report.Samples(num_samples, num_boards, Wtot, status)
 end

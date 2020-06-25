@@ -46,7 +46,7 @@ function SimpleNet{G}(hyper::SimpleNetHP) where G
       Dense(indim, outdim, relu)
     end
   end
-  indim = prod(GameInterface.board_dim(G))
+  indim = prod(GameInterface.state_dim(G))
   outdim = GameInterface.num_actions(G)
   hsize = hyper.width
   hlayers(depth) = [make_dense(hsize, hsize) for i in 1:depth]

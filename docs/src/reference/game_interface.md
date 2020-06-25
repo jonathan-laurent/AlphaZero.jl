@@ -18,22 +18,23 @@ CurrentModule = AlphaZero.GameInterface
 
 ```@docs
 AbstractGame
-Board
+State
 Action
+two_players
 ```
 
 ### Game Functions
 
 ```@docs
+game_terminated
 white_playing
 white_reward
-board
-board_symmetric
+current_state
 actions
 actions_mask
 play!
 heuristic_value
-vectorize_board
+vectorize_state
 symmetries
 ```
 
@@ -43,16 +44,14 @@ symmetries
 action_string
 parse_action
 read_state
-print_state
+render
 ```
 
 ## Derived Functions
 
 ```@docs
-state_symmetric
-game_terminated
 num_actions
 available_actions
-board_dim
-random_symmetric_state
+state_dim
+apply_random_symmetry
 ```

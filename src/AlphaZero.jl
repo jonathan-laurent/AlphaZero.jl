@@ -13,7 +13,7 @@ export MctsParams, MemAnalysisParams
 export SamplesWeighingPolicy, CONSTANT_WEIGHT, LOG_WEIGHT, LINEAR_WEIGHT
 export AbstractSchedule, ConstSchedule, PLSchedule, StepSchedule
 # Players and games
-export AbstractGame, AbstractPlayer
+export AbstractGame, AbstractPlayer, TwoPlayers, Trace
 export think, select_move, reset_player!, player_temperature, apply_temperature
 export play_game, interactive!
 export MctsPlayer, RandomPlayer, EpsilonGreedyPlayer, NetworkPlayer, Human
@@ -30,7 +30,7 @@ export Explorer, start_explorer
 
 include("util.jl")
 import .Util
-using .Util: Option, @unimplemented, apply_temperature
+using .Util: Option, apply_temperature
 
 include("game.jl")
 using .GameInterface
@@ -42,6 +42,7 @@ import .MCTS
 include("networks/network.jl")
 using .Network
 
+using Formatting
 using Base: @kwdef
 using DataStructures: CircularBuffer
 using Distributions: Categorical, Dirichlet
@@ -50,6 +51,7 @@ using Statistics: mean
 include("schedule.jl")
 include("params.jl")
 include("report.jl")
+include("trace.jl")
 include("memory.jl")
 include("learning.jl")
 include("play.jl")

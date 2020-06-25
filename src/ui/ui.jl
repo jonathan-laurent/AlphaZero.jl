@@ -12,7 +12,7 @@ module UserInterface
 
   using AlphaZero
   import AlphaZero: Util, GameType, apply_temperature
-  using AlphaZero.Util: Option, @unimplemented
+  using AlphaZero.Util: Option
 
   import Plots
   import Colors

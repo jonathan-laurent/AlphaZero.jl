@@ -8,7 +8,6 @@ export AbstractNetwork, OptimiserSpec, Nesterov, CyclicNesterov, Adam
 import ..MCTS, ..GI, ..Util
 
 using Base: @kwdef
-using ..Util: @unimplemented
 using Statistics: mean
 
 """
@@ -18,7 +17,8 @@ Abstract base type for a neural network.
 
 # Constructor
 
-Any subtype `Network` must implement the following constructor:
+Any subtype `Network` must implement `Base.copy` along with
+the following constructor:
 
     Network(hyperparams)
 
@@ -36,27 +36,14 @@ abstract type AbstractNetwork{G} <: MCTS.Oracle{G} end
 
 Return the hyperparameter type associated with a given network type.
 """
-function HyperParams(::Type{<:AbstractNetwork})
-  @unimplemented
-end
+function HyperParams end
 
 """
     hyperparams(::AbstractNetwork)
 
 Return the hyperparameters of a network.
 """
-function hyperparams(::AbstractNetwork)
-  @unimplemented
-end
-
-"""
-    Base.copy(::AbstractNetwork)
-
-Return a copy of the given network.
-"""
-function Base.copy(::AbstractNetwork)
-  @unimplemented
-end
+function hyperparams end
 
 """
     to_gpu(::AbstractNetwork)
@@ -64,9 +51,7 @@ end
 Return a copy of the given network that has been transferred to the GPU
 if one is available. Otherwise, return the given network untouched.
 """
-function to_gpu(::AbstractNetwork)
-  @unimplemented
-end
+function to_gpu end
 
 """
     to_cpu(::AbstractNetwork)
@@ -74,18 +59,14 @@ end
 Return a copy of the given network that has been transferred to the CPU
 or return the given network untouched if it is already on CPU.
 """
-function to_cpu(::AbstractNetwork)
-  @unimplemented
-end
+function to_cpu end
 
 """
     on_gpu(::AbstractNetwork) :: Bool
 
 Test whether or not a network is located on GPU.
 """
-function on_gpu(::AbstractNetwork)
-  @unimplemented
-end
+function on_gpu end
 
 """
     set_test_mode!(mode=true)
@@ -94,9 +75,7 @@ Put a network in test mode or in training mode.
 This is relevant for networks featuring layers such as
 batch normalization layers.
 """
-function set_test_mode!(mode=true)
-  @unimplemented
-end
+function set_test_mode! end
 
 """
     convert_input(::AbstractNetwork, input)
@@ -104,9 +83,7 @@ end
 Convert an array (or number) to the right format so that it can be used
 as an input by a given network.
 """
-function convert_input(::AbstractNetwork, input)
-  @unimplemented
-end
+function convert_input end
 
 function convert_input_tuple(nn::AbstractNetwork, input::Tuple)
   return map(input) do arr
@@ -120,9 +97,7 @@ end
 Convert an array (or number) produced by a neural network
 to a standard CPU array (or number) type.
 """
-function convert_output(::AbstractNetwork, output)
-  @unimplemented
-end
+function convert_output end
 
 function convert_output_tuple(nn::AbstractNetwork, output::Tuple)
   return map(output) do arr
@@ -143,9 +118,7 @@ Return a `(P, V)` triple where:
     to put weight on invalid actions (see [`evaluate`](@ref)).
   - `V` is a row vector of size `(1, batch_size)`
 """
-function forward(::AbstractNetwork, boards)
-  @unimplemented
-end
+function forward end
 
 """
     regularized_params(::AbstractNetwork)
@@ -153,27 +126,21 @@ end
 Return the collection of regularized parameters of a network.
 This usually excludes neuron's biases.
 """
-function regularized_params(::AbstractNetwork)
-  @unimplemented
-end
+function regularized_params end
 
 """
     params(::AbstractNetwork)
 
 Return the collection of trainable parameters of a network.
 """
-function params(::AbstractNetwork)
-  @unimplemented
-end
+function params end
 
 """
     gc(::AbstractNetwork)
 
 Perform full garbage collection and empty the GPU memory pool.
 """
-function gc(::AbstractNetwork)
-  @unimplemented
-end
+function gc end
 
 # Optimizers and training
 
@@ -224,9 +191,7 @@ Update a given network to fit some data.
   - `callback(i, loss)` is called at each step with the batch number `i`
      and the loss on last batch.
 """
-function train!(handle, ::AbstractNetwork, opt::OptimiserSpec, loss, data, n)
-  @unimplemented
-end
+function train! end
 
 #####
 ##### Derived functions
@@ -298,7 +263,7 @@ from_singletons(x) = reshape(x, size(x)[1:end-1])
 
 function MCTS.evaluate(nn::AbstractNetwork{Game}, board) where Game
   actions_mask = GI.actions_mask(Game(board))
-  x = GI.vectorize_board(Game, board)
+  x = GI.vectorize_state(Game, board)
   a = Float32.(actions_mask)
   xnet, anet = to_singletons.(convert_input_tuple(nn, (x, a)))
   net_output = evaluate(nn, xnet, anet)
@@ -307,7 +272,7 @@ function MCTS.evaluate(nn::AbstractNetwork{Game}, board) where Game
 end
 
 function MCTS.evaluate_batch(nn::AbstractNetwork{Game}, batch) where Game
-  X = Util.superpose((GI.vectorize_board(Game, b) for b in batch))
+  X = Util.superpose((GI.vectorize_state(Game, b) for b in batch))
   A = Util.superpose((GI.actions_mask(Game(b)) for b in batch))
   Xnet, Anet = convert_input_tuple(nn, (X, Float32.(A)))
   P, V, _ = convert_output_tuple(nn, evaluate(nn, Xnet, Anet))

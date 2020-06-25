@@ -153,7 +153,7 @@ end
 
 linear_reward(nw, nb) = (nw - nb) / NUM_SEEDS
 
-function GI.white_reward(g::Game)
+function GI.terminal_white_reward(g::Game)
   if game_terminated(g)
     nw, nb = g.board.stores
     return zero_one_reward(nw, nb) # + linear_reward(nw, nb)

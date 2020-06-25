@@ -10,6 +10,7 @@ Parameters of an MCTS player.
 | `num_workers`          | `Int`                        | `1`                 |
 | `use_gpu`              | `Bool`                       | `false`             |
 | `num_iters_per_turn`   | `Int`                        |  -                  |
+| `gamma`                | `Float64`                    | `1.`                |
 | `cpuct`                | `Float64`                    | `1.`                |
 | `temperature`          | `AbstractSchedule{Float64}`  | `ConstSchedule(1.)` |
 | `dirichlet_noise_ϵ`    | `Float64`                    |  -                  |
@@ -20,7 +21,8 @@ Parameters of an MCTS player.
 
 An MCTS player picks an action as follows. Given a game state, it launches
 `num_iters_per_turn` MCTS iterations that are executed asynchronously on
-`num_workers` workers, with UCT exploration constant `cpuct`.
+`num_workers` workers, with UCT exploration constant `cpuct`. Rewards are
+discounted using the `gamma` factor.
 
 Then, an action is picked according to the distribution ``π`` where
 ``π_i ∝ n_i^τ`` with ``n_i`` the number of times that the ``i^{\\text{th}}``
@@ -37,6 +39,7 @@ For information on parameters `cpuct`, `dirichlet_noise_ϵ`,
 
 In the original AlphaGo Zero paper:
 
++ The discount factor `gamma` is set to 1.
 + The number of MCTS iterations per move is 1600, which
   corresponds to 0.4s of computation time.
 + The temperature is set to 1 for the 30 first moves and then to an
@@ -49,6 +52,7 @@ In the original AlphaGo Zero paper:
 @kwdef struct MctsParams
   num_workers :: Int = 1
   use_gpu :: Bool = false
+  gamma :: Float64 = 1.
   cpuct :: Float64 = 1.
   num_iters_per_turn :: Int
   temperature :: AbstractSchedule{Float64} = ConstSchedule(1.)

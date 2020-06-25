@@ -64,7 +64,7 @@ function ResNetBlock(size, n, bnmom)
 end
 
 function ResNet{G}(hyper::ResNetHP) where G
-  bsize = GameInterface.board_dim(G)
+  bsize = GameInterface.state_dim(G)
   outdim = GameInterface.num_actions(G)
   ksize = hyper.conv_kernel_size
   @assert all(ksize .% 2 .== 1)

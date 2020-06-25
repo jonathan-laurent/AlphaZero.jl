@@ -19,6 +19,7 @@ const EMPTY = 0x00
 const Board = SMatrix{NUM_COLS, NUM_ROWS, Cell, NUM_CELLS}
 
 const INITIAL_BOARD = @SMatrix zeros(Cell, NUM_COLS, NUM_ROWS)
+const INITIAL_STATE = (board=INITIAL_BOARD, curplayer=WHITE)
 
 mutable struct Game <: GI.AbstractGame
   board :: Board
@@ -32,8 +33,8 @@ mutable struct Game <: GI.AbstractGame
 end
 
 function Game()
-  board = INITIAL_BOARD
-  curplayer = WHITE
+  board = INITIAL_STATE.board
+  curplayer = INITIAL_STATE.curplayer
   finished = false
   winner = 0x00
   amask = trues(NUM_COLS)
@@ -41,8 +42,11 @@ function Game()
   Game(board, curplayer, finished, winner, amask, history)
 end
 
-GI.Board(::Type{Game}) = Board
+GI.State(::Type{Game}) = typeof(INITIAL_STATE)
+
 GI.Action(::Type{Game}) = Int
+
+GI.two_players(::Type{Game}) = true
 
 const ACTIONS = collect(1:NUM_COLS)
 
@@ -120,11 +124,12 @@ function GI.play!(g::Game, col)
   g.curplayer = other(g.curplayer)
 end
 
-function Game(board::Board, white_playing=true)
+function Game(state)
+  board = state.board
   g = Game()
   g.history = nothing
   g.board = board
-  g.curplayer = white_playing ? WHITE : BLACK
+  g.curplayer = state.curplayer
   update_actions_mask!(g)
   any(g.amask) || (g.finished = true)
   for col in 1:NUM_COLS
@@ -141,21 +146,17 @@ function Game(board::Board, white_playing=true)
   return g
 end
 
-GI.board(g::Game) = g.board
+GI.current_state(g::Game) = (board=g.board, curplayer=g.curplayer)
 
-cell_symmetric(c::Cell) = c == EMPTY ? EMPTY : other(c)
-
-function GI.board_symmetric(g::Game) :: Board
-  return @SMatrix [
-    cell_symmetric(g.board[col, row])
-    for col in 1:NUM_COLS, row in 1:NUM_ROWS]
-end
-
-GI.white_playing(g::Game) = g.curplayer == WHITE
+GI.white_playing(::Type{Game}, state) = state.curplayer == WHITE
 
 #####
 ##### Reward shaping
 #####
+
+function GI.game_terminated(g::Game)
+  return g.finished
+end
 
 function GI.white_reward(g::Game)
   if g.finished
@@ -163,7 +164,7 @@ function GI.white_reward(g::Game)
     g.winner == BLACK && (return -1.)
     return 0.
   else
-    return nothing
+    return 0.
   end
 end
 
@@ -223,7 +224,16 @@ end
 ##### ML interface
 #####
 
-function GI.vectorize_board(::Type{Game}, board)
+flip_cell_color(c::Cell) = c == EMPTY ? EMPTY : other(c)
+
+function flip_colors(board)
+  return @SMatrix [
+    flip_cell_color(board[col, row])
+    for col in 1:NUM_COLS, row in 1:NUM_ROWS]
+end
+
+function GI.vectorize_state(::Type{Game}, state)
+  board = GI.white_playing(Game, state) ? state.board : flip_colors(state.board)
   return Float32[
     board[col, row] == c
     for col in 1:NUM_COLS,
@@ -240,10 +250,11 @@ function flipped_board(board)
     for col in reverse(1:NUM_COLS), row in 1:NUM_ROWS]
 end
 
-function GI.symmetries(::Type{Game}, board)
-  symb = flipped_board(board)
+function GI.symmetries(::Type{Game}, state)
+  symb = flipped_board(state.board)
   σ = reverse(collect(1:NUM_COLS))
-  return [(symb, σ)]
+  syms = (board=Board(symb), curplayer=state.curplayer)
+  return [(syms, σ)]
 end
 
 #####
@@ -275,7 +286,7 @@ player_mark(p)  = p == WHITE ? "o" : "x"
 cell_mark(c)    = c == EMPTY ? "." : player_mark(c)
 cell_color(c)   = c == EMPTY ? crayon"" : player_color(c)
 
-function GI.print_state(g::Game; with_position_names=true, botmargin=true)
+function GI.render(g::Game; with_position_names=true, botmargin=true)
   pname = player_name(g.curplayer)
   pcol = player_color(g.curplayer)
   print(pcol, pname, " plays:", crayon"reset", "\n\n")

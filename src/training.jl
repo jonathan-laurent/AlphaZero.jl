@@ -32,7 +32,7 @@ mutable struct Env{Game, Network, Board}
   itc    :: Int
   function Env{Game}(
       params, curnn, bestnn=copy(curnn), experience=[], itc=0) where Game
-    Board = GI.Board(Game)
+    Board = GI.State(Game)
     msize = max(params.mem_buffer_size[itc], length(experience))
     memory = MemoryBuffer{Board}(msize, experience)
     return new{Game, typeof(curnn), Board}(
@@ -134,16 +134,18 @@ function resize_memory!(env::Env{G,N,B}, n) where {G,N,B}
 end
 
 function evaluate_network(contender, baseline, params, handler)
-  contender = MctsPlayer(contender, params.mcts)
-  baseline = MctsPlayer(baseline, params.mcts)
-  ngames = params.num_games
-  rec = Recorder{GameType(baseline)}()
-  avgz = pit(contender, baseline, ngames; memory=rec,
-      reset_every=params.reset_mcts_every,
-      flip_probability=params.flip_probability) do i, z
+  contender = MctsPlayer(contender, params.arena.mcts)
+  baseline = MctsPlayer(baseline, params.arena.mcts)
+  ngames = params.arena.num_games
+  states = []
+  gamma = params.self_play.mcts.gamma
+  avgz = pit(contender, baseline, ngames; gamma=gamma,
+      reset_every=params.arena.reset_mcts_every,
+      flip_probability=params.arena.flip_probability) do i, z, t
     Handlers.checkpoint_game_played(handler)
+    append!(states, t.states)
   end
-  redundancy = compute_redundancy(rec)
+  redundancy = compute_redundancy(GameType(contender), states)
   return avgz, redundancy
 end
 
@@ -183,7 +185,7 @@ function learning_step!(env::Env, handler)
     Handlers.checkpoint_started(handler)
     env.curnn = get_trained_network(trainer)
     (evalz, redundancy), dteval =
-      @timed evaluate_network(env.curnn, env.bestnn, ap, handler)
+      @timed evaluate_network(env.curnn, env.bestnn, env.params, handler)
     teval += dteval
     # If eval is good enough, replace network
     success = (evalz >= best_evalz)
@@ -208,19 +210,21 @@ end
 function simple_memory_stats(env)
   mem = get_experience(env)
   nsamples = length(mem)
-  ndistinct = length(merge_by_board(mem))
+  ndistinct = length(merge_by_state(mem))
   return nsamples, ndistinct
 end
 
 function self_play_step!(env::Env{G}, handler) where G
   params = env.params.self_play
+  gamma = env.params.self_play.mcts.gamma
   player = MctsPlayer(env.bestnn, params.mcts)
   new_batch!(env.memory)
   Handlers.self_play_started(handler)
   mem_footprint = 0
   elapsed = @elapsed begin
     for i in 1:params.num_games
-      play_game(player, player, env.memory)
+      trace = play_game(player)
+      push_game!(env.memory, trace, gamma)
       Handlers.game_played(handler)
       reset_every = params.reset_mcts_every
       if (!isnothing(reset_every) && i % reset_every == 0) ||
@@ -236,7 +240,7 @@ function self_play_step!(env::Env{G}, handler) where G
   end
   MCTS.memory_footprint(player.mcts)
   inference_tr = MCTS.inference_time_ratio(player.mcts)
-  speed = last_batch_size(env.memory) / elapsed
+  speed = cur_batch_size(env.memory) / elapsed
   expdepth = MCTS.average_exploration_depth(player.mcts)
   memsize, memdistinct = simple_memory_stats(env)
   report = Report.SelfPlay(

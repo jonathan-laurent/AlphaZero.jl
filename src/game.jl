@@ -1,16 +1,14 @@
 """
-A generic interface for two-players, symmetric, zero-sum games.
+A generic interface for two-players, zero-sum games.
 
-We call a game _symmetric_ when the rules are the same for both players.
-Said differently, it is always possible to swap the players' colors along
-with the color of every piece on the board without affecting the game.
+Stochastic games and intermediate rewards are supported. By convention,
+rewards are expressed from the point of view of the player called _white_.
 """
 module GameInterface
 
 export AbstractPlayer
 
 import ..Util
-using ..Util: @unimplemented
 
 #####
 ##### Types
@@ -19,196 +17,159 @@ using ..Util: @unimplemented
 """
     AbstractGame
 
-Abstract base type for a game state.
+Abstract base type for a game environment.
 
 # Constructors
 
-Any subtype `Game` must implement `Base.copy` along with
-the following constructors:
+Any subtype `Game` must implement the following constructors:
 
     Game()
 
-Return the initial state of the game.
+Return an initialized game environment. Note that this constructor does not
+have to be deterministic.
 
-    Game(board, white_playing=true)
+    Game(state)
 
-Return the unique state specified by a board and a current player.
-By convention, the first player to play is called _white_ and
-the other is called _black_.
+Return a fresh game environment starting at a given state.
 """
 abstract type AbstractGame end
 
-"""
-    Board(Game::Type{<:AbstractGame})
-
-Return the board type corresponding to `Game`.
-
-Board objects must be persistent or appear as such as they are stored into
-the MCTS tree without copying.
-
-# Remark
-
-A game state (of type [`AbstractGame`](@ref)) is characterized by two pieces
-of information: the board state and the identity of the player to play next.
-There are two reasons for having a separate `Board` type:
-
-  - This separation allows the `Game` object to store redundant state
-    information, typically for caching expensive computations.
-  - This separation enables leveraging the symmetry between players by
-    storing every board in the MCTS tree from the perspective of the current
-    player (as if white were to play next).
-"""
-function Board(::Type{<:AbstractGame})
-  @unimplemented
+function Base.copy(env::Game) where {Game <: AbstractGame}
+  return Game(current_state(env))
 end
+
+"""
+    two_players(::Type{<:AbstractGame}) :: Bool
+
+Return whether or not a game is a two-players game.
+"""
+function two_players end
+
+"""
+    State(Game::Type{<:AbstractGame})
+
+Return the state type corresponding to `Game`.
+
+State objects must be persistent or appear as such as they are stored into
+the MCTS tree without copying. They also have to be comparable and hashable.
+"""
+function State end
 
 """
     Action(Game::Type{<:AbstractGame})
 
 Return the action type corresponding to `Game`.
-
-Actions must be _colorblind_ in the following sense:
-
-```
-available_actions(s) == available_actions(state_symmetric(s))
-```
 """
-function Action(::Type{<:AbstractGame})
-  @unimplemented
-end
+function Action end
 
 """
     actions(::Type{<:AbstractGame})
 
 Return the vector of all game actions.
 """
-function actions(::Type{<:AbstractGame})
-  @unimplemented
-end
-
-function Base.copy(::AbstractGame)
-  @unimplemented
-end
+function actions end
 
 #####
 ##### Game functions
 #####
 
 """
-    white_playing(state::AbstractGame) :: Bool
+    white_playing(::Type{<:AbstractGame}, state) :: Bool
+    white_playing(env::AbstractGame)
+      = white_playing(typeof(env), current_state(env))
 
-Return `true` if white is to play and `false` otherwise.
+Return `true` if white is to play and `false` otherwise. For a one-player
+game, it must always return `true`.
 """
-function white_playing(::AbstractGame)
-  @unimplemented
+function white_playing end
+
+function white_playing(env::AbstractGame)
+  return white_playing(typeof(env), current_state(env))
 end
 
 """
-    white_reward(state::AbstractGame)
+    white_reward(env::AbstractGame)
 
-Return `nothing` if the game hasn't ended. Otherwise, return a
-reward for the white player as a number between -1 and 1.
+Return the intermediate reward obtained by the white player after the last
+transition step. The result is undetermined when called at an initial state.
 """
-function white_reward(::AbstractGame)
-  @unimplemented
-end
+function white_reward end
 
 """
-    board(state::AbstractGame)
+    current_state(env::AbstractGame)
 
-Return the game board.
+Return the game state (which is persistent).
 """
-function board(::AbstractGame)
-  @unimplemented
-end
+function current_state end
 
 """
-    board_symmetric(state::AbstractGame)
+    game_terminated(::AbstractGame)
 
-Return the symmetric of the game board, where the players'
-colors are swapped.
-
-The white player must have opposite values in
-`state` and `state_symmetric(state)`.
+Return a boolean indicating whether or not the game is in a terminal state.
 """
-function board_symmetric(::AbstractGame)
-  @unimplemented
-end
+function game_terminated end
 
 """
-    actions_mask(state::AbstractGame)
+    actions_mask(env::AbstractGame)
 
-Return a boolean mask indicating what actions are available from `state`.
+Return a boolean mask indicating what actions are available from `env`.
 
 The following identities must hold:
 
-  - `game_terminated(state) || any(actions_mask(state))`
-  - `length(actions_mask(state)) == length(actions(typeof(state)))`
+  - `game_terminated(env) || any(actions_mask(env))`
+  - `length(actions_mask(env)) == length(actions(typeof(env)))`
 """
-function actions_mask(state::AbstractGame)
-  @unimplemented
-end
+function actions_mask end
 
 """
-    play!(state::AbstractGame, action)
+    play!(env::AbstractGame, action)
 
-Update the game state by making the current player perform `action`.
+Update the game environment by making the current player perform `action`.
+Note that this function does not have to be deterministic.
 """
-function play!(state::AbstractGame, action)
-  @unimplemented
-end
+function play! end
 
 """
-    heuristic_value(state::AbstractGame)
+    heuristic_value(env::AbstractGame)
 
 Return a heuristic estimate of the state value for the current player.
 
 The given state must be nonfinal and returned values must belong to the
-``(-∞, ∞)`` interval. Also, the following must hold:
-```
-heuristic_value(s) == heuristic_value(state_symmetric(s))
-```
+``(-∞, ∞)`` interval.
 
 This function is not needed by AlphaZero but it is useful for building
 baselines such as minmax players.
 """
-function heuristic_value(state::AbstractGame)
-  @unimplemented
-end
+function heuristic_value end
 
 #####
 ##### Symmetries
 #####
 
 """
-    symmetries(::Type{G}, board) where {G <: AbstractGame}
+    symmetries(::Type{G}, state) where {G <: AbstractGame}
 
-Return the vector of all pairs `(b, σ)` where:
-  - `b` is the image of `board` by a nonidentical symmetry
+Return the vector of all pairs `(s, σ)` where:
+  - `s` is the image of `state` by a nonidentical symmetry
   - `σ` is the associated actions permutation, as an integer vector of
      size `num_actions(Game)`.
 
 A default implementation is provided that returns an empty vector.
 
-# Note
+# Example
 
-This function should not be confused with [`board_symmetric`](@ref).
-
-  - `board_symmetric` only deals with _color symmetry_ (the rules of the
-     game are the same for both players). Its implementation is mandatory and
-     leveraged by MCTS.
-  - `symmetries` can be used to declare additional symmetries,
-     typically about board geometry (ie. a tictactoe grid is invariant
-     by rotation).
+In the game of tic-tac-toe, there are eight symmetries that can be
+obtained by composing reflexions and rotations of the board (including the
+identity symmetry).
 """
-function symmetries(::Type{G}, board) where {G <: AbstractGame}
-  return Tuple{Board(G), Vector{Int}}[]
+function symmetries(::Type{G}, state) where {G <: AbstractGame}
+  return Tuple{State(G), Vector{Int}}[]
 end
 
-function test_symmetry(Game, board, (symboard, aperm))
+function test_symmetry(Game, state, (symstate, aperm))
   syms = symmetries
-  mask = actions_mask(Game(board))
-  symmask = actions_mask(Game(symboard))
+  mask = actions_mask(Game(state))
+  symmask = actions_mask(Game(symstate))
   v = falses(length(symmask))
   v[mask] .= true
   v = v[aperm]
@@ -220,13 +181,11 @@ end
 #####
 
 """
-    vectorize_board(::Type{<:AbstractGame}, board) :: Array{Float32}
+    vectorize_state(::Type{<:AbstractGame}, state) :: Array{Float32}
 
-Return a vectorized representation of a board.
+Return a vectorized representation of a state.
 """
-function vectorize_board(::Type{<:AbstractGame}, board)
-  @unimplemented
-end
+function vectorize_state end
 
 #####
 ##### Interface for interactive exploratory tools
@@ -237,9 +196,7 @@ end
 
 Return a human-readable string representing the provided action.
 """
-function action_string(::Type{<:AbstractGame}, action)
-  @unimplemented
-end
+function action_string end
 
 """
     parse_action(::Type{<:AbstractGame}, str::String)
@@ -247,49 +204,26 @@ end
 Return the action described by string `str` or `nothing`
 if `str` does not denote a valid action.
 """
-function parse_action(::Type{<:AbstractGame}, ::String)
-  @unimplemented
-end
+function parse_action end
 
 """
-    read_state(::Type{G}) where G <: AbstractGame :: Union{G, Nothing}
+    read_state(::Type{G}) where G <: AbstractGame :: Union{State(G), Nothing}
 
-Read a state description from the standard input.
+Read a state from the standard input.
 Return the corresponding state or `nothing` in case of an invalid input.
 """
-function read_state(::Type{<:AbstractGame})
-  @unimplemented
-end
+function read_state end
 
 """
-    print_state(state::AbstractGame)
+    render(env::AbstractGame)
 
-Print a state on the standard output.
+Print the game state on the standard output.
 """
-function print_state(::AbstractGame)
-  @unimplemented
-end
+function render end
 
 #####
 ##### Derived functions
 #####
-
-"""
-    state_symmetric(state)
-
-Return a fresh symmetric state where the players' colors are swapped.
-See [`board_symmetric`](@ref).
-"""
-function state_symmetric(s::Game) where {Game <: AbstractGame}
-  return Game(board_symmetric(s), !white_playing(s))
-end
-
-"""
-    game_terminated(::AbstractGame)
-
-Return a boolean indicating whether or not a game is in a terminal state.
-"""
-game_terminated(state) = !isnothing(white_reward(state))
 
 """
     num_actions(::Type{G})
@@ -299,43 +233,37 @@ Return the total number of actions associated with a game.
 num_actions(::Type{G}) where G = length(actions(G))
 
 """
-    available_actions(state::AbstractGame)
+    available_actions(env::AbstractGame)
 
-Return the vector of all available actions in a given state.
+Return the vector of all available actions.
 """
-function available_actions(state::AbstractGame)
-  Game = typeof(state)
-  mask = actions_mask(state)
+function available_actions(env::AbstractGame)
+  Game = typeof(env)
+  mask = actions_mask(env)
   return actions(Game)[mask]
 end
 
 """
-    board_dim(::Type{G})
+    state_dim(::Type{G})
 
-Return a tuple that indicates the shape of a vectorized board representation.
+Return a tuple that indicates the shape of a vectorized state representation.
 """
-board_dim(::Type{G}) where G = size(vectorize_board(G, board(G())))
-
-function canonical_board(state)
-  return white_playing(state) ? board(state) : board_symmetric(state)
-end
+state_dim(::Type{G}) where G = size(vectorize_state(G, current_state(G())))
 
 """
-    random_symmetric_state(::AbstractGame)
+    apply_random_symmetry(::AbstractGame)
 
 Return a fresh new state that is the image of the given state by a random
 symmetry (see [`symmetries`](@ref)).
 """
-function random_symmetric_state(state::Game) where {Game <: AbstractGame}
-  bsym, _ = rand(symmetries(Game, board(state)))
-  return Game(bsym, white_playing(state))
+function apply_random_symmetry(env::Game) where {Game <: AbstractGame}
+  symstate, _ = rand(symmetries(Game, current_state(env)))
+  return Game(symstate)
 end
 
-function board_memsize(::Type{G}) where G
-  return Base.summarysize(board(G()))
+function state_memsize(::Type{G}) where G
+  return Base.summarysize(current_state(G()))
 end
-
-symmetric_reward(r::Real) = -r
 
 end
 
@@ -345,6 +273,4 @@ end
 Return the `Game` type associated with an object
 (such as a network, a player, an MCTS environment...)
 """
-function GameType(T)
-  @unimplemented
-end
+function GameType end
