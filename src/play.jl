@@ -455,6 +455,6 @@ function interactive!(game, player)
   end
 end
 
-interactive!(game, white, black) = interactive!(game, MixedPlayer(white, black))
+interactive!(game, white, black) = interactive!(game, TwoPlayers(white, black))
 
 interactive!(game::G) where G = interactive!(game, Human{G}(), Human{G}())
