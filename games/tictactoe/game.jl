@@ -68,9 +68,9 @@ GI.current_state(g::Game) = (board=g.board, curplayer=g.curplayer)
 GI.white_playing(::Type{Game}, state) = state.curplayer
 
 function terminal_white_reward(g::Game)
-  isempty(GI.available_actions(g)) && return 0.
   has_won(g, WHITE) && return 1.
   has_won(g, BLACK) && return -1.
+  isempty(GI.available_actions(g)) && return 0.
   return nothing
 end
 
