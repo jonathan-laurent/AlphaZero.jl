@@ -1,6 +1,7 @@
 # AlphaZero.jl
 
 [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://jonathan-laurent.github.io/AlphaZero.jl/dev)
+[![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://jonathan-laurent.github.io/AlphaZero.jl/stable)
 [![Build Status](https://travis-ci.com/jonathan-laurent/AlphaZero.jl.svg?branch=master)](https://travis-ci.com/jonathan-laurent/AlphaZero.jl)
 [![Codecov](https://codecov.io/gh/jonathan-laurent/AlphaZero.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/jonathan-laurent/AlphaZero.jl)
 [![Gitter](https://badges.gitter.im/alphazero-jl/community.svg)](https://gitter.im/alphazero-jl/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
@@ -42,7 +43,7 @@ We found the [Julia language](https://julialang.org/) to be instrumental in achi
 To download AlphaZero.jl and start training a Connect Four agent, just run:
 
 ```
-git clone https://github.com/jonathan-laurent/AlphaZero.jl.git
+git clone --branch v0.2.1 https://github.com/jonathan-laurent/AlphaZero.jl.git
 cd AlphaZero.jl
 julia --project -e "import Pkg; Pkg.instantiate()"
 julia --project --color=yes scripts/alphazero.jl --game connect-four train

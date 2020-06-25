@@ -22,7 +22,7 @@ To download AlphaZero.jl and start a new training session, just run the
 following:
 
 ```sh
-git clone https://github.com/jonathan-laurent/AlphaZero.jl.git
+git clone --branch v0.2.1 https://github.com/jonathan-laurent/AlphaZero.jl.git
 cd AlphaZero.jl
 julia --project -e "import Pkg; Pkg.instantiate()"
 julia --project --color=yes scripts/alphazero.jl --game connect-four train
