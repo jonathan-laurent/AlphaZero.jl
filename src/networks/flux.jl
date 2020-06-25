@@ -10,37 +10,15 @@ using ..Network
 using Base: @kwdef
 import ..GameInterface, ..Util, ..CyclicSchedule
 
-using CUDAapi
-
-# Import CUDA only if CUDA is installed
-if has_cuda()
-  try
-    using CUDA
-    @eval const CUARRAYS_IMPORTED = true
-  catch ex
-    @warn(
-      "CUDA is installed, but CUDA.jl fails to load.",
-      exception=(ex,catch_backtrace()))
-    @eval const CUARRAYS_IMPORTED = false
-  end
-else
-  @eval const CUARRAYS_IMPORTED = false
-end
+using CUDA
 
 import Flux
+import Functors
 
-if CUARRAYS_IMPORTED
-  @eval begin
-    CUDA.allowscalar(false)
-    on_gpu(::Type{<:Array}) = false
-    on_gpu(::Type{<:CuArray}) = true
-    on_gpu(x) = on_gpu(typeof(x))
-  end
-else
-  @eval begin
-    on_gpu(x) = false
-  end
-end
+CUDA.allowscalar(false)
+array_on_gpu(::Type{<:Array}) = false
+array_on_gpu(::Type{<:CuArray}) = true
+array_on_gpu(arr) = error("Usupported array type: ", typeof(arr))
 
 using Flux: relu, softmax, flatten
 using Flux: Chain, Dense, Conv, BatchNorm, SkipConnection
@@ -75,7 +53,7 @@ end
 Network.to_cpu(nn::FluxNetwork) = Flux.cpu(nn)
 
 function Network.to_gpu(nn::FluxNetwork)
-  CUARRAYS_IMPORTED && CUDA.allowscalar(false)
+  CUDA.allowscalar(false)
   return Flux.gpu(nn)
 end
 
@@ -138,7 +116,7 @@ regularized_params_(l::Flux.Conv) = [l.weight]
 
 # Reimplementation of what used to be Flux.prefor, does not visit leafs
 function foreach_flux_node(f::Function, x, seen = IdDict())
-  Flux.isleaf(x) && return
+  Functors.isleaf(x) && return
   haskey(seen, x) && return
   seen[x] = true
   f(x)
@@ -158,7 +136,6 @@ function Network.regularized_params(net::FluxNetwork)
 end
 
 function Network.gc(::FluxNetwork)
-  CUARRAYS_IMPORTED || return
   GC.gc(true)
   # CUDA.reclaim()
 end
@@ -196,7 +173,7 @@ end
 
 Network.hyperparams(nn::TwoHeadNetwork) = nn.hyper
 
-Network.on_gpu(nn::TwoHeadNetwork) = on_gpu(nn.vhead[end].b)
+Network.on_gpu(nn::TwoHeadNetwork) = array_on_gpu(nn.vhead[end].b)
 
 #####
 ##### Include networks library
