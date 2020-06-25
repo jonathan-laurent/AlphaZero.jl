@@ -59,27 +59,28 @@ function remaining_stones(game, player)
 end
 
 function value(player, game)
-  z = GI.terminal_white_reward(game)
-  if isnothing(z)
+  if !GI.game_terminated(game)
     return query_solver(player, game).score
-  elseif iszero(z)
+  elseif game.winner == 0x00
     return 0
   else
     v = remaining_stones(game, game.winner) + 1
-    z < 0 && (v = -v)
-    GI.white_playing(game) || (v = -v)
+    if (game.winner == WHITE) != GI.white_playing(game)
+      v = -v
+    end
     return v
   end
 end
 
 function qvalue(player, game, action)
-  @assert isnothing(GI.terminal_white_reward(game))
-  wp = GI.white_playing(game)
-  game = copy(game)
-  GI.play!(game, action)
-  pswitch = wp != GI.white_playing(game)
-  nextv = value(player, game)
-  return pswitch ? - nextv : nextv
+  @assert !GI.game_terminated(game)
+  next = copy(game)
+  GI.play!(next, action)
+  qnext = value(player, next)
+  if GI.white_playing(game) != GI.white_playing(next)
+    qnext = -qnext
+  end
+  return qnext
 end
 
 function think(p::Player, g)

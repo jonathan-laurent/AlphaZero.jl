@@ -151,7 +151,7 @@ end
 
 function generate_data(session_dir)
   println("Testing the minmax baseline")
-  player = MinMax.Player{Game}(depth=5, τ=0)
+  player = MinMax.Player{Game}(depth=5, amplify_rewards=true, τ=0)
   minmax_errs = test_player(player)
   println("")
 
