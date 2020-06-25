@@ -42,6 +42,7 @@ import .MCTS
 include("networks/network.jl")
 using .Network
 
+using Formatting
 using Base: @kwdef
 using DataStructures: CircularBuffer
 using Distributions: Categorical, Dirichlet

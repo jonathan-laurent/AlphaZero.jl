@@ -261,8 +261,6 @@ function state_memsize(::Type{G}) where G
   return Base.summarysize(current_state(G()))
 end
 
-symmetric_reward(r::Real) = -r
-
 end
 
 """

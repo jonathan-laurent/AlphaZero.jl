@@ -370,13 +370,13 @@ function worker_explore!(env::Env, worker::Worker, game, η, root=true)
       action = actions[action_id]
       wp = GI.white_playing(game)
       GI.play!(game, action)
+      wr = GI.white_reward(game)
+      r = wp ? wr : -wr
+      pswitch = wp != GI.white_playing(game)
       increment_visit_counter!(env, state, action_id)
       qnext = worker_explore!(env, worker, game, η, false)
-      if wp != GI.white_playing(game)
-        # If the player switched
-        qnext = -qnext
-      end
-      q = current_player_reward(game) + env.gamma * qnext
+      qnext = pswitch ? -qnext : qnext
+      q = r + env.gamma * qnext
       update_state_info!(env, state, action_id, q)
       env.total_nodes_traversed += 1
       return q

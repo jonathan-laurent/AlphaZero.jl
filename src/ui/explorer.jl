@@ -1,5 +1,5 @@
 #####
-##### Computing board statistics
+##### Exploring a player's policy
 #####
 
 using DataStructures: Stack
@@ -30,46 +30,51 @@ mutable struct StateStats{Action}
 end
 
 player_reward(game, white_reward) =
-  GI.white_playing(game) ? white_reward : GI.symmetric_reward(white_reward)
+  GI.white_playing(game) ? white_reward : - white_reward
 
 function evaluate_vnet(oracle::MCTS.Oracle, game)
-  r = GI.terminal_white_reward(game)
-  if !isnothing(r)
-    return player_reward(game, r)
+  if GI.game_terminated(game)
+    return 0.0
   else
-    cboard = GI.canonical_board(game)
-    return MCTS.evaluate(oracle, cboard)[2]
+    return MCTS.evaluate(oracle, GI.current_state(game))[2]
   end
 end
 
-function evaluate_qnet(oracle::MCTS.Oracle, game, action)
+function evaluate_qnet(oracle::MCTS.Oracle, game, action, gamma)
   @assert !GI.game_terminated(game)
   next = copy(game)
   GI.play!(next, action)
-  q = evaluate_vnet(oracle, next)
-  pswitch = (GI.white_playing(game) != GI.white_playing(next))
-  return pswitch ? GI.symmetric_reward(q) : q
+  wr = GI.white_reward(next)
+  r = GI.white_playing(game) ? wr : -wr
+  qnext = evaluate_vnet(oracle, next)
+  if GI.white_playing(game) != GI.white_playing(next)
+    qnext = -qnext
+  end
+  return r + gamma * qnext
 end
 
 player_oracle(p) = nothing
 player_oracle(p::MctsPlayer) = p.mcts.oracle
 player_oracle(p::NetworkPlayer) = p.network
 
+player_gamma(p) = p.gamma
+player_gamma(p::MctsPlayer) = p.mcts.gamma
+
 function state_statistics(game, player, turn, memory=nothing)
   @assert !GI.game_terminated(game)
-  cboard = GI.current_state(game)
+  state = GI.current_state(game)
   # Make the player think
   actions, π = think(player, game)
-  τ = player_temperature(player, turn)
+  τ = player_temperature(player, game, turn)
   π = apply_temperature(π, τ)
   report = StateStats(actions)
   for i in eachindex(actions)
     report.actions[i][2].P = π[i]
   end
   # Collect MCTS Statistics
-  if isa(player, MctsPlayer) && haskey(player.mcts.tree, cboard)
+  if isa(player, MctsPlayer) && haskey(player.mcts.tree, state)
     mcts = player.mcts
-    info = mcts.tree[cboard]
+    info = mcts.tree[state]
     ucts = MCTS.uct_scores(info, mcts.cpuct, 0., nothing)
     report.Nmcts = MCTS.Ntot(info)
     for (i, a) in enumerate(actions)
@@ -82,8 +87,8 @@ function state_statistics(game, player, turn, memory=nothing)
   end
   # Collect memory statistics
   if !isnothing(memory)
-    mem = AlphaZero.merge_by_board(get_experience(memory))
-    relevant = findall((ex -> ex.b == cboard), mem)
+    mem = AlphaZero.merge_by_state(get_experience(memory))
+    relevant = findall((ex -> ex.s == state), mem)
     if !isempty(relevant)
       @assert length(relevant) == 1
       e = mem[relevant[1]]
@@ -97,12 +102,12 @@ function state_statistics(game, player, turn, memory=nothing)
   # Collect network statistics
   oracle = player_oracle(player)
   if isa(oracle, AbstractNetwork)
-    Pnet, Vnet = MCTS.evaluate(oracle, cboard)
+    Pnet, Vnet = MCTS.evaluate(oracle, state)
     report.Vnet = Vnet
     for i in eachindex(actions)
       arep = report.actions[i][2]
       arep.Pnet = Pnet[i]
-      arep.Qnet = evaluate_qnet(oracle, game, actions[i])
+      arep.Qnet = evaluate_qnet(oracle, game, actions[i], player_gamma(player))
     end
   end
   # Sort the actions from best to worst
@@ -112,7 +117,7 @@ function state_statistics(game, player, turn, memory=nothing)
 end
 
 #####
-##### Displaying board statistics
+##### Displaying state statistics
 #####
 
 function print_state_statistics(::Type{G}, stats::StateStats) where G
