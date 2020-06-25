@@ -21,7 +21,8 @@ Parameters of an MCTS player.
 
 An MCTS player picks an action as follows. Given a game state, it launches
 `num_iters_per_turn` MCTS iterations that are executed asynchronously on
-`num_workers` workers, with UCT exploration constant `cpuct`.
+`num_workers` workers, with UCT exploration constant `cpuct`. Rewards are
+discounted using the `gamma` factor.
 
 Then, an action is picked according to the distribution ``π`` where
 ``π_i ∝ n_i^τ`` with ``n_i`` the number of times that the ``i^{\\text{th}}``
@@ -38,6 +39,7 @@ For information on parameters `cpuct`, `dirichlet_noise_ϵ`,
 
 In the original AlphaGo Zero paper:
 
++ The discount factor `gamma` is set to 1.
 + The number of MCTS iterations per move is 1600, which
   corresponds to 0.4s of computation time.
 + The temperature is set to 1 for the 30 first moves and then to an
@@ -158,7 +160,7 @@ the neural network is updated to fit the data in the memory buffer.
 
 | Parameter                     | Type                            | Default    |
 |:------------------------------|:--------------------------------|:-----------|
-| `use_gpu`                     | `Bool`                          | `true`     |
+| `use_gpu`                     | `Bool`                          | `false`    |
 | `use_position_averaging`      | `Bool`                          | `true`     |
 | `samples_weighing_policy`     | [`SamplesWeighingPolicy`](@ref) |  -         |
 | `optimiser`                   | [`OptimiserSpec`](@ref)         |  -         |
@@ -205,7 +207,7 @@ In the original AlphaGo Zero paper:
   are performed in total.
 """
 @kwdef struct LearningParams
-  use_gpu :: Bool = true
+  use_gpu :: Bool = false
   use_position_averaging :: Bool = true
   samples_weighing_policy :: SamplesWeighingPolicy
   optimiser :: OptimiserSpec
@@ -256,7 +258,6 @@ The AlphaZero training hyperparameters.
 | `learning`                 | [`LearningParams`](@ref)            |  -        |
 | `arena`                    | [`ArenaParams`](@ref)               |  -        |
 | `memory_analysis`          | `Union{Nothing, MemAnalysisParams}` | `nothing` |
-| `gamma`                    | `Float64`                           | `1.`      |
 | `num_iters`                | `Int`                               |  -        |
 | `use_symmetries`           | `Bool`                              | `false`   |
 | `ternary_rewards`          | `Bool`                              | `false`   |
@@ -291,7 +292,6 @@ In the original AlphaGo Zero paper:
 """
 @kwdef struct Params
   self_play :: SelfPlayParams
-  gamma :: Float64 = 1.
   memory_analysis :: Union{Nothing, MemAnalysisParams} = nothing
   learning :: LearningParams
   arena :: ArenaParams

@@ -22,12 +22,15 @@ RandomPlayer
 NetworkPlayer
 EpsilonGreedyPlayer
 PlayerWithTemperature
+TwoPlayers
 ```
 
 ## Derived Functions
 
 ```@docs
 play_game
+Trace
+Base.push!(::Trace, π, r, s)
 pit
 ColorPolicy
 interactive!

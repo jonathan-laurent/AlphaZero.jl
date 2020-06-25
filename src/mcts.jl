@@ -163,6 +163,7 @@ Create and initialize an MCTS environment with a given `oracle`.
   - `nworkers=1`: numbers of asynchronous workers (see below)
   - `fill_batches=false`: if true, a constant batch size is enforced for
      evaluation requests, by completing batches with dummy entries if necessary
+  - `gamma=1.`: the reward discount factor
   - `cpuct=1.`: exploration constant in the UCT formula
   - `noise_ϵ=0., noise_α=1.`: parameters for the dirichlet exploration noise
      (see below)

@@ -50,7 +50,7 @@ end
 
 A stochastic minmax player, to be used as a baseline.
 
-    MinMax.Player{Game}(;depth, τ=0.)
+    MinMax.Player{Game}(;depth, amplify_rewards, τ=0.)
 
 The minmax player explores the game tree exhaustively at depth `depth`
 to build an estimate of the Q-value of each available action. Then, it
@@ -70,6 +70,9 @@ Otherwise,
   Q value of action ``a`` and ``C`` is the maximum absolute value of all
   finite Q values, making the decision invariant to rescaling of
   [`GameInterface.heuristic_value`](@ref).
+
+If the `amplify_rewards` option is set to true, every received positive reward
+is converted to ``∞`` and every negative reward is converted to ``-∞``.
 """
 struct Player{G} <: AbstractPlayer{G}
   depth :: Int

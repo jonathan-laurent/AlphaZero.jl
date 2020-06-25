@@ -1,5 +1,8 @@
 """
 A generic interface for two-players, zero-sum games.
+
+Stochastic games and intermediate rewards are supported. By convention,
+rewards are expressed from the point of view of the player called _white_.
 """
 module GameInterface
 
@@ -102,7 +105,7 @@ function current_state end
 """
     game_terminated(::AbstractGame)
 
-Return a boolean indicating whether or not a game is in a terminal state.
+Return a boolean indicating whether or not the game is in a terminal state.
 """
 function game_terminated end
 
@@ -122,6 +125,7 @@ function actions_mask end
     play!(env::AbstractGame, action)
 
 Update the game environment by making the current player perform `action`.
+Note that this function does not have to be deterministic.
 """
 function play! end
 
@@ -203,9 +207,9 @@ if `str` does not denote a valid action.
 function parse_action end
 
 """
-    read_state(::Type{G}) where G <: AbstractGame :: Union{G, Nothing}
+    read_state(::Type{G}) where G <: AbstractGame :: Union{State(G), Nothing}
 
-Read a state description from the standard input.
+Read a state from the standard input.
 Return the corresponding state or `nothing` in case of an invalid input.
 """
 function read_state end

@@ -24,7 +24,6 @@ regularized_params
 ### Conversion and Copy
 
 ```@docs
-Base.copy(::AbstractNetwork)
 to_gpu
 to_cpu
 on_gpu

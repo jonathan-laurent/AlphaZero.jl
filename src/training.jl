@@ -138,7 +138,8 @@ function evaluate_network(contender, baseline, params, handler)
   baseline = MctsPlayer(baseline, params.arena.mcts)
   ngames = params.arena.num_games
   states = []
-  avgz = pit(contender, baseline, ngames; gamma=params.gamma,
+  gamma = params.self_play.mcts.gamma
+  avgz = pit(contender, baseline, ngames; gamma=gamma,
       reset_every=params.arena.reset_mcts_every,
       flip_probability=params.arena.flip_probability) do i, z, t
     Handlers.checkpoint_game_played(handler)
@@ -215,6 +216,7 @@ end
 
 function self_play_step!(env::Env{G}, handler) where G
   params = env.params.self_play
+  gamma = env.params.self_play.mcts.gamma
   player = MctsPlayer(env.bestnn, params.mcts)
   new_batch!(env.memory)
   Handlers.self_play_started(handler)
@@ -222,7 +224,7 @@ function self_play_step!(env::Env{G}, handler) where G
   elapsed = @elapsed begin
     for i in 1:params.num_games
       trace = play_game(player)
-      push_game!(env.memory, trace, env.params.gamma)
+      push_game!(env.memory, trace, gamma)
       Handlers.game_played(handler)
       reset_every = params.reset_mcts_every
       if (!isnothing(reset_every) && i % reset_every == 0) ||

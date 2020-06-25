@@ -9,7 +9,7 @@
 Type of a training sample. A sample features the following fields:
 - `s::State` is the state
 - `π::Vector{Float64}` is the recorded MCTS policy for this position
-- `z::Float64` is the reward cumulated from `s`
+- `z::Float64` is the discounted reward cumulated from state `s`
 - `t::Float64` is the (average) number of moves remaining before the end of the game
 - `n::Int` is the number of times the state `s` was recorded
 
@@ -32,9 +32,10 @@ sample_state_type(::Type{<:TrainingSample{S}}) where S = S
 
 A circular buffer to hold memory samples.
 
-- Use `new_batch!(mem)` to start a new batch, typically once per iteration
-  before self-play.
-- Use `push_game!(mem, trace)` to record a game.
+# Constructor
+
+    MemoryBuffer{State}(size, experience=[])
+
 """
 mutable struct MemoryBuffer{State}
   buf :: CircularBuffer{TrainingSample{State}}
@@ -46,6 +47,11 @@ mutable struct MemoryBuffer{State}
   end
 end
 
+"""
+    get_experience(::MemoryBuffer{S}) where S :: Vector{TrainingSample{S}}
+
+Return all samples in the memory buffer.
+"""
 get_experience(mem::MemoryBuffer) = mem.buf[:]
 
 last_batch(mem::MemoryBuffer) = mem.buf[end-cur_batch_size(mem)+1:end]
@@ -62,6 +68,13 @@ end
 
 Base.length(mem::MemoryBuffer) = length(mem.buf)
 
+"""
+    push_game!(mem::MemoryBuffer, trace::Trace, gamma)
+
+Collect samples out of a game trace and add them to the memory buffer.
+
+Here, `gamma` is the reward discount factor.
+"""
 function push_game!(mem::MemoryBuffer, trace, gamma)
   n = length(trace)
   wr = 0.

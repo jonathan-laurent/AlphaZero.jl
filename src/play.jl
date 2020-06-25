@@ -259,6 +259,13 @@ end
 ##### Merging two players into one
 #####
 
+"""
+    TwoPlayers{Game} <: AbstractPlayer{Game}
+
+If `white` and `black` are two [`AbstractPlayer`](@ref), then
+`TwoPlayers(white, black)` is a player that behaves as `white` when `white`
+is to play and as `black` when `black` is to play.
+"""
 struct TwoPlayers{G, W, B} <: AbstractPlayer{G}
   white :: W
   black :: B
@@ -305,9 +312,9 @@ end
 """
     play_game(player; flip_probability=0.) :: Trace
 
-Play a game between using an [`AbstractPlayer`](@ref) and return the reward
-obtained by `white`.
+Simulate a game by an [`AbstractPlayer`](@ref) and return a trace.
 
+- For two-player games, please use [`TwoPlayers`](@ref).
 - If the `flip_probability` argument is set to ``p``, the board
   is _flipped_ randomly at every turn with probability ``p``,
   using [`GI.apply_random_symmetry`](@ref).
@@ -328,7 +335,7 @@ function play_game(player; flip_probability=0.)
     π_sample = apply_temperature(π_target, τ)
     a = actions[Util.rand_categorical(π_sample)]
     GI.play!(game, a)
-    push!(trace, GI.current_state(game), π_target, GI.white_reward(game))
+    push!(trace, π_target, GI.white_reward(game), GI.current_state(game))
   end
 end
 
@@ -361,7 +368,6 @@ Note that this function can only be used with two-player games.
   - `reset_every`: if set, players are reset every `reset_every` games
   - `color_policy`: determines the [`ColorPolicy`](@ref),
      which is `ALTERNATE_COLORS` by default
-  - `memory=nothing`: memory to use to record samples
   - `flip_probability=0.`: see [`play_game`](@ref)
 """
 function pit(

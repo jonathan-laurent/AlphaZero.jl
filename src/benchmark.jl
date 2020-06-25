@@ -107,7 +107,7 @@ function run(env::Env{G}, duel::Duel, progress=nothing) where G
   states = []
   avgz, time = @timed begin
     pit(player, baseline, duel.num_games,
-        gamma=env.params.gamma,
+        gamma=env.params.self_play.mcts.gamma,
         flip_probability=duel.flip_probability,
         reset_every=duel.reset_every,
         color_policy=duel.color_policy) do i, z, t
