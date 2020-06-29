@@ -53,7 +53,9 @@ function performances_plot(rep::Report.Iteration)
   end
   push!(global_labels, "Learning")
   push!(global_content, rep.perfs_learning.time)
-  glob = Plots.pie(global_labels, global_content, title="Global")
+  glob = Plots.pie(global_labels, global_content,
+    title="Global",
+    legend=:right)
   # Self-play details
   self_play =
     let gcratio =
