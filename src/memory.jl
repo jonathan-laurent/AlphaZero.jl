@@ -87,6 +87,7 @@ function push_game!(mem::MemoryBuffer, trace, gamma)
     t = float(n - i + 1)
     push!(mem.buf, TrainingSample(s, π, z, t, 1))
   end
+  mem.cur_batch_size += n
 end
 
 function merge_samples(samples)
