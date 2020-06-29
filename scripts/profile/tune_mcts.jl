@@ -7,7 +7,7 @@ using AlphaZero: Log, Util
 using Formatting
 using Base: @kwdef
 
-const NUM_GAMES = 1000
+const NUM_GAMES = 500
 const RESET_MCTS_EVERY = 10
 const LOGGER = Log.Logger()
 
@@ -74,7 +74,8 @@ function evaluate_player(network, params, baseline, n)
     if i % RESET_MCTS_EVERY == 0
       MCTS.reset!(player.mcts)
     end
-    Rtot += AlphaZero.play_game(player, baseline)
+    trace = AlphaZero.play_game(TwoPlayers(player, baseline))
+    Rtot += AlphaZero.total_reward(trace)
   end
   return Report(
     reward=(Rtot / n),
@@ -128,5 +129,10 @@ configs = [
 ]
 
 network = session.env.bestnn
-baseline = MinMax.Player{Game}(;depth=5, τ=0.2)
+baseline_params = MctsParams(
+  num_workers=1,
+  num_iters_per_turn=2000,
+  dirichlet_noise_ϵ=0.,
+  dirichlet_noise_α=1.)
+baseline = MctsPlayer(MCTS.RolloutOracle{Game}(), baseline_params)
 run_experiments(network, baseline, configs)
