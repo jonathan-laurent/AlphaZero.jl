@@ -236,7 +236,12 @@ save_game!(exp::Explorer) = push!(exp.history, copy(exp.game))
 function interpret!(exp::Explorer, stats, cmd, args=[])
   Game = GameType(exp)
   if cmd == "go"
-    g = Game(GI.read_state(Game))
+    st = GI.read_state(Game)
+    if isnothing(st)
+      println("Invalid state description.")
+      return false
+    end
+    g = Game(st)
     if !isnothing(st)
       save_game!(exp)
       exp.game = g
