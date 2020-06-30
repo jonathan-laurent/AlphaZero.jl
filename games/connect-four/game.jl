@@ -323,13 +323,13 @@ function GI.read_state(::Type{Game})
     nw = count(==(WHITE), board)
     nb = count(==(BLACK), board)
     if nw == nb
-      wp = true
+      curplayer = WHITE
     elseif nw == nb + 1
-      wp = false
+      curplayer = BLACK
     else
       return nothing
     end
-    return Game(Board(board), wp)
+    return (board=board, curplayer=curplayer)
   catch e
     return nothing
   end
