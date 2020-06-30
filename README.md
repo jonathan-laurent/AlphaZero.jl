@@ -43,7 +43,7 @@ We found the [Julia language](https://julialang.org/) to be instrumental in achi
 To download AlphaZero.jl and start training a Connect Four agent, just run:
 
 ```
-git clone --branch v0.2.1 https://github.com/jonathan-laurent/AlphaZero.jl.git
+git clone --branch v0.3.0 https://github.com/jonathan-laurent/AlphaZero.jl.git
 cd AlphaZero.jl
 julia --project -e "import Pkg; Pkg.instantiate()"
 julia --project --color=yes scripts/alphazero.jl --game connect-four train
@@ -61,7 +61,7 @@ julia --project --color=yes scripts/alphazero.jl --game connect-four train
 
 <br/>
 
-Each training iteration takes between one and two hours on a desktop
+Each training iteration takes between 30 and 50 minutes on a desktop
 computer with an Intel Core i5 9600K processor and an 8GB Nvidia RTX
 2070 GPU. We plot below the evolution of the win rate of our AlphaZero agent against two baselines (a vanilla MCTS baseline and a minmax agent that plans at depth 5 using a handcrafted heuristic):
 

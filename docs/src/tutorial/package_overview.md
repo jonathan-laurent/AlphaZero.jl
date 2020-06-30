@@ -64,9 +64,9 @@ section of the manual.
 
 You can use AlphaZero.jl on the game of your choice by simply implementing the
 [Game Interface](@ref game_interface). Currently, there is support for
-two-players, symmetric (the rules are the same for both players), zero-sum
-games with finite action spaces and perfect information. We plan to handle
-more kinds of games in the future.
+two-players, zero-sum games with finite action spaces and perfect information.
+Support for Markov Decision Processes will be added in a forthcoming release.
+
 
 When adding support for a new game, we recommend following some
 [conventions](@ref add_game) to ensure that it works properly with all helper

@@ -13,19 +13,29 @@ using .SelectedGame: Game, Training
 
 SESSION_DIR = "sessions/$GAME"
 
-# Example: run a network-only benchmark
 
-make_duel(baseline) =
+# Examples: run a network-only benchmark
+
+netonly = Benchmark.NetworkOnly(τ=0.5, use_gpu=true)
+alphazero = Benchmark.Full(Training.arena.mcts)
+baselines = [Training.mcts_baseline, Training.minmax_baseline]
+
+make_duel(player, baseline) =
   Benchmark.Duel(
-    Benchmark.NetworkOnly(τ=0.5, use_gpu=true),
+    player,
     baseline,
     num_games=200,
+    reset_every=40,
     flip_probability=0.5,
     color_policy=CONTENDER_WHITE)
 
-benchmark = make_duel.(Training.baselines)
+netonly_benchmark   = [make_duel(netonly, b) for b in baselines]
+alphazero_benchmark = [make_duel(alphazero, b) for b in baselines]
+
+benchmark = alphazero_benchmark
+label = "full"
 
 AlphaZero.UserInterface.run_new_benchmark(
   Game, Training.Network{Game}, SESSION_DIR,
-  "netonly", benchmark,
+  label, benchmark,
   params=Training.params, itcmax=nothing)

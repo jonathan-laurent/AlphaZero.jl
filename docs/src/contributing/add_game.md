@@ -29,9 +29,16 @@ game directory's name in upper snake case. Also:
   `params`, `Network`, `netparams` and `benchmark` as explained in the
     [Connect Four Tutorial](@ref connect_four).
 
-Finally, to register your game, just add `"your-game"` to `AVAILABLE_GAMES`
-in `scripts/games.jl`. If you've done everything correctly, you should be
-able to launch a training session for your game by running:
+To register your game, just add `"your-game"` to `AVAILABLE_GAMES`
+in `scripts/games.jl`. Then, we recommend that you run the test suite in
+`test/test_game.jl` to check that your game correctly implements the game
+interface and that every expected invariant is met. To do so, just run:
+
+```sh
+julia --project --color=yes scripts/alphazero.jl --game your-game check-game
+```
+
+Finally, you can launch a training session by running:
 
 ```sh
 julia --project --color=yes scripts/alphazero.jl --game your-game train

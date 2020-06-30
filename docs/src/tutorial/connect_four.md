@@ -22,7 +22,7 @@ To download AlphaZero.jl and start a new training session, just run the
 following:
 
 ```sh
-git clone --branch v0.2.1 https://github.com/jonathan-laurent/AlphaZero.jl.git
+git clone --branch v0.3.0 https://github.com/jonathan-laurent/AlphaZero.jl.git
 cd AlphaZero.jl
 julia --project -e "import Pkg; Pkg.instantiate()"
 julia --project --color=yes scripts/alphazero.jl --game connect-four train
@@ -73,16 +73,16 @@ tutorial](@ref c4-config). Here are some highlights:
 
 - We use a [two-headed convolutional ResNet](@ref conv_resnet) similar to the
   one introduced in the AlphaGo Zero paper, although much smaller. Its tower
-  consists of 7 residual blocks with 64 convolutional filters per layer, for a
-  total of about 600K parameters (in contrast, the neural network from the
+  consists of 5 residual blocks with 64 convolutional filters per layer, for a
+  total of about 470K parameters (in contrast, the neural network from the
   AlphaGo Zero paper has about 100M parameters).
-- During each iteration, the current agent plays 4000 games against itself,
+- During each iteration, the current agent plays 1000 games against itself,
   running 600 MCTS simulations to plan each move.[^2] The move selection
   temperature is set to 1.0 during the first ten moves of every game and then
   decreased to 0.5.
 - Self-play data is accumulated in a memory buffer whose capacity grows from
-  400K samples (initially) to 2M samples (at iteration 60). For reference,
-  assuming an average game duration of 35 moves, about 35 x 4000 = 140K
+  200K samples (initially) to 1M samples (at iteration 60). For reference,
+  assuming an average game duration of 35 moves, about 35 x 1000 = 35K
   new samples are generated at each iteration.
 
 [^2]:
@@ -140,7 +140,7 @@ decisions.
 ### Training
 
 After the initial benchmarks are done, the first training iteration can start.
-Each training iteration took between one and two hours on our hardware. The
+Each training iteration took between 30 and 50 minutes on our hardware. The
 first iterations are typically on the shorter end, as games of self-play
 terminate more quickly and the memory buffer has yet to reach its final size.
 
@@ -229,7 +229,7 @@ This experiment can be replicated using the script at `games/connect-four/script
 
 ![Pons benchark](../assets/img/connect-four/pons-benchmark-results.png)
 
-As you can see, while our AlphaZero agent makes very few mistakes that
+As you can see, while our AlphaZero agent makes few mistakes that
 could be detected by planning up to 14 moves ahead, it is still imperfect at
 making longer term strategical decisions and playing overtures.
 
@@ -288,19 +288,21 @@ languages. For example, `Params(p, num_iters=100)` builds a `Params` object that
 is identical to `p` for every field, except `num_iters` which is set to `100`.
 
 ```julia
+# Hyperparameters
+
 Network = ResNet
 
 netparams = ResNetHP(
   num_filters=64,
-  num_blocks=7,
+  num_blocks=5,
   conv_kernel_size=(3, 3),
   num_policy_head_filters=32,
   num_value_head_filters=32,
   batch_norm_momentum=0.1)
 
 self_play = SelfPlayParams(
-  num_games=4_000,
-  reset_mcts_every=100,
+  num_games=2000,
+  reset_mcts_every=50,
   mcts=MctsParams(
     use_gpu=true,
     num_workers=32,
@@ -308,20 +310,21 @@ self_play = SelfPlayParams(
     cpuct=3.0,
     prior_temperature=0.7,
     temperature=PLSchedule([0, 20], [1.0, 0.3]),
-    dirichlet_noise_ϵ=0.15,
+    dirichlet_noise_ϵ=0.2,
     dirichlet_noise_α=1.0))
 
 arena = ArenaParams(
-  num_games=200,
-  reset_mcts_every=nothing,
+  num_games=100,
+  reset_mcts_every=50,
   flip_probability=0.5,
-  update_threshold=0.05,
+  update_threshold=0.1,
   mcts=MctsParams(
     self_play.mcts,
-    temperature=ConstSchedule(0.1),
+    temperature=ConstSchedule(0.2),
     dirichlet_noise_ϵ=0.05))
 
 learning = LearningParams(
+  use_gpu=true,
   use_position_averaging=true,
   samples_weighing_policy=LOG_WEIGHT,
   batch_size=2048,
@@ -331,7 +334,7 @@ learning = LearningParams(
   nonvalidity_penalty=1.,
   min_checkpoints_per_epoch=1,
   max_batches_per_checkpoint=1000,
-  num_checkpoints=2)
+  num_checkpoints=1)
 
 params = Params(
   arena=arena,
@@ -344,23 +347,37 @@ params = Params(
     num_game_stages=4),
   mem_buffer_size=PLSchedule(
   [      0,        60],
-  [400_000, 2_000_000]))
+  [200_000, 1_000_000]))
 
-baselines = [
+# Benchmarks
+
+mcts_baseline =
   Benchmark.MctsRollouts(
     MctsParams(
       arena.mcts,
       num_iters_per_turn=1000,
-      cpuct=1.)),
-  Benchmark.MinMaxTS(depth=5, τ=0.2)]
+      num_workers=1,
+      cpuct=1.))
 
-make_duel(baseline) =
+minmax_baseline = Benchmark.MinMaxTS(depth=5, amplify_rewards=true, τ=0.2)
+
+players = [
+  Benchmark.Full(arena.mcts),
+  Benchmark.Full(arena.mcts),
+  Benchmark.NetworkOnly(τ=0.5, use_gpu=true)]
+
+baselines = [
+  mcts_baseline,
+  minmax_baseline,
+  mcts_baseline]
+
+make_duel(player, baseline) =
   Benchmark.Duel(
-    Benchmark.Full(arena.mcts),
+    player,
     baseline,
-    num_games=200,
+    num_games=50,
     flip_probability=0.5,
     color_policy=CONTENDER_WHITE)
 
-benchmark = make_duel.(baselines)
+benchmark = [make_duel(p, b) for (p, b) in zip(players, baselines)]
 ```
