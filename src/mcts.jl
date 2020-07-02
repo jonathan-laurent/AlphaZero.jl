@@ -9,7 +9,6 @@ we recommend that you study the sychronous version first.
 """
 module MCTS
 
-using DataStructures: Stack
 using Distributions: Categorical, Dirichlet
 
 using ..Util: @printing_errors, apply_temperature
@@ -311,11 +310,6 @@ function uct_scores(info::StateInfo, cpuct, ϵ, η)
     P = iszero(ϵ) ? a.P : (1-ϵ) * a.P + ϵ * η[i]
     Q + cpuct * P * sqrtNtot / (a.N + 1)
   end
-end
-
-function current_player_reward(game)
-  wr = GI.white_reward(game)
-  return GI.white_playing(game) ? wr : -wr
 end
 
 function increment_visit_counter!(env, state, action_id)
