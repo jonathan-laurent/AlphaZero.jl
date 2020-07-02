@@ -36,7 +36,7 @@ include("game.jl")
 using .GameInterface
 const GI = GameInterface
 
-include("mcts.jl")
+include("mcts_simple.jl")
 import .MCTS
 
 include("networks/network.jl")
