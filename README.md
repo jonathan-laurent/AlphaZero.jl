@@ -1,7 +1,7 @@
 <p align="center">
   <img width="230px" src="./docs/src/assets/logo-text.png"/>
 </p>
-<br/>
+<p style="height: 20px;"/>
 <p align="center">
   <a href="https://jonathan-laurent.github.io/AlphaZero.jl/dev" alt="Dev">
     <img src="https://img.shields.io/badge/docs-dev-blue.svg"/>
@@ -16,7 +16,7 @@
     <img src="https://codecov.io/gh/jonathan-laurent/AlphaZero.jl/branch/master/graph/badge.svg"/>
   </a>
 </p>
-<br/>
+<p style="height: 20px;"/>
 
 This package provides a _generic_, _simple_ and _fast_ implementation of
 Deepmind's AlphaZero algorithm:
