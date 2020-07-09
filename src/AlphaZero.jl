@@ -42,6 +42,9 @@ import .MCTS
 include("networks/network.jl")
 using .Network
 
+include("batchifier.jl")
+import .Batchifier
+
 using Formatting
 using Base: @kwdef
 using DataStructures: CircularBuffer

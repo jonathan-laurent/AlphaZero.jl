@@ -3,10 +3,23 @@
 ##### before launching a training session
 #####
 
+function with_dummy_mcts(mcts::MctsParams)
+  return MctsParams(mcts; num_iters_per_turn=2)
+end
+
+function with_dummy_mcts(p::SelfPlayParams)
+  return SelfPlayParams(p; mcts=with_dummy_mcts(p.mcts))
+end
+
+function with_dummy_mcts(p::ArenaParams)
+  return ArenaParams(p; mcts=with_dummy_mcts(p.mcts))
+end
+
 # Returned modified parameters where all num_games fields are set to 1.
 # The number of iterations is set to 2.
 function dummy_run_params(params, benchmark)
-  self_play = SelfPlayParams(params.self_play, num_games=1)
+  self_play = SelfPlayParams(with_dummy_mcts(params.self_play),
+    num_games=1, num_workers=1)
   arena = ArenaParams(params.arena, num_games=1)
   learning = LearningParams(params.learning,
     max_batches_per_checkpoint=2,
@@ -15,7 +28,7 @@ function dummy_run_params(params, benchmark)
     self_play=self_play, arena=arena, learning=learning)
   benchmark = [
     Benchmark.Duel(d.player, d.baseline,
-      num_games=1, color_policy=d.color_policy)
+      num_games=1, num_workers=1, color_policy=d.color_policy)
     for d in benchmark ]
   return params, benchmark
 end

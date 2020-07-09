@@ -224,4 +224,6 @@ function random_batches_stream(convert, data::Tuple, batchsize)
     for _ in Iterators.repeated(nothing))))
 end
 
+threads_pmap(f, xs) = fetch.([Threads.@spawn f(x) for x in xs])
+
 end

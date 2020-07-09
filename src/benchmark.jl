@@ -79,16 +79,18 @@ Specify a duel that consists in `num_games` games between
 """
 struct Duel
   num_games :: Int
+  num_workers :: Int
+  use_gpu :: Bool
   reset_every :: Union{Nothing, Int}
   flip_probability :: Float64
   color_policy :: ColorPolicy
   player :: Player
   baseline :: Player
   function Duel(player, baseline;
-      num_games, reset_every=nothing,
+      num_games, num_workers, use_gpu=false, reset_every=nothing,
       color_policy=ALTERNATE_COLORS, flip_probability=0.)
-    return new(
-      num_games, reset_every, flip_probability, color_policy, player, baseline)
+    return new(num_games, num_workers, use_gpu, reset_every,
+      flip_probability, color_policy, player, baseline)
   end
 end
 
@@ -162,8 +164,7 @@ name(p::MctsRollouts) = "MCTS ($(p.params.num_iters_per_turn) rollouts)"
 
 function instantiate(p::MctsRollouts, nn::AbstractNetwork{G}) where G
   params = MctsParams(p.params,
-    num_workers=1,
-    use_gpu=false)
+    num_workers=1)
   return MctsPlayer(MCTS.RolloutOracle{G}(), params)
 end
 
@@ -176,28 +177,30 @@ Argument `params` has type [`MctsParams`](@ref).
 """
 struct Full <: Player
   params :: MctsParams
+  Full(params) = new(params)
 end
 
 name(::Full) = "AlphaZero"
 
-instantiate(p::Full, nn) = MctsPlayer(nn, p.params)
+function instantiate(p::Full, nn)
+  return MctsPlayer(nn, p.params)
+end
 
 """
-    Benchmark.NetworkOnly(;use_gpu=true, τ=1.0) <: Benchmark.Player
+    Benchmark.NetworkOnly(;τ=1.0) <: Benchmark.Player
 
 Player that uses the policy output by the learnt network directly,
 instead of relying on MCTS.
 """
 struct NetworkOnly <: Player
-  use_gpu :: Bool
   τ :: Float64
-  NetworkOnly(;use_gpu=false, τ=1.0) = new(use_gpu, τ)
+  NetworkOnly(;τ=1.0) = new(τ)
 end
 
 name(::NetworkOnly) = "Network Only"
 
 function instantiate(p::NetworkOnly, nn)
-  player = NetworkPlayer(nn, use_gpu=p.use_gpu)
+  player = NetworkPlayer(nn)
   return PlayerWithTemperature(player, ConstSchedule(p.τ))
 end
 

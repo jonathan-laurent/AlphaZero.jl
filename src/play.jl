@@ -159,8 +159,6 @@ The temperature parameter `τ` can be either a real number or a
     MctsPlayer(oracle::MCTS.Oracle, params::MctsParams; timeout=nothing)
 
 Construct an MCTS player from an oracle and an [`MctsParams`](@ref) structure.
-If the oracle is a network, this constructor handles copying it, putting it
-in test mode and copying it on the GPU (if necessary).
 """
 struct MctsPlayer{G, M} <: AbstractPlayer{G}
   mcts :: M
@@ -177,15 +175,8 @@ end
 # Alternative constructor
 function MctsPlayer(
     oracle::MCTS.Oracle{G}, params::MctsParams; timeout=nothing) where G
-  fill_batches = false
-  if isa(oracle, AbstractNetwork)
-    oracle = Network.copy(oracle, on_gpu=params.use_gpu, test_mode=true)
-    params.use_gpu && (fill_batches = true)
-  end
   mcts = MCTS.Env{G}(oracle,
-    nworkers=params.num_workers,
     gamma=params.gamma,
-    fill_batches=fill_batches,
     cpuct=params.cpuct,
     noise_ϵ=params.dirichlet_noise_ϵ,
     noise_α=params.dirichlet_noise_α,
@@ -200,7 +191,6 @@ end
 function RandomMctsPlayer(::Type{G}, params::MctsParams) where G
   oracle = MCTS.RandomOracle{G}()
   mcts = MCTS.Env{G}(oracle,
-    nworkers=1,
     cpuct=params.cpuct,
     gamma=params.gamma,
     noise_ϵ=params.dirichlet_noise_ϵ,
@@ -238,12 +228,11 @@ end
     NetworkPlayer{Game, Net} <: AbstractPlayer{Game}
 
 A player that uses the policy output by a neural network directly,
-instead of relying on MCTS.
+instead of relying on MCTS. The given neural network must be in test mode.
 """
 struct NetworkPlayer{G, N} <: AbstractPlayer{G}
   network :: N
-  function NetworkPlayer(nn::AbstractNetwork{G}; use_gpu=false) where G
-    nn = Network.copy(nn, on_gpu=use_gpu, test_mode=true)
+   function NetworkPlayer(nn::AbstractNetwork{G}) where G
     return new{G, typeof(nn)}(nn)
   end
 end

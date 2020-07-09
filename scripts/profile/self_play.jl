@@ -50,8 +50,7 @@ function config(nblocks, nfilters, niters, nworkers)
   network = ResNet{Game}(ResNetHP(Training.netparams,
     num_blocks=nblocks, num_filters=nfilters))
   params = MctsParams(Training.params.self_play.mcts,
-    num_iters_per_turn=niters,
-    num_workers=nworkers)
+    num_iters_per_turn=niters)
   return (title, network, params)
 end
 

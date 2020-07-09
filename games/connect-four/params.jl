@@ -10,10 +10,10 @@ netparams = ResNetHP(
 
 self_play = SelfPlayParams(
   num_games=2000,
-  reset_mcts_every=50,
+  num_workers=100,
+  use_gpu=true,
+  reset_mcts_every=1,
   mcts=MctsParams(
-    use_gpu=true,
-    num_workers=32,
     num_iters_per_turn=600,
     cpuct=3.0,
     prior_temperature=0.7,
@@ -23,7 +23,9 @@ self_play = SelfPlayParams(
 
 arena = ArenaParams(
   num_games=100,
-  reset_mcts_every=50,
+  num_workers=100,
+  use_gpu=true,
+  reset_mcts_every=1,
   flip_probability=0.5,
   update_threshold=0.1,
   mcts=MctsParams(
@@ -62,7 +64,6 @@ mcts_baseline =
     MctsParams(
       arena.mcts,
       num_iters_per_turn=1000,
-      num_workers=1,
       cpuct=1.))
 
 minmax_baseline = Benchmark.MinMaxTS(depth=5, amplify_rewards=true, τ=0.2)
@@ -70,7 +71,7 @@ minmax_baseline = Benchmark.MinMaxTS(depth=5, amplify_rewards=true, τ=0.2)
 players = [
   Benchmark.Full(arena.mcts),
   Benchmark.Full(arena.mcts),
-  Benchmark.NetworkOnly(τ=0.5, use_gpu=true)]
+  Benchmark.NetworkOnly(τ=0.5)]
 
 baselines = [
   mcts_baseline,
@@ -82,6 +83,8 @@ make_duel(player, baseline) =
     player,
     baseline,
     num_games=50,
+    num_workers=50,
+    use_gpu=true,
     flip_probability=0.5,
     color_policy=CONTENDER_WHITE)
 

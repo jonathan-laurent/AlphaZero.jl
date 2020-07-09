@@ -214,34 +214,56 @@ function simple_memory_stats(env)
   return nsamples, ndistinct
 end
 
+# Run `num_sims` game simulations and
+# return a (traces, mem, expdepth) named-tuple.
+function self_play_worker(oracle, params, lock, handler, num_sims)
+  player = MctsPlayer(oracle, params.mcts)
+  res = map(1:num_sims) do i
+    trace = play_game(player)
+    Base.lock(lock)
+    Handlers.game_played(handler)
+    unlock(lock)
+    reset_every = params.reset_mcts_every
+    if !isnothing(reset_every) && i % reset_every == 0
+      MCTS.reset!(player.mcts)
+    end
+    if !isnothing(params.gc_every) && i % params.gc_every == 0
+      Network.gc(env.bestnn)
+    end
+    mem = MCTS.approximate_memory_footprint(player.mcts)
+    return (trace=trace, mem=mem)
+  end
+  mem = maximum([r.mem for r in res])
+  expdepth = MCTS.average_exploration_depth(player.mcts)
+  return (traces=[r.trace for r in res], mem=mem, expdepth=expdepth)
+end
+
 function self_play_step!(env::Env{G}, handler) where G
   params = env.params.self_play
   gamma = env.params.self_play.mcts.gamma
-  player = MctsPlayer(env.bestnn, params.mcts)
-  new_batch!(env.memory)
   Handlers.self_play_started(handler)
-  mem_footprint = 0
-  elapsed = @elapsed begin
-    for i in 1:params.num_games
-      trace = play_game(player)
-      push_game!(env.memory, trace, gamma)
-      Handlers.game_played(handler)
-      reset_every = params.reset_mcts_every
-      if (!isnothing(reset_every) && i % reset_every == 0) ||
-          i == params.num_games
-        mem_footprint = max(mem_footprint,
-          MCTS.approximate_memory_footprint(player.mcts))
-        MCTS.reset!(player.mcts)
-      end
-      if !isnothing(params.gc_every) && i % params.gc_every == 0
-        Network.gc(env.bestnn)
-      end
-    end
+  network = Network.copy(env.bestnn, on_gpu=params.use_gpu, test_mode=true)
+  lock = ReentrantLock()
+  reqc = Batchifier.launch_server(params.num_workers) do state
+    lock(lock)
+    Network.evaluate_batch(network, state)
+    unlock(lock)
   end
-  MCTS.memory_footprint(player.mcts)
-  inference_tr = MCTS.inference_time_ratio(player.mcts)
+  # For each worker
+  @assert params.num_workers <= params.num_games
+  res, elapsed = @timed Util.threads_pmap(1:params.num_workers) do _
+    oracle = Batchifier.BatchedOracle{G}(reqc)
+    num_sims = params.num_games ÷ params.num_workers
+    return self_play_worker(oracle, params, lock, handler, num_sims)
+  end
+  traces = [t for r in res for t in r.traces]
+  new_batch!(env.memory)
+  for t in traces
+    push_game!(env.memory, trace, gamma)
+  end
   speed = cur_batch_size(env.memory) / elapsed
-  expdepth = MCTS.average_exploration_depth(player.mcts)
+  expdepth = mean([r.expdepth for r in res])
+  mem_footprint = sum([r.mem for r in res])
   memsize, memdistinct = simple_memory_stats(env)
   report = Report.SelfPlay(
     inference_tr, speed, expdepth, mem_footprint, memsize, memdistinct)
