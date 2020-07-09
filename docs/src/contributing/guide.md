@@ -7,7 +7,6 @@ ideas:
   - [Help with hyperparameter tuning](@ref)
   - [Improve the user interface](@ref improve_ui)
   - Write tutorials or other learning resources based on this package
-  - Design a logo
 
 We also believe that AlphaZero.jl can be made significantly faster
 without adding too much complexity to the codebase.

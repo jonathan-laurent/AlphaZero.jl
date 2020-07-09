@@ -1,8 +1,6 @@
 <p align="center">
-<img width="250px" src="./docs/src/assets/logo-text.png"/>
+<img width="200px" src="./docs/src/assets/logo-text.png"/>
 </p>
-
---------------------------------------------------------------------------------
 
 [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://jonathan-laurent.github.io/AlphaZero.jl/dev)
 [![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://jonathan-laurent.github.io/AlphaZero.jl/stable)
@@ -113,7 +111,9 @@ Please do not hesitate to open a Github
 [issue](https://github.com/jonathan-laurent/AlphaZero.jl/issues) to share
 any idea, feedback or suggestion.
 
+### Contributors
 
+* Logo design: Pavel Dimens
 
 ### Acknowledgements
 
