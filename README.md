@@ -122,6 +122,7 @@ any idea, feedback or suggestion.
 
 ### Contributors
 
+* Creator: Jonathan Laurent
 * Logo design: Pavel Dimens
 
 ### Acknowledgements
