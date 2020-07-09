@@ -16,6 +16,7 @@
     <img src="https://codecov.io/gh/jonathan-laurent/AlphaZero.jl/branch/master/graph/badge.svg"/>
   </a>
 </p>
+<br/>
 
 This package provides a _generic_, _simple_ and _fast_ implementation of
 Deepmind's AlphaZero algorithm:
