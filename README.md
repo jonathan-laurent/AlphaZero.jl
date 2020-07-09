@@ -1,14 +1,21 @@
 <p align="center">
-<img width="200px" src="./docs/src/assets/logo-text.png"/>
+  <img width="200px" src="./docs/src/assets/logo-text.png"/>
 </p>
-
 <br/>
-
-[![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://jonathan-laurent.github.io/AlphaZero.jl/dev)
-[![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://jonathan-laurent.github.io/AlphaZero.jl/stable)
-[![Build Status](https://travis-ci.com/jonathan-laurent/AlphaZero.jl.svg?branch=master)](https://travis-ci.com/jonathan-laurent/AlphaZero.jl)
-[![Codecov](https://codecov.io/gh/jonathan-laurent/AlphaZero.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/jonathan-laurent/AlphaZero.jl)
-[![Gitter](https://badges.gitter.im/alphazero-jl/community.svg)](https://gitter.im/alphazero-jl/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
+<p align="center">
+  <a href="https://jonathan-laurent.github.io/AlphaZero.jl/dev" alt="Dev">
+    <img src="https://img.shields.io/badge/docs-dev-blue.svg"/>
+  </a>
+  <a href="https://jonathan-laurent.github.io/AlphaZero.jl/stable" alt="Stable">
+    <img src="https://img.shields.io/badge/docs-stable-blue.svg"/>
+  </a>
+  <a href="https://travis-ci.com/jonathan-laurent/AlphaZero.jl" alt="Build Status">
+    <img src="https://travis-ci.com/jonathan-laurent/AlphaZero.jl.svg?branch=master"/>
+  </a>
+  <a href="https://codecov.io/gh/jonathan-laurent/AlphaZero.jl" alt="Codecov">
+    <img src="https://codecov.io/gh/jonathan-laurent/AlphaZero.jl/branch/master/graph/badge.svg"/>
+  </a>
+</p>
 
 This package provides a _generic_, _simple_ and _fast_ implementation of
 Deepmind's AlphaZero algorithm:
