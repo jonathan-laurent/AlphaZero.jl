@@ -2,7 +2,7 @@
   <img width="200px" src="./docs/src/assets/logo-text.png"/>
 </p>
 <br/>
-<p align="center">
+<p>
   <a href="https://jonathan-laurent.github.io/AlphaZero.jl/dev" alt="Dev">
     <img src="https://img.shields.io/badge/docs-dev-blue.svg"/>
   </a>
@@ -114,17 +114,15 @@ For more information on training a Connect Four agent using AlphaZero.jl, see ou
 - [Connect-Four Tutorial](https://jonathan-laurent.github.io/AlphaZero.jl/dev/tutorial/connect_four/)
 - [Hyperparameters Documentation](https://jonathan-laurent.github.io/AlphaZero.jl/dev/reference/params/)
 
-### Contributing
+### Contributors
+
+* Creator: Jonathan Laurent
+* Logo design: Pavel Dimens
 
 Contributions to AlphaZero.jl are most welcome. Many contribution ideas are available in our [contribution guide](https://jonathan-laurent.github.io/AlphaZero.jl/dev/contributing/guide/).
 Please do not hesitate to open a Github
 [issue](https://github.com/jonathan-laurent/AlphaZero.jl/issues) to share
 any idea, feedback or suggestion.
-
-### Contributors
-
-* Creator: Jonathan Laurent
-* Logo design: Pavel Dimens
 
 ### Acknowledgements
 
