@@ -6,7 +6,7 @@ rewards are expressed from the point of view of the player called _white_.
 """
 module GameInterface
 
-export AbstractPlayer
+export AbstractGame
 
 import ..Util
 
