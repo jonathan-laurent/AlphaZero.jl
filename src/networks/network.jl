@@ -3,7 +3,7 @@ A generic, framework agnostic interface for neural networks.
 """
 module Network
 
-export AbstractNetwork, OptimiserSpec, Nesterov, CyclicNesterov, Adam
+export AbstractNetwork, OptimiserSpec, CyclicNesterov, Adam
 
 import ..MCTS, ..GI, ..Util
 

@@ -26,7 +26,7 @@ end
 GameType(::Trace{Game}) where Game = Game
 
 function trace_invariant(t::Trace)
-  return length(t.policies) == length(t.rewards) == length(states) - 1
+  return length(t.policies) == length(t.rewards) == length(t.states) - 1
 end
 
 """

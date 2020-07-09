@@ -61,7 +61,6 @@ cur_batch_size(mem::MemoryBuffer) = min(mem.cur_batch_size, length(mem))
 new_batch!(mem::MemoryBuffer) = (mem.cur_batch_size = 0)
 
 function Base.empty!(mem::MemoryBuffer)
-  empty!(mem.cur)
   empty!(mem.buf)
   mem.cur_batch_size = 0
 end
