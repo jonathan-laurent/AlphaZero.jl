@@ -116,7 +116,7 @@ For more information on training a Connect Four agent using AlphaZero.jl, see ou
 
 ### Contributors
 
-* Creator: Jonathan Laurent
+* Main developer: Jonathan Laurent
 * Logo design: Pavel Dimens
 
 Contributions to AlphaZero.jl are most welcome. Many contribution ideas are available in our [contribution guide](https://jonathan-laurent.github.io/AlphaZero.jl/dev/contributing/guide/).
