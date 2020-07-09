@@ -2,7 +2,7 @@
   <img width="200px" src="./docs/src/assets/logo-text.png"/>
 </p>
 <br/>
-<p>
+<p align="center">
   <a href="https://jonathan-laurent.github.io/AlphaZero.jl/dev" alt="Dev">
     <img src="https://img.shields.io/badge/docs-dev-blue.svg"/>
   </a>
