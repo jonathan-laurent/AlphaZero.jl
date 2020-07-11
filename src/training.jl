@@ -223,6 +223,7 @@ function self_play_worker(oracle, params, lock, handler, num_sims)
     Base.lock(lock)
     Handlers.game_played(handler)
     unlock(lock)
+    mem = MCTS.approximate_memory_footprint(player.mcts)
     reset_every = params.reset_mcts_every
     if !isnothing(reset_every) && i % reset_every == 0
       MCTS.reset!(player.mcts)
@@ -230,7 +231,6 @@ function self_play_worker(oracle, params, lock, handler, num_sims)
     if !isnothing(params.gc_every) && i % params.gc_every == 0
       Network.gc(env.bestnn)
     end
-    mem = MCTS.approximate_memory_footprint(player.mcts)
     return (trace=trace, mem=mem)
   end
   mem = maximum([r.mem for r in res])
