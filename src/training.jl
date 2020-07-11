@@ -245,20 +245,20 @@ function self_play_step!(env::Env{G}, handler) where G
   network = Network.copy(env.bestnn, on_gpu=params.use_gpu, test_mode=true)
   lock = ReentrantLock()
   reqc = Batchifier.launch_server(params.num_workers) do state
-    lock(lock)
     Network.evaluate_batch(network, state)
-    unlock(lock)
   end
   # For each worker
   @assert params.num_workers <= params.num_games
   res, elapsed = @timed Util.threads_pmap(1:params.num_workers) do _
     oracle = Batchifier.BatchedOracle{G}(reqc)
     num_sims = params.num_games ÷ params.num_workers
-    return self_play_worker(oracle, params, lock, handler, num_sims)
+    res = self_play_worker(oracle, params, lock, handler, num_sims)
+    Batchifier.done!(oracle)
+    return res
   end
   traces = [t for r in res for t in r.traces]
   new_batch!(env.memory)
-  for t in traces
+  for trace in traces
     push_game!(env.memory, trace, gamma)
   end
   speed = cur_batch_size(env.memory) / elapsed
@@ -266,7 +266,7 @@ function self_play_step!(env::Env{G}, handler) where G
   mem_footprint = sum([r.mem for r in res])
   memsize, memdistinct = simple_memory_stats(env)
   report = Report.SelfPlay(
-    inference_tr, speed, expdepth, mem_footprint, memsize, memdistinct)
+    speed, expdepth, mem_footprint, memsize, memdistinct)
   Handlers.self_play_finished(handler, report)
   return report
 end

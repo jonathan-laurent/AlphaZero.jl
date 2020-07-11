@@ -2,15 +2,15 @@ Network = ResNet
 
 netparams = ResNetHP(
   num_filters=64,
-  num_blocks=5,
+  num_blocks=7,
   conv_kernel_size=(3, 3),
   num_policy_head_filters=32,
   num_value_head_filters=32,
   batch_norm_momentum=0.1)
 
 self_play = SelfPlayParams(
-  num_games=2000,
-  num_workers=100,
+  num_games=512,
+  num_workers=128,
   use_gpu=true,
   reset_mcts_every=1,
   mcts=MctsParams(

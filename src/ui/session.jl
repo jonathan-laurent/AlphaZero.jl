@@ -510,8 +510,6 @@ function print_report(logger::Logger, stats::Report.Memory)
 end
 
 function print_report(logger::Logger, report::Report.SelfPlay)
-  t = round(Int, 100 * report.inference_time_ratio)
-  Log.print(logger, "Time spent on inference: $(t)%")
   sspeed = format(round(Int, report.samples_gen_speed), commas=true)
   Log.print(logger, "Generating $(sspeed) samples per second on average")
   avgdepth = fmt(".1f", report.average_exploration_depth)

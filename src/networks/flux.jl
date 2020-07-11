@@ -16,8 +16,8 @@ import Flux
 import Functors
 
 CUDA.allowscalar(false)
-array_on_gpu(::Type{<:Array}) = false
-array_on_gpu(::Type{<:CuArray}) = true
+array_on_gpu(::Array) = false
+array_on_gpu(::CuArray) = true
 array_on_gpu(arr) = error("Usupported array type: ", typeof(arr))
 
 using Flux: relu, softmax, flatten

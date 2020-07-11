@@ -1,6 +1,6 @@
 module Batchifier
 
-import ..MCTS, ..GameType
+import ..MCTS, ..Util
 
 export BatchedOracle
 
@@ -31,7 +31,7 @@ The server stops automatically after all workers send `:none`.
 """
 function launch_server(f, num_workers)
   channel = Channel(num_workers)
-  Threads.@spawn begin
+  Threads.@spawn Util.@printing_errors begin
     num_active = num_workers
     pending = []
     while num_active > 0
@@ -42,7 +42,7 @@ function launch_server(f, num_workers)
         push!(pending, req)
       end
       @assert length(pending) <= num_active
-      if length(pending) == num_active
+      if length(pending) == num_active && num_active > 0
         batch = [p.query for p in pending]
         results = f(batch)
         for i in eachindex(pending)
@@ -65,7 +65,8 @@ end
 
 function (oracle::BatchedOracle)(state)
   put!(oracle.reqchan, (query=state, answer_channel=oracle.anschan))
-  return take!(oracle.anschan)
+  answer = take!(oracle.anschan)
+  return answer
 end
 
 function done!(oracle::BatchedOracle)
