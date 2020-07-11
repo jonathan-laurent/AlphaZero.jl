@@ -240,7 +240,6 @@ end
 
 function self_play_step!(env::Env{G}, handler) where G
   params = env.params.self_play
-  gamma = env.params.self_play.mcts.gamma
   Handlers.self_play_started(handler)
   network = Network.copy(env.bestnn, on_gpu=params.use_gpu, test_mode=true)
   lock = ReentrantLock()
@@ -259,7 +258,7 @@ function self_play_step!(env::Env{G}, handler) where G
   traces = [t for r in res for t in r.traces]
   new_batch!(env.memory)
   for trace in traces
-    push_game!(env.memory, trace, gamma)
+    push_game!(env.memory, trace, params.mcts.gamma)
   end
   speed = cur_batch_size(env.memory) / elapsed
   expdepth = mean([r.expdepth for r in res])
