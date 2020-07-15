@@ -55,16 +55,23 @@ function launch_server(f, num_workers)
   return channel
 end
 
-struct BatchedOracle{Game} <: MCTS.Oracle{Game}
+struct BatchedOracle{Game, F} <: MCTS.Oracle{Game}
+  make_query :: F # turn state into a query (this is usually the identity)
   reqchan :: Channel
   anschan :: Channel
-  function BatchedOracle{G}(reqchan) where G
-    return new{G}(reqchan, Channel(1))
+  function BatchedOracle{G}(f, reqchan) where G
+    return new{G, typeof(f)}(f, reqchan, Channel(1))
   end
+
+end
+
+function BatchedOracle{G}(reqchan) where G
+  return BatchedOracle{G}(x -> x, reqchan)
 end
 
 function (oracle::BatchedOracle)(state)
-  put!(oracle.reqchan, (query=state, answer_channel=oracle.anschan))
+  query = oracle.make_query(state)
+  put!(oracle.reqchan, (query=query, answer_channel=oracle.anschan))
   answer = take!(oracle.anschan)
   return answer
 end

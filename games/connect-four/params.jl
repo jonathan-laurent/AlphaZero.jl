@@ -22,10 +22,10 @@ self_play = SelfPlayParams(
     dirichlet_noise_α=1.0))
 
 arena = ArenaParams(
-  num_games=100,
-  num_workers=100,
+  num_games=128,
+  num_workers=64,
   use_gpu=true,
-  reset_mcts_every=1,
+  reset_mcts_every=2,
   flip_probability=0.5,
   update_threshold=0.1,
   mcts=MctsParams(

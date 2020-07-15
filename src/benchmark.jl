@@ -8,7 +8,7 @@ compete against a set of baselines.
 module Benchmark
 
 import ..AbstractNetwork, ..MinMax, ..GI
-import ..Env, ..MCTS, ..MctsParams, ..pit, ..compute_redundancy
+import ..Env, ..MCTS, ..MctsParams, ..pit_players, ..compute_redundancy
 import ..ColorPolicy, ..ALTERNATE_COLORS
 import ..AbstractPlayer, ..EpsilonGreedyPlayer, ..NetworkPlayer, ..MctsPlayer
 import ..PlayerWithTemperature, ..ConstSchedule
@@ -36,7 +36,6 @@ struct DuelOutcome
   baseline :: String
   avgz :: Float64
   redundancy :: Float64
-  rewards :: Vector{Float64}
   time :: Float64
 end
 
@@ -120,7 +119,7 @@ function run(env::Env{G}, duel::Duel, progress=nothing) where G
   end
   red = compute_redundancy(G, states)
   return DuelOutcome(
-    name(duel.player), name(duel.baseline), avgz, red, outcomes, time)
+    name(duel.player), name(duel.baseline), avgz, red, time)
 end
 
 #####

@@ -7,20 +7,23 @@ ENV["JULIA_CUDA_MEMORY_POOL"] = "split"
 using AlphaZero
 using ProgressMeter
 
-include("../games.jl")
-GAME = get(ENV, "GAME", "connect-four")
-SelectedGame = GAME_MODULE[GAME]
-using .SelectedGame: Game, Training
+include("../../games/connect-four/main.jl")
+using .ConnectFour: Game, Training
 
-const params = Training.params
+params = Training.params
 network = Training.Network{Game}(Training.netparams)
 env = AlphaZero.Env{Game}(params, network)
 
-const progress = Progress(params.self_play.num_games)
+const sp_progress = Progress(params.self_play.num_games)
+const arena_progress = Progress(params.arena.num_games)
 
 struct Handler end
-AlphaZero.Handlers.game_played(::Handler) = next!(progress)
+AlphaZero.Handlers.game_played(::Handler) = next!(sp_progress)
+AlphaZero.Handlers.checkpoint_game_played(::Handler) = next!(arena_progress)
 
 println("Running on $(Threads.nthreads()) threads.")
 
 report = AlphaZero.self_play_step!(env, Handler())
+
+# avgr, redundancy =
+#     AlphaZero.evaluate_network(env.curnn, env.bestnn, env.params, Handler())

@@ -134,19 +134,24 @@ function resize_memory!(env::Env{G,N,B}, n) where {G,N,B}
 end
 
 function evaluate_network(contender, baseline, params, handler)
-  contender = MctsPlayer(contender, params.arena.mcts)
-  baseline = MctsPlayer(baseline, params.arena.mcts)
-  ngames = params.arena.num_games
-  states = []
-  gamma = params.self_play.mcts.gamma
-  avgz = pit(contender, baseline, ngames; gamma=gamma,
+  on_gpu = params.arena.use_gpu
+  contender = Network.copy(contender, on_gpu=on_gpu, test_mode=true)
+  baseline = Network.copy(baseline, on_gpu=on_gpu, test_mode=true)
+  make_player(oracle) = MctsPlayer(oracle, params.arena.mcts)
+  samples = pit_players(
+      make_contender=make_player,
+      contender_oracle=contender,
+      make_baseline=make_player,
+      baseline_oracle=baseline,
+      num_games=params.arena.num_games,
+      num_workers=params.arena.num_workers,
+      handler=(trace -> Handlers.checkpoint_game_played(handler)),
       reset_every=params.arena.reset_mcts_every,
-      flip_probability=params.arena.flip_probability) do i, z, t
-    Handlers.checkpoint_game_played(handler)
-    append!(states, t.states)
-  end
-  redundancy = compute_redundancy(GameType(contender), states)
-  return avgz, redundancy
+      flip_probability=params.arena.flip_probability,
+      color_policy=ALTERNATE_COLORS)
+  gamma = params.self_play.mcts.gamma
+  avgr, redundancy =  average_reward_and_redundancy(samples, gamma=gamma)
+  return avgr, redundancy
 end
 
 function learning_step!(env::Env, handler)

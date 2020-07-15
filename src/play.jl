@@ -329,7 +329,77 @@ function play_game(player; flip_probability=0.)
 end
 
 #####
-##### Evaluate two players against each other
+##### Utilities to manage inference servers
+#####
+
+# Start a server that processes inference requests for TWO networks
+# Expected queries must have fields `state` and `netid`.
+function inference_server(net1::AbstractNetwork, net2::AbstractNetwork, n)
+  return Batchifier.launch_server(n) do batch
+    n = length(batch)
+    mask1 = findall(b -> b.netid == 1, batch)
+    mask2 = findall(b -> b.netid == 2, batch)
+    @assert length(mask1) + length(mask2) == n
+    state(x) = x.state
+    batch1 = state.(batch[mask1])
+    batch2 = state.(batch[mask2])
+    if isempty(mask2) # there are only queries from net1
+      return Network.evaluate_batch(net1, batch1)
+    elseif isempty(mask1) # there are only queries from net2
+      return Network.evaluate_batch(net2, batch2)
+    else # both networks sent queries
+      res1 = Network.evaluate_batch(net1, state.(batch[mask1]))
+      res2 = Network.evaluate_batch(net2, state.(batch[mask2]))
+      @assert typeof(res1) == typeof(res2)
+      res = similar(res1, n)
+      res[mask1] = res1
+      res[mask2] = res2
+      return res
+    end
+  end
+end
+
+# Start an inference server for one agent
+function inference_server(net::AbstractNetwork, n)
+  return Batchifier.launch_server(n) do batch
+    return Network.evaluate_batch(net, batch)
+  end
+end
+
+ret_oracle(x) = () -> x
+do_nothing!(x) = nothing
+call_done!(oracle) = Batchifier.done!(oracle)
+
+# Two neural network oracles
+function batchify_oracles(o1::AbstractNetwork, o2::AbstractNetwork, n)
+  reqc = inference_server(o1, o2, n)
+  G = GameType(o1)
+  make1() = Batchifier.BatchedOracle{G}(st -> (state=st, netid=1), reqc)
+  make2() = Batchifier.BatchedOracle{G}(st -> (state=st, netid=2), reqc)
+  return (make1, call_done!), (make2, call_done!)
+end
+
+# One neural network oracle
+function batchify_oracles(o1, o2::AbstractNetwork, n)
+  reqc = inference_server(o2, n)
+  make2() = Batchifier.BatchedOracle{GameType(o2)}(reqc)
+  return (ret_oracle(o1), do_nothing!), (make2, call_done!)
+end
+
+# One neural network oracle (symmetric version)
+function batchify_oracles(o1::AbstractNetwork, o2, n)
+  reqc = inference_server(o1, n)
+  make1() = Batchifier.BatchedOracle{GameType(o1)}(reqc)
+  return (make1, call_done!), (ret_oracle(o2), do_nothing!)
+end
+
+# No neural network oracle
+function batchify_oracles(o1, o2, n)
+  return (ret_oracle(o1), do_nothing!), (ret_oracle(o2), do_nothing!)
+end
+
+#####
+##### Pitting two players against each other
 #####
 
 """
@@ -339,64 +409,95 @@ Policy for attributing colors in a duel between a baseline and a contender.
 """
 @enum ColorPolicy ALTERNATE_COLORS BASELINE_WHITE CONTENDER_WHITE
 
+
 """
-    pit(handler, contender, baseline, ngames)
+    pit_players(<keyword arguments>)
 
 Evaluate two `AbstractPlayer` against each other in a series of games.
 
-Note that this function can only be used with two-player games.
+Return a vector of `(trace::Trace, baseline_white::Bool)` named tuples.
 
-# Arguments
+This function can only be used with two-player games.
 
-  - `handler`: this function is called after each simulated
-     game with three arguments: the game number `i`, the reward `r` for the
-     contender player and the trace `t`
-  - `ngames`: number of games to play
+# Keyword Arguments
 
-# Optional keyword arguments
+  - `make_contender`: function that builds a contender player from an oracle
+  - `contender_oracle`: contender oracle, or `nothing`
+  - `make_baseline`: function that builds a baseline player from an oracle
+  - `num_games`: number of games to play
+  - `num_workers`: number of workers tasks to spawn
+  - `handler`: called every time a game is played with the simulated trace
   - `reset_every`: if set, players are reset every `reset_every` games
   - `color_policy`: determines the [`ColorPolicy`](@ref),
      which is `ALTERNATE_COLORS` by default
   - `flip_probability=0.`: see [`play_game`](@ref)
 """
-function pit(
-    handler, contender, baseline, num_games; gamma,
-    reset_every=nothing, color_policy=ALTERNATE_COLORS, flip_probability=0.)
-  Game = GameType(contender)
-  @assert GI.two_players(Game)
-  baseline_white = (color_policy != CONTENDER_WHITE)
-  zsum = 0.
-  for i in 1:num_games
-    white = baseline_white ? baseline : contender
-    black = baseline_white ? contender : baseline
-    trace =
-      play_game(TwoPlayers(white, black), flip_probability=flip_probability)
-    z = total_reward(trace, gamma)
-    baseline_white && (z = -z)
-    zsum += z
-    handler(i, z, trace)
-    if !isnothing(reset_every) && (i % reset_every == 0 || i == num_games)
-      reset_player!(baseline)
-      reset_player!(contender)
+function pit_players(;
+    make_contender,
+    contender_oracle,
+    make_baseline,
+    baseline_oracle,
+    num_games,
+    num_workers,
+    handler,
+    reset_every=nothing,
+    flip_probability=0.,
+    color_policy=ALTERNATE_COLORS)
+
+  # Naming convention: *_c stands for contender, *_b for baseline
+  @assert num_workers <= num_games
+  @assert GI.two_players(GameType(contender_oracle))
+  lock = ReentrantLock() # only used to surround the calls to `handler`
+  (make_c, done_c), (make_b, done_b) =
+    batchify_oracles(contender_oracle, baseline_oracle, num_workers)
+  res = Util.threads_pmap(1:num_workers) do _
+    oracle_c = make_c()
+    oracle_b = make_b()
+    num_sims = num_games ÷ num_workers
+    player_c = make_contender(oracle_c)
+    player_b = make_baseline(oracle_b)
+    # For each worker
+    res = map(1:num_sims) do i
+      baseline_white =
+        (color_policy == BASELINE_WHITE) ||
+        (color_policy == ALTERNATE_COLORS && i % 2 == 1)
+      white = baseline_white ? player_b : player_c
+      black = baseline_white ? player_c : player_b
+      trace = play_game(
+        TwoPlayers(white, black),
+        flip_probability=flip_probability)
+      if !isnothing(reset_every) && i % reset_every == 0
+        reset_player!(player_b)
+        reset_player!(player_c)
+      end
+      Base.lock(lock)
+      handler(trace)
+      Base.unlock(lock)
+      return (trace=trace, baseline_white=baseline_white)
     end
-    if color_policy == ALTERNATE_COLORS
-      baseline_white = !baseline_white
-    end
+    done_c(oracle_c)
+    done_b(oracle_b)
+    return res
   end
-  return zsum / num_games
+  return res |> Iterators.flatten |> collect
 end
 
-#####
-##### Redudancy analysis
-#####
-
-function compute_redundancy(Game, states)
-  # TODO: Excluding the inial state from redundancy statistics
-  # only makes sense for deterministic games.
-  init_state = GI.current_state(Game())
+function compute_redundancy(states)
   noninit = filter(!=(init_state), states)
   unique = Set(noninit)
   return 1. - length(unique) / length(noninit)
+end
+
+# To be called on the output of `pit_players`
+function average_reward_and_redundancy(samples; gamma)
+  rewards = map(samples) do s
+    wr = total_reward(s.trace, gamma)
+    return s.baseline_white ? -wr : wr
+  end
+  avgr = mean(rewards)
+  states = [st for s in samples for st in s.trace.states]
+  redundancy = compute_redundancy(states)
+  return avgr, redundancy
 end
 
 #####
