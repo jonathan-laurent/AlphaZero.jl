@@ -332,9 +332,31 @@ end
 ##### Utilities to manage inference servers
 #####
 
+function fill_and_evaluate(net, batch; batch_size, fill=false)
+  n = length(batch)
+  @assert n > 0
+  if !fill
+    return Network.evaluate_batch(net, batch)
+  else
+    nmissing = batch_size - n
+    @assert nmissing >= 0
+    if nmissing == 0
+      return Network.evaluate_batch(net, batch)
+    else
+      append!(batch, [batch[1] for _ in 1:nmissing])
+      return Network.evaluate_batch(net, batch)[1:n]
+    end
+  end
+end
+
 # Start a server that processes inference requests for TWO networks
 # Expected queries must have fields `state` and `netid`.
-function inference_server(net1::AbstractNetwork, net2::AbstractNetwork, n)
+function inference_server(
+    net1::AbstractNetwork,
+    net2::AbstractNetwork,
+    n;
+    fill_batches=false)
+
   return Batchifier.launch_server(n) do batch
     n = length(batch)
     mask1 = findall(b -> b.netid == 1, batch)
@@ -344,12 +366,12 @@ function inference_server(net1::AbstractNetwork, net2::AbstractNetwork, n)
     batch1 = state.(batch[mask1])
     batch2 = state.(batch[mask2])
     if isempty(mask2) # there are only queries from net1
-      return Network.evaluate_batch(net1, batch1)
+      return fill_and_evaluate(net1, batch1; batch_size=n, fill=fill_batches)
     elseif isempty(mask1) # there are only queries from net2
-      return Network.evaluate_batch(net2, batch2)
+      return fill_and_evaluate(net2, batch2; batch_size=n, fill=fill_batches)
     else # both networks sent queries
-      res1 = Network.evaluate_batch(net1, state.(batch[mask1]))
-      res2 = Network.evaluate_batch(net2, state.(batch[mask2]))
+      res1 = fill_and_evaluate(net1, batch1; batch_size=n, fill=fill_batches)
+      res2 = fill_and_evaluate(net2, batch2; batch_size=n, fill=fill_batches)
       @assert typeof(res1) == typeof(res2)
       res = similar(res1, n)
       res[mask1] = res1
@@ -367,35 +389,35 @@ function inference_server(net::AbstractNetwork, n)
 end
 
 ret_oracle(x) = () -> x
-do_nothing!(x) = nothing
-call_done!(oracle) = Batchifier.done!(oracle)
+do_nothing!() = nothing
+send_done!(reqc) = () -> Batchifier.client_done!(reqc)
 
 # Two neural network oracles
 function batchify_oracles(o1::AbstractNetwork, o2::AbstractNetwork, n)
-  reqc = inference_server(o1, o2, n)
+  reqc = inference_server(o1, o2, n, fill_batches=true)
   G = GameType(o1)
   make1() = Batchifier.BatchedOracle{G}(st -> (state=st, netid=1), reqc)
   make2() = Batchifier.BatchedOracle{G}(st -> (state=st, netid=2), reqc)
-  return (make1, call_done!), (make2, call_done!)
+  return make1, make2, send_done!(reqc)
 end
 
 # One neural network oracle
 function batchify_oracles(o1, o2::AbstractNetwork, n)
-  reqc = inference_server(o2, n)
+  reqc = inference_server(o2, n, fill_batches=true)
   make2() = Batchifier.BatchedOracle{GameType(o2)}(reqc)
-  return (ret_oracle(o1), do_nothing!), (make2, call_done!)
+  return ret_oracle(o1), make2, send_done!(reqc)
 end
 
 # One neural network oracle (symmetric version)
 function batchify_oracles(o1::AbstractNetwork, o2, n)
-  reqc = inference_server(o1, n)
+  reqc = inference_server(o1, n, fill_batches=true)
   make1() = Batchifier.BatchedOracle{GameType(o1)}(reqc)
-  return (make1, call_done!), (ret_oracle(o2), do_nothing!)
+  return make1, ret_oracle(o2), send_done!(reqc)
 end
 
 # No neural network oracle
 function batchify_oracles(o1, o2, n)
-  return (ret_oracle(o1), do_nothing!), (ret_oracle(o2), do_nothing!)
+  return ret_oracle(o1), ret_oracle(o2), do_nothing!
 end
 
 #####
@@ -448,7 +470,7 @@ function pit_players(;
   @assert num_workers <= num_games
   @assert GI.two_players(GameType(contender_oracle))
   lock = ReentrantLock() # only used to surround the calls to `handler`
-  (make_c, done_c), (make_b, done_b) =
+  make_c, make_b, done =
     batchify_oracles(contender_oracle, baseline_oracle, num_workers)
   res = Util.threads_pmap(1:num_workers) do _
     oracle_c = make_c()
@@ -475,17 +497,15 @@ function pit_players(;
       Base.unlock(lock)
       return (trace=trace, baseline_white=baseline_white)
     end
-    done_c(oracle_c)
-    done_b(oracle_b)
+    done()
     return res
   end
   return res |> Iterators.flatten |> collect
 end
 
 function compute_redundancy(states)
-  noninit = filter(!=(init_state), states)
-  unique = Set(noninit)
-  return 1. - length(unique) / length(noninit)
+  unique = Set(states)
+  return 1. - length(unique) / length(states)
 end
 
 # To be called on the output of `pit_players`

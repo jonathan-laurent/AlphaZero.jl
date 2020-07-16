@@ -268,7 +268,7 @@ Empty the MCTS tree.
 """
 function reset!(env)
   empty!(env.tree)
-  GC.gc(true)
+  #GC.gc(true)
 end
 
 #####

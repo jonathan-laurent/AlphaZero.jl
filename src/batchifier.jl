@@ -38,6 +38,7 @@ function launch_server(f, num_workers)
       req = take!(channel)
       if req == :done
         num_active -= 1
+        @show num_active
       else
         push!(pending, req)
       end
@@ -54,6 +55,8 @@ function launch_server(f, num_workers)
   end
   return channel
 end
+
+client_done!(reqc) = put!(reqc, :done)
 
 struct BatchedOracle{Game, F} <: MCTS.Oracle{Game}
   make_query :: F # turn state into a query (this is usually the identity)
@@ -74,10 +77,6 @@ function (oracle::BatchedOracle)(state)
   put!(oracle.reqchan, (query=query, answer_channel=oracle.anschan))
   answer = take!(oracle.anschan)
   return answer
-end
-
-function done!(oracle::BatchedOracle)
-  put!(oracle.reqchan, :done)
 end
 
 end

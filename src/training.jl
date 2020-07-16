@@ -257,7 +257,7 @@ function self_play_step!(env::Env{G}, handler) where G
     oracle = Batchifier.BatchedOracle{G}(reqc)
     num_sims = params.num_games ÷ params.num_workers
     res = self_play_worker(oracle, params, lock, handler, num_sims)
-    Batchifier.done!(oracle)
+    Batchifier.client_done!(reqc)
     return res
   end
   traces = [t for r in res for t in r.traces]
