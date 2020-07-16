@@ -116,13 +116,9 @@ Parameters governing self-play.
 | `num_workers`        | `Int`                 |  -             |
 | `use_gpu`            | `Bool`                | `false`        |
 | `reset_mcts_every`   | `Union{Int, Nothing}` | `1`            |
-| `gc_every`           | `Union{Int, Nothing}` | `nothing`      |
 
 # Explanation
 
-+ The `gc_every` field, when set, forces a full garbage collection
-  and an emptying of the GPU memory pool periodically, the period being
-  specified in terms of a fixed number of games.
 + The MCTS tree is reset every `reset_mcts_every` games
   (or never if `nothing` is passed).
 
@@ -136,7 +132,6 @@ of self-play across 200 iterations).
   num_workers :: Int
   use_gpu :: Bool = false
   reset_mcts_every :: Union{Nothing, Int} = 1
-  gc_every :: Union{Nothing, Int} = nothing
   mcts :: MctsParams
 end
 

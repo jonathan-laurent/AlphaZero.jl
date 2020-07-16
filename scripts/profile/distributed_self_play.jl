@@ -23,10 +23,10 @@ AlphaZero.Handlers.checkpoint_game_played(::Handler) = next!(arena_progress)
 
 println("Running on $(Threads.nthreads()) threads.")
 
-report, t, mem, gct = @timed AlphaZero.self_play_step!(env, Handler())
+#report, t, mem, gct = @timed AlphaZero.self_play_step!(env, Handler())
 
-# (avgr, redundancy), t, mem, gct = @timed AlphaZero.evaluate_network(
-#   env.curnn, env.bestnn, env.params, Handler())
+(avgr, redundancy), t, mem, gct = @timed AlphaZero.evaluate_network(
+  env.curnn, env.bestnn, env.params, Handler())
 
 println("Total time: $t")
 println("Spent in GC: $gct")
