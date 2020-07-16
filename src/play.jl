@@ -467,19 +467,17 @@ function pit_players(;
     color_policy=ALTERNATE_COLORS)
 
   # Naming convention: *_c stands for contender, *_b for baseline
-  @assert num_workers <= num_games
   @assert GI.two_players(GameType(contender_oracle))
   lock = ReentrantLock() # only used to surround the calls to `handler`
   make_c, make_b, done =
     batchify_oracles(contender_oracle, baseline_oracle, num_workers)
-  res = Util.threads_pmap(1:num_workers) do _
+  return Util.mapreduce(1:num_games, num_workers, (x, y) -> [x;y], []) do
     oracle_c = make_c()
     oracle_b = make_b()
-    num_sims = num_games ÷ num_workers
     player_c = make_contender(oracle_c)
     player_b = make_baseline(oracle_b)
     # For each worker
-    res = map(1:num_sims) do i
+    function simulate_game(i)
       baseline_white =
         (color_policy == BASELINE_WHITE) ||
         (color_policy == ALTERNATE_COLORS && i % 2 == 1)
@@ -497,10 +495,8 @@ function pit_players(;
       Base.unlock(lock)
       return (trace=trace, baseline_white=baseline_white)
     end
-    done()
-    return res
+    return (process=simulate_game, terminate=done)
   end
-  return res |> Iterators.flatten |> collect
 end
 
 function compute_redundancy(states)

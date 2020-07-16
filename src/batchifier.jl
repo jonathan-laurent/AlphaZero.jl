@@ -38,7 +38,6 @@ function launch_server(f, num_workers)
       req = take!(channel)
       if req == :done
         num_active -= 1
-        @show num_active
       else
         push!(pending, req)
       end
