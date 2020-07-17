@@ -267,4 +267,16 @@ function mapreduce(f, args, num_workers, reduce, unit)
   return ret
 end
 
+# Same semantics than mapreduce but sequential: to be used for
+# debugging purposes only.
+function mapreduce_sequential(f, args, num_workers, merge, unit)
+  ys = map(args) do x
+    worker = f()
+    y = worker.process(x)
+    worker.terminate()
+    return y
+  end
+  return reduce(merge, ys, init=unit)
+end
+
 end

@@ -13,9 +13,11 @@ using .ConnectFour: Game, Training
 params = Training.params
 network = Training.Network{Game}(Training.netparams)
 env = AlphaZero.Env{Game}(params, network)
+duel = Training.benchmark[1]
 
 const sp_progress = Progress(params.self_play.num_games)
 const arena_progress = Progress(params.arena.num_games)
+const bench_progress = Progress(duel.num_games)
 
 struct Handler end
 AlphaZero.Handlers.game_played(::Handler) = next!(sp_progress)
@@ -23,10 +25,12 @@ AlphaZero.Handlers.checkpoint_game_played(::Handler) = next!(arena_progress)
 
 println("Running on $(Threads.nthreads()) threads.")
 
-#report, t, mem, gct = @timed AlphaZero.self_play_step!(env, Handler())
+# report, t, mem, gct = @timed AlphaZero.self_play_step!(env, Handler())
 
-(avgr, redundancy), t, mem, gct = @timed AlphaZero.evaluate_network(
-  env.curnn, env.bestnn, env.params, Handler())
+# (avgr, redundancy), t, mem, gct = @timed AlphaZero.evaluate_network(
+#   env.curnn, env.bestnn, env.params, Handler())
+
+report, t, mem, gct = @timed AlphaZero.Benchmark.run(env, duel, bench_progress)
 
 println("Total time: $t")
 println("Spent in GC: $gct")

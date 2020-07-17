@@ -7,8 +7,9 @@ compete against a set of baselines.
 """
 module Benchmark
 
-import ..AbstractNetwork, ..MinMax, ..GI
-import ..Env, ..MCTS, ..MctsParams, ..pit_players, ..compute_redundancy
+import ..Network, ..AbstractNetwork, ..MinMax, ..GI
+import ..Env, ..MCTS, ..MctsParams, ..TwoPlayers
+import ..simulate, ..Simulator, ..average_reward_and_redundancy, ..record_trace
 import ..ColorPolicy, ..ALTERNATE_COLORS
 import ..AbstractPlayer, ..EpsilonGreedyPlayer, ..NetworkPlayer, ..MctsPlayer
 import ..PlayerWithTemperature, ..ConstSchedule
@@ -102,24 +103,24 @@ If a `progress` is provided, `next!(progress)` is called
 after each simulated game.
 """
 function run(env::Env{G}, duel::Duel, progress=nothing) where G
-  player = instantiate(duel.player, env.bestnn)
-  baseline = instantiate(duel.baseline, env.bestnn)
-  outcomes = []
-  states = []
-  avgz, time = @timed begin
-    pit(player, baseline, duel.num_games,
-        gamma=env.params.self_play.mcts.gamma,
-        flip_probability=duel.flip_probability,
-        reset_every=duel.reset_every,
-        color_policy=duel.color_policy) do i, z, t
-      push!(outcomes, z)
-      append!(states, t.states)
-      isnothing(progress) || next!(progress)
-    end
+  net = Network.copy(env.bestnn, on_gpu=duel.use_gpu, test_mode=true)
+  simulator = Simulator(net, record_trace) do net
+    player = instantiate(duel.player, net)
+    baseline = instantiate(duel.baseline, net)
+    return TwoPlayers(player, baseline)
   end
-  red = compute_redundancy(G, states)
+  samples, elapsed = @timed simulate(
+    simulator,
+    num_games=duel.num_games,
+    num_workers=duel.num_workers,
+    handler=(trace -> next!(progress)),
+    reset_every=duel.reset_every,
+    flip_probability=duel.flip_probability,
+    color_policy=duel.color_policy)
+  gamma = env.params.self_play.mcts.gamma
+  avgr, redundancy =  average_reward_and_redundancy(samples, gamma=gamma)
   return DuelOutcome(
-    name(duel.player), name(duel.baseline), avgz, red, time)
+    name(duel.player), name(duel.baseline), avgr, redundancy, elapsed)
 end
 
 #####
@@ -161,10 +162,8 @@ end
 
 name(p::MctsRollouts) = "MCTS ($(p.params.num_iters_per_turn) rollouts)"
 
-function instantiate(p::MctsRollouts, nn::AbstractNetwork{G}) where G
-  params = MctsParams(p.params,
-    num_workers=1)
-  return MctsPlayer(MCTS.RolloutOracle{G}(), params)
+function instantiate(p::MctsRollouts, nn::MCTS.Oracle{G}) where G
+  return MctsPlayer(MCTS.RolloutOracle{G}(), p.params)
 end
 
 """

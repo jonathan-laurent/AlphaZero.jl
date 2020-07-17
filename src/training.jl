@@ -134,21 +134,22 @@ function resize_memory!(env::Env{G,N,B}, n) where {G,N,B}
 end
 
 function evaluate_network(contender, baseline, params, handler)
-  on_gpu = params.arena.use_gpu
-  contender = Network.copy(contender, on_gpu=on_gpu, test_mode=true)
-  baseline = Network.copy(baseline, on_gpu=on_gpu, test_mode=true)
-  make_player(oracle) = MctsPlayer(oracle, params.arena.mcts)
-  samples = pit_players(
-      make_contender=make_player,
-      contender_oracle=contender,
-      make_baseline=make_player,
-      baseline_oracle=baseline,
-      num_games=params.arena.num_games,
-      num_workers=params.arena.num_workers,
-      handler=(trace -> Handlers.checkpoint_game_played(handler)),
-      reset_every=params.arena.reset_mcts_every,
-      flip_probability=params.arena.flip_probability,
-      color_policy=ALTERNATE_COLORS)
+  use_gpu = params.arena.use_gpu
+  contender = Network.copy(contender, on_gpu=use_gpu, test_mode=true)
+  baseline = Network.copy(baseline, on_gpu=use_gpu, test_mode=true)
+  simulator = Simulator((contender, baseline), record_trace) do oracles
+    white = MctsPlayer(oracles[1], params.arena.mcts)
+    black = MctsPlayer(oracles[2], params.arena.mcts)
+    return TwoPlayers(white, black)
+  end
+  samples = simulate(
+    simulator,
+    num_games=params.arena.num_games,
+    num_workers=params.arena.num_workers,
+    handler=(trace -> Handlers.checkpoint_game_played(handler)),
+    reset_every=params.arena.reset_mcts_every,
+    flip_probability=params.arena.flip_probability,
+    color_policy=ALTERNATE_COLORS)
   gamma = params.self_play.mcts.gamma
   avgr, redundancy =  average_reward_and_redundancy(samples, gamma=gamma)
   return avgr, redundancy
@@ -219,50 +220,41 @@ function simple_memory_stats(env)
   return nsamples, ndistinct
 end
 
+# To be given as an argument to `Simulator`
+function self_play_measurements(trace, _, player)
+  mem = MCTS.approximate_memory_footprint(player.mcts)
+  edepth = MCTS.average_exploration_depth(player.mcts)
+  return (trace=trace, mem=mem, edepth=edepth)
+end
+
 function self_play_step!(env::Env{G}, handler) where G
   params = env.params.self_play
   Handlers.self_play_started(handler)
   network = Network.copy(env.bestnn, on_gpu=params.use_gpu, test_mode=true)
-  lock = ReentrantLock()
-  reqc = Batchifier.launch_server(params.num_workers) do state
-    Network.evaluate_batch(network, state)
+  simulator = Simulator(network, self_play_measurements) do oracle
+    return MctsPlayer(oracle, params.mcts)
   end
-  results, elapsed =
-    @timed Util.mapreduce(
-        1:params.num_games,
-        params.num_workers,
-        (x, y) -> [x;y], []) do
-      # Prepare the worker
-      it_counter = 0
-      oracle = Batchifier.BatchedOracle{G}(reqc)
-      player = MctsPlayer(oracle, params.mcts)
-      # Worker iteration
-      function simulate(_)
-        trace = play_game(player)
-        Base.lock(lock)
-        Handlers.game_played(handler)
-        unlock(lock)
-        mem = MCTS.approximate_memory_footprint(player.mcts)
-        it_counter += 1
-        reset_every = params.reset_mcts_every
-        if !isnothing(reset_every) && it_counter % reset_every == 0
-          MCTS.reset!(player.mcts)
-        end
-        expdepth = MCTS.average_exploration_depth(player.mcts)
-        return (trace=trace, mem=mem, expdepth=expdepth)
-      end
-      return (process=simulate, terminate=()->Batchifier.client_done!(reqc))
-  end
+  # Run the simulations
+  results, elapsed = @timed simulate(
+    simulator,
+    num_games=params.num_games,
+    num_workers=params.num_workers,
+    handler=_->Handlers.game_played(handler),
+    reset_every=params.reset_mcts_every,
+    fill_batches=true,
+    flip_probability=0.,
+    color_policy=nothing)
+  # Add the collected samples in memory
   new_batch!(env.memory)
   for x in results
     push_game!(env.memory, x.trace, params.mcts.gamma)
   end
   speed = cur_batch_size(env.memory) / elapsed
-  expdepth = mean([x.expdepth for x in results])
+  edepth = mean([x.edepth for x in results])
   mem_footprint = maximum([x.mem for x in results])
   memsize, memdistinct = simple_memory_stats(env)
   report = Report.SelfPlay(
-    speed, expdepth, mem_footprint, memsize, memdistinct)
+    speed, edepth, mem_footprint, memsize, memdistinct)
   Handlers.self_play_finished(handler, report)
   return report
 end
