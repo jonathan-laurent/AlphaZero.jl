@@ -23,7 +23,7 @@ self_play = SelfPlayParams(
 
 arena = ArenaParams(
   num_games=128,
-  num_workers=64,
+  num_workers=128,
   use_gpu=true,
   reset_mcts_every=2,
   flip_probability=0.5,
