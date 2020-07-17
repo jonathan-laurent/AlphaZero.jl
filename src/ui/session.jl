@@ -251,7 +251,8 @@ function run_duel(env, logger, duel)
   progress = Log.Progress(logger, duel.num_games)
   outcome = Benchmark.run(env, duel, progress)
   show_space_after_progress_bar(logger)
-  z = fmt("+.2f", outcome.avgz)
+  avgr = mean(outcome.rewards)
+  z = fmt("+.2f", avgr)
   if env.params.ternary_rewards
     stats = Benchmark.TernaryOutcomeStatistics(outcome)
     n = length(outcome.rewards)
@@ -260,7 +261,7 @@ function run_duel(env, logger, duel)
     plost = percentage(stats.num_lost, n)
     details = "$pwon% won, $pdraw% draw, $plost% lost"
   else
-    wr = win_rate(outcome.avgz)
+    wr = win_rate(avgr)
     details = "win rate of $wr%"
   end
   red = fmt(".1f", 100 * outcome.redundancy)
@@ -582,11 +583,11 @@ end
 
 function Handlers.checkpoint_finished(session::Session, report)
   show_space_after_progress_bar(session.logger)
-  avgz = fmt("+.2f", report.reward)
+  avgr = fmt("+.2f", report.reward)
   wr = win_rate(report.reward)
   red = fmt(".1f", report.redundancy * 100)
   nnr = report.nn_replaced ? ", network replaced" : ""
-  msg = "Average reward: $avgz (win rate of $wr%$nnr), redundancy: $red%"
+  msg = "Average reward: $avgr (win rate of $wr%$nnr), redundancy: $red%"
   Log.print(session.logger, msg)
   Log.section(session.logger, 3, "Optimizing the loss")
 end

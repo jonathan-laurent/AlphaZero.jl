@@ -232,7 +232,7 @@ instead of relying on MCTS. The given neural network must be in test mode.
 """
 struct NetworkPlayer{G, N} <: AbstractPlayer{G}
   network :: N
-   function NetworkPlayer(nn::AbstractNetwork{G}) where G
+   function NetworkPlayer(nn::MCTS.Oracle{G}) where G
     return new{G, typeof(nn)}(nn)
   end
 end
@@ -240,7 +240,7 @@ end
 function think(p::NetworkPlayer, game)
   actions = GI.available_actions(game)
   state = GI.current_state(game)
-  π, _ = MCTS.evaluate(p.network, state)
+  π, _ = p.network(state)
   return actions, π
 end
 
@@ -429,17 +429,38 @@ function batchify_oracles(o::Any, fill, n)
   return ret_oracle(o), do_nothing!
 end
 
+#####
+##### Distributed simulator
+#####
+
+"""
+    Simulator(make_player, oracles, measure)
+
+A distributed simulator that encapsulates the details of running simulations
+across multiple threads and multiple machines.
+
+# Arguments
+
+    - `oracles`: the oracles used by the player. This argument can be either
+      `nothing`, a single oracle or a pair of oracles.
+    - `make_player`: a function that takes as an argument the `oracles` field
+      above and nuild a player from it.
+    - `measure(trace, colors_flipped, player)`: the function that is used to
+      take measurements after each game simulation.
+"""
 struct Simulator{MakePlayer, Oracles, Measure}
   make_player :: MakePlayer
   oracles :: Oracles
-  measure :: Measure # (trace, colors_flipped, player) -> measure
+  measure :: Measure
 end
 
-record_trace(t, cf, p) = (trace=t, colors_flipped=cf)
+"""
+    record_trace
 
-#####
-##### Pitting two players against each other
-#####
+A measurement function to be passed to a [`Simulator`](@ref) that produces
+named tuples with two fields: `trace::Trace` and `colors_flipped::Bool`.
+"""
+record_trace(t, cf, p) = (trace=t, colors_flipped=cf)
 
 """
     @enum ColorPolicy ALTERNATE_COLORS BASELINE_WHITE CONTENDER_WHITE
@@ -450,21 +471,17 @@ Policy for attributing colors in a duel between a baseline and a contender.
 
 
 """
-    play_games(<keyword arguments>)
+    simulate(::Simulator; <keyword arguments>)
 
-Play a series of games, leveraging distributed computation if possible.
+Play a series of games using a given [`Simulator`](@ref).
 
 # Keyword Arguments
 
-  - `make_contender`: function that builds a contender player from an oracle
-  - `contender_oracle`: contender oracle, or `nothing`
-  - `make_baseline`: function that builds a baseline player from an oracle
   - `num_games`: number of games to play
   - `num_workers`: number of workers tasks to spawn
   - `handler`: called every time a game is played with the simulated trace
   - `reset_every`: if set, players are reset every `reset_every` games
-  - `color_policy`: determines the [`ColorPolicy`](@ref),
-     which is `ALTERNATE_COLORS` by default
+  - `color_policy`: either `nothing` or a [`ColorPolicy`](@ref)
   - `flip_probability=0.`: see [`play_game`](@ref)
 
 # Return
@@ -472,7 +489,7 @@ Play a series of games, leveraging distributed computation if possible.
 Return a vector of objects returned by `simulator.measure`.
 """
 function simulate(
-    simulator;
+    simulator::Simulator;
     num_games,
     num_workers,
     handler,
@@ -525,16 +542,15 @@ function compute_redundancy(states)
   return 1. - length(unique) / length(states)
 end
 
-# To be called on the output of `pit_players`
-function average_reward_and_redundancy(samples; gamma)
+# samples is a vector of named tuples with fields `trace` and `colors_flipped`
+function rewards_and_redundancy(samples; gamma)
   rewards = map(samples) do s
     wr = total_reward(s.trace, gamma)
     return s.colors_flipped ? -wr : wr
   end
-  avgr = mean(rewards)
   states = [st for s in samples for st in s.trace.states]
   redundancy = compute_redundancy(states)
-  return avgr, redundancy
+  return rewards, redundancy
 end
 
 #####

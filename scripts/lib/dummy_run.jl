@@ -15,19 +15,35 @@ function with_dummy_mcts(p::ArenaParams)
   return ArenaParams(p; mcts=with_dummy_mcts(p.mcts))
 end
 
+function with_dummy_mcts(p::Benchmark.Full)
+  return Benchmark.Full(with_dummy_mcts(p.params))
+end
+
+function with_dummy_mcts(p::Benchmark.MctsRollouts)
+  return Benchmark.MctsRollouts(with_dummy_mcts(p.params))
+end
+
+function with_dummy_mcts(p::Benchmark.Player)
+  return p
+end
+
 # Returned modified parameters where all num_games fields are set to 1.
 # The number of iterations is set to 2.
 function dummy_run_params(params, benchmark)
-  self_play = SelfPlayParams(with_dummy_mcts(params.self_play),
+  self_play = SelfPlayParams(
+    with_dummy_mcts(params.self_play),
     num_games=1, num_workers=1)
-  arena = ArenaParams(params.arena, num_games=1)
-  learning = LearningParams(params.learning,
+  arena = ArenaParams(with_dummy_mcts(params.arena), num_games=1)
+  learning = LearningParams(
+    params.learning,
     max_batches_per_checkpoint=2,
     num_checkpoints=min(params.learning.num_checkpoints, 2))
-  params = Params(params, num_iters=2,
+  params = Params(
+    params, num_iters=2,
     self_play=self_play, arena=arena, learning=learning)
   benchmark = [
-    Benchmark.Duel(d.player, d.baseline,
+    Benchmark.Duel(
+      with_dummy_mcts(d.player), with_dummy_mcts(d.baseline),
       num_games=1, num_workers=1, color_policy=d.color_policy)
     for d in benchmark ]
   return params, benchmark

@@ -20,6 +20,7 @@ module UserInterface
   import JSON3
 
   using Base: @kwdef
+  using Statistics: mean
   using Formatting
   using Crayons
   using Colors: @colorant_str

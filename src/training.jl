@@ -151,8 +151,8 @@ function evaluate_network(contender, baseline, params, handler)
     flip_probability=params.arena.flip_probability,
     color_policy=ALTERNATE_COLORS)
   gamma = params.self_play.mcts.gamma
-  avgr, redundancy =  average_reward_and_redundancy(samples, gamma=gamma)
-  return avgr, redundancy
+  rewards, redundancy = rewards_and_redundancy(samples, gamma=gamma)
+  return mean(rewards), redundancy
 end
 
 function learning_step!(env::Env, handler)
