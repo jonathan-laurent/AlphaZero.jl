@@ -43,14 +43,13 @@ gc
 
 ```@docs
 evaluate
+evaluate_batch
 ```
 
 ### Oracle Interface
 
 All subtypes of `AbstractNetwork` implement the
-[`MCTS.Oracle`](@ref) interface through functions:
-  - [`MCTS.evaluate`](@ref)
-  - [`MCTS.evaluate_batch`](@ref).
+[`MCTS.Oracle`](@ref) interface along with [`evaluate_batch`].
 
 Since evaluating a neural network on single samples at a
 time is slow, the latter should be used whenever possible.

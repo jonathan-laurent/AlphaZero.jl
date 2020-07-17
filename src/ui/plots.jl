@@ -58,13 +58,12 @@ function performances_plot(rep::Report.Iteration)
     legend=:right)
   # Self-play details
   self_play =
-    let gcratio =
-      rep.perfs_self_play.gc_time / rep.perfs_self_play.time
-    let itratio = rep.self_play.inference_time_ratio
+    let gcratio = rep.perfs_self_play.gc_time / rep.perfs_self_play.time
       Plots.pie(
-        ["MCTS (inference)", "MCTS (other)", "GC"],
-        [(1 - gcratio) * itratio, (1 - gcratio) * (1 - itratio), gcratio],
-        title="Self Play") end end
+        ["MCTS and Inference", "GC"],
+        [1 - gcratio, gcratio],
+        title="Self Play")
+    end
   # Learning details
   learning = Plots.pie(
     ["Samples conversion", "Loss computation", "Optimization", "Arena (MCTS)"],
@@ -118,15 +117,15 @@ function plot_benchmark(
   isdir(dir) || mkpath(dir)
   labels = ["$(d.player) / $(d.baseline)" for _ in 1:1, d in benchs[1]]
   # Average reward
-  avgz_data = [[b[i].avgz for b in benchs] for i in 1:nduels]
-  avgz = Plots.plot(0:n,
-    avgz_data,
+  avgr_data = [[b[i].avgr for b in benchs] for i in 1:nduels]
+  avgr = Plots.plot(0:n,
+    avgr_data,
     title="Average Reward",
     ylims=(-1.0, 1.0),
     legend=:bottomright,
     label=labels,
     xlabel="Iteration number")
-  Plots.savefig(avgz, joinpath(dir, "benchmark_reward"))
+  Plots.savefig(avgr, joinpath(dir, "benchmark_reward"))
   if params.ternary_rewards
     function compute_percentage(b, f)
       stats = Benchmark.TernaryOutcomeStatistics(b)

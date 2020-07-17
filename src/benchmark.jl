@@ -25,6 +25,7 @@ The outcome of a duel between two players.
 # Fields
 - `player` and `baseline` are `String` fields containing the names of
     both players involved in the duel
+- `avgr` is the averagereward collected by `player`
 - `rewards` is the sequence of rewards collected by `player` (one per game)
 - `redundancy` is the ratio of duplicate positions encountered during the
    evaluation, not counting the initial position. If this number is too high,
@@ -34,6 +35,7 @@ The outcome of a duel between two players.
 struct DuelOutcome
   player :: String
   baseline :: String
+  avgr :: Float64
   rewards :: Vector{Float64}
   redundancy :: Float64
   time :: Float64
@@ -118,8 +120,9 @@ function run(env::Env{G}, duel::Duel, progress=nothing) where G
     color_policy=duel.color_policy)
   gamma = env.params.self_play.mcts.gamma
   rewards, redundancy = rewards_and_redundancy(samples, gamma=gamma)
+  avgr = mean(rewards)
   return DuelOutcome(
-    name(duel.player), name(duel.baseline), rewards, redundancy, elapsed)
+    name(duel.player), name(duel.baseline), avgr, rewards, redundancy, elapsed)
 end
 
 #####

@@ -271,6 +271,11 @@ function (nn::AbstractNetwork{Game})(board) where Game
   return (p[actions_mask], v[1])
 end
 
+"""
+    evaluate_batch(::AbstractNetwork, batch)
+
+Evaluate a batch of positions at once.
+"""
 function evaluate_batch(nn::AbstractNetwork{Game}, batch) where Game
   X = Util.superpose((GI.vectorize_state(Game, b) for b in batch))
   A = Util.superpose((GI.actions_mask(Game(b)) for b in batch))

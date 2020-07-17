@@ -14,6 +14,20 @@ import ..GI, ..GameType
 ##### Interface for External Oracles
 #####
 
+"""
+    MCTS.Oracle{Game}
+
+Abstract base type for an oracle. Oracles must be callable:
+
+  (::Oracle)(state)
+
+Evaluate a single state from the current player's perspective.
+
+Return a pair `(P, V)` where:
+
+  - `P` is a probability vector on `GI.available_actions(Game(state))`
+  - `V` is a scalar estimating the value or win probability for white.
+"""
 abstract type Oracle{Game} end
 
 GameType(::Oracle{G}) where G = G

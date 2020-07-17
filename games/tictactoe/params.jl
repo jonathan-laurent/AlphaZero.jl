@@ -9,6 +9,7 @@ netparams = SimpleNetHP(
 self_play = SelfPlayParams(
   num_games=10_000,
   num_workers=100,
+  reset_mcts_every=4,
   mcts = MctsParams(
     num_iters_per_turn=400,
     cpuct=1.0,

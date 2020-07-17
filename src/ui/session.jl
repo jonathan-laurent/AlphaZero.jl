@@ -251,8 +251,7 @@ function run_duel(env, logger, duel)
   progress = Log.Progress(logger, duel.num_games)
   outcome = Benchmark.run(env, duel, progress)
   show_space_after_progress_bar(logger)
-  avgr = mean(outcome.rewards)
-  z = fmt("+.2f", avgr)
+  z = fmt("+.2f", outcome.avgr)
   if env.params.ternary_rewards
     stats = Benchmark.TernaryOutcomeStatistics(outcome)
     n = length(outcome.rewards)
@@ -261,7 +260,7 @@ function run_duel(env, logger, duel)
     plost = percentage(stats.num_lost, n)
     details = "$pwon% won, $pdraw% draw, $plost% lost"
   else
-    wr = win_rate(avgr)
+    wr = win_rate(outcome.avgr)
     details = "win rate of $wr%"
   end
   red = fmt(".1f", 100 * outcome.redundancy)
