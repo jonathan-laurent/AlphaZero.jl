@@ -1,8 +1,8 @@
 Network = ResNet
 
 netparams = ResNetHP(
-  num_filters=64,
-  num_blocks=7,
+  num_filters=128,
+  num_blocks=5,
   conv_kernel_size=(3, 3),
   num_policy_head_filters=32,
   num_value_head_filters=32,
@@ -37,13 +37,13 @@ learning = LearningParams(
   use_gpu=true,
   use_position_averaging=true,
   samples_weighing_policy=LOG_WEIGHT,
-  batch_size=2048,
-  loss_computation_batch_size=2048,
+  batch_size=1024,
+  loss_computation_batch_size=1024,
   optimiser=Adam(lr=1e-3),
   l2_regularization=1e-4,
   nonvalidity_penalty=1.,
   min_checkpoints_per_epoch=1,
-  max_batches_per_checkpoint=1000,
+  max_batches_per_checkpoint=2000,
   num_checkpoints=1)
 
 params = Params(
