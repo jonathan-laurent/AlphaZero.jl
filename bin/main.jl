@@ -9,15 +9,25 @@ ENV["GKSwstype"]="nul"
 
 using AlphaZero
 
+const DUMMY_RUN = false
+include("../scripts/lib/dummy_run.jl")
+
 include("../games/connect-four/main.jl")
 using .ConnectFour: Game, Training
+
+params, benchmark = Training.params, Training.benchmark
+if DUMMY_RUN
+  params, benchmark = dummy_run_params(params, benchmark)
+end
 
 session = Session(
   Game,
   Training.Network{Game},
-  Training.params,
+  params,
   Training.netparams,
-  benchmark=Training.benchmark,
+  benchmark=benchmark,
   dir="sessions/connect-four",
   autosave=true,
   save_intermediate=false)
+
+resume!(session)
