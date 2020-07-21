@@ -1,11 +1,21 @@
 using Distributed
 
-include("dummy_module.jl")
+# This fix only works on a single machine
+function include_everywhere(filepath)
+    fullpath = joinpath(@__DIR__, filepath)
+    @sync for p in procs()
+        @async remotecall_wait(include, p, fullpath)
+    end
+end
 
 addprocs(2)
 
-@everywhere include("dummy_module.jl")
+include_everywhere("dummy_module.jl")
 
-# @show nworkers()
-#
-# @spawnat 2 DummyModule.greet()
+@everywhere using .DummyModule
+
+@show nworkers()
+
+greet()
+
+@spawnat 2 greet()
