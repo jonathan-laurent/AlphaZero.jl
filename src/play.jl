@@ -501,7 +501,7 @@ function simulate(
   lock = ReentrantLock() # only used to surround the calls to `handler`
   spawn_oracles, done =
     batchify_oracles(simulator.oracles, fill_batches, num_workers)
-  return Util.mapreduce(1:num_games, num_workers, (x, y) -> [x;y], []) do
+  return Util.mapreduce(1:num_games, num_workers, vcat, []) do
     oracles = spawn_oracles()
     player = simulator.make_player(oracles)
     worker_sim_id = 0
@@ -535,6 +535,40 @@ function simulate(
     end
     return (process=simulate_game, terminate=done)
   end
+end
+
+"""
+    simulate_distributed(::Simulator; <keyword arguments>)
+
+Identical to [`simulate`](@ref) but splits the work
+across all available workers.
+"""
+function simulate_distributed(
+    simulator::Simulator;
+    num_games,
+    num_workers,
+    handler,
+    reset_every=nothing,
+    fill_batches=true,
+    flip_probability=0.,
+    color_policy=nothing)
+
+  num_each = num_games ÷ Distributed.nworkers()
+  @assert num_each >= 1
+  tasks = map(Distributed.workers()) do w
+    Distributed.@spawnat w begin
+      simulate(
+        simulator,
+        num_games=num_each,
+        num_workers=num_workers,
+        handler=handler,
+        reset_every=reset_every,
+        fill_batches=fill_batches,
+        flip_probability=flip_probability,
+        color_policy=color_policy)
+    end
+  end
+  return reduce(vcat, fetch.(tasks))
 end
 
 function compute_redundancy(states)

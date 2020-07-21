@@ -51,6 +51,8 @@ using DataStructures: CircularBuffer
 using Distributions: Categorical, Dirichlet
 using Statistics: mean
 
+import Distributed
+
 include("schedule.jl")
 include("params.jl")
 include("report.jl")

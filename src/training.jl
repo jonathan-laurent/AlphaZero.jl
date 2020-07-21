@@ -235,7 +235,7 @@ function self_play_step!(env::Env{G}, handler) where G
     return MctsPlayer(oracle, params.mcts)
   end
   # Run the simulations
-  results, elapsed = @timed simulate(
+  results, elapsed = @timed simulate_distributed(
     simulator,
     num_games=params.num_games,
     num_workers=params.num_workers,
