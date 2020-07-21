@@ -146,7 +146,7 @@ function evaluate_network(contender, baseline, params, handler)
     simulator,
     num_games=params.arena.num_games,
     num_workers=params.arena.num_workers,
-    handler=(trace -> Handlers.checkpoint_game_played(handler)),
+    game_simulated=(() -> Handlers.checkpoint_game_played(handler)),
     reset_every=params.arena.reset_mcts_every,
     flip_probability=params.arena.flip_probability,
     color_policy=ALTERNATE_COLORS)
@@ -239,7 +239,7 @@ function self_play_step!(env::Env{G}, handler) where G
     simulator,
     num_games=params.num_games,
     num_workers=params.num_workers,
-    handler=_->Handlers.game_played(handler),
+    game_simulated=()->Handlers.game_played(handler),
     reset_every=params.reset_mcts_every,
     fill_batches=true,
     flip_probability=0.,

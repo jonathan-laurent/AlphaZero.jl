@@ -114,7 +114,7 @@ function run(env::Env{G}, duel::Duel, progress=nothing) where G
     simulator,
     num_games=duel.num_games,
     num_workers=duel.num_workers,
-    handler=(trace -> next!(progress)),
+    game_simulated=(() -> next!(progress)),
     reset_every=duel.reset_every,
     flip_probability=duel.flip_probability,
     color_policy=duel.color_policy)

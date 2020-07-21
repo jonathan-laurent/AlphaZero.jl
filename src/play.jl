@@ -479,7 +479,7 @@ Play a series of games using a given [`Simulator`](@ref).
 
   - `num_games`: number of games to play
   - `num_workers`: number of workers tasks to spawn
-  - `handler`: called every time a game is played with the simulated trace
+  - `game_simulated`: called every time a game simulation is completed
   - `reset_every`: if set, players are reset every `reset_every` games
   - `color_policy`: either `nothing` or a [`ColorPolicy`](@ref)
   - `flip_probability=0.`: see [`play_game`](@ref)
@@ -492,13 +492,12 @@ function simulate(
     simulator::Simulator;
     num_games,
     num_workers,
-    handler,
+    game_simulated,
     reset_every=nothing,
     fill_batches=true,
     flip_probability=0.,
     color_policy=nothing)
 
-  lock = ReentrantLock() # only used to surround the calls to `handler`
   spawn_oracles, done =
     batchify_oracles(simulator.oracles, fill_batches, num_workers)
   return Util.mapreduce(1:num_games, num_workers, vcat, []) do
@@ -527,10 +526,8 @@ function simulate(
       if !isnothing(reset_every) && worker_sim_id % reset_every == 0
         reset_player!(player)
       end
-      # Call the handler
-      Base.lock(lock)
-      handler(trace)
-      Base.unlock(lock)
+      # Indicates that a game has been simulated
+      game_simulated()
       return report
     end
     return (process=simulate_game, terminate=done)
@@ -547,28 +544,46 @@ function simulate_distributed(
     simulator::Simulator;
     num_games,
     num_workers,
-    handler,
+    game_simulated,
     reset_every=nothing,
     fill_batches=true,
     flip_probability=0.,
     color_policy=nothing)
 
-  num_each = num_games ÷ Distributed.nworkers()
+  # Spawning a task to keep count of completed simulations
+  chan = Distributed.RemoteChannel(()->Channel{Nothing}(1))
+  Threads.@spawn begin
+    for i in 1:num_workers
+      take!(chan)
+      game_simulated()
+    end
+  end
+  remote_game_simulated() = put!(chan, nothing)
+  # Distributing the simulations across workers
+  num_each, rem = divrem(num_games, Distributed.nworkers())
   @assert num_each >= 1
-  tasks = map(Distributed.workers()) do w
+  workers = Distributed.workers()
+  tasks = map(workers) do w
     Distributed.@spawnat w begin
       simulate(
         simulator,
-        num_games=num_each,
+        num_games=(w == workers[1] ? num_each + rem : num_each),
         num_workers=num_workers,
-        handler=handler,
+        game_simulated=remote_game_simulated,
         reset_every=reset_every,
         fill_batches=fill_batches,
         flip_probability=flip_probability,
         color_policy=color_policy)
     end
   end
-  return reduce(vcat, fetch.(tasks))
+  results = fetch.(tasks)
+  # If one of the worker raised an exception, we print it
+  for r in results
+    if isa(r, Distributed.RemoteException)
+      showerror(stderr, r, catch_backtrace())
+    end
+  end
+  return reduce(vcat, results)
 end
 
 function compute_redundancy(states)
