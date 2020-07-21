@@ -63,12 +63,12 @@ benchmark = [
     Benchmark.MctsRollouts(self_play.mcts),
     num_games=400,
     num_workers=100,
-    use_gpu=true,
+    use_gpu=false,
     flip_probability=0.5),
   Benchmark.Duel(
     Benchmark.NetworkOnly(),
     Benchmark.MinMaxTS(depth=6, amplify_rewards=true, τ=1.),
     num_games=400,
     num_workers=100,
-    use_gpu=true,
+    use_gpu=false,
     flip_probability=0.5)]
