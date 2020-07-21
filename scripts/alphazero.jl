@@ -10,6 +10,7 @@ ENV["JULIA_CUDA_MEMORY_POOL"] = "split" # "binned" / "split"
 ENV["GKSwstype"]="nul"
 
 using AlphaZero
+import Distributed
 include("games.jl")
 
 #####
@@ -75,6 +76,7 @@ if cmd == "check-game"
   test_game(Game)
   @info "All tests passed."
 else
+  println("\nUsing $(Distributed.nworkers()) distributed worker(s).\n")
   session = Session(
     Game, Training.Network{Game}, params, netparams, benchmark=benchmark,
     dir=SESSION_DIR, autosave=true, save_intermediate=args["save-intermediate"])
