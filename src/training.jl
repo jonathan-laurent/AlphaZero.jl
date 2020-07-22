@@ -230,6 +230,8 @@ end
 function self_play_step!(env::Env{G}, handler) where G
   params = env.params.self_play
   Handlers.self_play_started(handler)
+  # TODO: the network should not be be copied onto the GPU yet.
+  # It must be sent to the remote workers first.
   network = Network.copy(env.bestnn, on_gpu=params.use_gpu, test_mode=true)
   simulator = Simulator(network, self_play_measurements) do oracle
     return MctsPlayer(oracle, params.mcts)

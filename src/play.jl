@@ -526,7 +526,7 @@ function simulate(
       if !isnothing(reset_every) && worker_sim_id % reset_every == 0
         reset_player!(player)
       end
-      # Indicates that a game has been simulated
+      # Signal that a game has been simulated
       game_simulated()
       return report
     end
@@ -553,7 +553,7 @@ function simulate_distributed(
   # Spawning a task to keep count of completed simulations
   chan = Distributed.RemoteChannel(()->Channel{Nothing}(1))
   Threads.@spawn begin
-    for i in 1:num_workers
+    for i in 1:num_games
       take!(chan)
       game_simulated()
     end
@@ -563,17 +563,20 @@ function simulate_distributed(
   num_each, rem = divrem(num_games, Distributed.nworkers())
   @assert num_each >= 1
   workers = Distributed.workers()
+  @show workers
   tasks = map(workers) do w
     Distributed.@spawnat w begin
-      simulate(
-        simulator,
-        num_games=(w == workers[1] ? num_each + rem : num_each),
-        num_workers=num_workers,
-        game_simulated=remote_game_simulated,
-        reset_every=reset_every,
-        fill_batches=fill_batches,
-        flip_probability=flip_probability,
-        color_policy=color_policy)
+      Util.@printing_errors begin
+        simulate(
+          simulator,
+          num_games=(w == workers[1] ? num_each + rem : num_each),
+          num_workers=num_workers,
+          game_simulated=remote_game_simulated,
+          reset_every=reset_every,
+          fill_batches=fill_batches,
+          flip_probability=flip_probability,
+          color_policy=color_policy)
+        end
     end
   end
   results = fetch.(tasks)
