@@ -19,26 +19,30 @@ end
 
 function learning_iter_plot(rep::Report.Learning, params::Params)
   n = length(rep.checkpoints)
-  nbatches = rep.checkpoints[end].batch_id
-  losses_plot = plot_losses(0:n, "Losses") do i
-    if i == 0
-      (0, rep.initial_status.loss)
-    else
-      (rep.checkpoints[i].batch_id, rep.checkpoints[i].status_after.loss)
+  if n == 0
+    return nothing
+  else
+    nbatches = rep.checkpoints[end].batch_id
+    losses_plot = plot_losses(0:n, "Losses") do i
+      if i == 0
+        (0, rep.initial_status.loss)
+      else
+        (rep.checkpoints[i].batch_id, rep.checkpoints[i].status_after.loss)
+      end
     end
+    checkpoints_plot = Plots.hline(
+      [0, params.arena.update_threshold],
+      title="Checkpoints")
+    Plots.plot!(checkpoints_plot,
+      [c.batch_id for c in rep.checkpoints],
+      [c.reward for c in rep.checkpoints],
+      ylims=(-1.0, 1.0),
+      t=:scatter,
+      legend=:none)
+    Plots.xlims!(losses_plot, (0, nbatches))
+    Plots.xlims!(checkpoints_plot, (0, nbatches))
+    return Plots.plot(losses_plot, checkpoints_plot, layout=(2, 1))
   end
-  checkpoints_plot = Plots.hline(
-    [0, params.arena.update_threshold],
-    title="Checkpoints")
-  Plots.plot!(checkpoints_plot,
-    [c.batch_id for c in rep.checkpoints],
-    [c.reward for c in rep.checkpoints],
-    ylims=(-1.0, 1.0),
-    t=:scatter,
-    legend=:none)
-  Plots.xlims!(losses_plot, (0, nbatches))
-  Plots.xlims!(checkpoints_plot, (0, nbatches))
-  return Plots.plot(losses_plot, checkpoints_plot, layout=(2, 1))
 end
 
 function performances_plot(rep::Report.Iteration)
@@ -80,10 +84,13 @@ function plot_iteration(
     params::Params,
     dir::String,
     itc::Int)
+  plots = []
   # Summary plot
   splot = learning_iter_plot(report.learning, params)
+  isnothing(splot) || push!(plots, ("iter_summary", splot))
   # Performances plot
   pplot = performances_plot(report)
+  push!(plots, ("iter_perfs", pplot))
   # Losses plot
   losses = Util.momentum_smoothing(report.learning.losses, 0.1)
   lplot = Plots.plot(collect(eachindex(losses)), losses,
@@ -91,10 +98,9 @@ function plot_iteration(
     ylims=(0, Inf),
     legend=nothing,
     xlabel="Batch number")
+  push!(plots, ("iter_loss", lplot))
   # Saving everything
-  plots = [splot, pplot, lplot]
-  names = ["iter_summary", "iter_perfs", "iter_loss"]
-  for (plot, name) in zip(plots, names)
+  for (name, plot) in plots
     pdir = joinpath(dir, name)
     isdir(pdir) || mkdir(pdir)
     Plots.savefig(plot, joinpath(pdir, "$itc"))
@@ -180,15 +186,19 @@ function plot_training(
     [0;[it.self_play.memory_num_distinct_boards for it in iterations]],
     label="Number of distinct boards")
   # Performances during evaluation
-  arena = Plots.plot(1:n, [
-    maximum(c.reward for c in it.learning.checkpoints)
-    for it in iterations],
-    title="Arena Results",
-    ylims=(-1, 1),
-    t=:bar,
-    legend=:none,
-    xlabel="Iteration number")
-  Plots.hline!(arena, [0, params.arena.update_threshold])
+  if all(it -> !isempty(it.learning.checkpoints), iterations)
+    arena = Plots.plot(1:n, [
+      maximum(c.reward for c in it.learning.checkpoints)
+      for it in iterations],
+      title="Arena Results",
+      ylims=(-1, 1),
+      t=:bar,
+      legend=:none,
+      xlabel="Iteration number")
+    Plots.hline!(arena, [0, params.arena.update_threshold])
+    push!(plots, arena)
+    push!(files, "arena")
+  end
   # Loss on the full memory after an iteration
   lfmt = "Loss on Full Memory"
   losses_fullmem = plot_losses(1:n, lfmt, "Iteration number") do i
@@ -234,9 +244,9 @@ function plot_training(
     label="Network")
   # Assembling everything together
   append!(plots,
-    [arena, entropies, nsamples, expdepth, losses_fullmem])
+    [entropies, nsamples, expdepth, losses_fullmem])
   append!(files,
-    ["arena", "entropies", "nsamples", "exploration_depth", "loss"])
+    ["entropies", "nsamples", "exploration_depth", "loss"])
   for (file, plot) in zip(files, plots)
     Plots.savefig(plot, joinpath(dir, file))
   end

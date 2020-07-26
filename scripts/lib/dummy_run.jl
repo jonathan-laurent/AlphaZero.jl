@@ -23,9 +23,9 @@ function with_dummy_mcts(p::Benchmark.MctsRollouts)
   return Benchmark.MctsRollouts(with_dummy_mcts(p.params))
 end
 
-function with_dummy_mcts(p::Benchmark.Player)
-  return p
-end
+with_dummy_mcts(p::Benchmark.Player) = p
+
+with_dummy_mcts(::Nothing) = nothing
 
 # Returned modified parameters where all num_games fields are set to 1.
 # The number of iterations is set to 2.
@@ -33,7 +33,10 @@ function dummy_run_params(params, benchmark)
   self_play = SelfPlayParams(
     with_dummy_mcts(params.self_play),
     num_games=1, num_workers=1)
-  arena = ArenaParams(with_dummy_mcts(params.arena), num_games=1)
+  arena = nothing
+  if !isnothing(params.arena)
+    arena = ArenaParams(with_dummy_mcts(params.arena), num_games=1)
+  end
   learning = LearningParams(
     params.learning,
     max_batches_per_checkpoint=2,
@@ -49,14 +52,14 @@ function dummy_run_params(params, benchmark)
   return params, benchmark
 end
 
-function dummy_run(GameModule)
+function dummy_run(GameModule; session_dir=nothing, nostdout=true)
   Game = GameModule.Game
   Training = GameModule.Training
   Net = Training.Network
   netparams = Training.netparams
   params, benchmark = dummy_run_params(Training.params, Training.benchmark)
   session = Session(Game, Net{Game}, params, netparams,
-    benchmark=benchmark, nostdout=true)
+    benchmark=benchmark, nostdout=nostdout, dir=session_dir)
   resume!(session)
   return true
 end

@@ -14,6 +14,7 @@ include("test_game.jl")
 end
 
 @testset "Dummy Runs" begin
-  @test dummy_run(Tictactoe)
+  dir = "sessions/test-tictactoe"
+  @test dummy_run(Tictactoe, nostdout=false, session_dir=dir)
   #@test dummy_run(ConnectFour) # Takes a bit too long for Travis
 end

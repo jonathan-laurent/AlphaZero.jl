@@ -175,7 +175,7 @@ function learning_step!(env::Env, handler)
     nbatches = min(nbatches, ntotal ÷ lp.min_checkpoints_per_epoch)
   end
   # Loop state variables
-  best_evalz = ap.update_threshold
+  best_evalz = isnothing(ap) ? nothing : ap.update_threshold
   nn_replaced = false
 
   for k in 1:lp.num_checkpoints
@@ -187,25 +187,31 @@ function learning_step!(env::Env, handler)
     tloss += dtloss
     ttrain += dttrain
     append!(losses, dlosses)
-    # Run a checkpoint evaluation
-    Handlers.checkpoint_started(handler)
-    env.curnn = get_trained_network(trainer)
-    (evalz, redundancy), dteval =
-      @timed evaluate_network(env.curnn, env.bestnn, env.params, handler)
-    teval += dteval
-    # If eval is good enough, replace network
-    success = (evalz >= best_evalz)
-    if success
-      nn_replaced = true
+    # Run a checkpoint evaluation if the arena parameter is provided
+    if isnothing(ap)
+      env.curnn = get_trained_network(trainer)
       env.bestnn = copy(env.curnn)
-      best_evalz = evalz
+      nn_replaced = true
+    else
+      Handlers.checkpoint_started(handler)
+      env.curnn = get_trained_network(trainer)
+      (evalz, redundancy), dteval = @timed begin
+        evaluate_network(env.curnn, env.bestnn, env.params, handler)
+      end
+      teval += dteval
+      # If eval is good enough, replace network
+      success = (evalz >= best_evalz)
+      if success
+        nn_replaced = true
+        env.bestnn = copy(env.curnn)
+        best_evalz = evalz
+      end
+      checkpoint_report = Report.Checkpoint(
+        k * nbatches, status, evalz, redundancy, success)
+      push!(checkpoints, checkpoint_report)
+      Handlers.checkpoint_finished(handler, checkpoint_report)
     end
-    checkpoint_report = Report.Checkpoint(
-      k * nbatches, status, evalz, redundancy, success)
-    push!(checkpoints, checkpoint_report)
-    Handlers.checkpoint_finished(handler, checkpoint_report)
   end
-
   report = Report.Learning(
     tconvert, tloss, ttrain, teval,
     init_status, losses, checkpoints, nn_replaced)
