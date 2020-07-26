@@ -441,7 +441,8 @@ across multiple threads and multiple machines.
 
 # Arguments
 
-    - `oracles`: the oracles used by the player. This argument can be either
+    - `make_oracles`: a function that takes no argument and returns
+       the oracles used by the player, which can be either
       `nothing`, a single oracle or a pair of oracles.
     - `make_player`: a function that takes as an argument the `oracles` field
       above and nuild a player from it.
@@ -450,7 +451,7 @@ across multiple threads and multiple machines.
 """
 struct Simulator{MakePlayer, Oracles, Measure}
   make_player :: MakePlayer
-  oracles :: Oracles
+  make_oracles :: Oracles
   measure :: Measure
 end
 
@@ -498,8 +499,9 @@ function simulate(
     flip_probability=0.,
     color_policy=nothing)
 
+  oracles = simulator.make_oracles()
   spawn_oracles, done =
-    batchify_oracles(simulator.oracles, fill_batches, num_workers)
+    batchify_oracles(oracles, fill_batches, num_workers)
   return Util.mapreduce(1:num_games, num_workers, vcat, []) do
     oracles = spawn_oracles()
     player = simulator.make_player(oracles)

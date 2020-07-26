@@ -104,7 +104,7 @@ If a `progress` is provided, `next!(progress)` is called
 after each simulated game.
 """
 function run(env::Env{G}, duel::Duel, progress=nothing) where G
-  net = Network.copy(env.bestnn, on_gpu=duel.use_gpu, test_mode=true)
+  net() = Network.copy(env.bestnn, on_gpu=duel.use_gpu, test_mode=true)
   simulator = Simulator(net, record_trace) do net
     player = instantiate(duel.player, net)
     baseline = instantiate(duel.baseline, net)

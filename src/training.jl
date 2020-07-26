@@ -135,9 +135,10 @@ end
 
 function evaluate_network(contender, baseline, params, handler)
   use_gpu = params.arena.use_gpu
-  contender = Network.copy(contender, on_gpu=use_gpu, test_mode=true)
-  baseline = Network.copy(baseline, on_gpu=use_gpu, test_mode=true)
-  simulator = Simulator((contender, baseline), record_trace) do oracles
+  make_oracles() = (
+    Network.copy(contender, on_gpu=use_gpu, test_mode=true),
+    Network.copy(baseline, on_gpu=use_gpu, test_mode=true))
+  simulator = Simulator(make_oracles, record_trace) do oracles
     white = MctsPlayer(oracles[1], params.arena.mcts)
     black = MctsPlayer(oracles[2], params.arena.mcts)
     return TwoPlayers(white, black)
@@ -236,10 +237,9 @@ end
 function self_play_step!(env::Env{G}, handler) where G
   params = env.params.self_play
   Handlers.self_play_started(handler)
-  # TODO: the network should not be be copied onto the GPU yet.
-  # It must be sent to the remote workers first.
-  network = Network.copy(env.bestnn, on_gpu=params.use_gpu, test_mode=true)
-  simulator = Simulator(network, self_play_measurements) do oracle
+  make_oracle() =
+    Network.copy(env.bestnn, on_gpu=params.use_gpu, test_mode=true)
+  simulator = Simulator(make_oracle, self_play_measurements) do oracle
     return MctsPlayer(oracle, params.mcts)
   end
   # Run the simulations
