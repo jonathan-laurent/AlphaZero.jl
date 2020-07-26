@@ -2,7 +2,7 @@ Network = ResNet
 
 netparams = ResNetHP(
   num_filters=128,
-  num_blocks=10,
+  num_blocks=5,
   conv_kernel_size=(3, 3),
   num_policy_head_filters=32,
   num_value_head_filters=32,
@@ -16,7 +16,7 @@ self_play = SelfPlayParams(
   mcts=MctsParams(
     num_iters_per_turn=600,
     cpuct=3.0,
-    prior_temperature=1.0,
+    prior_temperature=0.8,
     temperature=PLSchedule([0, 20], [1.0, 0.3]),
     dirichlet_noise_ϵ=0.2,
     dirichlet_noise_α=1.0))
@@ -47,14 +47,13 @@ learning = LearningParams(
   num_checkpoints=1)
 
 params = Params(
-  arena=arena,
+  arena=nothing, # skipping this part for the demo
   self_play=self_play,
   learning=learning,
-  num_iters=50,
+  num_iters=12, # for the demo, 12 iterations should be enough
   ternary_rewards=true,
   use_symmetries=true,
-  memory_analysis=MemAnalysisParams(
-    num_game_stages=4),
+  memory_analysis=nothing, # removed for the demo for more parallelism
   mem_buffer_size=PLSchedule(
   [      0,        40],
   [400_000, 2_000_000]))
@@ -70,20 +69,18 @@ minmax_baseline = Benchmark.MinMaxTS(depth=5, amplify_rewards=true, τ=0.2)
 
 players = [
   Benchmark.Full(arena.mcts),
-  Benchmark.Full(arena.mcts),
   Benchmark.NetworkOnly(τ=0.5)]
 
 baselines = [
   mcts_baseline,
-  minmax_baseline,
   mcts_baseline]
 
 make_duel(player, baseline) =
   Benchmark.Duel(
     player,
     baseline,
-    num_games=128,
-    num_workers=128,
+    num_games=64,
+    num_workers=64,
     use_gpu=true,
     flip_probability=0.5,
     color_policy=CONTENDER_WHITE)
