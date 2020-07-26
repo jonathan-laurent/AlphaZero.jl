@@ -563,7 +563,6 @@ function simulate_distributed(
   num_each, rem = divrem(num_games, Distributed.nworkers())
   @assert num_each >= 1
   workers = Distributed.workers()
-  @show workers
   tasks = map(workers) do w
     Distributed.@spawnat w begin
       Util.@printing_errors begin
