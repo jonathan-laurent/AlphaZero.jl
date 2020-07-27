@@ -39,7 +39,7 @@ learning = LearningParams(
   samples_weighing_policy=LOG_WEIGHT,
   batch_size=2048,
   loss_computation_batch_size=2048,
-  optimiser=Adam(lr=5e-4),
+  optimiser=Adam(lr=2e-3),
   l2_regularization=1e-4,
   nonvalidity_penalty=1.,
   min_checkpoints_per_epoch=1,
