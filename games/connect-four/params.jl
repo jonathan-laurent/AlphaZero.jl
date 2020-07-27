@@ -37,13 +37,13 @@ learning = LearningParams(
   use_gpu=true,
   use_position_averaging=true,
   samples_weighing_policy=LOG_WEIGHT,
-  batch_size=512,
-  loss_computation_batch_size=1024,
+  batch_size=2048,
+  loss_computation_batch_size=2048,
   optimiser=Adam(lr=5e-4),
   l2_regularization=1e-4,
   nonvalidity_penalty=1.,
   min_checkpoints_per_epoch=1,
-  max_batches_per_checkpoint=4000,
+  max_batches_per_checkpoint=1000,
   num_checkpoints=1)
 
 params = Params(
