@@ -434,9 +434,10 @@ end
 
 Start an explorer session for the current environment. See [`Explorer`](@ref).
 """
-function start_explorer(session::Session)
+function start_explorer(session::Session; mcts_params=nothing, on_gpu=false)
+  isnothing(mcts_params) && (mcts_params = session.env.params.self_play.mcts)
   Log.section(session.logger, 1, "Starting interactive exploration")
-  explorer = Explorer(session.env)
+  explorer = Explorer(session.env, mcts_params=mcts_params, on_gpu=on_gpu)
   start_explorer(explorer)
 end
 
@@ -446,12 +447,12 @@ end
 Start an interactive game against AlphaZero, allowing it
 `timeout` seconds of thinking time for each move.
 """
-function play_interactive_game(session::Session; timeout=2.)
+function play_interactive_game(
+    session::Session; timeout=2., mcts_params=nothing, on_gpu=false)
   Game = GameType(session)
-  player = MctsPlayer(
-    session.env.bestnn,
-    session.env.params.arena.mcts,
-    timeout=timeout)
+  net = Network.copy(session.env.bestnn, on_gpu=on_gpu, test_mode=true)
+  isnothing(mcts_params) && (mcts_params = session.env.params.self_play.mcts)
+  player = MctsPlayer(net, mcts_params, timeout=timeout)
   interactive!(Game(), player, Human{Game}())
 end
 

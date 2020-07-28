@@ -83,9 +83,9 @@ else
   if cmd == "train"
     resume!(session)
   elseif cmd == "explore"
-    start_explorer(session)
+    start_explorer(session, mcts_params=Training.arena.mcts, on_gpu=true)
   elseif cmd == "play"
-    play_interactive_game(session)
+    play_interactive_game(session, mcts_params=Training.arena.mcts, on_gpu=true)
   elseif cmd == "replot"
     AlphaZero.UserInterface.regenerate_plots(session)
   end
