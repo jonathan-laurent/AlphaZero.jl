@@ -9,6 +9,11 @@ ENV["JULIA_CUDA_MEMORY_POOL"] = "split" # "binned" / "split"
 # Enables running the script on a distant machine without an X server
 ENV["GKSwstype"]="nul"
 
+# When running on a CPU, having multiple threads does not play
+# well with BLAS multithreading
+using LinearAlgebra
+BLAS.set_num_threads(1)
+
 using AlphaZero
 import Distributed
 include("games.jl")
