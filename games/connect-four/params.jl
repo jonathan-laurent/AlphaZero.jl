@@ -30,7 +30,7 @@ arena = ArenaParams(
   update_threshold=0.05,
   mcts=MctsParams(
     self_play.mcts,
-    num_iters_per_turn=100, # for the demo
+    num_iters_per_turn=200,
     temperature=ConstSchedule(0.2),
     dirichlet_noise_ϵ=0.05))
 

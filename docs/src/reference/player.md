@@ -42,4 +42,5 @@ Simulator
 record_trace
 ColorPolicy
 simulate
+simulate_distributed
 ```
