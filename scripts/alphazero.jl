@@ -10,6 +10,7 @@ ENV["JULIA_CUDA_MEMORY_POOL"] = "split" # "binned" / "split"
 ENV["GKSwstype"]="nul"
 
 using AlphaZero
+import Distributed
 include("games.jl")
 
 #####
@@ -75,15 +76,16 @@ if cmd == "check-game"
   test_game(Game)
   @info "All tests passed."
 else
+  println("\nUsing $(Distributed.nworkers()) distributed worker(s).\n")
   session = Session(
     Game, Training.Network{Game}, params, netparams, benchmark=benchmark,
     dir=SESSION_DIR, autosave=true, save_intermediate=args["save-intermediate"])
   if cmd == "train"
     resume!(session)
   elseif cmd == "explore"
-    start_explorer(session)
+    start_explorer(session, mcts_params=Training.arena.mcts, on_gpu=true)
   elseif cmd == "play"
-    play_interactive_game(session)
+    play_interactive_game(session, mcts_params=Training.arena.mcts, on_gpu=true)
   elseif cmd == "replot"
     AlphaZero.UserInterface.regenerate_plots(session)
   end

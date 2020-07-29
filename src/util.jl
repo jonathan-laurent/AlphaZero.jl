@@ -224,4 +224,59 @@ function random_batches_stream(convert, data::Tuple, batchsize)
     for _ in Iterators.repeated(nothing))))
 end
 
+#####
+##### Multithreading utilities
+#####
+
+function threads_pmap(f, xs)
+  return fetch.([Threads.@spawn @printing_errors f(x) for x in xs])
+end
+
+# TODO: this can probably be made much prettier
+# Also, this function makes one call to reduce per computed element,
+# and so it should only be used when the associated symchronization cost
+# is small compared to the cost of computing individual elements.
+function mapreduce(f, args, num_workers, reduce, unit)
+  next = 1
+  ret = unit
+  lock = ReentrantLock()
+  tasks = []
+  for w in 1:num_workers
+    task = Threads.@spawn Util.@printing_errors begin
+      local k = 0
+      worker = f()
+      while true
+        Base.lock(lock)
+        if next > length(args)
+          Base.unlock(lock)
+          break
+        end
+        k = next
+        next += 1
+        Base.unlock(lock)
+        y = worker.process(args[k])
+        Base.lock(lock)
+        ret = reduce(ret, y)
+        Base.unlock(lock)
+      end
+      worker.terminate()
+    end
+    push!(tasks, task)
+  end
+  wait.(tasks)
+  return ret
+end
+
+# Same semantics than mapreduce but sequential: to be used for
+# debugging purposes only.
+function mapreduce_sequential(f, args, num_workers, merge, unit)
+  ys = map(args) do x
+    worker = f()
+    y = worker.process(x)
+    worker.terminate()
+    return y
+  end
+  return reduce(merge, ys, init=unit)
+end
+
 end

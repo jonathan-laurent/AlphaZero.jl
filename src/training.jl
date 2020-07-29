@@ -134,19 +134,26 @@ function resize_memory!(env::Env{G,N,B}, n) where {G,N,B}
 end
 
 function evaluate_network(contender, baseline, params, handler)
-  contender = MctsPlayer(contender, params.arena.mcts)
-  baseline = MctsPlayer(baseline, params.arena.mcts)
-  ngames = params.arena.num_games
-  states = []
-  gamma = params.self_play.mcts.gamma
-  avgz = pit(contender, baseline, ngames; gamma=gamma,
-      reset_every=params.arena.reset_mcts_every,
-      flip_probability=params.arena.flip_probability) do i, z, t
-    Handlers.checkpoint_game_played(handler)
-    append!(states, t.states)
+  use_gpu = params.arena.use_gpu
+  make_oracles() = (
+    Network.copy(contender, on_gpu=use_gpu, test_mode=true),
+    Network.copy(baseline, on_gpu=use_gpu, test_mode=true))
+  simulator = Simulator(make_oracles, record_trace) do oracles
+    white = MctsPlayer(oracles[1], params.arena.mcts)
+    black = MctsPlayer(oracles[2], params.arena.mcts)
+    return TwoPlayers(white, black)
   end
-  redundancy = compute_redundancy(GameType(contender), states)
-  return avgz, redundancy
+  samples = simulate(
+    simulator,
+    num_games=params.arena.num_games,
+    num_workers=params.arena.num_workers,
+    game_simulated=(() -> Handlers.checkpoint_game_played(handler)),
+    reset_every=params.arena.reset_mcts_every,
+    flip_probability=params.arena.flip_probability,
+    color_policy=ALTERNATE_COLORS)
+  gamma = params.self_play.mcts.gamma
+  rewards, redundancy = rewards_and_redundancy(samples, gamma=gamma)
+  return mean(rewards), redundancy
 end
 
 function learning_step!(env::Env, handler)
@@ -169,7 +176,7 @@ function learning_step!(env::Env, handler)
     nbatches = min(nbatches, ntotal ÷ lp.min_checkpoints_per_epoch)
   end
   # Loop state variables
-  best_evalz = ap.update_threshold
+  best_evalz = isnothing(ap) ? nothing : ap.update_threshold
   nn_replaced = false
 
   for k in 1:lp.num_checkpoints
@@ -181,25 +188,31 @@ function learning_step!(env::Env, handler)
     tloss += dtloss
     ttrain += dttrain
     append!(losses, dlosses)
-    # Run a checkpoint evaluation
-    Handlers.checkpoint_started(handler)
-    env.curnn = get_trained_network(trainer)
-    (evalz, redundancy), dteval =
-      @timed evaluate_network(env.curnn, env.bestnn, env.params, handler)
-    teval += dteval
-    # If eval is good enough, replace network
-    success = (evalz >= best_evalz)
-    if success
-      nn_replaced = true
+    # Run a checkpoint evaluation if the arena parameter is provided
+    if isnothing(ap)
+      env.curnn = get_trained_network(trainer)
       env.bestnn = copy(env.curnn)
-      best_evalz = evalz
+      nn_replaced = true
+    else
+      Handlers.checkpoint_started(handler)
+      env.curnn = get_trained_network(trainer)
+      (evalz, redundancy), dteval = @timed begin
+        evaluate_network(env.curnn, env.bestnn, env.params, handler)
+      end
+      teval += dteval
+      # If eval is good enough, replace network
+      success = (evalz >= best_evalz)
+      if success
+        nn_replaced = true
+        env.bestnn = copy(env.curnn)
+        best_evalz = evalz
+      end
+      checkpoint_report = Report.Checkpoint(
+        k * nbatches, status, evalz, redundancy, success)
+      push!(checkpoints, checkpoint_report)
+      Handlers.checkpoint_finished(handler, checkpoint_report)
     end
-    checkpoint_report = Report.Checkpoint(
-      k * nbatches, status, evalz, redundancy, success)
-    push!(checkpoints, checkpoint_report)
-    Handlers.checkpoint_finished(handler, checkpoint_report)
   end
-
   report = Report.Learning(
     tconvert, tloss, ttrain, teval,
     init_status, losses, checkpoints, nn_replaced)
@@ -214,37 +227,42 @@ function simple_memory_stats(env)
   return nsamples, ndistinct
 end
 
+# To be given as an argument to `Simulator`
+function self_play_measurements(trace, _, player)
+  mem = MCTS.approximate_memory_footprint(player.mcts)
+  edepth = MCTS.average_exploration_depth(player.mcts)
+  return (trace=trace, mem=mem, edepth=edepth)
+end
+
 function self_play_step!(env::Env{G}, handler) where G
   params = env.params.self_play
-  gamma = env.params.self_play.mcts.gamma
-  player = MctsPlayer(env.bestnn, params.mcts)
-  new_batch!(env.memory)
   Handlers.self_play_started(handler)
-  mem_footprint = 0
-  elapsed = @elapsed begin
-    for i in 1:params.num_games
-      trace = play_game(player)
-      push_game!(env.memory, trace, gamma)
-      Handlers.game_played(handler)
-      reset_every = params.reset_mcts_every
-      if (!isnothing(reset_every) && i % reset_every == 0) ||
-          i == params.num_games
-        mem_footprint = max(mem_footprint,
-          MCTS.approximate_memory_footprint(player.mcts))
-        MCTS.reset!(player.mcts)
-      end
-      if !isnothing(params.gc_every) && i % params.gc_every == 0
-        Network.gc(env.bestnn)
-      end
-    end
+  make_oracle() =
+    Network.copy(env.bestnn, on_gpu=params.use_gpu, test_mode=true)
+  simulator = Simulator(make_oracle, self_play_measurements) do oracle
+    return MctsPlayer(oracle, params.mcts)
   end
-  MCTS.memory_footprint(player.mcts)
-  inference_tr = MCTS.inference_time_ratio(player.mcts)
+  # Run the simulations
+  results, elapsed = @timed simulate_distributed(
+    simulator,
+    num_games=params.num_games,
+    num_workers=params.num_workers,
+    game_simulated=()->Handlers.game_played(handler),
+    reset_every=params.reset_mcts_every,
+    fill_batches=true,
+    flip_probability=0.,
+    color_policy=nothing)
+  # Add the collected samples in memory
+  new_batch!(env.memory)
+  for x in results
+    push_game!(env.memory, x.trace, params.mcts.gamma)
+  end
   speed = cur_batch_size(env.memory) / elapsed
-  expdepth = MCTS.average_exploration_depth(player.mcts)
+  edepth = mean([x.edepth for x in results])
+  mem_footprint = maximum([x.mem for x in results])
   memsize, memdistinct = simple_memory_stats(env)
   report = Report.SelfPlay(
-    inference_tr, speed, expdepth, mem_footprint, memsize, memdistinct)
+    speed, edepth, mem_footprint, memsize, memdistinct)
   Handlers.self_play_finished(handler, report)
   return report
 end

@@ -9,6 +9,7 @@ CurrentModule = AlphaZero
 
 ```@docs
 GameType
+Batchifier.launch_server
 ```
 
 ```@autodocs

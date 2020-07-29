@@ -16,8 +16,8 @@ import Flux
 import Functors
 
 CUDA.allowscalar(false)
-array_on_gpu(::Type{<:Array}) = false
-array_on_gpu(::Type{<:CuArray}) = true
+array_on_gpu(::Array) = false
+array_on_gpu(::CuArray) = true
 array_on_gpu(arr) = error("Usupported array type: ", typeof(arr))
 
 using Flux: relu, softmax, flatten
@@ -114,7 +114,7 @@ regularized_params_(l) = []
 regularized_params_(l::Flux.Dense) = [l.W]
 regularized_params_(l::Flux.Conv) = [l.weight]
 
-# Reimplementation of what used to be Flux.prefor, does not visit leafs
+# Reimplementation of what used to be Flux.prefor, does not visit leaves
 function foreach_flux_node(f::Function, x, seen = IdDict())
   Functors.isleaf(x) && return
   haskey(seen, x) && return

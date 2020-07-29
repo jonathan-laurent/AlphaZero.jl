@@ -154,7 +154,6 @@ end
 
 Report generated after the self-play phase of an iteration.
 
-- `inference_time_ratio`: see [`MCTS.inference_time_ratio`](@ref)
 - `samples_gen_speed`: average number of samples generated per second
 - `average_exploration_depth`: see [`MCTS.average_exploration_depth`](@ref)
 - `mcts_memory_footprint`: estimation of the maximal memory footprint of the
@@ -166,7 +165,6 @@ Report generated after the self-play phase of an iteration.
     memory buffer at the end of the self-play phase
 """
 struct SelfPlay
-  inference_time_ratio :: Float64
   samples_gen_speed :: Float64
   average_exploration_depth :: Float64
   mcts_memory_footprint :: Int

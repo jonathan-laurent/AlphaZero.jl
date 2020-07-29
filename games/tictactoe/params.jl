@@ -7,10 +7,10 @@ netparams = SimpleNetHP(
   batch_norm_momentum=1.)
 
 self_play = SelfPlayParams(
-  num_games=10_000,
+  num_games=1000,
+  num_workers=128,
+  reset_mcts_every=4,
   mcts = MctsParams(
-    use_gpu=false,
-    num_workers=1,
     num_iters_per_turn=400,
     cpuct=1.0,
     temperature=ConstSchedule(1.0),
@@ -19,6 +19,8 @@ self_play = SelfPlayParams(
 
 arena = ArenaParams(
   num_games=100,
+  num_workers=100,
+  use_gpu=false,
   reset_mcts_every=1,
   update_threshold=0.00,
   flip_probability=0.5,
@@ -60,9 +62,13 @@ benchmark = [
     Benchmark.Full(self_play.mcts),
     Benchmark.MctsRollouts(self_play.mcts),
     num_games=400,
+    num_workers=100,
+    use_gpu=false,
     flip_probability=0.5),
   Benchmark.Duel(
     Benchmark.NetworkOnly(),
     Benchmark.MinMaxTS(depth=6, amplify_rewards=true, τ=1.),
     num_games=400,
+    num_workers=100,
+    use_gpu=false,
     flip_probability=0.5)]

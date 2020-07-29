@@ -159,8 +159,6 @@ The temperature parameter `τ` can be either a real number or a
     MctsPlayer(oracle::MCTS.Oracle, params::MctsParams; timeout=nothing)
 
 Construct an MCTS player from an oracle and an [`MctsParams`](@ref) structure.
-If the oracle is a network, this constructor handles copying it, putting it
-in test mode and copying it on the GPU (if necessary).
 """
 struct MctsPlayer{G, M} <: AbstractPlayer{G}
   mcts :: M
@@ -177,15 +175,8 @@ end
 # Alternative constructor
 function MctsPlayer(
     oracle::MCTS.Oracle{G}, params::MctsParams; timeout=nothing) where G
-  fill_batches = false
-  if isa(oracle, AbstractNetwork)
-    oracle = Network.copy(oracle, on_gpu=params.use_gpu, test_mode=true)
-    params.use_gpu && (fill_batches = true)
-  end
   mcts = MCTS.Env{G}(oracle,
-    nworkers=params.num_workers,
     gamma=params.gamma,
-    fill_batches=fill_batches,
     cpuct=params.cpuct,
     noise_ϵ=params.dirichlet_noise_ϵ,
     noise_α=params.dirichlet_noise_α,
@@ -200,7 +191,6 @@ end
 function RandomMctsPlayer(::Type{G}, params::MctsParams) where G
   oracle = MCTS.RandomOracle{G}()
   mcts = MCTS.Env{G}(oracle,
-    nworkers=1,
     cpuct=params.cpuct,
     gamma=params.gamma,
     noise_ϵ=params.dirichlet_noise_ϵ,
@@ -238,12 +228,11 @@ end
     NetworkPlayer{Game, Net} <: AbstractPlayer{Game}
 
 A player that uses the policy output by a neural network directly,
-instead of relying on MCTS.
+instead of relying on MCTS. The given neural network must be in test mode.
 """
 struct NetworkPlayer{G, N} <: AbstractPlayer{G}
   network :: N
-  function NetworkPlayer(nn::AbstractNetwork{G}; use_gpu=false) where G
-    nn = Network.copy(nn, on_gpu=use_gpu, test_mode=true)
+   function NetworkPlayer(nn::MCTS.Oracle{G}) where G
     return new{G, typeof(nn)}(nn)
   end
 end
@@ -251,7 +240,7 @@ end
 function think(p::NetworkPlayer, game)
   actions = GI.available_actions(game)
   state = GI.current_state(game)
-  π, _ = MCTS.evaluate(p.network, state)
+  π, _ = p.network(state)
   return actions, π
 end
 
@@ -275,6 +264,8 @@ struct TwoPlayers{G, W, B} <: AbstractPlayer{G}
     return new{G, typeof(white), typeof(black)}(white, black)
   end
 end
+
+flipped_colors(p::TwoPlayers) = TwoPlayers(p.black, p.white)
 
 function think(p::TwoPlayers, game)
   if GI.white_playing(game)
@@ -340,8 +331,137 @@ function play_game(player; flip_probability=0.)
 end
 
 #####
-##### Evaluate two players against each other
+##### Utilities to manage inference servers
 #####
+
+function fill_and_evaluate(net, batch; batch_size, fill)
+  n = length(batch)
+  @assert n > 0
+  if !fill
+    return Network.evaluate_batch(net, batch)
+  else
+    nmissing = batch_size - n
+    @assert nmissing >= 0
+    if nmissing == 0
+      return Network.evaluate_batch(net, batch)
+    else
+      append!(batch, [batch[1] for _ in 1:nmissing])
+      return Network.evaluate_batch(net, batch)[1:n]
+    end
+  end
+end
+
+# Start a server that processes inference requests for TWO networks
+# Expected queries must have fields `state` and `netid`.
+function inference_server(
+    net1::AbstractNetwork,
+    net2::AbstractNetwork,
+    nworkers;
+    fill_batches)
+  return Batchifier.launch_server(nworkers) do batch
+    n = length(batch)
+    mask1 = findall(b -> b.netid == 1, batch)
+    mask2 = findall(b -> b.netid == 2, batch)
+    @assert length(mask1) + length(mask2) == n
+    state(x) = x.state
+    batch1 = state.(batch[mask1])
+    batch2 = state.(batch[mask2])
+    if isempty(mask2) # there are only queries from net1
+      return fill_and_evaluate(net1, batch1; batch_size=n, fill=fill_batches)
+    elseif isempty(mask1) # there are only queries from net2
+      return fill_and_evaluate(net2, batch2; batch_size=n, fill=fill_batches)
+    else # both networks sent queries
+      res1 = fill_and_evaluate(net1, batch1; batch_size=n, fill=fill_batches)
+      res2 = fill_and_evaluate(net2, batch2; batch_size=n, fill=fill_batches)
+      @assert typeof(res1) == typeof(res2)
+      res = similar(res1, n)
+      res[mask1] = res1
+      res[mask2] = res2
+      return res
+    end
+  end
+end
+
+# Start an inference server for one agent
+function inference_server(net::AbstractNetwork, n; fill_batches)
+  return Batchifier.launch_server(n) do batch
+    fill_and_evaluate(net, batch; batch_size=n, fill=fill_batches)
+  end
+end
+
+ret_oracle(x) = () -> x
+do_nothing!() = nothing
+send_done!(reqc) = () -> Batchifier.client_done!(reqc)
+zipthunk(f1, f2) = () -> (f1(), f2())
+
+# Two neural network oracles
+function batchify_oracles(os::Tuple{AbstractNetwork, AbstractNetwork}, fill, n)
+  reqc = inference_server(os[1], os[2], n, fill_batches=fill)
+  G = GameType(os[1])
+  make1() = Batchifier.BatchedOracle{G}(st -> (state=st, netid=1), reqc)
+  make2() = Batchifier.BatchedOracle{G}(st -> (state=st, netid=2), reqc)
+  return zipthunk(make1, make2), send_done!(reqc)
+end
+
+function batchify_oracles(os::Tuple{<:Any, AbstractNetwork}, fill, n)
+  reqc = inference_server(os[2], n, fill_batches=fill)
+  make2() = Batchifier.BatchedOracle{GameType(os[2])}(reqc)
+  return zipthunk(ret_oracle(os[1]), make2), send_done!(reqc)
+end
+
+function batchify_oracles(os::Tuple{AbstractNetwork, <:Any}, fill, n)
+  reqc = inference_server(os[1], n, fill_batches=fill)
+  make1() = Batchifier.BatchedOracle{GameType(os[1])}(reqc)
+  return zipthunk(make1, ret_oracle(os[2])), send_done!(reqc)
+end
+
+function batchify_oracles(os::Tuple{<:Any, <:Any}, fill, n)
+  return zipthunk(ret_oracle(os[1]), ret_oracle(os[2])), do_nothing!
+end
+
+function batchify_oracles(o::AbstractNetwork, fill, n)
+  reqc = inference_server(o, n, fill_batches=fill)
+  make() = Batchifier.BatchedOracle{GameType(o)}(reqc)
+  return make, send_done!(reqc)
+end
+
+function batchify_oracles(o::Any, fill, n)
+  return ret_oracle(o), do_nothing!
+end
+
+#####
+##### Distributed simulator
+#####
+
+"""
+    Simulator(make_player, oracles, measure)
+
+A distributed simulator that encapsulates the details of running simulations
+across multiple threads and multiple machines.
+
+# Arguments
+
+    - `make_oracles`: a function that takes no argument and returns
+       the oracles used by the player, which can be either
+      `nothing`, a single oracle or a pair of oracles.
+    - `make_player`: a function that takes as an argument the `oracles` field
+      above and nuild a player from it.
+    - `measure(trace, colors_flipped, player)`: the function that is used to
+      take measurements after each game simulation.
+"""
+struct Simulator{MakePlayer, Oracles, Measure}
+  make_player :: MakePlayer
+  make_oracles :: Oracles
+  measure :: Measure
+end
+
+"""
+    record_trace
+
+A measurement function to be passed to a [`Simulator`](@ref) that produces
+named tuples with two fields: `trace::Trace` and `colors_flipped::Bool`.
+"""
+record_trace(t, cf, p) = (trace=t, colors_flipped=cf)
 
 """
     @enum ColorPolicy ALTERNATE_COLORS BASELINE_WHITE CONTENDER_WHITE
@@ -350,64 +470,140 @@ Policy for attributing colors in a duel between a baseline and a contender.
 """
 @enum ColorPolicy ALTERNATE_COLORS BASELINE_WHITE CONTENDER_WHITE
 
+
 """
-    pit(handler, contender, baseline, ngames)
+    simulate(::Simulator; <keyword arguments>)
 
-Evaluate two `AbstractPlayer` against each other in a series of games.
+Play a series of games using a given [`Simulator`](@ref).
 
-Note that this function can only be used with two-player games.
+# Keyword Arguments
 
-# Arguments
-
-  - `handler`: this function is called after each simulated
-     game with three arguments: the game number `i`, the reward `r` for the
-     contender player and the trace `t`
-  - `ngames`: number of games to play
-
-# Optional keyword arguments
+  - `num_games`: number of games to play
+  - `num_workers`: number of workers tasks to spawn
+  - `game_simulated`: called every time a game simulation is completed
   - `reset_every`: if set, players are reset every `reset_every` games
-  - `color_policy`: determines the [`ColorPolicy`](@ref),
-     which is `ALTERNATE_COLORS` by default
+  - `color_policy`: either `nothing` or a [`ColorPolicy`](@ref)
   - `flip_probability=0.`: see [`play_game`](@ref)
+
+# Return
+
+Return a vector of objects returned by `simulator.measure`.
 """
-function pit(
-    handler, contender, baseline, num_games; gamma,
-    reset_every=nothing, color_policy=ALTERNATE_COLORS, flip_probability=0.)
-  Game = GameType(contender)
-  @assert GI.two_players(Game)
-  baseline_white = (color_policy != CONTENDER_WHITE)
-  zsum = 0.
-  for i in 1:num_games
-    white = baseline_white ? baseline : contender
-    black = baseline_white ? contender : baseline
-    trace =
-      play_game(TwoPlayers(white, black), flip_probability=flip_probability)
-    z = total_reward(trace, gamma)
-    baseline_white && (z = -z)
-    zsum += z
-    handler(i, z, trace)
-    if !isnothing(reset_every) && (i % reset_every == 0 || i == num_games)
-      reset_player!(baseline)
-      reset_player!(contender)
+function simulate(
+    simulator::Simulator;
+    num_games,
+    num_workers,
+    game_simulated,
+    reset_every=nothing,
+    fill_batches=true,
+    flip_probability=0.,
+    color_policy=nothing)
+
+  oracles = simulator.make_oracles()
+  spawn_oracles, done =
+    batchify_oracles(oracles, fill_batches, num_workers)
+  return Util.mapreduce(1:num_games, num_workers, vcat, []) do
+    oracles = spawn_oracles()
+    player = simulator.make_player(oracles)
+    worker_sim_id = 0
+    # For each worker
+    function simulate_game(sim_id)
+      worker_sim_id += 1
+      # Switch players' colors if necessary
+      if !isnothing(color_policy)
+        @assert isa(player, TwoPlayers)
+        colors_flipped =
+          (color_policy == BASELINE_WHITE) ||
+          (color_policy == ALTERNATE_COLORS && sim_id % 2 == 1)
+        # "_pf" stands for "possibly flipped"
+        player_pf = colors_flipped ? flipped_colors(player) : player
+      else
+        colors_flipped = false
+        player_pf = player
+      end
+      # Play the game and generate a report
+      trace = play_game(player_pf, flip_probability=flip_probability)
+      report = simulator.measure(trace, colors_flipped, player)
+      # Reset the player periodically
+      if !isnothing(reset_every) && worker_sim_id % reset_every == 0
+        reset_player!(player)
+      end
+      # Signal that a game has been simulated
+      game_simulated()
+      return report
     end
-    if color_policy == ALTERNATE_COLORS
-      baseline_white = !baseline_white
-    end
+    return (process=simulate_game, terminate=done)
   end
-  return zsum / num_games
 end
 
-#####
-##### Redudancy analysis
-#####
+"""
+    simulate_distributed(::Simulator; <keyword arguments>)
 
-function compute_redundancy(Game, states)
-  # TODO: Excluding the inial state from redundancy statistics
-  # only makes sense for deterministic games.
-  init_state = GI.current_state(Game())
-  noninit = filter(!=(init_state), states)
-  unique = Set(noninit)
-  return 1. - length(unique) / length(noninit)
+Identical to [`simulate`](@ref) but splits the work
+across all available workers.
+"""
+function simulate_distributed(
+    simulator::Simulator;
+    num_games,
+    num_workers,
+    game_simulated,
+    reset_every=nothing,
+    fill_batches=true,
+    flip_probability=0.,
+    color_policy=nothing)
+
+  # Spawning a task to keep count of completed simulations
+  chan = Distributed.RemoteChannel(()->Channel{Nothing}(1))
+  Threads.@spawn begin
+    for i in 1:num_games
+      take!(chan)
+      game_simulated()
+    end
+  end
+  remote_game_simulated() = put!(chan, nothing)
+  # Distributing the simulations across workers
+  num_each, rem = divrem(num_games, Distributed.nworkers())
+  @assert num_each >= 1
+  workers = Distributed.workers()
+  tasks = map(workers) do w
+    Distributed.@spawnat w begin
+      Util.@printing_errors begin
+        simulate(
+          simulator,
+          num_games=(w == workers[1] ? num_each + rem : num_each),
+          num_workers=num_workers,
+          game_simulated=remote_game_simulated,
+          reset_every=reset_every,
+          fill_batches=fill_batches,
+          flip_probability=flip_probability,
+          color_policy=color_policy)
+        end
+    end
+  end
+  results = fetch.(tasks)
+  # If one of the worker raised an exception, we print it
+  for r in results
+    if isa(r, Distributed.RemoteException)
+      showerror(stderr, r, catch_backtrace())
+    end
+  end
+  return reduce(vcat, results)
+end
+
+function compute_redundancy(states)
+  unique = Set(states)
+  return 1. - length(unique) / length(states)
+end
+
+# samples is a vector of named tuples with fields `trace` and `colors_flipped`
+function rewards_and_redundancy(samples; gamma)
+  rewards = map(samples) do s
+    wr = total_reward(s.trace, gamma)
+    return s.colors_flipped ? -wr : wr
+  end
+  states = [st for s in samples for st in s.trace.states]
+  redundancy = compute_redundancy(states)
+  return rewards, redundancy
 end
 
 #####

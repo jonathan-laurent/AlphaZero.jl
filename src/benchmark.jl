@@ -7,13 +7,15 @@ compete against a set of baselines.
 """
 module Benchmark
 
-import ..AbstractNetwork, ..MinMax, ..GI
-import ..Env, ..MCTS, ..MctsParams, ..pit, ..compute_redundancy
+import ..Network, ..MinMax, ..GI
+import ..Env, ..MCTS, ..MctsParams, ..TwoPlayers
+import ..simulate, ..Simulator, ..rewards_and_redundancy, ..record_trace
 import ..ColorPolicy, ..ALTERNATE_COLORS
 import ..AbstractPlayer, ..EpsilonGreedyPlayer, ..NetworkPlayer, ..MctsPlayer
 import ..PlayerWithTemperature, ..ConstSchedule
 
 using ProgressMeter
+using Statistics: mean
 
 """
     Benchmark.DuelOutcome
@@ -23,20 +25,19 @@ The outcome of a duel between two players.
 # Fields
 - `player` and `baseline` are `String` fields containing the names of
     both players involved in the duel
-- `avgz` is the average reward collected by `player`
+- `avgr` is the averagereward collected by `player`
+- `rewards` is the sequence of rewards collected by `player` (one per game)
 - `redundancy` is the ratio of duplicate positions encountered during the
    evaluation, not counting the initial position. If this number is too high,
    you may want to increase the move selection temperature.
-- `rewards` is a vector containing all rewards collected by `player`
-    (one per game played)
 - `time` is the computing time spent running the duel, in seconds
 """
 struct DuelOutcome
   player :: String
   baseline :: String
-  avgz :: Float64
-  redundancy :: Float64
+  avgr :: Float64
   rewards :: Vector{Float64}
+  redundancy :: Float64
   time :: Float64
 end
 
@@ -79,16 +80,18 @@ Specify a duel that consists in `num_games` games between
 """
 struct Duel
   num_games :: Int
+  num_workers :: Int
+  use_gpu :: Bool
   reset_every :: Union{Nothing, Int}
   flip_probability :: Float64
   color_policy :: ColorPolicy
   player :: Player
   baseline :: Player
   function Duel(player, baseline;
-      num_games, reset_every=nothing,
+      num_games, num_workers, use_gpu=false, reset_every=nothing,
       color_policy=ALTERNATE_COLORS, flip_probability=0.)
-    return new(
-      num_games, reset_every, flip_probability, color_policy, player, baseline)
+    return new(num_games, num_workers, use_gpu, reset_every,
+      flip_probability, color_policy, player, baseline)
   end
 end
 
@@ -101,24 +104,25 @@ If a `progress` is provided, `next!(progress)` is called
 after each simulated game.
 """
 function run(env::Env{G}, duel::Duel, progress=nothing) where G
-  player = instantiate(duel.player, env.bestnn)
-  baseline = instantiate(duel.baseline, env.bestnn)
-  outcomes = []
-  states = []
-  avgz, time = @timed begin
-    pit(player, baseline, duel.num_games,
-        gamma=env.params.self_play.mcts.gamma,
-        flip_probability=duel.flip_probability,
-        reset_every=duel.reset_every,
-        color_policy=duel.color_policy) do i, z, t
-      push!(outcomes, z)
-      append!(states, t.states)
-      isnothing(progress) || next!(progress)
-    end
+  net() = Network.copy(env.bestnn, on_gpu=duel.use_gpu, test_mode=true)
+  simulator = Simulator(net, record_trace) do net
+    player = instantiate(duel.player, net)
+    baseline = instantiate(duel.baseline, net)
+    return TwoPlayers(player, baseline)
   end
-  red = compute_redundancy(G, states)
+  samples, elapsed = @timed simulate(
+    simulator,
+    num_games=duel.num_games,
+    num_workers=duel.num_workers,
+    game_simulated=(() -> next!(progress)),
+    reset_every=duel.reset_every,
+    flip_probability=duel.flip_probability,
+    color_policy=duel.color_policy)
+  gamma = env.params.self_play.mcts.gamma
+  rewards, redundancy = rewards_and_redundancy(samples, gamma=gamma)
+  avgr = mean(rewards)
   return DuelOutcome(
-    name(duel.player), name(duel.baseline), avgz, red, outcomes, time)
+    name(duel.player), name(duel.baseline), avgr, rewards, redundancy, elapsed)
 end
 
 #####
@@ -160,11 +164,8 @@ end
 
 name(p::MctsRollouts) = "MCTS ($(p.params.num_iters_per_turn) rollouts)"
 
-function instantiate(p::MctsRollouts, nn::AbstractNetwork{G}) where G
-  params = MctsParams(p.params,
-    num_workers=1,
-    use_gpu=false)
-  return MctsPlayer(MCTS.RolloutOracle{G}(), params)
+function instantiate(p::MctsRollouts, nn::MCTS.Oracle{G}) where G
+  return MctsPlayer(MCTS.RolloutOracle{G}(), p.params)
 end
 
 """
@@ -176,28 +177,30 @@ Argument `params` has type [`MctsParams`](@ref).
 """
 struct Full <: Player
   params :: MctsParams
+  Full(params) = new(params)
 end
 
 name(::Full) = "AlphaZero"
 
-instantiate(p::Full, nn) = MctsPlayer(nn, p.params)
+function instantiate(p::Full, nn)
+  return MctsPlayer(nn, p.params)
+end
 
 """
-    Benchmark.NetworkOnly(;use_gpu=true, τ=1.0) <: Benchmark.Player
+    Benchmark.NetworkOnly(;τ=1.0) <: Benchmark.Player
 
 Player that uses the policy output by the learnt network directly,
 instead of relying on MCTS.
 """
 struct NetworkOnly <: Player
-  use_gpu :: Bool
   τ :: Float64
-  NetworkOnly(;use_gpu=false, τ=1.0) = new(use_gpu, τ)
+  NetworkOnly(;τ=1.0) = new(τ)
 end
 
 name(::NetworkOnly) = "Network Only"
 
 function instantiate(p::NetworkOnly, nn)
-  player = NetworkPlayer(nn, use_gpu=p.use_gpu)
+  player = NetworkPlayer(nn)
   return PlayerWithTemperature(player, ConstSchedule(p.τ))
 end
 
@@ -215,7 +218,7 @@ end
 
 name(p::MinMaxTS) = "MinMax (depth $(p.depth))"
 
-function instantiate(p::MinMaxTS, ::AbstractNetwork{G}) where G
+function instantiate(p::MinMaxTS, ::MCTS.Oracle{G}) where G
   return MinMax.Player{G}(
     depth=p.depth, amplify_rewards=p.amplify_rewards, τ=p.τ)
 end
@@ -236,7 +239,7 @@ function PerfectPlayer end
 
 name(p::Solver) = "Perfect Player ($(round(Int, 100 * p.ϵ))% random)"
 
-function instantiate(p::Solver, nn::AbstractNetwork{G}) where G
+function instantiate(p::Solver, nn::MCTS.Oracle{G}) where G
   return EpsilonGreedyPlayer(PerfectPlayer(G)(), p.ϵ)
 end
 

@@ -36,17 +36,22 @@ include("game.jl")
 using .GameInterface
 const GI = GameInterface
 
-include("mcts.jl")
+include("mcts_simple.jl")
 import .MCTS
 
 include("networks/network.jl")
 using .Network
+
+include("batchifier.jl")
+import .Batchifier
 
 using Formatting
 using Base: @kwdef
 using DataStructures: CircularBuffer
 using Distributions: Categorical, Dirichlet
 using Statistics: mean
+
+import Distributed
 
 include("schedule.jl")
 include("params.jl")

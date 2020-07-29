@@ -18,8 +18,13 @@ env = AlphaZero.Env{Game}(params, network)
 using Profile
 using ProfileSVG
 
+# using Juno
+# Juno.@enter AlphaZero.self_play_step!(env, nothing)
+
+AlphaZero.self_play_worker(env.bestnn, env.params.self_play, ReentrantLock(), nothing , 1)
+
 # The neural network should not be used at iteration 0
-AlphaZero.self_play_step!(env, nothing) # To compile every function
-Profile.clear()
-@profile AlphaZero.self_play_step!(env, nothing)
-ProfileSVG.save("self-play-profile.svg")
+# AlphaZero.self_play_step!(env, nothing) # To compile every function
+# Profile.clear()
+# @profile AlphaZero.self_play_step!(env, nothing)
+# ProfileSVG.save("self-play-profile.svg")

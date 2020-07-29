@@ -7,8 +7,6 @@ Parameters of an MCTS player.
 
 | Parameter              | Type                         | Default             |
 |:-----------------------|:-----------------------------|:--------------------|
-| `num_workers`          | `Int`                        | `1`                 |
-| `use_gpu`              | `Bool`                       | `false`             |
 | `num_iters_per_turn`   | `Int`                        |  -                  |
 | `gamma`                | `Float64`                    | `1.`                |
 | `cpuct`                | `Float64`                    | `1.`                |
@@ -20,9 +18,8 @@ Parameters of an MCTS player.
 # Explanation
 
 An MCTS player picks an action as follows. Given a game state, it launches
-`num_iters_per_turn` MCTS iterations that are executed asynchronously on
-`num_workers` workers, with UCT exploration constant `cpuct`. Rewards are
-discounted using the `gamma` factor.
+`num_iters_per_turn` MCTS iterations, with UCT exploration constant `cpuct`.
+Rewards are discounted using the `gamma` factor.
 
 Then, an action is picked according to the distribution ``π`` where
 ``π_i ∝ n_i^τ`` with ``n_i`` the number of times that the ``i^{\\text{th}}``
@@ -50,8 +47,6 @@ In the original AlphaGo Zero paper:
   which is ``19 × 19 + 1 = 362`` in the case of Go.
 """
 @kwdef struct MctsParams
-  num_workers :: Int = 1
-  use_gpu :: Bool = false
   gamma :: Float64 = 1.
   cpuct :: Float64 = 1.
   num_iters_per_turn :: Int
@@ -72,8 +67,9 @@ the current neural network with the best one seen so far
 |:---------------------|:----------------------|:---------------|
 | `mcts`               | [`MctsParams`](@ref)  |  -             |
 | `num_games`          | `Int`                 |  -             |
+| `num_workers`        | `Int`                 |  -             |
 | `flip_probability`   | `Float64`             | `0.`           |
-| `reset_mcts_every`   | `Union{Int, Nothing}` | `nothing`      |
+| `reset_mcts_every`   | `Union{Nothing, Int}` | `1`            |
 | `update_threshold`   | `Float64`             |  -             |
 
 # Explanation
@@ -100,7 +96,9 @@ and the `update_threshold` parameter is set to a value that corresponds to a
 """
 @kwdef struct ArenaParams
   num_games :: Int
-  reset_mcts_every :: Union{Nothing, Int} = nothing
+  num_workers :: Int
+  use_gpu :: Bool = false
+  reset_mcts_every :: Union{Nothing, Int} = 1
   flip_probability :: Float64 = 0.
   mcts :: MctsParams
   update_threshold :: Float64
@@ -115,14 +113,12 @@ Parameters governing self-play.
 |:---------------------|:----------------------|:---------------|
 | `mcts`               | [`MctsParams`](@ref)  |  -             |
 | `num_games`          | `Int`                 |  -             |
-| `reset_mcts_every`   | `Union{Int, Nothing}` | `nothing`      |
-| `gc_every`           | `Union{Int, Nothing}` | `nothing`      |
+| `num_workers`        | `Int`                 |  -             |
+| `use_gpu`            | `Bool`                | `false`        |
+| `reset_mcts_every`   | `Union{Int, Nothing}` | `1`            |
 
 # Explanation
 
-+ The `gc_every` field, when set, forces a full garbage collection
-  and an emptying of the GPU memory pool periodically, the period being
-  specified in terms of a fixed number of games.
 + The MCTS tree is reset every `reset_mcts_every` games
   (or never if `nothing` is passed).
 
@@ -133,8 +129,9 @@ of self-play across 200 iterations).
 """
 @kwdef struct SelfPlayParams
   num_games :: Int
-  reset_mcts_every :: Union{Nothing, Int} = nothing
-  gc_every :: Union{Nothing, Int} = nothing
+  num_workers :: Int
+  use_gpu :: Bool = false
+  reset_mcts_every :: Union{Nothing, Int} = 1
   mcts :: MctsParams
 end
 
@@ -256,7 +253,7 @@ The AlphaZero training hyperparameters.
 |:---------------------------|:------------------------------------|:----------|
 | `self_play`                | [`SelfPlayParams`](@ref)            |  -        |
 | `learning`                 | [`LearningParams`](@ref)            |  -        |
-| `arena`                    | [`ArenaParams`](@ref)               |  -        |
+| `arena`                    | [`Union{Nothing, ArenaParams`}]     |  -        |
 | `memory_analysis`          | `Union{Nothing, MemAnalysisParams}` | `nothing` |
 | `num_iters`                | `Int`                               |  -        |
 | `use_symmetries`           | `Bool`                              | `false`   |
@@ -294,7 +291,7 @@ In the original AlphaGo Zero paper:
   self_play :: SelfPlayParams
   memory_analysis :: Union{Nothing, MemAnalysisParams} = nothing
   learning :: LearningParams
-  arena :: ArenaParams
+  arena :: Union{Nothing, ArenaParams}
   num_iters :: Int
   use_symmetries :: Bool = false
   ternary_rewards :: Bool = false
