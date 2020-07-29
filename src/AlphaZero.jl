@@ -15,7 +15,7 @@ export AbstractSchedule, ConstSchedule, PLSchedule, StepSchedule
 # Players and games
 export AbstractGame, AbstractPlayer, TwoPlayers, Trace
 export think, select_move, reset_player!, player_temperature, apply_temperature
-export play_game, interactive!
+export play_game, interactive!, total_reward
 export MctsPlayer, RandomPlayer, EpsilonGreedyPlayer, NetworkPlayer, Human
 export ColorPolicy, ALTERNATE_COLORS, BASELINE_WHITE, CONTENDER_WHITE
 # Networks

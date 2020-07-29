@@ -1,5 +1,6 @@
 using AlphaZero
 using ProgressMeter
+using Statistics: mean
 
 # include("../games/tictactoe/main.jl")
 # using .Tictactoe: Game
@@ -9,15 +10,15 @@ using .ConnectFour: Game
 
 baseline = MinMax.Player{Game}(depth=5, amplify_rewards=true, τ=0.2)
 mcts = MCTS.Env{Game}(MCTS.RolloutOracle{Game}())
-player = MctsPlayer(mcts, niters=1000, τ=ConstSchedule(0.5))
+mcts = MctsPlayer(mcts, niters=1000, τ=ConstSchedule(0.5))
+player = TwoPlayers(mcts, baseline)
 
-num_games = 1000
+num_games = 200
 bar = Progress(num_games)
-avgz = AlphaZero.pit(player, baseline, num_games, gamma=1.0,
-    reset_every=nothing,
-    color_policy=ALTERNATE_COLORS,
-    flip_probability=0.) do i, z, t
-  #AlphaZero.debug_trace(t)
+rewards = map(1:num_games) do _
+  trace = play_game(player)
   next!(bar)
+  return total_reward(trace)
 end
-println("Average reward: $avgz")
+
+println("Average reward: $(mean(rewards))")
