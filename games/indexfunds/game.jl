@@ -1,6 +1,6 @@
 import AlphaZero.GI
 using StaticArrays
-using CSV, DataFrames, DataStructures
+using CSV, DataFrames, Dates
 using Statistics
 
 const SEQ_LEN = 20  # how long of a preceeding sequence to collect for RNN
@@ -24,9 +24,9 @@ end
 function data_loader()
 	data_array=[]
 	for index in indices
-		df = CSV.read("/Users/d/Github/AlphaZero.jl/indices_data/$(index)_daily.csv",types=Dict(:Close=>Float64,:Volume=>Int64),strict=false)
+		df = CSV.read("./indices_data/$(index)_daily.csv",types=Dict(:"Adj Close"=>Float64))
 		df[!,:Date]=[Dates.date2epochdays(i) for i in df[!,:Date]]
-		select!(df,[1,5])
+		select!(df,[1,6])
 		rename!(df,[Symbol(string(index,"_",i)) for i in names(df)])
 		rename!(df,Symbol(string(index,"_Date"))=>:Date)
 		if isempty(data_array)
@@ -34,9 +34,11 @@ function data_loader()
 		else
 			data_array=innerjoin(data_array,df,on=:Date)
 		end
-
 	end
+	sort!(data_array,:Date)
 	select!(data_array,2:5)
+	data_array.=ifelse.(isnan.(data_array), missing, data_array)
+	data_array.=ifelse.(isnothing.(data_array), missing, data_array)
 	data_array=dropmissing(data_array)
 	select!(data_array, names(data_array) .=> pct_change .=> names(data_array))
 	data_array=dropmissing(data_array)
@@ -44,7 +46,15 @@ function data_loader()
 	return data_array
 end
 
+function sequencer()
+	data=Matrix(data_loader())
+	sequences=[]
+	for i in 1:size(data)[1]-SEQ_LEN-1
+      push!(sequences,data(i:i+SEQ_LEN-1,:))
+       end
+	   return sequences
 
+end
 
 const Transaction = Float
 const M_HANNA = true
