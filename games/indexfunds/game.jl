@@ -1,13 +1,13 @@
 import AlphaZero.GI
 using StaticArrays
 using CSV, DataFrames, Dates
-using Statistics
+using Statistics, Random
 
 const SEQ_LEN = 20  # how long of a preceeding sequence to collect for RNN
 const FUTURE_PERIOD_PREDICT = 1  # how far into the future are we trying to predict?
 const indices = ["SNP", "STOXX", "IBEX", "DAX"]
 const NUM_INDICES = 4
-const NUM_TIMESTEPS = SEQ_LEN + FUTURE_PERIOD_PREDICT
+
 
 function pct_change(input::AbstractVector{<:Number})
 	[i == 1 ? missing : (input[i]-input[i-1])/input[i-1] for i in eachindex(input)]
@@ -48,32 +48,43 @@ end
 
 function sequencer()
 	data=Matrix(data_loader())
-	sequences=[]
+	sequences=Array{Float64}(undef,SEQ_LEN,4,size(data)[1]-SEQ_LEN-1)
+	futures=Array{Float64}(undef,1,4,size(data)[1]-SEQ_LEN-1)
+	sequences_futures=[]
 	for i in 1:size(data)[1]-SEQ_LEN-1
-      push!(sequences,data(i:i+SEQ_LEN-1,:))
-       end
-	   return sequences
+		sequences[:,:,i]=data[i:i+SEQ_LEN-1,:]
+		futures[:,:,i]=data[i+SEQ_LEN,:]
+		push!(sequences_futures,(sequences[:,:,i],futures[:,:,i]))
+	end
 
+	len=size(sequences_futures)[1]
+	sequences_futures=sequences_futures[shuffle(1:len)]
+	return sequences_futures
 end
-
-const Transaction = Float
+const NUM_TIMESTEPS = SEQ_LEN
+const Transaction = Float64
 const M_HANNA = true
-
 const Cell = Union{Nothing, Transaction}
-const Board = SVector{NUM_TIMESTEPS, Cell}
-const INITIAL_BOARD = Board(repeat([nothing], NUM_TIMESTEPS))
-const INITIAL_STATE = (board=INITIAL_BOARD)
+const Board = SMatrix{NUM_TIMESTEPS, 4,  Cell}
+const Predictions=SMatrix{1, 4,  Cell}
+const Futures=SMatrix{1, 4,  Transaction}
+const INITIAL_BOARD = Board(repeat([nothing], NUM_TIMESTEPS,4))
+const PREDICTIONS = Predictions(repeat([nothing], 1,4))
+const FUTURES = Futures(repeat([nothing], 1,4))
+const INITIAL_STATE = (board=INITIAL_BOARD,predictions=PREDICTIONS,futures=FUTURES)
 
 mutable struct Game <: GI.AbstractGame
 	board :: Board
+	predictions:: Predictions
+	futures:: Futures
 	function Game(state=INITIAL_STATE)
-		new(state.board)
+		new(state.board,state.predictions,state.futures)
 	end
 end
 
 GI.State(::Type{Game}) = typeof(INITIAL_STATE)
 
-GI.Action(::Type{Game}) = Float
+GI.Action(::Type{Game}) = Float64
 
 GI.two_players(::Type{Game}) = false
 
@@ -81,11 +92,11 @@ GI.two_players(::Type{Game}) = false
 ##### Defining winning conditions
 #####
 
-function has_won(g::Game, player)
-	any(ALIGNMENTS) do al
-		all(al) do pos
-			g.board[pos] == player
-		end
+function has_won(g::Game)
+	if !isnothing.(g.predictions)
+		return sum(g.predictions.*sign.(g.futures))>0
+	else
+		return false
 	end
 end
 
@@ -93,62 +104,60 @@ end
 ##### Game API
 #####
 
-const ACTIONS = collect(1:NUM_TIMESTEPS)
+const ACTIONS = collect(1:2^NUM_INDICES)
+
+# const Acitons= Array of all position arrays for the case of 4 stocks there are 2^4 actions availbale
 
 GI.actions(::Type{Game}) = ACTIONS
 
-GI.actions_mask(g::Game) = map(isnothing, g.board)
+GI.actions_mask(g::Game) = map(isnothing, g.predictions)
 
-GI.current_state(g::Game) = (board=g.board, curplayer=g.curplayer)
+GI.current_state(g::Game) = (board=g.board,predictions=g.predictions,futures=g.futures)
 
 GI.white_playing(::Type{Game}, state) = state.curplayer
 
 function terminal_white_reward(g::Game)
-	has_won(g, M_HANNA) && return 1.
-	has_won(g, BLACK) && return -1.
-	isempty(GI.available_actions(g)) && return 0.
-	return nothing
+	has_won(g) && return 1.
+	has_won(g) || return -1.
 end
 
 GI.game_terminated(g::Game) = !isnothing(terminal_white_reward(g))
 
 function GI.white_reward(g::Game)
-	z = terminal_white_reward(g)
-	return isnothing(z) ? 0. : z
+	return terminal_white_reward(g)
 end
 
-function GI.play!(g::Game, pos)
-	g.board = setindex(g.board, g.curplayer, pos)
-	g.curplayer = !g.curplayer
+function GI.play!(g::Game, action)
+	g.predictions = Actions(action)
 end
 
 #####
 ##### Simple heuristic for minmax
 #####
 
-function alignment_value_for(g::Game, player, alignment)
-	γ = 0.3
-	N = 0
-	for pos in alignment
-		mark = g.board[pos]
-		if mark == player
-			N += 1
-		elseif !isnothing(mark)
-			return 0.
-		end
-	end
-	return γ ^ (BOARD_SIDE - 1 - N)
-end
-
-function heuristic_value_for(g::Game, player)
-	return sum(alignment_value_for(g, player, al) for al in ALIGNMENTS)
-end
-
-function GI.heuristic_value(g::Game)
-	mine = heuristic_value_for(g, g.curplayer)
-	yours = heuristic_value_for(g, !g.curplayer)
-	return mine - yours
-end
+# function alignment_value_for(g::Game, player, alignment)
+# 	γ = 0.3
+# 	N = 0
+# 	for pos in alignment
+# 		mark = g.board[pos]
+# 		if mark == player
+# 			N += 1
+# 		elseif !isnothing(mark)
+# 			return 0.
+# 		end
+# 	end
+# 	return γ ^ (BOARD_SIDE - 1 - N)
+# end
+#
+# function heuristic_value_for(g::Game, player)
+# 	return sum(alignment_value_for(g, player, al) for al in ALIGNMENTS)
+# end
+#
+# function GI.heuristic_value(g::Game)
+# 	mine = heuristic_value_for(g, g.curplayer)
+# 	yours = heuristic_value_for(g, !g.curplayer)
+# 	return mine - yours
+# end
 
 #####
 ##### Machine Learning API
@@ -177,27 +186,11 @@ function GI.vectorize_state(::Type{Game}, state)
 	##### Symmetries
 	#####
 
-	function generate_dihedral_symmetries()
-		N = BOARD_SIDE
-		rot((x, y)) = (y, N - x + 1) # 90° rotation
-		flip((x, y)) = (x, N - y + 1) # flip along vertical axis
-		ap(f) = p -> pos_of_xy(f(xy_of_pos(p)))
-		sym(f) = map(ap(f), collect(1:NUM_TIMESTEPS))
-		rot2 = rot ∘ rot
-		rot3 = rot2 ∘ rot
-		return [
-		sym(rot), sym(rot2), sym(rot3),
-		sym(flip), sym(flip ∘ rot), sym(flip ∘ rot2), sym(flip ∘ rot3)]
-	end
 
-	const SYMMETRIES = generate_dihedral_symmetries()
-
-	function GI.symmetries(::Type{Game}, s)
-		return [
-		((board=Board(s.board[sym]), curplayer=s.curplayer), sym)
-		for sym in SYMMETRIES]
-		end
-
+	# function GI.symmetries(::Type{Game}, s)
+	# 	return Vector[]
+	# 	end
+	#
 		#####
 		##### Interaction API
 		#####
