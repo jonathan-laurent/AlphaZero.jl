@@ -61,6 +61,8 @@ function sequencer()
 	sequences_futures=sequences_futures[shuffle(1:len)]
 	return sequences_futures
 end
+
+
 const NUM_TIMESTEPS = SEQ_LEN
 const Transaction = Float64
 const M_HANNA = true
@@ -68,21 +70,30 @@ const Cell = Union{Nothing, Transaction}
 const Board = SMatrix{NUM_TIMESTEPS, 4,  Cell}
 const Predictions=SMatrix{1, 4,  Cell}
 const Futures=SMatrix{1, 4,  Transaction}
-const INITIAL_BOARD = Board(repeat([nothing], NUM_TIMESTEPS,4))
+# const INITIAL_Board = Board(repeat([nothing], NUM_TIMESTEPS,4))
 const PREDICTIONS = Predictions(repeat([nothing], 1,4))
-const FUTURES = Futures(repeat([nothing], 1,4))
-const INITIAL_STATE = (board=INITIAL_BOARD,predictions=PREDICTIONS,futures=FUTURES)
+# const Futures = Futures(repeat([nothing], 1,4))
+const INITIAL_State = (board=Board,predictions=PREDICTIONS,futures=Futures)
+const SEQUENCE = sequencer()
+const SEQ = collect(1:length(SEQUENCE))
+
+function INITIAL_STATE(SEQ)
+	INITIAL_BOARD = Board(SEQUENCE[SEQ][1])
+	FUTURES = Futures(SEQUENCE[SEQ][2])
+	return (board=INITIAL_BOARD,predictions=PREDICTIONS,futures=FUTURES)
+end
 
 mutable struct Game <: GI.AbstractGame
 	board :: Board
 	predictions:: Predictions
 	futures:: Futures
-	function Game(state=INITIAL_STATE)
-		new(state.board,state.predictions,state.futures)
+	function Game(SEQ)
+		state=INITIAL_STATE(SEQ)
+		return (state.board,state.predictions,state.futures)
 	end
 end
 
-GI.State(::Type{Game}) = typeof(INITIAL_STATE)
+GI.State(::Type{Game}) = typeof(INITIAL_State)
 
 GI.Action(::Type{Game}) = Float64
 
@@ -106,13 +117,21 @@ end
 
 const ACTIONS = collect(1:2^NUM_INDICES)
 
-# const Acitons= Array of all position arrays for the case of 4 stocks there are 2^4 actions availbale
+function actions_list()
+	array=[]
+	for i=[1,-1],j=[1,-1],k=[1,-1],l=[1,-1]
+		push!(array,[i,j,k,l])
+	end
+	return array
+end
+
+const Actions=actions_list()
 
 GI.actions(::Type{Game}) = ACTIONS
 
 GI.actions_mask(g::Game) = map(isnothing, g.predictions)
 
-GI.current_state(g::Game) = (board=g.board,predictions=g.predictions,futures=g.futures)
+GI.current_state(g::Game,SEQ) = (board=g.board,predictions=g.predictions,futures=g.futures)
 
 GI.white_playing(::Type{Game}, state) = state.curplayer
 
@@ -163,11 +182,11 @@ end
 ##### Machine Learning API
 #####
 
-function flip_colors(board)
-	flip(cell) = isnothing(cell) ? nothing : !cell
-	# Inference fails when using `map`
-	return @SVector Cell[flip(board[i]) for i in 1:NUM_TIMESTEPS]
-end
+# function flip_colors(board)
+# 	flip(cell) = isnothing(cell) ? nothing : !cell
+# 	# Inference fails when using `map`
+# 	return @SVector Cell[flip(board[i]) for i in 1:NUM_TIMESTEPS]
+# end
 
 # Vectorized representation: 3x3x3 array
 # Channels: free, white, black
@@ -191,74 +210,74 @@ function GI.vectorize_state(::Type{Game}, state)
 	# 	return Vector[]
 	# 	end
 	#
-		#####
-		##### Interaction API
-		#####
+	#####
+	##### Interaction API
+	#####
 
-		function GI.action_string(::Type{Game}, a)
-			string(Char(Int('A') + a - 1))
+	function GI.action_string(::Type{Game}, action)
+		string(action)
+	end
+	
+	function GI.parse_action(g::Game, str)
+		length(str) == 1 || (return nothing)
+		x = Int(uppercase(str[1])) - Int('A')
+		(0 <= x < NUM_TIMESTEPS) ? x + 1 : nothing
+	end
+
+	function read_board(::Type{Game})
+		n = BOARD_SIDE
+		str = reduce(*, ((readline() * "   ")[1:n] for i in 1:n))
+		white = ['w', 'r', 'o']
+		black = ['b', 'b', 'x']
+		function cell(i)
+			if (str[i] ∈ white) M_HANNA
+			elseif (str[i] ∈ black) BLACK
+			else nothing end
 		end
+		@SVector [cell(i) for i in 1:NUM_TIMESTEPS]
+	end
 
-		function GI.parse_action(g::Game, str)
-			length(str) == 1 || (return nothing)
-			x = Int(uppercase(str[1])) - Int('A')
-			(0 <= x < NUM_TIMESTEPS) ? x + 1 : nothing
+	function GI.read_state(::Type{Game})
+		b = read_board(Game)
+		nw = count(==(M_HANNA), b)
+		nb = count(==(BLACK), b)
+		if nw == nb
+			return (board=b, curplayer=M_HANNA)
+		elseif nw == nb + 1
+			return (board=b, curplayer=BLACK)
+		else
+			return nothing
 		end
+	end
 
-		function read_board(::Type{Game})
-			n = BOARD_SIDE
-			str = reduce(*, ((readline() * "   ")[1:n] for i in 1:n))
-			white = ['w', 'r', 'o']
-			black = ['b', 'b', 'x']
-			function cell(i)
-				if (str[i] ∈ white) M_HANNA
-				elseif (str[i] ∈ black) BLACK
-				else nothing end
-			end
-			@SVector [cell(i) for i in 1:NUM_TIMESTEPS]
-		end
+	using Crayons
 
-		function GI.read_state(::Type{Game})
-			b = read_board(Game)
-			nw = count(==(M_HANNA), b)
-			nb = count(==(BLACK), b)
-			if nw == nb
-				return (board=b, curplayer=M_HANNA)
-			elseif nw == nb + 1
-				return (board=b, curplayer=BLACK)
-			else
-				return nothing
-			end
-		end
+	player_color(p) = p == M_HANNA ? crayon"light_red" : crayon"light_blue"
+	player_name(p)  = p == M_HANNA ? "Red" : "Blue"
+	player_mark(p)  = p == M_HANNA ? "o" : "x"
 
-		using Crayons
-
-		player_color(p) = p == M_HANNA ? crayon"light_red" : crayon"light_blue"
-		player_name(p)  = p == M_HANNA ? "Red" : "Blue"
-		player_mark(p)  = p == M_HANNA ? "o" : "x"
-
-		function GI.render(g::Game; with_position_names=true, botmargin=true)
-			pname = player_name(g.curplayer)
-			pcol = player_color(g.curplayer)
-			print(pcol, pname, " plays:", crayon"reset", "\n\n")
-			for y in 1:BOARD_SIDE
-				for x in 1:BOARD_SIDE
-					pos = pos_of_xy((x, y))
-					c = g.board[pos]
-					if isnothing(c)
-						print(" ")
-					else
-						print(player_color(c), player_mark(c), crayon"reset")
-					end
+	function GI.render(g::Game; with_position_names=true, botmargin=true)
+		pname = player_name(g.curplayer)
+		pcol = player_color(g.curplayer)
+		print(pcol, pname, " plays:", crayon"reset", "\n\n")
+		for y in 1:BOARD_SIDE
+			for x in 1:BOARD_SIDE
+				pos = pos_of_xy((x, y))
+				c = g.board[pos]
+				if isnothing(c)
 					print(" ")
+				else
+					print(player_color(c), player_mark(c), crayon"reset")
 				end
-				if with_position_names
-					print(" | ")
-					for x in 1:BOARD_SIDE
-						print(GI.action_string(Game, pos_of_xy((x, y))), " ")
-					end
-				end
-				print("\n")
+				print(" ")
 			end
-			botmargin && print("\n")
+			if with_position_names
+				print(" | ")
+				for x in 1:BOARD_SIDE
+					print(GI.action_string(Game, pos_of_xy((x, y))), " ")
+				end
+			end
+			print("\n")
 		end
+		botmargin && print("\n")
+	end
