@@ -75,7 +75,7 @@ const PREDICTIONS = Predictions(repeat([nothing], 1,4))
 # const Futures = Futures(repeat([nothing], 1,4))
 const INITIAL_State = (board=Board,predictions=PREDICTIONS,futures=Futures)
 const SEQUENCE = sequencer()
-const SEQ = collect(1:length(SEQUENCE))
+const LEN_SEQ = collect(1:length(SEQUENCE))
 
 function INITIAL_STATE(SEQ)
 	INITIAL_BOARD = Board(SEQUENCE[SEQ][1])
@@ -89,7 +89,7 @@ mutable struct Game <: GI.AbstractGame
 	futures:: Futures
 	function Game(SEQ)
 		state=INITIAL_STATE(SEQ)
-		return (state.board,state.predictions,state.futures)
+		return Game(state.board,state.predictions,state.futures)
 	end
 end
 
@@ -127,13 +127,13 @@ end
 
 const Actions=actions_list()
 
-GI.actions(::Type{Game}) = ACTIONS
+GI.actions(::Type{Game}) = Actions
 
 GI.actions_mask(g::Game) = map(isnothing, g.predictions)
 
-GI.current_state(g::Game,SEQ) = (board=g.board,predictions=g.predictions,futures=g.futures)
+GI.current_state(g::Game) = Game(rand(LEN_SEQ))
 
-GI.white_playing(::Type{Game}, state) = state.curplayer
+GI.white_playing(::Type{Game}) = true
 
 function terminal_white_reward(g::Game)
 	has_won(g) && return 1.
@@ -147,7 +147,7 @@ function GI.white_reward(g::Game)
 end
 
 function GI.play!(g::Game, action)
-	g.predictions = Actions(action)
+	g.predictions = Predictions(Actions(action))
 end
 
 #####
@@ -199,85 +199,86 @@ function GI.vectorize_state(::Type{Game}, state)
 	for x in 1:BOARD_SIDE,
 		y in 1:BOARD_SIDE,
 		c in [nothing, M_HANNA, BLACK]]
+end
+
+
+#####
+##### Symmetries
+#####
+
+
+# function GI.symmetries(::Type{Game}, s)
+# 	return Vector[]
+# 	end
+#
+#####
+##### Interaction API
+#####
+
+function GI.action_string(::Type{Game}, action)
+	string(action)
+end
+
+function GI.parse_action(g::Game, str)
+	length(str) == 1 || (return nothing)
+	x = Int(uppercase(str[1])) - Int('A')
+	(0 <= x < NUM_TIMESTEPS) ? x + 1 : nothing
+end
+
+function read_board(::Type{Game})
+	n = BOARD_SIDE
+	str = reduce(*, ((readline() * "   ")[1:n] for i in 1:n))
+	white = ['w', 'r', 'o']
+	black = ['b', 'b', 'x']
+	function cell(i)
+		if (str[i] ∈ white) M_HANNA
+		elseif (str[i] ∈ black) BLACK
+		else nothing end
 	end
+	@SVector [cell(i) for i in 1:NUM_TIMESTEPS]
+end
 
-	#####
-	##### Symmetries
-	#####
-
-
-	# function GI.symmetries(::Type{Game}, s)
-	# 	return Vector[]
-	# 	end
-	#
-	#####
-	##### Interaction API
-	#####
-
-	function GI.action_string(::Type{Game}, action)
-		string(action)
+function GI.read_state(::Type{Game})
+	b = read_board(Game)
+	nw = count(==(M_HANNA), b)
+	nb = count(==(BLACK), b)
+	if nw == nb
+		return (board=b, curplayer=M_HANNA)
+	elseif nw == nb + 1
+		return (board=b, curplayer=BLACK)
+	else
+		return nothing
 	end
-	
-	function GI.parse_action(g::Game, str)
-		length(str) == 1 || (return nothing)
-		x = Int(uppercase(str[1])) - Int('A')
-		(0 <= x < NUM_TIMESTEPS) ? x + 1 : nothing
-	end
+end
 
-	function read_board(::Type{Game})
-		n = BOARD_SIDE
-		str = reduce(*, ((readline() * "   ")[1:n] for i in 1:n))
-		white = ['w', 'r', 'o']
-		black = ['b', 'b', 'x']
-		function cell(i)
-			if (str[i] ∈ white) M_HANNA
-			elseif (str[i] ∈ black) BLACK
-			else nothing end
-		end
-		@SVector [cell(i) for i in 1:NUM_TIMESTEPS]
-	end
+using Crayons
 
-	function GI.read_state(::Type{Game})
-		b = read_board(Game)
-		nw = count(==(M_HANNA), b)
-		nb = count(==(BLACK), b)
-		if nw == nb
-			return (board=b, curplayer=M_HANNA)
-		elseif nw == nb + 1
-			return (board=b, curplayer=BLACK)
-		else
-			return nothing
-		end
-	end
+player_color(p) = p == M_HANNA ? crayon"light_red" : crayon"light_blue"
+player_name(p)  = p == M_HANNA ? "Red" : "Blue"
+player_mark(p)  = p == M_HANNA ? "o" : "x"
 
-	using Crayons
-
-	player_color(p) = p == M_HANNA ? crayon"light_red" : crayon"light_blue"
-	player_name(p)  = p == M_HANNA ? "Red" : "Blue"
-	player_mark(p)  = p == M_HANNA ? "o" : "x"
-
-	function GI.render(g::Game; with_position_names=true, botmargin=true)
-		pname = player_name(g.curplayer)
-		pcol = player_color(g.curplayer)
-		print(pcol, pname, " plays:", crayon"reset", "\n\n")
-		for y in 1:BOARD_SIDE
-			for x in 1:BOARD_SIDE
-				pos = pos_of_xy((x, y))
-				c = g.board[pos]
-				if isnothing(c)
-					print(" ")
-				else
-					print(player_color(c), player_mark(c), crayon"reset")
-				end
+function GI.render(g::Game; with_position_names=true, botmargin=true)
+	pname = player_name(g.curplayer)
+	pcol = player_color(g.curplayer)
+	print(pcol, pname, " plays:", crayon"reset", "\n\n")
+	for y in 1:BOARD_SIDE
+		for x in 1:BOARD_SIDE
+			pos = pos_of_xy((x, y))
+			c = g.board[pos]
+			if isnothing(c)
 				print(" ")
+			else
+				print(player_color(c), player_mark(c), crayon"reset")
 			end
-			if with_position_names
-				print(" | ")
-				for x in 1:BOARD_SIDE
-					print(GI.action_string(Game, pos_of_xy((x, y))), " ")
-				end
-			end
-			print("\n")
+			print(" ")
 		end
-		botmargin && print("\n")
+		if with_position_names
+			print(" | ")
+			for x in 1:BOARD_SIDE
+				print(GI.action_string(Game, pos_of_xy((x, y))), " ")
+			end
+		end
+		print("\n")
 	end
+	botmargin && print("\n")
+end
