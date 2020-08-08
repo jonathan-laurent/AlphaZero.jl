@@ -14,6 +14,7 @@ const DEFAULT_SOLVER_DIR = joinpath(@__DIR__, "solver", "connect4")
 
 struct Player <: AbstractPlayer{Game}
   process :: Base.Process
+  lock :: ReentrantLock
   function Player(;
       solver_dir=DEFAULT_SOLVER_DIR,
       solver_name="c4solver",
@@ -23,7 +24,7 @@ struct Player <: AbstractPlayer{Game}
       cmd = pipeline(cmd, stderr=devnull)
     end
     p = open(cmd, "r+")
-    return new(p)
+    return new(p, ReentrantLock())
   end
 end
 
@@ -42,8 +43,10 @@ history_string(game) = reduce(*, map(string, history(game)))
 
 function query_solver(p::Player, g)
   hstr = history_string(g)
+  Base.lock(p.lock)
   println(p.process, hstr)
   l = readline(p.process)
+  Base.unlock(p.lock)
   args = map(split(l)[2:end]) do x
     parse(Int64, x)
   end
