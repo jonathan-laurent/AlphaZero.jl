@@ -9,16 +9,16 @@ netparams = ResNetHP(
   batch_norm_momentum=0.1)
 
 self_play = SelfPlayParams(
-  num_games=4000,
+  num_games=5000,
   num_workers=128,
   use_gpu=true,
   reset_mcts_every=4,
   mcts=MctsParams(
     num_iters_per_turn=600,
-    cpuct=3.0,
-    prior_temperature=0.8,
-    temperature=PLSchedule([0, 20], [1.0, 0.3]),
-    dirichlet_noise_ϵ=0.2,
+    cpuct=2.0,
+    prior_temperature=1.0,
+    temperature=PLSchedule([0, 20, 30], [1.0, 1.0, 0.3]),
+    dirichlet_noise_ϵ=0.25,
     dirichlet_noise_α=1.0))
 
 arena = ArenaParams(
@@ -30,7 +30,6 @@ arena = ArenaParams(
   update_threshold=0.05,
   mcts=MctsParams(
     self_play.mcts,
-    num_iters_per_turn=200,
     temperature=ConstSchedule(0.2),
     dirichlet_noise_ϵ=0.05))
 
@@ -38,23 +37,23 @@ learning = LearningParams(
   use_gpu=true,
   use_position_averaging=true,
   samples_weighing_policy=LOG_WEIGHT,
-  batch_size=2048,
-  loss_computation_batch_size=2048,
+  batch_size=1024,
+  loss_computation_batch_size=1024,
   optimiser=Adam(lr=2e-3),
   l2_regularization=1e-4,
   nonvalidity_penalty=1.,
   min_checkpoints_per_epoch=1,
-  max_batches_per_checkpoint=1000,
+  max_batches_per_checkpoint=2000,
   num_checkpoints=1)
 
 params = Params(
-  arena=nothing, # skipping this part for the demo
+  arena=arena,
   self_play=self_play,
   learning=learning,
-  num_iters=10, # for the demo, 10 iterations should be enough
+  num_iters=20,
   ternary_rewards=true,
   use_symmetries=true,
-  memory_analysis=nothing, # removed for the demo for more parallelism
+  memory_analysis=nothing,
   mem_buffer_size=PLSchedule(
   [      0,        40],
   [400_000, 2_000_000]))
@@ -80,8 +79,8 @@ make_duel(player, baseline) =
   Benchmark.Duel(
     player,
     baseline,
-    num_games=64,
-    num_workers=64,
+    num_games=128,
+    num_workers=128,
     use_gpu=true,
     flip_probability=0.5,
     color_policy=CONTENDER_WHITE)
