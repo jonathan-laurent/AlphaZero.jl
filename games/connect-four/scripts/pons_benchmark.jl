@@ -11,6 +11,7 @@ const SESSION_DIR = "sessions/connect-four"
 const SAVE_FILE = "pons-benchmark-results.json"
 const PLOT_FILE = "pons-benchmark-results.png"
 const ITC_STRIDE = 5
+const NUM_WORKERS = 128
 const DEBUG_MODE = false # Launches a quick run on a tiny dataset to help debug
 
 # A benchmark to evaluate connect-four agents is available at:
@@ -84,6 +85,7 @@ include("../main.jl")
 using .ConnectFour: Game, Solver, Training
 using ProgressMeter
 using Formatting
+using Statistics: mean
 
 function state_of_string(str)
   g = Game()
@@ -102,23 +104,36 @@ function optimal_on(solver, player, e)
   return sign(qs[api]) == maximum(sign, qs)
 end
 
-function test_player_on(player, benchmark, progress)
+# TODO: the Solver is not thread safe.
+function test_player_on(make_player, oracle, benchmark, progress)
+  # Split benchmark entries into batches for workers
+  entries = DEBUG_MODE ?
+    Iterators.take(benchmark.entries, 2) :
+    benchmark.entries
+  batch_size = max(length(entries) ÷ NUM_WORKERS, 1)
+  batches = Iterators.partition(entries, batch_size) |> collect
+  nworkers = length(batches)
+  # Spawn nworkers workers (nworkers <= NUM_WORKERS)
+  spawn_oracle, done = AlphaZero.batchify_oracles(oracle, false, nworkers)
   solver = Solver.Player()
-  nerr = 0
-  entries = benchmark.entries
-  DEBUG_MODE && (entries = Iterators.take(entries, 10))
-  for e in entries
-    optimal_on(solver, player, e) || (nerr += 1)
-    next!(progress)
+  results = AlphaZero.Util.threads_pmap(batches) do batch
+    player = make_player(spawn_oracle())
+    res = map(batch) do e
+      err = optimal_on(solver, player, e) ? 0. : 1.
+      next!(progress)
+      return err
+    end
+    done()
+    return res
   end
-  return nerr / length(entries)
+  return mean(Iterators.flatten(results) |> collect)
 end
 
-function test_player(player)
+function test_player(make_player, oracle)
   errs = Float64[]
   for bench in BENCHMARKS
     p = Progress(length(bench.entries))
-    err = test_player_on(player, bench, p)
+    err = test_player_on(make_player, oracle, bench, p)
     push!(errs, err)
     err_str =
     println("($(bench.stage), $(bench.difficulty)): $(fmt(".2f", 100 * err))%")
@@ -126,14 +141,10 @@ function test_player(player)
   return errs
 end
 
-function load_alphazero_player(dir)
-  env = AlphaZero.UserInterface.load_env(
+function load_alphazero_env(dir)
+  return AlphaZero.UserInterface.load_env(
     Game, Training.Network{Game},
     AlphaZero.Log.Logger(devnull), dir, params=Training.params)
-  mcts_params = MctsParams(env.params.arena.mcts,
-    temperature=ConstSchedule(0.),
-    dirichlet_noise_ϵ=0.)
-  return MctsPlayer(env.bestnn, mcts_params)
 end
 
 ####
@@ -149,15 +160,26 @@ struct Results
   alphazero_training :: Vector{Tuple{Int, Errors}}
 end
 
+function test_alphazero(env)
+  mcts_params = MctsParams(env.params.arena.mcts,
+    temperature=ConstSchedule(0.),
+    dirichlet_noise_ϵ=0.)
+  net = Network.copy(env.bestnn, on_gpu=true, test_mode=true)
+  return test_player(net) do net
+    return MctsPlayer(net, mcts_params)
+  end
+end
+
 function generate_data(session_dir)
   println("Testing the minmax baseline")
-  player = MinMax.Player{Game}(depth=5, amplify_rewards=true, τ=0)
-  minmax_errs = test_player(player)
+  minmax_errs = test_player(nothing) do _
+     MinMax.Player{Game}(depth=5, amplify_rewards=true, τ=0)
+  end
   println("")
 
   println("Testing AlphaZero")
-  player = load_alphazero_player(session_dir)
-  az_errs = test_player(player)
+  env = load_alphazero_env(session_dir)
+  az_errs = test_alphazero(env)
   println("")
 
   println("Testing AlphaZero during training")
@@ -168,8 +190,8 @@ function generate_data(session_dir)
     AlphaZero.UserInterface.valid_session_dir(itdir) || break
     DEBUG_MODE && itc > 10 && break
     println("Iteration $itc")
-    player = load_alphazero_player(itdir)
-    push!(az_training_errs, (itc, test_player(player)))
+    env = load_alphazero_env(itdir)
+    push!(az_training_errs, (itc, test_alphazero(env)))
     itc += ITC_STRIDE
   end
   return Results(minmax_errs, az_errs, az_training_errs)
