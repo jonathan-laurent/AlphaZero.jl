@@ -1,6 +1,8 @@
-Network = ResNet
+NetLib = FluxLib
 
-netparams = ResNetHP(
+Network = NetLib.ResNet
+
+netparams = NetLib.ResNetHP(
   num_filters=128,
   num_blocks=5,
   conv_kernel_size=(3, 3),

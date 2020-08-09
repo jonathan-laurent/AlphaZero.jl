@@ -2,7 +2,7 @@
 This module provides utilities to build neural networks with Knet,
 along with a library of standard architectures.
 """
-module KNets
+module KnetLib
 
 export SimpleNet, SimpleNetHP, ResNet, ResNetHP
 

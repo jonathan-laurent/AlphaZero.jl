@@ -6,7 +6,8 @@
 module AlphaZero
 
 # Submodules
-export MCTS, MinMax, GameInterface, GI, Report, Network, Benchmark
+export MCTS, MinMax, GameInterface, GI, Report, Benchmark
+export Network, KnetLib, FluxLib
 # AlphaZero parameters
 export Params, SelfPlayParams, LearningParams, ArenaParams
 export MctsParams, MemAnalysisParams
@@ -20,7 +21,6 @@ export MctsPlayer, RandomPlayer, EpsilonGreedyPlayer, NetworkPlayer, Human
 export ColorPolicy, ALTERNATE_COLORS, BASELINE_WHITE, CONTENDER_WHITE
 # Networks
 export AbstractNetwork, OptimiserSpec, Nesterov, CyclicNesterov, Adam
-export SimpleNet, SimpleNetHP, ResNet, ResNetHP
 # Training environments
 export Env, train!, get_experience
 # User interface
@@ -68,23 +68,11 @@ import .MinMax
 include("benchmark.jl")
 using .Benchmark
 
-# We provide a library of predefined network architectures for convenience.
-# Right now, it is included in the main AlphaZero.jl package. In the future,
-# we may want to separate it so as to drop the Knet and Flux dependencies.
+include("networks/knet.jl")
+import .KnetLib
 
-const USE_KNET_FOR_NETLIB = false
-
-if USE_KNET_FOR_NETLIB
-  @eval begin
-    include("networks/knet.jl")
-    using .KNets
-  end
-else
-  @eval begin
-    include("networks/flux.jl")
-    using .FluxNets
-  end
-end
+include("networks/flux.jl")
+import .FluxLib
 
 # The default user interface is included here for convenience but it could be
 # replaced or separated from the main AlphaZero.jl package (which would also

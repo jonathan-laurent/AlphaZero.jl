@@ -2,7 +2,7 @@
 This module provides utilities to build neural networks with Flux,
 along with a library of standard architectures.
 """
-module FluxNets
+module FluxLib
 
 export SimpleNet, SimpleNetHP, ResNet, ResNetHP
 
