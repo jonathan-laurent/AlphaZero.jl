@@ -124,17 +124,9 @@ function load_network(logger, net_file, netparams_file)
 end
 
 function load_env(
-    ::Type{Game}, ::Type{Network}, logger, dir; params=nothing
+    ::Type{Game}, ::Type{Network}, logger, dir; params
   ) where {Game, Network}
   Log.section(logger, 1, "Loading environment")
-  # Load parameters
-  if isnothing(params)
-    params_file = joinpath(dir, PARAMS_FILE)
-    params = open(params_file, "r") do io
-      JSON3.read(io, Params)
-    end
-    Log.print(logger, "Loading parameters from: $(params_file)")
-  end
   # Load the neural networks
   netparams_file = joinpath(dir, NET_PARAMS_FILE)
   bestnn = load_network(logger, joinpath(dir, BESTNN_FILE), netparams_file)
@@ -325,9 +317,6 @@ it already exists.
     any file will be generated
 - `nostdout=false`: disables logging on the standard output when set to `true`
 - `benchmark=[]`: vector of [`Benchmark.Duel`](@ref) to be used as a benchmark
-- `load_saved_params=false`: if set to `true`, load the training parameters from
-    the session directory (if present) rather than using the `params`
-    argument
 - `save_intermediate=false`: if set to true (along with `autosave`), all
     intermediate training environments are saved on disk so that
     the whole training process can be analyzed later. This can
@@ -336,12 +325,11 @@ it already exists.
 function Session(
     ::Type{Game}, ::Type{Net}, params, netparams;
     dir=nothing, autosave=true, nostdout=false, benchmark=[],
-    load_saved_params=false, save_intermediate=false
+    save_intermediate=false
   ) where {Game, Net}
   logger = session_logger(dir, nostdout, autosave)
   if valid_session_dir(dir)
-    env = load_env(Game, Net, logger, dir,
-      params=(load_saved_params ? nothing : params))
+    env = load_env(Game, Net, logger, dir, params=params)
     # The parameters must be unchanged
     same_json(x, y) = JSON3.write(x) == JSON3.write(y)
     same_json(env.params, params) || @info "Using modified parameters"
@@ -356,24 +344,6 @@ function Session(
     zeroth_iteration!(session)
   end
   return session
-end
-
-"""
-    Session(::Type{Game}, ::Type{Network}, dir::String) where {Game, Net}
-
-Load an existing session from a directory.
-
-This constructor accepts the optional keyword arguments
-`autosave`, `nostdout`, `benchmark` and `save_intermediate`.
-"""
-function Session(
-    ::Type{Game}, ::Type{Network}, dir::String;
-    autosave=true, nostdout=false, benchmark=[], save_intermediate=false
-  ) where {Game, Network}
-  @assert valid_session_dir(dir)
-  logger = session_logger(dir, nostdout, autosave)
-  env = load_env(Game, Network, logger, dir)
-  return Session(env, dir, logger, autosave, save_intermediate, benchmark)
 end
 
 """
