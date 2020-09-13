@@ -7,7 +7,7 @@ module AlphaZero
 
 # Submodules
 export MCTS, MinMax, GameInterface, GI, Report, Benchmark
-export Network, KnetLib, FluxLib
+export Network, KnetLib, FluxLib, NetLib
 # AlphaZero parameters
 export Params, SelfPlayParams, LearningParams, ArenaParams
 export MctsParams, MemAnalysisParams
@@ -69,10 +69,10 @@ include("benchmark.jl")
 using .Benchmark
 
 include("networks/knet.jl")
-import .KnetLib
+# import .KnetLib
 
 include("networks/flux.jl")
-import .FluxLib
+# import .FluxLib
 
 # The default user interface is included here for convenience but it could be
 # replaced or separated from the main AlphaZero.jl package (which would also
@@ -80,5 +80,22 @@ import .FluxLib
 
 include("ui/ui.jl")
 using .UserInterface
+
+# Choose the default DL framework based on an environment variable
+function __init__()
+  @eval begin
+    const DEFAULT_DL_FRAMEWORK = get(ENV, "ALPHAZERO_DEFAULT_DL_FRAMEWORK", "FLUX")
+    const NetLib =
+      if DEFAULT_DL_FRAMEWORK == "FLUX"
+        @info "Using Flux."
+        FluxLib
+      elseif DEFAULT_DL_FRAMEWORK == "KNET"
+        @info "Using Knet."
+        KnetLib
+      else
+        error("Unknown DL framework: $(DEFAULT_DL_FRAMEWORK)")
+      end
+  end
+end
 
 end

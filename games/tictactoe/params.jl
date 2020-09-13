@@ -1,5 +1,3 @@
-NetLib = FluxLib
-
 Network = NetLib.SimpleNet
 
 netparams = NetLib.SimpleNetHP(
