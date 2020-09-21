@@ -7,7 +7,7 @@ compete against a set of baselines.
 """
 module Benchmark
 
-import ..Network, ..MinMax, ..GI
+import ..Network, ..MinMax, ..GI, ..AbstractGame
 import ..Env, ..MCTS, ..MctsParams, ..TwoPlayers
 import ..simulate, ..Simulator, ..rewards_and_redundancy, ..record_trace
 import ..ColorPolicy, ..ALTERNATE_COLORS
@@ -103,15 +103,16 @@ Run a benchmark duel and return a [`Benchmark.DuelOutcome`](@ref).
 If a `progress` is provided, `next!(progress)` is called
 after each simulated game.
 """
-function run(env::Env{G}, duel::Duel, progress=nothing) where G
+function run(env::Env, duel::Duel, game::AbstractGame, progress=nothing)
   net() = Network.copy(env.bestnn, on_gpu=duel.use_gpu, test_mode=true)
   simulator = Simulator(net, record_trace) do net
-    player = instantiate(duel.player, net)
-    baseline = instantiate(duel.baseline, net)
+    player = instantiate(duel.player, game, net)
+    baseline = instantiate(duel.baseline, game, net)
     return TwoPlayers(player, baseline)
   end
   samples, elapsed = @timed simulate(
     simulator,
+    game,
     num_games=duel.num_games,
     num_workers=duel.num_workers,
     game_simulated=(() -> next!(progress)),
@@ -164,8 +165,8 @@ end
 
 name(p::MctsRollouts) = "MCTS ($(p.params.num_iters_per_turn) rollouts)"
 
-function instantiate(p::MctsRollouts, nn::MCTS.Oracle{G}) where G
-  return MctsPlayer(MCTS.RolloutOracle{G}(), p.params)
+function instantiate(p::MctsRollouts, game::AbstractGame, nn::MCTS.Oracle)
+  return MctsPlayer(game, MCTS.RolloutOracle(), p.params)
 end
 
 """
@@ -182,7 +183,7 @@ end
 
 name(::Full) = "AlphaZero"
 
-function instantiate(p::Full, nn)
+function instantiate(p::Full, game, nn)
   return MctsPlayer(nn, p.params)
 end
 
@@ -199,7 +200,7 @@ end
 
 name(::NetworkOnly) = "Network Only"
 
-function instantiate(p::NetworkOnly, nn)
+function instantiate(p::NetworkOnly, game, nn)
   player = NetworkPlayer(nn)
   return PlayerWithTemperature(player, ConstSchedule(p.τ))
 end
@@ -218,8 +219,8 @@ end
 
 name(p::MinMaxTS) = "MinMax (depth $(p.depth))"
 
-function instantiate(p::MinMaxTS, ::MCTS.Oracle{G}) where G
-  return MinMax.Player{G}(
+function instantiate(p::MinMaxTS, game::AbstractGame, ::MCTS.Oracle)
+  return MinMax.Player(
     depth=p.depth, amplify_rewards=p.amplify_rewards, τ=p.τ)
 end
 
@@ -234,13 +235,13 @@ struct Solver <: Player
 end
 
 # Return the type of the perfect player for a given type of game
-# PerfectPlayer(::Type{<:GI.AbstractGame})
+# PerfectPlayer(::AbstractGame)
 function PerfectPlayer end
 
 name(p::Solver) = "Perfect Player ($(round(Int, 100 * p.ϵ))% random)"
 
-function instantiate(p::Solver, nn::MCTS.Oracle{G}) where G
-  return EpsilonGreedyPlayer(PerfectPlayer(G)(), p.ϵ)
+function instantiate(p::Solver, game::AbstractGame, nn::MCTS.Oracle)
+  return EpsilonGreedyPlayer(PerfectPlayer(game)(), p.ϵ)
 end
 
 end

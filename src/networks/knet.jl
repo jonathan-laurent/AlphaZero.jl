@@ -51,7 +51,7 @@ end
 #####
 
 """
-    KNetwork{Game} <: AbstractNetwork{Game}
+    KNetwork <: AbstractNetwork
 
 Abstract type for neural networks implemented using the _Knet_ framework.
 
@@ -67,7 +67,7 @@ with the following exceptions:
 [`Network.HyperParams`](@ref), [`Network.hyperparams`](@ref),
 [`Network.forward`](@ref) and [`Network.on_gpu`](@ref).
 """
-abstract type KNetwork{Game} <: AbstractNetwork{Game} end
+abstract type KNetwork <: AbstractNetwork end
 
 Base.copy(nn::KNetwork) = Base.deepcopy(nn)
 
@@ -133,7 +133,7 @@ end
 #####
 
 """
-    TwoHeadNetwork{Game} <: KNetwork{G}
+    TwoHeadNetwork <: KNetwork
 
 An abstract type for two-head neural networks implemented with Knet.
 
@@ -143,10 +143,10 @@ is provided for [`Network.hyperparams`](@ref), [`Network.forward`](@ref) and
 [`Network.on_gpu`](@ref), leaving only [`Network.HyperParams`](@ref) to
 be implemented.
 """
-abstract type TwoHeadNetwork{G} <: KNetwork{G} end
+abstract type TwoHeadNetwork <: KNetwork end
 
-function Network.forward(nn::TwoHeadNetwork, board)
-  c = nn.common(board)
+function Network.forward(nn::TwoHeadNetwork, state)
+  c = nn.common(state)
   v = nn.vhead(c)
   p = nn.phead(c)
   return (p, v)

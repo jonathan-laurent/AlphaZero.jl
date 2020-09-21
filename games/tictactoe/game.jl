@@ -16,16 +16,18 @@ const INITIAL_STATE = (board=INITIAL_BOARD, curplayer=WHITE)
 mutable struct Game <: GI.AbstractGame
   board :: Board
   curplayer :: Player
-  function Game(state=INITIAL_STATE)
-    new(state.board, state.curplayer)
-  end
+  Game(state=INITIAL_STATE) = new(state.board, state.curplayer)
 end
 
-GI.State(::Type{Game}) = typeof(INITIAL_STATE)
+function GI.reset!(g::Game, state=INITIAL_STATE)
+  g.board = state.board
+  g.curplayer = state.curplayer
+  return
+end
 
-GI.Action(::Type{Game}) = Int
+GI.clone(g::Game) = Game(GI.current_state(g))
 
-GI.two_players(::Type{Game}) = true
+GI.two_players(::Game) = true
 
 #####
 ##### Defining winning conditions
@@ -59,13 +61,13 @@ end
 
 const ACTIONS = collect(1:NUM_POSITIONS)
 
-GI.actions(::Type{Game}) = ACTIONS
+GI.actions(::Game) = ACTIONS
 
 GI.actions_mask(g::Game) = map(isnothing, g.board)
 
 GI.current_state(g::Game) = (board=g.board, curplayer=g.curplayer)
 
-GI.white_playing(::Type{Game}, state) = state.curplayer
+GI.white_playing(::Game, state) = state.curplayer
 
 function terminal_white_reward(g::Game)
   has_won(g, WHITE) && return 1.
@@ -128,7 +130,7 @@ end
 # Channels: free, white, black
 # The board is represented from the perspective of white
 # (as if white were to play next)
-function GI.vectorize_state(::Type{Game}, state)
+function GI.vectorize_state(::Game, state)
   board = GI.white_playing(Game, state) ? state.board : flip_colors(state.board)
   return Float32[
     board[pos_of_xy((x, y))] == c
@@ -156,7 +158,7 @@ end
 
 const SYMMETRIES = generate_dihedral_symmetries()
 
-function GI.symmetries(::Type{Game}, s)
+function GI.symmetries(::::AbstractGame, state)
   return [
     ((board=Board(s.board[sym]), curplayer=s.curplayer), sym)
     for sym in SYMMETRIES]
@@ -166,7 +168,7 @@ end
 ##### Interaction API
 #####
 
-function GI.action_string(::Type{Game}, a)
+function GI.action_string(::Game, a)
   string(Char(Int('A') + a - 1))
 end
 
@@ -176,7 +178,7 @@ function GI.parse_action(g::Game, str)
   (0 <= x < NUM_POSITIONS) ? x + 1 : nothing
 end
 
-function read_board(::Type{Game})
+function read_board(::Game)
   n = BOARD_SIDE
   str = reduce(*, ((readline() * "   ")[1:n] for i in 1:n))
   white = ['w', 'r', 'o']
@@ -189,7 +191,7 @@ function read_board(::Type{Game})
   @SVector [cell(i) for i in 1:NUM_POSITIONS]
 end
 
-function GI.read_state(::Type{Game})
+function GI.read_state(::Game)
   b = read_board(Game)
   nw = count(==(WHITE), b)
   nb = count(==(BLACK), b)

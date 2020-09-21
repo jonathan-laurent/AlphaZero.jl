@@ -166,7 +166,7 @@ end
 #####
 
 """
-    Explorer{Game}
+    Explorer
 
 A command interpreter to explore the internals of a player
 through interactive play.
@@ -200,25 +200,21 @@ The following commands are currently implemented:
   - `restart`: restart the explorer.
 """
 mutable struct Explorer{Game}
-  game :: Game
+  game :: AbstractGame
   history :: Stack{Game}
-  player :: AbstractPlayer{Game}
+  player :: AbstractPlayer
   memory :: Option{MemoryBuffer}
   turn :: Int
-  function Explorer(player::AbstractPlayer, game=nothing; memory=nothing)
-    Game = GameType(player)
-    isnothing(game) && (game = Game())
+  function Explorer(player::AbstractPlayer, game; memory=nothing)
+    Game = typeof(game)
     history = Stack{Game}()
     new{Game}(game, history, player, memory, 0)
   end
 end
 
-GameType(::Explorer{Game}) where Game = Game
-
 function Explorer(
-    env::Env, game=nothing; mcts_params=env.params.self_play.mcts, on_gpu=false)
-  Game = GameType(env)
-  isnothing(game) && (game = Game())
+    env::Env, game; mcts_params=env.params.self_play.mcts, on_gpu=false)
+  Game = typeof(game)
   net = Network.copy(env.bestnn, on_gpu=on_gpu, test_mode=true)
   player = MctsPlayer(net, mcts_params)
   return Explorer(player, game, memory=env.memory)

@@ -18,52 +18,59 @@ import ..Util
     AbstractGame
 
 Abstract base type for a game environment.
-
-# Constructors
-
-Any subtype `Game` must implement the following constructors:
-
-    Game()
-
-Return an initialized game environment. Note that this constructor does not
-have to be deterministic.
-
-    Game(state)
-
-Return a fresh game environment starting at a given state.
 """
 abstract type AbstractGame end
 
-function Base.copy(env::Game) where {Game <: AbstractGame}
-  return Game(current_state(env))
-end
+"""
+    clone(::AbstractGame)
+
+Return an independent copy of the given environment.
+"""
+function clone end
 
 """
-    two_players(::Type{<:AbstractGame}) :: Bool
+    reset!(::AbstractGame)
+
+Reset the game environment to an initial state.
+
+This function is allowed to be nondeterministic for stochastic environments.
+
+    reset!(::AbstractGame, state)
+
+Reset the environment to a given state.
+"""
+function reset! end
+
+"""
+    two_players(::AbstractGame) :: Bool
 
 Return whether or not a game is a two-players game.
 """
 function two_players end
 
 """
-    State(Game::Type{<:AbstractGame})
+    state_type(::AbstractGame)
 
-Return the state type corresponding to `Game`.
+Return the state type associated to a game environment.
 
 State objects must be persistent or appear as such as they are stored into
 the MCTS tree without copying. They also have to be comparable and hashable.
 """
-function State end
+function state_type(env::AbstractGame)
+  return typeof(current_state(env))
+end
 
 """
-    Action(Game::Type{<:AbstractGame})
+    action_type(::AbstractGame)
 
-Return the action type corresponding to `Game`.
+Return the action type associated to a game environment.
 """
-function Action end
+function action_type(env::AbstractGame)
+  return eltype(actions(env))
+end
 
 """
-    actions(::Type{<:AbstractGame})
+    actions(::AbstractGame)
 
 Return the vector of all game actions.
 """
@@ -74,18 +81,12 @@ function actions end
 #####
 
 """
-    white_playing(::Type{<:AbstractGame}, state) :: Bool
-    white_playing(env::AbstractGame)
-      = white_playing(typeof(env), current_state(env))
+    white_playing(::AbstractGame, state) :: Bool
 
 Return `true` if white is to play and `false` otherwise. For a one-player
 game, it must always return `true`.
 """
 function white_playing end
-
-function white_playing(env::AbstractGame)
-  return white_playing(typeof(env), current_state(env))
-end
 
 """
     white_reward(env::AbstractGame)
@@ -147,14 +148,16 @@ function heuristic_value end
 #####
 
 """
-    symmetries(::Type{G}, state) where {G <: AbstractGame}
+    symmetries(::AbstractGame, state)
 
 Return the vector of all pairs `(s, σ)` where:
   - `s` is the image of `state` by a nonidentical symmetry
   - `σ` is the associated actions permutation, as an integer vector of
-     size `num_actions(Game)`.
+     size `num_actions(env)`.
 
 A default implementation is provided that returns an empty vector.
+
+Note that the urrent state of the passed environment is ignored by this function.
 
 # Example
 
@@ -162,14 +165,13 @@ In the game of tic-tac-toe, there are eight symmetries that can be
 obtained by composing reflexions and rotations of the board (including the
 identity symmetry).
 """
-function symmetries(::Type{G}, state) where {G <: AbstractGame}
-  return Tuple{State(G), Vector{Int}}[]
+function symmetries(::AbstractGame, state)
+  return Tuple{typeof(state), Vector{Int}}[]
 end
 
-function test_symmetry(Game, state, (symstate, aperm))
-  syms = symmetries
-  mask = actions_mask(Game(state))
-  symmask = actions_mask(Game(symstate))
+function test_symmetry(env, (symstate, aperm))
+  mask = actions_mask(env)
+  symmask = actions_mask(new_env(env, symstate))
   v = falses(length(symmask))
   v[mask] .= true
   v = v[aperm]
@@ -181,9 +183,11 @@ end
 #####
 
 """
-    vectorize_state(::Type{<:AbstractGame}, state) :: Array{Float32}
+    vectorize_state(env::AbstractGame, state) :: Array{Float32}
 
-Return a vectorized representation of a state.
+Return a vectorized representation of a given state.
+
+Note that the current state of the passed environment is not considered.
 """
 function vectorize_state end
 
@@ -192,14 +196,14 @@ function vectorize_state end
 #####
 
 """
-    action_string(::Type{<:AbstractGame}, action) :: String
+    action_string(::AbstractGame, action) :: String
 
 Return a human-readable string representing the provided action.
 """
 function action_string end
 
 """
-    parse_action(::Type{<:AbstractGame}, str::String)
+    parse_action(::AbstractGame, str::String)
 
 Return the action described by string `str` or `nothing`
 if `str` does not denote a valid action.
@@ -207,10 +211,11 @@ if `str` does not denote a valid action.
 function parse_action end
 
 """
-    read_state(::Type{G}) where G <: AbstractGame :: Union{State(G), Nothing}
+    read_state(env::AbstractGame)
 
 Read a state from the standard input.
-Return the corresponding state or `nothing` in case of an invalid input.
+Return the corresponding state (with type `state_type(env)`)
+or `nothing` in case of an invalid input.
 """
 function read_state end
 
@@ -226,14 +231,36 @@ function render end
 #####
 
 """
-    num_actions(::Type{G})
+    new_env(env::AbstractGame)
+
+Return a fresh copy of the current environment, reset to an initial state.
+"""
+function new_env(env::AbstractGame)
+  env = clone(env)
+  reset!(env)
+  return env
+end
+
+"""
+    new_env(env::AbstractGame, state)
+
+Return a fresh copy of the current environment, reset to a given state.
+"""
+function new_env(env::AbstractGame, state)
+  env = clone(env)
+  reset!(env, state)
+  return env
+end
+
+"""
+    num_actions(::AbstractGame)
 
 Return the total number of actions associated with a game.
 """
 num_actions(::Type{G}) where G = length(actions(G))
 
 """
-    available_actions(env::AbstractGame)
+    available_actions(::AbstractGame)
 
 Return the vector of all available actions.
 """
@@ -244,33 +271,25 @@ function available_actions(env::AbstractGame)
 end
 
 """
-    state_dim(::Type{G})
+    state_dim(::AbstractGame)
 
 Return a tuple that indicates the shape of a vectorized state representation.
 """
-state_dim(::Type{G}) where G = size(vectorize_state(G, current_state(G())))
+state_dim(env) = size(vectorize_state(env, current_state(env)))
 
 """
-    apply_random_symmetry(::AbstractGame)
+    apply_random_symmetry!(::AbstractGame)
 
-Return a fresh new state that is the image of the given state by a random
-symmetry (see [`symmetries`](@ref)).
+Apply a random symmetry to the current game state (see [`symmetries`](@ref)).
 """
-function apply_random_symmetry(env::Game) where {Game <: AbstractGame}
-  symstate, _ = rand(symmetries(Game, current_state(env)))
-  return Game(symstate)
+function apply_random_symmetry!(env)
+  symstate, _ = rand(symmetries(env))
+  reset!(env, symstate)
+  return
 end
 
-function state_memsize(::Type{G}) where G
-  return Base.summarysize(current_state(G()))
+function state_memsize(env::AbstractGame)
+  return Base.summarysize(current_state(env))
 end
 
 end
-
-"""
-    GameType(T)
-
-Return the `Game` type associated with an object
-(such as a network, a player, an MCTS environment...)
-"""
-function GameType end

@@ -29,7 +29,7 @@ import Zygote
 #####
 
 """
-    FluxNetwork{Game} <: AbstractNetwork{Game}
+    FluxNetwork <: AbstractNetwork
 
 Abstract type for neural networks implemented using the _Flux_ framework.
 
@@ -41,7 +41,7 @@ network interface with the following exceptions:
 [`Network.HyperParams`](@ref), [`Network.hyperparams`](@ref),
 [`Network.forward`](@ref) and [`Network.on_gpu`](@ref).
 """
-abstract type FluxNetwork{Game} <: AbstractNetwork{Game} end
+abstract type FluxNetwork <: AbstractNetwork end
 
 function Base.copy(nn::Net) where Net <: FluxNetwork
   #new = Net(Network.hyperparams(nn))
@@ -145,7 +145,7 @@ end
 #####
 
 """
-    TwoHeadNetwork{Game} <: FluxNetwork{G}
+    TwoHeadNetwork <: FluxNetwork
 
 An abstract type for two-head neural networks implemented with Flux.
 
@@ -155,10 +155,10 @@ is provided for [`Network.hyperparams`](@ref), [`Network.forward`](@ref) and
 [`Network.on_gpu`](@ref), leaving only [`Network.HyperParams`](@ref) to
 be implemented.
 """
-abstract type TwoHeadNetwork{G} <: FluxNetwork{G} end
+abstract type TwoHeadNetwork <: FluxNetwork end
 
-function Network.forward(nn::TwoHeadNetwork, board)
-  c = nn.common(board)
+function Network.forward(nn::TwoHeadNetwork, state)
+  c = nn.common(state)
   v = nn.vhead(c)
   p = nn.phead(c)
   return (p, v)

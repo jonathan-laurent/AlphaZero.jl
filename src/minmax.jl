@@ -46,11 +46,11 @@ function minmax(player, game, actions, depth)
 end
 
 """
-    MinMax.Player{Game} <: AbstractPlayer{Game}
+    MinMax.Player <: AbstractPlayer
 
 A stochastic minmax player, to be used as a baseline.
 
-    MinMax.Player{Game}(;depth, amplify_rewards, τ=0.)
+    MinMax.Player(;depth, amplify_rewards, τ=0.)
 
 The minmax player explores the game tree exhaustively at depth `depth`
 to build an estimate of the Q-value of each available action. Then, it
@@ -74,13 +74,13 @@ Otherwise,
 If the `amplify_rewards` option is set to true, every received positive reward
 is converted to ``∞`` and every negative reward is converted to ``-∞``.
 """
-struct Player{G} <: AbstractPlayer{G}
+struct Player <: AbstractPlayer
   depth :: Int
   amplify_rewards :: Bool
   τ :: Float64
   gamma :: Float64
-  function Player{G}(;depth, amplify_rewards, τ=0., γ=1.) where G
-    return new{G}(depth, amplify_rewards, τ, γ)
+  function Player(;depth, amplify_rewards, τ=0., γ=1.)
+    return new(depth, amplify_rewards, τ, γ)
   end
 end
 

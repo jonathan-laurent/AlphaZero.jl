@@ -1,6 +1,6 @@
 module Batchifier
 
-import ..MCTS, ..Util
+import ..MCTS, ..Util, ..AbstractGame
 
 export BatchedOracle
 
@@ -57,21 +57,19 @@ end
 
 client_done!(reqc) = put!(reqc, :done)
 
-struct BatchedOracle{Game, F} <: MCTS.Oracle{Game}
+struct BatchedOracle{F} <: MCTS.Oracle
   make_query :: F # turn state into a query (this is usually the identity)
   reqchan :: Channel
   anschan :: Channel
-  function BatchedOracle{G}(f, reqchan) where G
-    return new{G, typeof(f)}(f, reqchan, Channel(1))
+  function BatchedOracle(f, reqchan)
+    return new{typeof(f)}(f, reqchan, Channel(1))
   end
 
 end
 
-function BatchedOracle{G}(reqchan) where G
-  return BatchedOracle{G}(x -> x, reqchan)
-end
+BatchedOracle(reqchan) = BatchedOracle(x -> x, reqchan)
 
-function (oracle::BatchedOracle)(state)
+function (oracle::BatchedOracle)(::AbstractGame, state)
   query = oracle.make_query(state)
   put!(oracle.reqchan, (query=query, answer_channel=oracle.anschan))
   answer = take!(oracle.anschan)

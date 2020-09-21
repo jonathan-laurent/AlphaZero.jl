@@ -14,12 +14,13 @@ as targets.
     Trace{Game}(initial_state)
 
 """
-mutable struct Trace{Game, State}
+mutable struct Trace{State}
   states :: Vector{State}
+  white_playing :: Vector{Bool}
   policies :: Vector{Vector{Float64}}
   rewards :: Vector{Float32}
-  function Trace{G}(init_state) where G
-    return new{G, GI.State(G)}([init_state], [], [])
+  function Trace(init_state, white_playing)
+    return new{typeof(init_state)}([init_state], [white_playing], [], [])
   end
 end
 
@@ -30,11 +31,11 @@ function trace_invariant(t::Trace)
 end
 
 """
-    Base.push!(t::Trace, π, r, s)
+    Base.push!(t::Trace, π, r, s, wp)
 
-Add a (target policy, reward, new state) triple to a trace.
+Add a (target policy, reward, new state, white playing next) quadruple to a trace.
 """
-function Base.push!(t::Trace, π, r, s)
+function Base.push!(t::Trace, π, r, s, wp)
   push!(t.states, s)
   push!(t.policies, π)
   push!(t.rewards, r)

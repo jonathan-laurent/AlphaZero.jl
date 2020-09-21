@@ -3,13 +3,11 @@
 #####
 
 """
-    AbstractPlayer{Game}
+    AbstractPlayer
 
 Abstract type for a player of `Game`.
 """
-abstract type AbstractPlayer{Game} end
-
-GameType(::AbstractPlayer{Game}) where Game = Game
+abstract type AbstractPlayer end
 
 """
     think(::AbstractPlayer, game)
@@ -59,13 +57,13 @@ end
 #####
 
 """
-    RandomPlayer{Game} <: AbstractPlayer{Game}
+    RandomPlayer <: AbstractPlayer
 
 A player that picks actions uniformly at random.
 """
-struct RandomPlayer{Game} <: AbstractPlayer{Game} end
+struct RandomPlayer <: AbstractPlayer end
 
-function think(player::RandomPlayer, game)
+function think(::RandomPlayer, game)
   actions = GI.available_actions(game)
   n = length(actions)
   π = ones(n) ./ length(actions)
@@ -77,16 +75,16 @@ end
 #####
 
 """
-    EpsilonGreedyPlayer{Game, Player} <: AbstractPlayer{Game}
+    EpsilonGreedyPlayer{Player} <: AbstractPlayer
 
 A wrapper on a player that makes it choose a random move
 with a fixed ``ϵ`` probability.
 """
-struct EpsilonGreedyPlayer{G, P} <: AbstractPlayer{G}
+struct EpsilonGreedyPlayer{P} <: AbstractPlayer
   player :: P
   ϵ :: Float64
-  function EpsilonGreedyPlayer(p::AbstractPlayer{G}, ϵ) where G
-    return new{G, typeof(p)}(p, ϵ)
+  function EpsilonGreedyPlayer(p::AbstractPlayer, ϵ)
+    return new{typeof(p)}(p, ϵ)
   end
 end
 
@@ -110,15 +108,15 @@ end
 #####
 
 """
-    PlayerWithTemperature{Game, Player} <: AbstractPlayer{Game}
+    PlayerWithTemperature{Player} <: AbstractPlayer
 
 A wrapper on a player that enables overwriting the temperature schedule.
 """
-struct PlayerWithTemperature{G, P} <: AbstractPlayer{G}
+struct PlayerWithTemperature{P} <: AbstractPlayer
   player :: P
   temperature :: AbstractSchedule{Float64}
-  function PlayerWithTemperature(p::AbstractPlayer{G}, τ) where G
-    return new{G, typeof(p)}(p, τ)
+  function PlayerWithTemperature(p::AbstractPlayer, τ)
+    return new{typeof(p)}(p, τ)
   end
 end
 
@@ -139,7 +137,7 @@ end
 #####
 
 """
-    MctsPlayer{Game, MctsEnv} <: AbstractPlayer{Game}
+    MctsPlayer{MctsEnv} <: AbstractPlayer
 
 A player that selects actions using MCTS.
 
@@ -156,26 +154,27 @@ Construct a player from an MCTS environment. When computing each move:
 The temperature parameter `τ` can be either a real number or a
 [`AbstractSchedule`](@ref).
 
-    MctsPlayer(oracle::MCTS.Oracle, params::MctsParams; timeout=nothing)
+    MctsPlayer(game::AbstractGame, oracle::MCTS.Oracle,
+               params::MctsParams; timeout=nothing)
 
 Construct an MCTS player from an oracle and an [`MctsParams`](@ref) structure.
 """
-struct MctsPlayer{G, M} <: AbstractPlayer{G}
+struct MctsPlayer{M} <: AbstractPlayer
   mcts :: M
   niters :: Int
   timeout :: Union{Float64, Nothing}
   τ :: AbstractSchedule{Float64} # Temperature
-  function MctsPlayer(mcts::MCTS.Env{G}; τ, niters, timeout=nothing) where G
+  function MctsPlayer(mcts::MCTS.Env; τ, niters, timeout=nothing)
     @assert niters > 0
     @assert isnothing(timeout) || timeout > 0
-    new{G, typeof(mcts)}(mcts, niters, timeout, τ)
+    new{typeof(mcts)}(mcts, niters, timeout, τ)
   end
 end
 
 # Alternative constructor
 function MctsPlayer(
-    oracle::MCTS.Oracle{G}, params::MctsParams; timeout=nothing) where G
-  mcts = MCTS.Env{G}(oracle,
+    game::AbstractGame, oracle::MCTS.Oracle, params::MctsParams; timeout=nothing)
+  mcts = MCTS.Env(game, oracle,
     gamma=params.gamma,
     cpuct=params.cpuct,
     noise_ϵ=params.dirichlet_noise_ϵ,
@@ -188,9 +187,9 @@ function MctsPlayer(
 end
 
 # MCTS with random oracle
-function RandomMctsPlayer(::Type{G}, params::MctsParams) where G
-  oracle = MCTS.RandomOracle{G}()
-  mcts = MCTS.Env{G}(oracle,
+function RandomMctsPlayer(game::AbstractGame, params::MctsParams)
+  oracle = MCTS.RandomOracle()
+  mcts = MCTS.Env(game, oracle,
     cpuct=params.cpuct,
     gamma=params.gamma,
     noise_ϵ=params.dirichlet_noise_ϵ,
@@ -225,16 +224,13 @@ end
 #####
 
 """
-    NetworkPlayer{Game, Net} <: AbstractPlayer{Game}
+    NetworkPlayer{Net} <: AbstractPlayer
 
 A player that uses the policy output by a neural network directly,
 instead of relying on MCTS. The given neural network must be in test mode.
 """
-struct NetworkPlayer{G, N} <: AbstractPlayer{G}
+struct NetworkPlayer{N} <: AbstractPlayer
   network :: N
-   function NetworkPlayer(nn::MCTS.Oracle{G}) where G
-    return new{G, typeof(nn)}(nn)
-  end
 end
 
 function think(p::NetworkPlayer, game)
@@ -249,20 +245,15 @@ end
 #####
 
 """
-    TwoPlayers{Game} <: AbstractPlayer{Game}
+    TwoPlayers <: AbstractPlayer
 
 If `white` and `black` are two [`AbstractPlayer`](@ref), then
 `TwoPlayers(white, black)` is a player that behaves as `white` when `white`
 is to play and as `black` when `black` is to play.
 """
-struct TwoPlayers{G, W, B} <: AbstractPlayer{G}
+struct TwoPlayers{W, B} <: AbstractPlayer
   white :: W
   black :: B
-  function TwoPlayers(white, black)
-    G = GameType(white)
-    @assert G == GameType(black)
-    return new{G, typeof(white), typeof(black)}(white, black)
-  end
 end
 
 flipped_colors(p::TwoPlayers) = TwoPlayers(p.black, p.white)
@@ -301,25 +292,27 @@ end
 #####
 
 """
-    play_game(player; flip_probability=0.) :: Trace
+    play_game(game, player; flip_probability=0.) :: Trace
 
-Simulate a game by an [`AbstractPlayer`](@ref) and return a trace.
+Simulate a game by an [`AbstractPlayer`](@ref) starting from the current state
+of `game` and return a trace.
 
 - For two-player games, please use [`TwoPlayers`](@ref).
 - If the `flip_probability` argument is set to ``p``, the board
   is _flipped_ randomly at every turn with probability ``p``,
   using [`GI.apply_random_symmetry`](@ref).
+
+The `game` environment is left unchanged.
 """
-function play_game(player; flip_probability=0.)
-  Game = GameType(player)
-  game = Game()
-  trace = Trace{Game}(GI.current_state(game))
+function play_game(game, player; flip_probability=0.)
+  game = GI.clone(GI)
+  trace = Trace(GI.current_state(game))
   while true
     if GI.game_terminated(game)
       return trace
     end
     if !iszero(flip_probability) && rand() < flip_probability
-      game = GI.apply_random_symmetry(game)
+      GI.apply_random_symmetry!(game)
     end
     actions, π_target = think(player, game)
     τ = player_temperature(player, game, length(trace))
@@ -397,21 +390,20 @@ zipthunk(f1, f2) = () -> (f1(), f2())
 # Two neural network oracles
 function batchify_oracles(os::Tuple{AbstractNetwork, AbstractNetwork}, fill, n)
   reqc = inference_server(os[1], os[2], n, fill_batches=fill)
-  G = GameType(os[1])
-  make1() = Batchifier.BatchedOracle{G}(st -> (state=st, netid=1), reqc)
-  make2() = Batchifier.BatchedOracle{G}(st -> (state=st, netid=2), reqc)
+  make1() = Batchifier.BatchedOracle(st -> (state=st, netid=1), reqc)
+  make2() = Batchifier.BatchedOracle(st -> (state=st, netid=2), reqc)
   return zipthunk(make1, make2), send_done!(reqc)
 end
 
 function batchify_oracles(os::Tuple{<:Any, AbstractNetwork}, fill, n)
   reqc = inference_server(os[2], n, fill_batches=fill)
-  make2() = Batchifier.BatchedOracle{GameType(os[2])}(reqc)
+  make2() = Batchifier.BatchedOracle(reqc)
   return zipthunk(ret_oracle(os[1]), make2), send_done!(reqc)
 end
 
 function batchify_oracles(os::Tuple{AbstractNetwork, <:Any}, fill, n)
   reqc = inference_server(os[1], n, fill_batches=fill)
-  make1() = Batchifier.BatchedOracle{GameType(os[1])}(reqc)
+  make1() = Batchifier.BatchedOracle(reqc)
   return zipthunk(make1, ret_oracle(os[2])), send_done!(reqc)
 end
 
@@ -421,7 +413,7 @@ end
 
 function batchify_oracles(o::AbstractNetwork, fill, n)
   reqc = inference_server(o, n, fill_batches=fill)
-  make() = Batchifier.BatchedOracle{GameType(o)}(reqc)
+  make() = Batchifier.BatchedOracle(reqc)
   return make, send_done!(reqc)
 end
 
@@ -491,6 +483,7 @@ Return a vector of objects returned by `simulator.measure`.
 """
 function simulate(
     simulator::Simulator;
+    game::AbstractGame,
     num_games,
     num_workers,
     game_simulated,
@@ -522,7 +515,7 @@ function simulate(
         player_pf = player
       end
       # Play the game and generate a report
-      trace = play_game(player_pf, flip_probability=flip_probability)
+      trace = play_game(game, player_pf, flip_probability=flip_probability)
       report = simulator.measure(trace, colors_flipped, player)
       # Reset the player periodically
       if !isnothing(reset_every) && worker_sim_id % reset_every == 0
@@ -611,14 +604,14 @@ end
 #####
 
 """
-    Human{Game} <: AbstractPlayer{Game}
+    Human <: AbstractPlayer
 
 Human player that queries the standard input for actions.
 
 Does not implement [`think`](@ref) but instead implements
 [`select_move`](@ref) directly.
 """
-struct Human{Game} <: AbstractPlayer{Game} end
+struct Human <: AbstractPlayer end
 
 struct Quit <: Exception end
 
@@ -659,4 +652,4 @@ end
 
 interactive!(game, white, black) = interactive!(game, TwoPlayers(white, black))
 
-interactive!(game::G) where G = interactive!(game, Human{G}(), Human{G}())
+interactive!(game) = interactive!(game, Human(), Human())

@@ -40,6 +40,7 @@ A circular buffer to hold memory samples.
 mutable struct MemoryBuffer{State}
   buf :: CircularBuffer{TrainingSample{State}}
   cur_batch_size :: Int
+  game_static_info :: Game
   function MemoryBuffer{S}(size, experience=[]) where S
     buf = CircularBuffer{TrainingSample{S}}(size)
     append!(buf, experience)
@@ -114,9 +115,9 @@ function merge_by_state(samples)
   return [merge_samples(ss) for ss in values(dict)]
 end
 
-function apply_symmetry(Game, sample, (symstate, aperm))
-  mask = GI.actions_mask(Game(sample.s))
-  symmask = GI.actions_mask(Game(symstate))
+function apply_symmetry(game, sample, (symstate, aperm))
+  mask = GI.actions_mask(GI.new_env(game, sample.s))
+  symmask = GI.actions_mask(GI.new_env(game, symstate))
   π = zeros(eltype(sample.π), length(mask))
   π[mask] = sample.π
   π = π[aperm]
@@ -126,8 +127,8 @@ function apply_symmetry(Game, sample, (symstate, aperm))
     symstate, π, sample.z, sample.t, sample.n)
 end
 
-function augment_with_symmetries(Game, samples)
-  symsamples = [apply_symmetry(Game, s, sym)
-    for s in samples for sym in GI.symmetries(Game, s.s)]
+function augment_with_symmetries(game, samples)
+  symsamples = [apply_symmetry(game, s, sym)
+    for s in samples for sym in GI.symmetries(game, s.s)]
   return [samples ; symsamples]
 end
