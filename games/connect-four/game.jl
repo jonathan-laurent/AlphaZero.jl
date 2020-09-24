@@ -264,7 +264,7 @@ end
 
 GI.action_string(::GameSpec, a) = string(a)
 
-function GI.parse_action(g::GameEnv, str)
+function GI.parse_action(g::GameSpec, str)
   try
     p = parse(Int, str)
     1 <= p <= NUM_COLS ? p : nothing
@@ -293,7 +293,7 @@ function GI.render(g::GameEnv; with_position_names=true, botmargin=true)
   print(pcol, pname, " plays:", crayon"reset", "\n\n")
   # Print legend
   for col in 1:NUM_COLS
-    print(GI.action_string(Game, col), " ")
+    print(GI.action_string(GI.spec(g), col), " ")
   end
   print("\n")
   # Print board

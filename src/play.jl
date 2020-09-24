@@ -616,7 +616,7 @@ function select_move(::Human, game, turn)
     str = readline()
     print("\n")
     isempty(str) && throw(Quit())
-    a = GI.parse_action(game, str)
+    a = GI.parse_action(GI.spec(game), str)
   end
   return a
 end

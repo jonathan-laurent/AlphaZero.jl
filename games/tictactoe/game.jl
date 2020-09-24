@@ -190,7 +190,7 @@ function read_board(::GameSpec)
 end
 
 function GI.read_state(::GameSpec)
-  b = read_board(GameSpec)
+  b = read_board(GameSpec())
   nw = count(==(WHITE), b)
   nb = count(==(BLACK), b)
   if nw == nb
@@ -226,7 +226,7 @@ function GI.render(g::GameEnv; with_position_names=true, botmargin=true)
     if with_position_names
       print(" | ")
       for x in 1:BOARD_SIDE
-        print(GI.action_string(GameSpec, pos_of_xy((x, y))), " ")
+        print(GI.action_string(GI.spec(g), pos_of_xy((x, y))), " ")
       end
     end
     print("\n")

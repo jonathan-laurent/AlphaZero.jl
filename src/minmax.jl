@@ -27,7 +27,7 @@ end
 
 function qvalue(player, game, action, depth)
   @assert !GI.game_terminated(game)
-  next = copy(game)
+  next = GI.clone(game)
   GI.play!(next, action)
   wr = GI.white_reward(next)
   r = GI.white_playing(game) ? wr : -wr

@@ -154,7 +154,7 @@ end
 function compute_and_print_state_statistics(exp)
   if !GI.game_terminated(exp.game)
     stats = state_statistics(exp.game, exp.player, exp.turn, exp.memory)
-    print_state_statistics(GameType(exp), stats)
+    print_state_statistics(GI.spec(exp.game), stats)
     return stats
   else
     return nothing
@@ -222,11 +222,11 @@ end
 function restart!(exp::Explorer)
   reset_player!(exp.player)
   empty!(exp.history)
-  exp.game = GameType(exp)()
+  exp.game = GI.init(GI.spec(exp.game))
   exp.turn = 0
 end
 
-save_game!(exp::Explorer) = push!(exp.history, copy(exp.game))
+save_game!(exp::Explorer) = push!(exp.history, GI.clone(exp.game))
 
 # Return true if the command is valid, false otherwise
 function interpret!(exp::Explorer, stats, cmd, args=[])
@@ -259,7 +259,7 @@ function interpret!(exp::Explorer, stats, cmd, args=[])
       a = stats.actions[1][1]
     else
       length(args) == 1 || return false
-      a = GI.parse_action(exp.game, args[1])
+      a = GI.parse_action(GI.spec(exp.game), args[1])
       isnothing(a) && return false
       a ∈ GI.available_actions(exp.game) || return false
     end
