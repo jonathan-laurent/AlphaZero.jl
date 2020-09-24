@@ -78,12 +78,12 @@ if get(ENV, "DUMMY_RUN", "false") == "true"
 end
 
 if cmd == "check-game"
-  test_game(Game)
+  test_game(GameSpec())
   @info "All tests passed."
 else
   println("\nUsing $(Distributed.nworkers()) distributed worker(s).\n")
   session = Session(
-    Game, Training.Network{Game}, params, netparams, benchmark=benchmark,
+    GameSpec(), params, Training.Network, netparams, benchmark=benchmark,
     dir=SESSION_DIR, autosave=true, save_intermediate=args["save-intermediate"])
   if cmd == "train"
     resume!(session)

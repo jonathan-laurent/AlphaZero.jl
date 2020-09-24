@@ -231,7 +231,7 @@ function show_space_after_progress_bar(logger)
   end
 end
 
-function run_duel(env, logger, duel)
+function run_duel(env::Env, logger, duel)
   player_name = Benchmark.name(duel.player)
   baseline_name = Benchmark.name(duel.baseline)
   legend = "$player_name against $baseline_name"
@@ -333,7 +333,7 @@ function Session(
     session = Session(env, dir, logger, autosave, save_intermediate, benchmark)
     session.report = load_session_report(dir, env.itc)
   else
-    network = mknet(netparams, gspec)
+    network = mknet(gspec, netparams)
     env = Env(gspec, params, network)
     session = Session(env, dir, logger, autosave, save_intermediate, benchmark)
     Log.section(session.logger, 1, "Initializing a new AlphaZero environment")
@@ -577,7 +577,8 @@ end
 ##### Launch new experiments on an existing session
 #####
 
-function run_duel(gspec, dir::String, duel::Benchmark.Duel; params=nothing)
+function run_duel(
+    gspec::AbstractGameSpec, dir::String, duel::Benchmark.Duel; params=nothing)
   logger = Logger()
   env = load_env(gspec, logger, dir, params=params)
   run_duel(env, logger, duel)

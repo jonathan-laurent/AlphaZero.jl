@@ -8,7 +8,7 @@ export SimpleNet, SimpleNetHP, ResNet, ResNetHP
 
 using ..Network
 using Base: @kwdef
-import ..GameInterface, ..Util, ..CyclicSchedule
+import ..GI, ..AbstractGameSpec, ..Util, ..CyclicSchedule
 
 using CUDA
 
@@ -167,7 +167,7 @@ end
 # Flux.@functor does not work do to Network being parametric
 function Flux.functor(nn::Net) where Net <: TwoHeadNetwork
   children = (nn.common, nn.vhead, nn.phead)
-  constructor = cs -> Net(nn.hyper, cs...)
+  constructor = cs -> Net(nn.gspec, nn.hyper, cs...)
   return (children, constructor)
 end
 

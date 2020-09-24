@@ -20,7 +20,7 @@ Abstract base type for a neural network.
 Any subtype `Network` must implement `Base.copy` along with
 the following constructor:
 
-    Network(hyperparams, game_spec)
+    Network(game_spec, hyperparams)
 
 where the expected type of `hyperparams` is given by
 [`HyperParams(Network)`](@ref HyperParams).
@@ -279,7 +279,7 @@ function evaluate(nn::AbstractNetwork, state)
   x = GI.vectorize_state(gspec, state)
   a = Float32.(actions_mask)
   xnet, anet = to_singletons.(convert_input_tuple(nn, (x, a)))
-  net_output = evaluate(nn, xnet, anet)
+  net_output = forward_normalized(nn, xnet, anet)
   p, v, _ = from_singletons.(convert_output_tuple(nn, net_output))
   return (p[actions_mask], v[1])
 end
@@ -302,9 +302,9 @@ Evaluate a batch of positions at once.
 function evaluate_batch(nn::AbstractNetwork, batch)
   gspec = game_spec(nn)
   X = Util.superpose((GI.vectorize_state(gspec, b) for b in batch))
-  A = Util.superpose((GI.actions_mask(GI.new_env(gspec, b)) for b in batch))
+  A = Util.superpose((GI.actions_mask(GI.init(gspec, b)) for b in batch))
   Xnet, Anet = convert_input_tuple(nn, (X, Float32.(A)))
-  P, V, _ = convert_output_tuple(nn, evaluate(nn, Xnet, Anet))
+  P, V, _ = convert_output_tuple(nn, forward_normalized(nn, Xnet, Anet))
   return [(P[A[:,i],i], V[1,i]) for i in eachindex(batch)]
 end
 

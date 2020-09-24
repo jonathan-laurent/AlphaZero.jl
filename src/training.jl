@@ -37,7 +37,7 @@ mutable struct Env{GameSpec, Network, State}
     msize = max(params.mem_buffer_size[itc], length(experience))
     memory = MemoryBuffer(gspec, msize, experience)
     return new{typeof(gspec), typeof(curnn), GI.state_type(gspec)}(
-      params, curnn, bestnn, memory, itc)
+      gspec, params, curnn, bestnn, memory, itc)
   end
 end
 
@@ -116,7 +116,7 @@ as an object of type [`Report.Initial`](@ref).
 function initial_report(env::Env)
   num_network_parameters = Network.num_parameters(env.curnn)
   num_reg_params = Network.num_regularized_parameters(env.curnn)
-  player = MctsPlayer(env.curnn, env.params.self_play.mcts)
+  player = MctsPlayer(env.gspec, env.curnn, env.params.self_play.mcts)
   mcts_footprint_per_node = MCTS.memory_footprint_per_node(player.mcts)
   return Report.Initial(
     num_network_parameters, num_reg_params, mcts_footprint_per_node)
@@ -132,14 +132,14 @@ function resize_memory!(env::Env, n)
   return
 end
 
-function evaluate_network(contender, baseline, params, handler)
+function evaluate_network(gspec, contender, baseline, params, handler)
   use_gpu = params.arena.use_gpu
   make_oracles() = (
     Network.copy(contender, on_gpu=use_gpu, test_mode=true),
     Network.copy(baseline, on_gpu=use_gpu, test_mode=true))
   simulator = Simulator(make_oracles, record_trace) do oracles
-    white = MctsPlayer(oracles[1], params.arena.mcts)
-    black = MctsPlayer(oracles[2], params.arena.mcts)
+    white = MctsPlayer(gspec, oracles[1], params.arena.mcts)
+    black = MctsPlayer(gspec, oracles[2], params.arena.mcts)
     return TwoPlayers(white, black)
   end
   samples = simulate(
@@ -196,7 +196,7 @@ function learning_step!(env::Env, handler)
       Handlers.checkpoint_started(handler)
       env.curnn = get_trained_network(trainer)
       (evalz, redundancy), dteval = @timed begin
-        evaluate_network(env.curnn, env.bestnn, env.params, handler)
+        evaluate_network(env.gspec, env.curnn, env.bestnn, env.params, handler)
       end
       teval += dteval
       # If eval is good enough, replace network
@@ -239,11 +239,12 @@ function self_play_step!(env::Env, handler)
   make_oracle() =
     Network.copy(env.bestnn, on_gpu=params.use_gpu, test_mode=true)
   simulator = Simulator(make_oracle, self_play_measurements) do oracle
-    return MctsPlayer(oracle, params.mcts)
+    return MctsPlayer(env.gspec, oracle, params.mcts)
   end
   # Run the simulations
   results, elapsed = @timed simulate_distributed(
     simulator,
+    GI.init(env.gspec),
     num_games=params.num_games,
     num_workers=params.num_workers,
     game_simulated=()->Handlers.game_played(handler),

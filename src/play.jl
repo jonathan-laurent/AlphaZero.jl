@@ -458,7 +458,7 @@ Policy for attributing colors in a duel between a baseline and a contender.
 
 
 """
-    simulate(::Simulator; <keyword arguments>)
+    simulate(::Simulator, ::AbstractGameEnv; <keyword arguments>)
 
 Play a series of games using a given [`Simulator`](@ref).
 
@@ -476,8 +476,8 @@ Play a series of games using a given [`Simulator`](@ref).
 Return a vector of objects returned by `simulator.measure`.
 """
 function simulate(
-    simulator::Simulator;
-    game::AbstractGameEnv,
+    simulator::Simulator,
+    game::AbstractGameEnv;
     num_games,
     num_workers,
     game_simulated,
@@ -524,13 +524,14 @@ function simulate(
 end
 
 """
-    simulate_distributed(::Simulator; <keyword arguments>)
+    simulate_distributed(::Simulator, ::AbstractGameEnv; <keyword arguments>)
 
 Identical to [`simulate`](@ref) but splits the work
 across all available workers.
 """
 function simulate_distributed(
-    simulator::Simulator;
+    simulator::Simulator,
+    game::AbstractGameEnv;
     num_games,
     num_workers,
     game_simulated,
@@ -556,7 +557,7 @@ function simulate_distributed(
     Distributed.@spawnat w begin
       Util.@printing_errors begin
         simulate(
-          simulator,
+          simulator, game,
           num_games=(w == workers[1] ? num_each + rem : num_each),
           num_workers=num_workers,
           game_simulated=remote_game_simulated,

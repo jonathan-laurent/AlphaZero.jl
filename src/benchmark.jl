@@ -184,8 +184,8 @@ end
 
 name(::Full) = "AlphaZero"
 
-function instantiate(p::Full, ::AbstractGameSpec, nn)
-  return MctsPlayer(nn, p.params)
+function instantiate(p::Full, gspec::AbstractGameSpec, nn)
+  return MctsPlayer(gspec, nn, p.params)
 end
 
 """

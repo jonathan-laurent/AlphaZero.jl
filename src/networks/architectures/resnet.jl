@@ -45,8 +45,8 @@ The convolutional residual network architecture that is used
 in the original AlphaGo Zero paper.
 """
 mutable struct ResNet <: TwoHeadNetwork
-  hyper
   gspec
+  hyper
   common
   vhead
   phead
@@ -64,7 +64,7 @@ function ResNetBlock(size, n, bnmom)
     x -> relu.(x))
 end
 
-function ResNet(hyper::ResNetHP, gspec)
+function ResNet(gspec::AbstractGameSpec, hyper::ResNetHP)
   indim = GI.state_dim(gspec)
   outdim = GI.num_actions(gspec)
   ksize = hyper.conv_kernel_size
@@ -90,7 +90,7 @@ function ResNet(hyper::ResNetHP, gspec)
     flatten,
     Dense(indim[1] * indim[2] * nvf, nf, relu),
     Dense(nf, 1, tanh))
-  ResNet(hyper, gspec, common, vhead, phead)
+  ResNet(gspec, hyper, common, vhead, phead)
 end
 
 Network.HyperParams(::Type{<:ResNet}) = ResNetHP

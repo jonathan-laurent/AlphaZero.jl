@@ -9,7 +9,7 @@ using AlphaZero
 include("games.jl")
 GAME = get(ENV, "GAME", "connect-four")
 SelectedGame = GAME_MODULE[GAME]
-using .SelectedGame: Game, Training
+using .SelectedGame: GameSpec, Training
 
 SESSION_DIR = "sessions/$GAME"
 
@@ -36,6 +36,6 @@ benchmark = alphazero_benchmark
 label = "full"
 
 AlphaZero.UserInterface.run_new_benchmark(
-  Game, Training.Network{Game}, SESSION_DIR,
+  GameSpec(), SESSION_DIR,
   label, benchmark,
   params=Training.params, itcmax=nothing)

@@ -8,7 +8,7 @@ export SimpleNet, SimpleNetHP, ResNet, ResNetHP
 
 using ..Network
 using Base: @kwdef
-import ..GameInterface, ..Util, ..CyclicSchedule
+import ..GI, ..AbstractGameSpec, ..Util, ..CyclicSchedule
 
 import CUDA
 import Knet
@@ -154,7 +154,7 @@ end
 children(nn::TwoHeadNetwork) = (nn.common, nn.vhead, nn.phead)
 
 function mapchildren(f, nn::Net) where Net <: TwoHeadNetwork
-  Net(nn.hyper, f(nn.common), f(nn.vhead), f(nn.phead))
+  Net(nn.gspec, nn.hyper, f(nn.common), f(nn.vhead), f(nn.phead))
 end
 
 Network.hyperparams(nn::TwoHeadNetwork) = nn.hyper

@@ -29,14 +29,14 @@ Util.generate_update_constructor(SimpleNetHP) |> eval
 A simple two-headed architecture with only dense layers.
 """
 mutable struct SimpleNet <: TwoHeadNetwork
-  hyper
   gspec
+  hyper
   common
   vhead
   phead
 end
 
-function SimpleNet(hyper::SimpleNetHP, gspec)
+function SimpleNet(gspec::AbstractGameSpec, hyper::SimpleNetHP)
   indim = GI.state_dim(gspec)
   outdim = GI.num_actions(gspec)
   bnmom = hyper.batch_norm_momentum
@@ -62,7 +62,7 @@ function SimpleNet(hyper::SimpleNetHP, gspec)
     hlayers(hyper.depth_phead)...,
     Dense(hsize, outdim),
     softmax)
-  SimpleNet(hyper, gspec, common, vhead, phead)
+  SimpleNet(gspec, hyper, common, vhead, phead)
 end
 
 Network.HyperParams(::Type{SimpleNet}) = SimpleNetHP

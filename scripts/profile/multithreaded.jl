@@ -8,11 +8,16 @@ ENV["JULIA_CUDA_MEMORY_POOL"] = "split"
 
 # ENV["ALPHAZERO_DEFAULT_DL_FRAMEWORK"] = "FLUX" # FLUX / KNET
 
+# When running on a CPU, having multiple threads does not play
+# well with BLAS multithreading
+using LinearAlgebra
+BLAS.set_num_threads(1)
+
 using AlphaZero
 using ProgressMeter
 
 include("../../games/connect-four/main.jl")
-using .ConnectFour: Game, Training
+using .ConnectFour: GameSpec, Training
 
 struct Handler
   progress :: Progress
@@ -22,10 +27,11 @@ AlphaZero.Handlers.game_played(h::Handler) = next!(h.progress)
 AlphaZero.Handlers.checkpoint_game_played(h::Handler) = next!(h.progress)
 
 function bench_self_play(n)
+  gspec = GameSpec()
   params = Training.params
   params = Params(params, self_play=SelfPlayParams(params.self_play, num_games=n))
-  network = Training.Network{Game}(Training.netparams)
-  env = AlphaZero.Env{Game}(params, network)
+  network = Training.Network(gspec, Training.netparams)
+  env = AlphaZero.Env(gspec, params, network)
   return @timed AlphaZero.self_play_step!(env, Handler(n))
 end
 

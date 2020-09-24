@@ -8,11 +8,11 @@ using AlphaZero
 include("games.jl")
 GAME = get(ENV, "GAME", "connect-four")
 SelectedGame = GAME_MODULE[GAME]
-using .SelectedGame: Game, Training
+using .SelectedGame: GameSpec, Training
 
 SESSION_DIR = "sessions/$GAME"
 
-AlphaZero.UserInterface.run_duel(Game, Training.Network{Game}, SESSION_DIR,
+AlphaZero.UserInterface.run_duel(GameSpec(), Training.Network, SESSION_DIR,
   Benchmark.Duel(
     Benchmark.NetworkOnly(),
     Benchmark.MinMaxTS(depth=5, τ=0.2),
