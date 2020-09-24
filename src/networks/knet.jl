@@ -10,6 +10,7 @@ using ..Network
 using Base: @kwdef
 import ..GameInterface, ..Util, ..CyclicSchedule
 
+import CUDA
 import Knet
 
 include("knet/layers.jl")
@@ -71,10 +72,8 @@ abstract type KNetwork <: AbstractNetwork end
 
 Base.copy(nn::KNetwork) = Base.deepcopy(nn)
 
-const GPU_AVAILABLE = Knet.gpu() >= 0
-
-Network.to_gpu(nn::KNetwork) = GPU_AVAILABLE ? Knet.gpucopy(nn) : nn
-Network.to_cpu(nn::KNetwork) = GPU_AVAILABLE ? Knet.cpucopy(nn) : nn
+Network.to_gpu(nn::KNetwork) = CUDA.functional() ? Knet.gpucopy(nn) : nn
+Network.to_cpu(nn::KNetwork) = CUDA.functional() ? Knet.cpucopy(nn) : nn
 
 params_(x) = []
 params_(x::Knet.Param) = [x]
@@ -123,7 +122,7 @@ function Network.train!(callback, nn::KNetwork, opt::Adam, loss, data, n)
 end
 
 function Network.gc(::KNetwork)
-  GPU_AVAILABLE || return
+  CUDA.functional() || return
   GC.gc(true)
   Knet.gc()
 end

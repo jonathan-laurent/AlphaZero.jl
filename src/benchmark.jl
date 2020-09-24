@@ -7,7 +7,7 @@ compete against a set of baselines.
 """
 module Benchmark
 
-import ..Network, ..MinMax, ..GI, ..AbstractGameSpec
+import ..Network, ..MinMax, ..GI, ..AbstractGameSpec, ..AbstractGameEnv
 import ..Env, ..MCTS, ..MctsParams, ..TwoPlayers
 import ..simulate, ..Simulator, ..rewards_and_redundancy, ..record_trace
 import ..ColorPolicy, ..ALTERNATE_COLORS

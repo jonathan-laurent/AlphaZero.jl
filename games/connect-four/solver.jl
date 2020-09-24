@@ -7,12 +7,12 @@
 
 module Solver
 
-import ..Game, ..history, ..WHITE, ..NUM_CELLS
+import ..GameEnv, ..history, ..WHITE, ..NUM_CELLS
 import AlphaZero: GI, GameInterface, Benchmark, AbstractPlayer, think
 
 const DEFAULT_SOLVER_DIR = joinpath(@__DIR__, "solver", "connect4")
 
-struct Player <: AbstractPlayer{Game}
+struct Player <: AbstractPlayer
   process :: Base.Process
   lock :: ReentrantLock
   function Player(;
@@ -95,7 +95,5 @@ function think(p::Player, g)
   π[opt] .= 1 / length(opt)
   return as, π
 end
-
-Benchmark.PerfectPlayer(::Type{Game}) = Player
 
 end

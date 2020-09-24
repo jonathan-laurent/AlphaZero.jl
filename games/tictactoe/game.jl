@@ -156,7 +156,7 @@ end
 
 const SYMMETRIES = generate_dihedral_symmetries()
 
-function GI.symmetries(::GameSpec, state)
+function GI.symmetries(::GameSpec, s)
   return [
     ((board=Board(s.board[sym]), curplayer=s.curplayer), sym)
     for sym in SYMMETRIES]

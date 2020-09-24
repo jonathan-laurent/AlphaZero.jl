@@ -22,9 +22,9 @@ const INITIAL_BOARD = @SMatrix zeros(Cell, NUM_COLS, NUM_ROWS)
 const INITIAL_STATE = (board=INITIAL_BOARD, curplayer=WHITE)
 
 # TODO: we could have the game parametrized by grid size.
-struct Game <: GI.AbstractGameSpec end
+struct GameSpec <: GI.AbstractGameSpec end
 
-mutable struct Env <: GI.AbstractGameEnv
+mutable struct GameEnv <: GI.AbstractGameEnv
   board :: Board
   curplayer :: Player
   finished :: Bool
@@ -35,32 +35,52 @@ mutable struct Env <: GI.AbstractGameEnv
   history :: Union{Nothing, Vector{Int}}
 end
 
-function Game()
+GI.spec(::GameEnv) = GameSpec()
+
+function GI.init(::GameSpec)
   board = INITIAL_STATE.board
   curplayer = INITIAL_STATE.curplayer
   finished = false
   winner = 0x00
   amask = trues(NUM_COLS)
   history = Int[]
-  Game(board, curplayer, finished, winner, amask, history)
+  return GameEnv(board, curplayer, finished, winner, amask, history)
 end
 
-GI.State(::Type{Game}) = typeof(INITIAL_STATE)
+function GI.init(::GameSpec, state)
+  board = state.board
+  g = GI.init(GameSpec())
+  g.history = nothing
+  g.board = board
+  g.curplayer = state.curplayer
+  update_actions_mask!(g)
+  any(g.amask) || (g.finished = true)
+  for col in 1:NUM_COLS
+    top = first_free(g.board, col)
+    top == 1 && continue
+    row = top - 1
+    c = board[col, row]
+    if c != EMPTY && winning_pattern_at(board, c, (col, row))
+      g.winner = c
+      g.finished = true
+      break
+    end
+  end
+  return g
+end
 
-GI.Action(::Type{Game}) = Int
-
-GI.two_players(::Type{Game}) = true
+GI.two_players(::GameSpec) = true
 
 const ACTIONS = collect(1:NUM_COLS)
 
-GI.actions(::Type{Game}) = ACTIONS
+GI.actions(::GameSpec) = ACTIONS
 
-function Base.copy(g::Game)
+function GI.clone(g::GameEnv)
   history = isnothing(g.history) ? nothing : copy(g.history)
-  Game(g.board, g.curplayer, g.finished, g.winner, copy(g.amask), history)
+  GameEnv(g.board, g.curplayer, g.finished, g.winner, copy(g.amask), history)
 end
 
-history(g::Game) = g.history
+history(g::GameEnv) = g.history
 
 #####
 ##### Defining game rules
@@ -74,13 +94,13 @@ function first_free(board, col)
   return row
 end
 
-function update_actions_mask!(g::Game)
+function update_actions_mask!(g::GameEnv)
   g.amask = map(ACTIONS) do col
     first_free(g.board, col) <= NUM_ROWS
   end
 end
 
-GI.actions_mask(g::Game) = g.amask
+GI.actions_mask(g::GameEnv) = g.amask
 
 valid_pos((col, row)) = 1 <= col <= NUM_COLS && 1 <= row <= NUM_ROWS
 
@@ -109,7 +129,7 @@ function winning_pattern_at(board, player, pos)
 end
 
 # Update the game status assuming g.curplayer just played at pos=(col, row)
-function update_status!(g::Game, pos)
+function update_status!(g::GameEnv, pos)
   update_actions_mask!(g)
   if winning_pattern_at(g.board, g.curplayer, pos)
     g.winner = g.curplayer
@@ -119,7 +139,7 @@ function update_status!(g::Game, pos)
   end
 end
 
-function GI.play!(g::Game, col)
+function GI.play!(g::GameEnv, col)
   isnothing(g.history) || push!(g.history, col)
   row = first_free(g.board, col)
   g.board = setindex(g.board, g.curplayer, col, row)
@@ -127,41 +147,19 @@ function GI.play!(g::Game, col)
   g.curplayer = other(g.curplayer)
 end
 
-function Game(state)
-  board = state.board
-  g = Game()
-  g.history = nothing
-  g.board = board
-  g.curplayer = state.curplayer
-  update_actions_mask!(g)
-  any(g.amask) || (g.finished = true)
-  for col in 1:NUM_COLS
-    top = first_free(g.board, col)
-    top == 1 && continue
-    row = top - 1
-    c = board[col, row]
-    if c != EMPTY && winning_pattern_at(board, c, (col, row))
-      g.winner = c
-      g.finished = true
-      break
-    end
-  end
-  return g
-end
+GI.current_state(g::GameEnv) = (board=g.board, curplayer=g.curplayer)
 
-GI.current_state(g::Game) = (board=g.board, curplayer=g.curplayer)
-
-GI.white_playing(::Type{Game}, state) = state.curplayer == WHITE
+GI.white_playing(g::GameEnv) = g.curplayer == WHITE
 
 #####
 ##### Reward shaping
 #####
 
-function GI.game_terminated(g::Game)
+function GI.game_terminated(g::GameEnv)
   return g.finished
 end
 
-function GI.white_reward(g::Game)
+function GI.white_reward(g::GameEnv)
   if g.finished
     g.winner == WHITE && (return  1.)
     g.winner == BLACK && (return -1.)
@@ -199,7 +197,7 @@ const ALIGNMENTS = [
   alignments_with((0,  1));
   alignments_with((1,  0))]
 
-function alignment_value_for(g::Game, player, alignment)
+function alignment_value_for(g::GameEnv, player, alignment)
   γ = 0.1
   N = 0
   for pos in alignment
@@ -213,11 +211,11 @@ function alignment_value_for(g::Game, player, alignment)
   return γ ^ (TO_CONNECT - 1 - N)
 end
 
-function heuristic_value_for(g::Game, player)
+function heuristic_value_for(g::GameEnv, player)
   return sum(alignment_value_for(g, player, al) for al in ALIGNMENTS)
 end
 
-function GI.heuristic_value(g::Game)
+function GI.heuristic_value(g::GameEnv)
   mine = heuristic_value_for(g, g.curplayer)
   yours = heuristic_value_for(g, other(g.curplayer))
   return mine - yours
@@ -235,8 +233,8 @@ function flip_colors(board)
     for col in 1:NUM_COLS, row in 1:NUM_ROWS]
 end
 
-function GI.vectorize_state(::Type{Game}, state)
-  board = GI.white_playing(Game, state) ? state.board : flip_colors(state.board)
+function GI.vectorize_state(::GameSpec, state)
+  board = state.curplayer == WHITE ? state.board : flip_colors(state.board)
   return Float32[
     board[col, row] == c
     for col in 1:NUM_COLS,
@@ -253,7 +251,7 @@ function flipped_board(board)
     for col in reverse(1:NUM_COLS), row in 1:NUM_ROWS]
 end
 
-function GI.symmetries(::Type{Game}, state)
+function GI.symmetries(::GameSpec, state)
   symb = flipped_board(state.board)
   σ = reverse(collect(1:NUM_COLS))
   syms = (board=Board(symb), curplayer=state.curplayer)
@@ -264,9 +262,9 @@ end
 ##### User interface
 #####
 
-GI.action_string(::Type{Game}, a) = string(a)
+GI.action_string(::GameSpec, a) = string(a)
 
-function GI.parse_action(g::Game, str)
+function GI.parse_action(g::GameEnv, str)
   try
     p = parse(Int, str)
     1 <= p <= NUM_COLS ? p : nothing
@@ -289,7 +287,7 @@ player_mark(p)  = p == WHITE ? "o" : "x"
 cell_mark(c)    = c == EMPTY ? "." : player_mark(c)
 cell_color(c)   = c == EMPTY ? crayon"" : player_color(c)
 
-function GI.render(g::Game; with_position_names=true, botmargin=true)
+function GI.render(g::GameEnv; with_position_names=true, botmargin=true)
   pname = player_name(g.curplayer)
   pcol = player_color(g.curplayer)
   print(pcol, pname, " plays:", crayon"reset", "\n\n")
@@ -309,7 +307,7 @@ function GI.render(g::Game; with_position_names=true, botmargin=true)
   botmargin && print("\n")
 end
 
-function GI.read_state(::Type{Game})
+function GI.read_state(::GameSpec)
   board = Array(INITIAL_BOARD)
   try
     for col in 1:NUM_COLS

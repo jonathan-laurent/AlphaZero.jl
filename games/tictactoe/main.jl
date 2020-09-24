@@ -1,5 +1,5 @@
 module Tictactoe
-  export Game, Board
+  export GameEnv, GameSpec, Board
   include("game.jl")
   module Training
     using AlphaZero

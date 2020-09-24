@@ -61,8 +61,6 @@ mutable struct Session{Env}
   end
 end
 
-AlphaZero.GameType(::Session{<:Env{G}}) where {G} = G
-
 #####
 ##### Save and load environments
 #####
@@ -123,9 +121,7 @@ function load_network(logger, net_file, netparams_file)
   return network
 end
 
-function load_env(
-    ::Type{Game}, ::Type{Network}, logger, dir; params
-  ) where {Game, Network}
+function load_env(gspec, logger, dir; params)
   Log.section(logger, 1, "Loading environment")
   # Load the neural networks
   netparams_file = joinpath(dir, NET_PARAMS_FILE)
@@ -151,7 +147,7 @@ function load_env(
     itc = 0
     Log.print(logger, Log.RED, "File not found: $(itc_file)")
   end
-  return Env{Game}(params, curnn, bestnn, experience, itc)
+  return Env(gspec, params, curnn, bestnn, experience, itc)
 end
 
 #####
@@ -298,16 +294,16 @@ end
 #####
 
 """
-    Session(::Type{Game}, ::Type{Net}, params, netparams) where {Game, Net}
+    Session(gspec, params, mknet, netparams)
 
 Create a new session using the given parameters, or load it from disk if
 it already exists.
 
 # Arguments
-- `Game` is the type ot the game that is being learnt
-- `Net` is the type of the network that is being used
+- `gspec` is the specification of the game to be played
 - `params` has type [`Params`](@ref)
-- `netparams` has type [`Network.HyperParams(Net)`](@ref Network.HyperParams)
+- `mknet` is a neural network constructor taking arguments `(netparams, gspec)`
+- `netparams` are the neural network hyperparameters                                                                                             
 
 # Optional keyword arguments
 - `dir`: session directory in which all files and reports are saved; this
@@ -323,13 +319,13 @@ it already exists.
     consume a lot of disk space.
 """
 function Session(
-    ::Type{Game}, ::Type{Net}, params, netparams;
+    gspec, params, mknet, netparams;
     dir=nothing, autosave=true, nostdout=false, benchmark=[],
-    save_intermediate=false
-  ) where {Game, Net}
+    save_intermediate=false)
+  
   logger = session_logger(dir, nostdout, autosave)
   if valid_session_dir(dir)
-    env = load_env(Game, Net, logger, dir, params=params)
+    env = load_env(gspec, logger, dir, params=params)
     # The parameters must be unchanged
     same_json(x, y) = JSON3.write(x) == JSON3.write(y)
     same_json(env.params, params) || @info "Using modified parameters"
@@ -337,8 +333,8 @@ function Session(
     session = Session(env, dir, logger, autosave, save_intermediate, benchmark)
     session.report = load_session_report(dir, env.itc)
   else
-    network = Net(netparams)
-    env = Env{Game}(params, network)
+    network = mknet(netparams, gspec)
+    env = Env(gspec, params, network)
     session = Session(env, dir, logger, autosave, save_intermediate, benchmark)
     Log.section(session.logger, 1, "Initializing a new AlphaZero environment")
     zeroth_iteration!(session)
@@ -419,11 +415,11 @@ Start an interactive game against AlphaZero, allowing it
 """
 function play_interactive_game(
     session::Session; timeout=2., mcts_params=nothing, on_gpu=false)
-  Game = GameType(session)
+  gspec = session.env.gspec
   net = Network.copy(session.env.bestnn, on_gpu=on_gpu, test_mode=true)
   isnothing(mcts_params) && (mcts_params = session.env.params.self_play.mcts)
   player = MctsPlayer(net, mcts_params, timeout=timeout)
-  interactive!(Game(), player, Human{Game}())
+  interactive!(GI.init(gspec), player, Human())
 end
 
 #####
@@ -581,17 +577,14 @@ end
 ##### Launch new experiments on an existing session
 #####
 
-function run_duel(
-    ::Type{G}, ::Type{N}, dir::String, duel::Benchmark.Duel;
-    params=nothing) where {G, N}
+function run_duel(gspec, dir::String, duel::Benchmark.Duel; params=nothing)
   logger = Logger()
-  env = load_env(G, N, logger, dir, params=params)
+  env = load_env(gspec, logger, dir, params=params)
   run_duel(env, logger, duel)
 end
 
 function run_new_benchmark(
-  ::Type{G}, ::Type{N}, session_dir, name, benchmark;
-  params=nothing, itcmax=nothing) where {G, N}
+    gspec, session_dir, name, benchmark; params=nothing, itcmax=nothing)
   outdir = joinpath(session_dir, name)
   isdir(outdir) || mkpath(outdir)
   logger = Logger()
@@ -602,7 +595,7 @@ function run_new_benchmark(
     !isnothing(itcmax) && itc > itcmax && break
     Log.section(logger, 1, "Iteration: $itc")
     itdir = iterdir(session_dir, itc)
-    env = load_env(G, N, logger, itdir, params=params)
+    env = load_env(gspec, logger, itdir, params=params)
     report = [run_duel(env, logger, duel) for duel in benchmark]
     push!(reports, report)
     # Save the intermediate reports

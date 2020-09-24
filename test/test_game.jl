@@ -15,8 +15,8 @@ same_state(game1, game2) = GI.current_state(game1) == GI.current_state(game2)
 
 # Test that the same (symmetric) actions are still available in a symmetric state
 function test_symmetry(gspec, state, (symstate, aperm))
-  mask = GI.actions_mask(init(gspec, state))
-  symmask = actions_mask(init(gspec, symstate))
+  mask = GI.actions_mask(GI.init(gspec, state))
+  symmask = GI.actions_mask(GI.init(gspec, symstate))
   v = falses(length(symmask))
   v[mask] .= true
   v = v[aperm]
@@ -50,7 +50,7 @@ function test_game(gspec, n=100)
     game = GI.init(gspec, state)
     @assert GI.current_state(game) == state
     @assert isa(GI.current_state(game), State)
-    @assert same_state(GI.clone(game), GI.init(game, state))
+    @assert same_state(GI.clone(game), GI.init(gspec, state))
 
     @assert isa(GI.white_playing(game), Bool)
     @assert GI.white_playing(game) || two_players
@@ -70,7 +70,7 @@ function test_game(gspec, n=100)
       @assert isa(GI.heuristic_value(game), Float64)
       state_copy = deepcopy(state)
       a = rand(GI.available_actions(game))
-      @assert isa(GI.action_string(game, a), String)
+      @assert isa(GI.action_string(gspec, a), String)
       GI.play!(game, a)
       @assert state_copy == state "States must appear as persistent."
       @assert isa(GI.white_reward(game), Float64)
@@ -91,7 +91,7 @@ function test_game(gspec, n=100)
     @assert GI.num_actions(GI.spec(game)) == num_actions
     @assert GI.actions(GI.spec(game)) == actions
     @assert GI.state_type(GI.spec(game)) == State
-    @assert GI.action_type(GI.spec(game)) == State
+    @assert GI.action_type(GI.spec(game)) == Action
     @assert GI.two_players(GI.spec(game)) == two_players
     @assert GI.state_dim(GI.spec(game)) == state_dim
   end

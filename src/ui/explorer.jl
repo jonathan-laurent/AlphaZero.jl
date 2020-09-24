@@ -32,7 +32,7 @@ end
 player_reward(game, white_reward) =
   GI.white_playing(game) ? white_reward : - white_reward
 
-function evaluate_vnet(oracle::MCTS.Oracle, game)
+function evaluate_vnet(oracle, game)
   if GI.game_terminated(game)
     return 0.0
   else
@@ -40,7 +40,7 @@ function evaluate_vnet(oracle::MCTS.Oracle, game)
   end
 end
 
-function evaluate_qnet(oracle::MCTS.Oracle, game, action, gamma)
+function evaluate_qnet(oracle, game, action, gamma)
   @assert !GI.game_terminated(game)
   next = copy(game)
   GI.play!(next, action)
@@ -120,7 +120,7 @@ end
 ##### Displaying state statistics
 #####
 
-function print_state_statistics(::Type{G}, stats::StateStats) where G
+function print_state_statistics(gspec, stats::StateStats)
   prob   = Log.ColType(nothing, x -> fmt(".1f", 100 * x) * "%")
   val    = Log.ColType(nothing, x -> fmt("+.2f", x))
   bigint = Log.ColType(nothing, n -> format(ceil(Int, n), commas=true))
@@ -132,7 +132,7 @@ function print_state_statistics(::Type{G}, stats::StateStats) where G
     ("Vnet",  val,    r -> r.Vnet)],
     header_style=Log.BOLD)
   atable = Log.Table([
-    ("",      alabel, r -> GI.action_string(G, r[1])),
+    ("",      alabel, r -> GI.action_string(gspec, r[1])),
     ("",      prob,   r -> r[2].P),
     ("Pmcts", prob,   r -> r[2].Pmcts),
     ("Pnet",  prob,   r -> r[2].Pnet),
@@ -173,14 +173,14 @@ through interactive play.
 
 # Constructors
 
-    Explorer(player::AbstractPlayer, game=nothing; memory=nothing)
+    Explorer(player::AbstractPlayer, game; memory=nothing)
 
-Build an explorer to investigate the behavior of `player` in a given `game`
-(by default, in the initial state). Optionally, a reference to a memory buffer
+Build an explorer to investigate the behavior of `player` in a given `game`.
+Optionally, a reference to a memory buffer
 can be provided, in which case additional state statistics
 will be displayed.
 
-    Explorer(env::Env, game=nothing; arena_mode=false)
+    Explorer(env::Env, game; arena_mode=false)
 
 Build an explorer for the MCTS player based on neural network `env.bestnn`
 and on parameters `env.params.self_play.mcts` or `env.params.arena.mcts`
@@ -199,22 +199,21 @@ The following commands are currently implemented:
   - `undo`: undo the effect of the previous command.
   - `restart`: restart the explorer.
 """
-mutable struct Explorer{Game}
-  game :: AbstractGame
-  history :: Stack{Game}
+mutable struct Explorer
+  game :: AbstractGameEnv
+  history :: Stack{AbstractGameEnv}
   player :: AbstractPlayer
   memory :: Option{MemoryBuffer}
   turn :: Int
-  function Explorer(player::AbstractPlayer, game; memory=nothing)
-    Game = typeof(game)
-    history = Stack{Game}()
-    new{Game}(game, history, player, memory, 0)
+  function Explorer(player::AbstractPlayer, game::AbstractGameEnv; memory=nothing)
+    history = Stack{AbstractGameEnv}()
+    new(game, history, player, memory, 0)
   end
 end
 
 function Explorer(
-    env::Env, game; mcts_params=env.params.self_play.mcts, on_gpu=false)
-  Game = typeof(game)
+    env::Env, game::AbstractGameEnv; mcts_params=env.params.self_play.mcts, on_gpu=false)
+  GameEnv = typeof(game)
   net = Network.copy(env.bestnn, on_gpu=on_gpu, test_mode=true)
   player = MctsPlayer(net, mcts_params)
   return Explorer(player, game, memory=env.memory)
@@ -231,14 +230,14 @@ save_game!(exp::Explorer) = push!(exp.history, copy(exp.game))
 
 # Return true if the command is valid, false otherwise
 function interpret!(exp::Explorer, stats, cmd, args=[])
-  Game = GameType(exp)
+  gspec = GI.spec(exp.game)
   if cmd == "go"
-    st = GI.read_state(Game)
+    st = GI.read_state(gspec)
     if isnothing(st)
       println("Invalid state description.")
       return false
     end
-    g = Game(st)
+    g = GI.init(gspec, st)
     if !isnothing(st)
       save_game!(exp)
       exp.game = g

@@ -237,7 +237,7 @@ Return a tuple that indicates the shape of a vectorized state representation.
 """
 function state_dim(game_spec::AbstractGameSpec)
   state = current_state(init(game_spec))
-  return vectorize_state(game_spec, state)
+  return size(vectorize_state(game_spec, state))
 end
 
 """

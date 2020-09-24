@@ -1,6 +1,6 @@
 module Batchifier
 
-import ..MCTS, ..Util, ..AbstractGame
+import ..MCTS, ..Util
 
 export BatchedOracle
 

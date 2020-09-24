@@ -299,7 +299,7 @@ of `game` and return a trace.
 The `game` environment is left unchanged.
 """
 function play_game(game, player; flip_probability=0.)
-  game = GI.clone(GI)
+  game = GI.clone(game)
   trace = Trace(GI.current_state(game))
   while true
     if GI.game_terminated(game)

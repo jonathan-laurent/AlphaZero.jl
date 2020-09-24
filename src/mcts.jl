@@ -7,7 +7,7 @@ module MCTS
 
 using Distributions: Categorical, Dirichlet
 
-import ..GI, ..Util
+import ..GI, ..AbstractGameSpec, ..Util
 
 #####
 ##### Interface for External Oracles
@@ -39,7 +39,7 @@ Therefore, it can be used to implement the "vanilla" MCTS algorithm.
 struct RolloutOracle{GameSpec} <: Oracle
   gspec :: GameSpec
   gamma :: Float64
-  RolloutOracle(gspec, γ=1.) = new(gspec, γ)
+  RolloutOracle(gspec, γ=1.) = new{typeof(gspec)}(gspec, γ)
 end
 
 function rollout!(game, γ=1.)
