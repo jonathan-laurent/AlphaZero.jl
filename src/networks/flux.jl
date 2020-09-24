@@ -150,10 +150,10 @@ end
 An abstract type for two-head neural networks implemented with Flux.
 
 Subtypes are assumed to have fields
-`hyper`, `common`, `vhead` and `phead`. Based on those, an implementation
-is provided for [`Network.hyperparams`](@ref), [`Network.forward`](@ref) and
-[`Network.on_gpu`](@ref), leaving only [`Network.HyperParams`](@ref) to
-be implemented.
+`hyper`, `gspec`, `common`, `vhead` and `phead`. Based on those, an implementation
+is provided for [`Network.hyperparams`](@ref), [`Network.game_spec`](@ref),
+[`Network.forward`](@ref) and [`Network.on_gpu`](@ref), leaving only
+[`Network.HyperParams`](@ref) to be implemented.
 """
 abstract type TwoHeadNetwork <: FluxNetwork end
 
@@ -172,6 +172,8 @@ function Flux.functor(nn::Net) where Net <: TwoHeadNetwork
 end
 
 Network.hyperparams(nn::TwoHeadNetwork) = nn.hyper
+
+Network.game_spec(nn::TwoHeadNetwork) = nn.gspec
 
 Network.on_gpu(nn::TwoHeadNetwork) = array_on_gpu(nn.vhead[end].b)
 

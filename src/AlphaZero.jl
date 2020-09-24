@@ -14,7 +14,7 @@ export MctsParams, MemAnalysisParams
 export SamplesWeighingPolicy, CONSTANT_WEIGHT, LOG_WEIGHT, LINEAR_WEIGHT
 export AbstractSchedule, ConstSchedule, PLSchedule, StepSchedule
 # Players and games
-export AbstractGame, AbstractPlayer, TwoPlayers, Trace
+export AbstractGameEnv, AbstractGameSpec, AbstractPlayer, TwoPlayers, Trace
 export think, select_move, reset_player!, player_temperature, apply_temperature
 export play_game, interactive!, total_reward
 export MctsPlayer, RandomPlayer, EpsilonGreedyPlayer, NetworkPlayer, Human

@@ -30,12 +30,15 @@ A simple two-headed architecture with only dense layers.
 """
 mutable struct SimpleNet <: TwoHeadNetwork
   hyper
+  gspec
   common
   vhead
   phead
 end
 
-function SimpleNet(hyper::SimpleNetHP, indim, outdim)
+function SimpleNet(hyper::SimpleNetHP, gspec)
+  indim = GI.state_dim(gspec)
+  outdim = GI.num_actions(gspec)
   bnmom = hyper.batch_norm_momentum
   function make_dense(indim, outdim)
     if hyper.use_batch_norm
@@ -59,7 +62,7 @@ function SimpleNet(hyper::SimpleNetHP, indim, outdim)
     hlayers(hyper.depth_phead)...,
     Dense(hsize, outdim),
     softmax)
-  SimpleNet(hyper, common, vhead, phead)
+  SimpleNet(hyper, gspec, common, vhead, phead)
 end
 
 Network.HyperParams(::Type{SimpleNet}) = SimpleNetHP

@@ -21,7 +21,10 @@ const Board = SMatrix{NUM_COLS, NUM_ROWS, Cell, NUM_CELLS}
 const INITIAL_BOARD = @SMatrix zeros(Cell, NUM_COLS, NUM_ROWS)
 const INITIAL_STATE = (board=INITIAL_BOARD, curplayer=WHITE)
 
-mutable struct Game <: GI.AbstractGame
+# TODO: we could have the game parametrized by grid size.
+struct Game <: GI.AbstractGameSpec end
+
+mutable struct Env <: GI.AbstractGameEnv
   board :: Board
   curplayer :: Player
   finished :: Bool

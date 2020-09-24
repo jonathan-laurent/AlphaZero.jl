@@ -7,42 +7,39 @@ module MCTS
 
 using Distributions: Categorical, Dirichlet
 
-using ..Util: apply_temperature
-import ..GI
+import ..GI, ..Util
 
 #####
 ##### Interface for External Oracles
 #####
 
 """
-    MCTS.Oracle
+    MCTS.Oracle <: Function
 
-Abstract base type for an oracle. Oracles must be callable:
+Abstract base type for an oracle. An oracle must be a function or a callable object.
 
-  (::Oracle)(game::AbstractGame, state)
+    (::Oracle)(state)
 
 Evaluate a single state from the current player's perspective.
 
 Return a pair `(P, V)` where:
 
-  - `P` is a probability vector on `GI.available_actions(GI.new_env(game, state))`
+  - `P` is a probability vector on `GI.available_actions(GI.init(gspec, state))`
   - `V` is a scalar estimating the value or win probability for white.
-
-Note that it is possible but not necessary to have `GI.current_state(game) == state`.
 """
-abstract type Oracle end
-
+abstract type Oracle <: Function end
 
 """
-    MCTS.RolloutOracle(γ=1.)
+    MCTS.RolloutOracle(game_spec::AbstractGameSpec, γ=1.) :: MCTS.Oracle
 
 This oracle estimates the value of a position by simulating a random game
 from it (a rollout). Moreover, it puts a uniform prior on available actions.
 Therefore, it can be used to implement the "vanilla" MCTS algorithm.
 """
-struct RolloutOracle <: Oracle
+struct RolloutOracle{GameSpec} <: Oracle
+  gspec :: GameSpec
   gamma :: Float64
-  RolloutOracle(γ=1.) = new(γ)
+  RolloutOracle(gspec, γ=1.) = new(gspec, γ)
 end
 
 function rollout!(game, γ=1.)
@@ -55,8 +52,8 @@ function rollout!(game, γ=1.)
   return r
 end
 
-function (r::RolloutOracle)(env, state)
-  g = GI.new_env(env, state)
+function (r::RolloutOracle)(state)
+  g = GI.init(r.gspec, state)
   wp = GI.white_playing(g)
   n = length(GI.available_actions(g))
   P = ones(n) ./ n
@@ -65,10 +62,12 @@ function (r::RolloutOracle)(env, state)
   return P, V
 end
 
-struct RandomOracle <: Oracle end
+struct RandomOracle{GameSpec} <: Oracle
+  gspec :: GameSpec
+end
 
-function (::RandomOracle)(env, state)
-  g = GI.new_env(env, state)
+function (::RandomOracle)(state)
+  g = GI.init(r.gspec, state)
   n = length(GI.available_actions(g))
   P = ones(n) ./ n
   V = 0.
@@ -97,7 +96,7 @@ Ntot(b::StateInfo) = sum(s.N for s in b.stats)
 #####
 
 """
-    MCTS.Env(game::AbstractGame, oracle; <keyword args>)
+    MCTS.Env(game_spec::AbstractGameSpec, oracle; <keyword args>)
 
 Create and initialize an MCTS environment with a given `oracle`.
 
@@ -139,18 +138,18 @@ mutable struct Env{State, Oracle}
   # Performance statistics
   total_simulations :: Int64
   total_nodes_traversed :: Int64
-  # We store a copy of a game environment to access static (state independent) game info
-  game_static_info :: GI.AbstractGame
+  # Game specification
+  gspec :: AbstractGameSpec
 
-  function Env(env, oracle;
+  function Env(gspec, oracle;
       gamma=1., cpuct=1., noise_ϵ=0., noise_α=1., prior_temperature=1.)
-    S = GI.state_type(env)
+    S = GI.state_type(gspec)
     tree = Dict{S, StateInfo}()
     total_simulations = 0
     total_nodes_traversed = 0
     new{S, typeof(oracle)}(
       tree, oracle, gamma, cpuct, noise_ϵ, noise_α, prior_temperature,
-      total_simulations, total_nodes_traversed, env)
+      total_simulations, total_nodes_traversed, gspec)
   end
 end
 
@@ -159,18 +158,18 @@ end
 #####
 
 function init_state_info(P, V, prior_temperature)
-  P = apply_temperature(P, prior_temperature)
+  P = Util.apply_temperature(P, prior_temperature)
   stats = [ActionStats(p, 0, 0) for p in P]
   return StateInfo(stats, V)
 end
 
 # Returns statistics for the current player, along with a boolean indicating
 # whether or not a new node has been created.
-function state_info(env, game, state)
+function state_info(env, state)
   if haskey(env.tree, state)
     return (env.tree[state], false)
   else
-    (P, V) = env.oracle(game, state)
+    (P, V) = env.oracle(state)
     info = init_state_info(P, V, env.prior_temperature)
     env.tree[state] = info
     return (info, true)
@@ -207,7 +206,7 @@ function run_simulation!(env::Env, game; η, root=true)
   else
     state = GI.current_state(game)
     actions = GI.available_actions(game)
-    info, new_node = state_info(env, game, state)
+    info, new_node = state_info(env, state)
     if new_node
       return info.Vest
     else
@@ -321,7 +320,7 @@ end
 Return an estimate of the memory footprint of the MCTS tree (in bytes).
 """
 function approximate_memory_footprint(env::Env)
-  return memory_footprint_per_node(env.game_static_info) * length(env.tree)
+  return memory_footprint_per_node(env.gspec) * length(env.tree)
 end
 
 # Possibly very slow for large trees

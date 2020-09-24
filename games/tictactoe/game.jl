@@ -13,21 +13,19 @@ const Board = SVector{NUM_POSITIONS, Cell}
 const INITIAL_BOARD = Board(repeat([nothing], NUM_POSITIONS))
 const INITIAL_STATE = (board=INITIAL_BOARD, curplayer=WHITE)
 
-mutable struct Game <: GI.AbstractGame
+# TODO: we could have the game parametrized by grid size.
+struct GameSpec <: GI.AbstractGameSpec end
+
+mutable struct GameEnv <: GI.AbstractGameEnv
   board :: Board
   curplayer :: Player
-  Game(state=INITIAL_STATE) = new(state.board, state.curplayer)
 end
 
-function GI.reset!(g::Game, state=INITIAL_STATE)
-  g.board = state.board
-  g.curplayer = state.curplayer
-  return
-end
+GI.init(::GameSpec, state=INITIAL_STATE) = GameEnv(state.board, state.curplayer)
 
-GI.clone(g::Game) = Game(GI.current_state(g))
+GI.spec(::GameEnv) = GameSpec()
 
-GI.two_players(::Game) = true
+GI.two_players(::GameSpec) = true
 
 #####
 ##### Defining winning conditions
@@ -47,7 +45,7 @@ const ALIGNMENTS =
   [map(pos_of_xy, al) for al in XY]
 end end
 
-function has_won(g::Game, player)
+function has_won(g::GameEnv, player)
   any(ALIGNMENTS) do al
     all(al) do pos
       g.board[pos] == player
@@ -61,29 +59,29 @@ end
 
 const ACTIONS = collect(1:NUM_POSITIONS)
 
-GI.actions(::Game) = ACTIONS
+GI.actions(::GameSpec) = ACTIONS
 
-GI.actions_mask(g::Game) = map(isnothing, g.board)
+GI.actions_mask(g::GameEnv) = map(isnothing, g.board)
 
-GI.current_state(g::Game) = (board=g.board, curplayer=g.curplayer)
+GI.current_state(g::GameEnv) = (board=g.board, curplayer=g.curplayer)
 
-GI.white_playing(::Game, state) = state.curplayer
+GI.white_playing(g::GameEnv) = g.curplayer
 
-function terminal_white_reward(g::Game)
+function terminal_white_reward(g::GameEnv)
   has_won(g, WHITE) && return 1.
   has_won(g, BLACK) && return -1.
   isempty(GI.available_actions(g)) && return 0.
   return nothing
 end
 
-GI.game_terminated(g::Game) = !isnothing(terminal_white_reward(g))
+GI.game_terminated(g::GameEnv) = !isnothing(terminal_white_reward(g))
 
-function GI.white_reward(g::Game)
+function GI.white_reward(g::GameEnv)
   z = terminal_white_reward(g)
   return isnothing(z) ? 0. : z
 end
 
-function GI.play!(g::Game, pos)
+function GI.play!(g::GameEnv, pos)
   g.board = setindex(g.board, g.curplayer, pos)
   g.curplayer = !g.curplayer
 end
@@ -92,7 +90,7 @@ end
 ##### Simple heuristic for minmax
 #####
 
-function alignment_value_for(g::Game, player, alignment)
+function alignment_value_for(g::GameEnv, player, alignment)
   γ = 0.3
   N = 0
   for pos in alignment
@@ -106,11 +104,11 @@ function alignment_value_for(g::Game, player, alignment)
   return γ ^ (BOARD_SIDE - 1 - N)
 end
 
-function heuristic_value_for(g::Game, player)
+function heuristic_value_for(g::GameEnv, player)
   return sum(alignment_value_for(g, player, al) for al in ALIGNMENTS)
 end
 
-function GI.heuristic_value(g::Game)
+function GI.heuristic_value(g::GameEnv)
   mine = heuristic_value_for(g, g.curplayer)
   yours = heuristic_value_for(g, !g.curplayer)
   return mine - yours
@@ -130,8 +128,8 @@ end
 # Channels: free, white, black
 # The board is represented from the perspective of white
 # (as if white were to play next)
-function GI.vectorize_state(::Game, state)
-  board = GI.white_playing(Game, state) ? state.board : flip_colors(state.board)
+function GI.vectorize_state(::GameSpec, state)
+  board = state.curplayer == WHITE ? state.board : flip_colors(state.board)
   return Float32[
     board[pos_of_xy((x, y))] == c
     for x in 1:BOARD_SIDE,
@@ -158,7 +156,7 @@ end
 
 const SYMMETRIES = generate_dihedral_symmetries()
 
-function GI.symmetries(::::AbstractGame, state)
+function GI.symmetries(::GameSpec, state)
   return [
     ((board=Board(s.board[sym]), curplayer=s.curplayer), sym)
     for sym in SYMMETRIES]
@@ -168,17 +166,17 @@ end
 ##### Interaction API
 #####
 
-function GI.action_string(::Game, a)
+function GI.action_string(::GameSpec, a)
   string(Char(Int('A') + a - 1))
 end
 
-function GI.parse_action(g::Game, str)
+function GI.parse_action(::GameSpec, str)
   length(str) == 1 || (return nothing)
   x = Int(uppercase(str[1])) - Int('A')
   (0 <= x < NUM_POSITIONS) ? x + 1 : nothing
 end
 
-function read_board(::Game)
+function read_board(::GameSpec)
   n = BOARD_SIDE
   str = reduce(*, ((readline() * "   ")[1:n] for i in 1:n))
   white = ['w', 'r', 'o']
@@ -191,8 +189,8 @@ function read_board(::Game)
   @SVector [cell(i) for i in 1:NUM_POSITIONS]
 end
 
-function GI.read_state(::Game)
-  b = read_board(Game)
+function GI.read_state(::GameSpec)
+  b = read_board(GameSpec)
   nw = count(==(WHITE), b)
   nb = count(==(BLACK), b)
   if nw == nb
@@ -210,7 +208,7 @@ player_color(p) = p == WHITE ? crayon"light_red" : crayon"light_blue"
 player_name(p)  = p == WHITE ? "Red" : "Blue"
 player_mark(p)  = p == WHITE ? "o" : "x"
 
-function GI.render(g::Game; with_position_names=true, botmargin=true)
+function GI.render(g::GameEnv; with_position_names=true, botmargin=true)
   pname = player_name(g.curplayer)
   pcol = player_color(g.curplayer)
   print(pcol, pname, " plays:", crayon"reset", "\n\n")
@@ -228,7 +226,7 @@ function GI.render(g::Game; with_position_names=true, botmargin=true)
     if with_position_names
       print(" | ")
       for x in 1:BOARD_SIDE
-        print(GI.action_string(Game, pos_of_xy((x, y))), " ")
+        print(GI.action_string(GameSpec, pos_of_xy((x, y))), " ")
       end
     end
     print("\n")

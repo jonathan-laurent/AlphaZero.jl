@@ -5,14 +5,14 @@
 """
     AbstractPlayer
 
-Abstract type for a player of `Game`.
+Abstract type for a game player.
 """
 abstract type AbstractPlayer end
 
 """
     think(::AbstractPlayer, game)
 
-Return a probability distribution over actions as a `(actions, π)` pair.
+Return a probability distribution over available actions as a `(actions, π)` pair.
 """
 function think end
 
@@ -83,9 +83,6 @@ with a fixed ``ϵ`` probability.
 struct EpsilonGreedyPlayer{P} <: AbstractPlayer
   player :: P
   ϵ :: Float64
-  function EpsilonGreedyPlayer(p::AbstractPlayer, ϵ)
-    return new{typeof(p)}(p, ϵ)
-  end
 end
 
 function think(p::EpsilonGreedyPlayer, game)
@@ -115,9 +112,6 @@ A wrapper on a player that enables overwriting the temperature schedule.
 struct PlayerWithTemperature{P} <: AbstractPlayer
   player :: P
   temperature :: AbstractSchedule{Float64}
-  function PlayerWithTemperature(p::AbstractPlayer, τ)
-    return new{typeof(p)}(p, τ)
-  end
 end
 
 function think(p::PlayerWithTemperature, game)
@@ -154,7 +148,7 @@ Construct a player from an MCTS environment. When computing each move:
 The temperature parameter `τ` can be either a real number or a
 [`AbstractSchedule`](@ref).
 
-    MctsPlayer(game::AbstractGame, oracle::MCTS.Oracle,
+    MctsPlayer(game_spec::AbstractGameSpec, oracle::MCTS.Oracle,
                params::MctsParams; timeout=nothing)
 
 Construct an MCTS player from an oracle and an [`MctsParams`](@ref) structure.
@@ -173,8 +167,8 @@ end
 
 # Alternative constructor
 function MctsPlayer(
-    game::AbstractGame, oracle::MCTS.Oracle, params::MctsParams; timeout=nothing)
-  mcts = MCTS.Env(game, oracle,
+    game_spec::AbstractGameSpec, oracle::MCTS.Oracle, params::MctsParams; timeout=nothing)
+  mcts = MCTS.Env(game_spec, oracle,
     gamma=params.gamma,
     cpuct=params.cpuct,
     noise_ϵ=params.dirichlet_noise_ϵ,
@@ -187,9 +181,9 @@ function MctsPlayer(
 end
 
 # MCTS with random oracle
-function RandomMctsPlayer(game::AbstractGame, params::MctsParams)
+function RandomMctsPlayer(game_spec::AbstractGameSpec, params::MctsParams)
   oracle = MCTS.RandomOracle()
-  mcts = MCTS.Env(game, oracle,
+  mcts = MCTS.Env(game_spec, oracle,
     cpuct=params.cpuct,
     gamma=params.gamma,
     noise_ϵ=params.dirichlet_noise_ϵ,
@@ -292,7 +286,7 @@ end
 #####
 
 """
-    play_game(game, player; flip_probability=0.) :: Trace
+    play_game(game::AbstractGameEnv, player; flip_probability=0.) :: Trace
 
 Simulate a game by an [`AbstractPlayer`](@ref) starting from the current state
 of `game` and return a trace.
@@ -312,7 +306,7 @@ function play_game(game, player; flip_probability=0.)
       return trace
     end
     if !iszero(flip_probability) && rand() < flip_probability
-      GI.apply_random_symmetry!(game)
+      game = GI.apply_random_symmetry(game)
     end
     actions, π_target = think(player, game)
     τ = player_temperature(player, game, length(trace))
@@ -483,7 +477,7 @@ Return a vector of objects returned by `simulator.measure`.
 """
 function simulate(
     simulator::Simulator;
-    game::AbstractGame,
+    game::AbstractGameEnv,
     num_games,
     num_workers,
     game_simulated,
@@ -628,9 +622,9 @@ function select_move(::Human, game, turn)
 end
 
 """
-    interactive!(game, white, black)
+    interactive!(game, player)
 
-Launch an interactive session for `game::AbstractGame` between players
+Launch a possibly interactive session for `game::AbstractGameEnv` between players
 `white` and `black`. Both players have type `AbstractPlayer` and one of them
 is typically [`Human`](@ref).
 """

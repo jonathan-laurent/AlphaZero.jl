@@ -46,6 +46,7 @@ in the original AlphaGo Zero paper.
 """
 mutable struct ResNet <: TwoHeadNetwork
   hyper
+  gspec
   common
   vhead
   phead
@@ -63,7 +64,9 @@ function ResNetBlock(size, n, bnmom)
     x -> relu.(x))
 end
 
-function ResNet(hyper::ResNetHP, indim, outdim)
+function ResNet(hyper::ResNetHP, gspec)
+  indim = GI.state_dim(gspec)
+  outdim = GI.num_actions(gspec)
   ksize = hyper.conv_kernel_size
   @assert all(ksize .% 2 .== 1)
   pad = ksize .÷ 2
@@ -87,7 +90,7 @@ function ResNet(hyper::ResNetHP, indim, outdim)
     flatten,
     Dense(indim[1] * indim[2] * nvf, nf, relu),
     Dense(nf, 1, tanh))
-  ResNet(hyper, common, vhead, phead)
+  ResNet(hyper, gspec, common, vhead, phead)
 end
 
 Network.HyperParams(::Type{<:ResNet}) = ResNetHP

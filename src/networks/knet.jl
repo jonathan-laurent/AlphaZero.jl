@@ -137,11 +137,11 @@ end
 
 An abstract type for two-head neural networks implemented with Knet.
 
-Subtypes are assumed to have the following fields:
-`hyper`, `common`, `vhead` and `phead`. Based on those, an implementation
-is provided for [`Network.hyperparams`](@ref), [`Network.forward`](@ref) and
-[`Network.on_gpu`](@ref), leaving only [`Network.HyperParams`](@ref) to
-be implemented.
+Subtypes are assumed to have fields
+`hyper`, `gspec`, `common`, `vhead` and `phead`. Based on those, an implementation
+is provided for [`Network.hyperparams`](@ref), [`Network.game_spec`](@ref),
+[`Network.forward`](@ref) and [`Network.on_gpu`](@ref), leaving only
+[`Network.HyperParams`](@ref) to be implemented.
 """
 abstract type TwoHeadNetwork <: KNetwork end
 
@@ -159,6 +159,8 @@ function mapchildren(f, nn::Net) where Net <: TwoHeadNetwork
 end
 
 Network.hyperparams(nn::TwoHeadNetwork) = nn.hyper
+
+Network.game_spec(nn::TwoHeadNetwork) = nn.gspec
 
 function Network.on_gpu(nn::TwoHeadNetwork)
   b = nn.vhead.layers[end].b

@@ -69,7 +69,7 @@ end
 
 BatchedOracle(reqchan) = BatchedOracle(x -> x, reqchan)
 
-function (oracle::BatchedOracle)(::AbstractGame, state)
+function (oracle::BatchedOracle)(state)
   query = oracle.make_query(state)
   put!(oracle.reqchan, (query=query, answer_channel=oracle.anschan))
   answer = take!(oracle.anschan)

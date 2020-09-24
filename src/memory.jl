@@ -28,28 +28,24 @@ end
 sample_state_type(::Type{<:TrainingSample{S}}) where S = S
 
 """
-    MemoryBuffer{State}
+    MemoryBuffer(game_spec, size, experience=[])
 
 A circular buffer to hold memory samples.
-
-# Constructor
-
-    MemoryBuffer{State}(size, experience=[])
-
 """
-mutable struct MemoryBuffer{State}
+mutable struct MemoryBuffer{GameSpec, State}
+  gspec :: GameSpec
   buf :: CircularBuffer{TrainingSample{State}}
   cur_batch_size :: Int
-  game_static_info :: Game
-  function MemoryBuffer{S}(size, experience=[]) where S
-    buf = CircularBuffer{TrainingSample{S}}(size)
+  function MemoryBuffer(gspec, size, experience=[])
+    State = GI.state_type(gspec)
+    buf = CircularBuffer{TrainingSample{State}}(size)
     append!(buf, experience)
-    new{S}(buf, 0)
+    new{typeof(gspec), State}(gspec, buf, 0)
   end
 end
 
 """
-    get_experience(::MemoryBuffer{S}) where S :: Vector{TrainingSample{S}}
+    get_experience(::MemoryBuffer) :: Vector{<:TrainingSample}
 
 Return all samples in the memory buffer.
 """
@@ -69,20 +65,20 @@ end
 Base.length(mem::MemoryBuffer) = length(mem.buf)
 
 """
-    push_game!(mem::MemoryBuffer, trace::Trace, gamma)
+    push_trace!(mem::MemoryBuffer, trace::Trace, gamma)
 
 Collect samples out of a game trace and add them to the memory buffer.
 
 Here, `gamma` is the reward discount factor.
 """
-function push_game!(mem::MemoryBuffer, trace, gamma)
+function push_trace!(mem::MemoryBuffer, trace, gamma)
   n = length(trace)
   wr = 0.
   for i in reverse(1:n)
     wr = gamma * wr + trace.rewards[i]
     s = trace.states[i]
     π = trace.policies[i]
-    wp = GI.white_playing(GameType(trace), s)
+    wp = GI.white_playing(GI.init(mem.gspec, s))
     z = wp ? wr : -wr
     t = float(n - i + 1)
     push!(mem.buf, TrainingSample(s, π, z, t, 1))

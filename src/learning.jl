@@ -14,7 +14,11 @@
 # Note that the weight of a sample is computed as an increasing
 # function of its `n` field.
 
-function convert_sample(Game, wp, e::TrainingSample)
+function convert_sample(
+    gspec::AbstractGameSpec,
+    wp::SamplesWeighingPolicy,
+    e::TrainingSample)
+
   if wp == CONSTANT_WEIGHT
     w = Float32[1]
   elseif wp == LOG_WEIGHT
@@ -23,15 +27,19 @@ function convert_sample(Game, wp, e::TrainingSample)
     @assert wp == LINEAR_WEIGHT
     w = Float32[n]
   end
-  x = GI.vectorize_state(Game, e.s)
-  a = GI.actions_mask(Game(e.s))
+  x = GI.vectorize_state(gspec, e.s)
+  a = GI.actions_mask(GI.init(gspec, e.s))
   p = zeros(size(a))
   p[a] = e.π
   v = [e.z]
   return (w, x, a, p, v)
 end
 
-function convert_samples(Game, wp, es::Vector{<:TrainingSample})
+function convert_samples(
+    gspec::AbstractGameSpec,
+    wp::SamplesWeighingPolicy,
+    es::Vector{<:TrainingSample})
+
   ces = [convert_sample(Game, wp, e) for e in es]
   W = Util.superpose((e[1] for e in ces))
   X = Util.superpose((e[2] for e in ces))
@@ -84,12 +92,11 @@ struct Trainer
   Wmean :: Float32
   Hp :: Float32
   batches_stream # infinite stateful iterator of training batches
-  function Trainer(network, samples, params; test_mode=false)
+  function Trainer(gspec, network, samples, params; test_mode=false)
     if params.use_position_averaging
       samples = merge_by_state(samples)
     end
-    Game = GameType(network)
-    data = convert_samples(Game, params.samples_weighing_policy, samples)
+    data = convert_samples(gspec, params.samples_weighing_policy, samples)
     network = Network.copy(network, on_gpu=params.use_gpu, test_mode=test_mode)
     W, X, A, P, V = data
     Wmean = mean(W)

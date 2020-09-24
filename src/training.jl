@@ -3,7 +3,7 @@
 #####
 
 """
-    Env{Game, Network, Board}
+    Env
 
 Type for an AlphZero environment.
 
@@ -13,10 +13,10 @@ and an iteration counter.
 
 # Constructor
 
-    Env{Game}(params, curnn, bestnn=copy(curnn), experience=[], itc=0)
+    Env(game_spec, params, curnn, bestnn=copy(curnn), experience=[], itc=0)
 
-Construct a new AlphaZero environment.
-- `Game` is the type of the game being played
+Construct a new AlphaZero environment:
+- `game_spec` specified the game being played
 - `params` has type [`Params`](@ref)
 - `curnn` is the current neural network and has type [`AbstractNetwork`](@ref)
 - `bestnn` is the best neural network so far, which is used for data generation
@@ -24,23 +24,22 @@ Construct a new AlphaZero environment.
    as a vector of [`TrainingSample`](@ref)
 - `itc` is the value of the iteration counter (0 at the start of training)
 """
-mutable struct Env{Game, Network, Board}
+mutable struct Env{GameSpec, Network, State}
+  gspec  :: GameSpec
   params :: Params
   curnn  :: Network
   bestnn :: Network
-  memory :: MemoryBuffer{Board}
+  memory :: MemoryBuffer{GameSpec, State}
   itc    :: Int
-  function Env{Game}(
-      params, curnn, bestnn=copy(curnn), experience=[], itc=0) where Game
-    Board = GI.State(Game)
+  function Env(
+      gspec::AbstractGameSpec
+      params, curnn, bestnn=copy(curnn), experience=[], itc=0)
     msize = max(params.mem_buffer_size[itc], length(experience))
-    memory = MemoryBuffer{Board}(msize, experience)
-    return new{Game, typeof(curnn), Board}(
+    memory = MemoryBuffer(gspec, msize, experience)
+    return new{typeof(gspec), typeof(curnn), GI.state_type(gspec)}(
       params, curnn, bestnn, memory, itc)
   end
 end
-
-GameType(env::Env{Game}) where Game = Game
 
 #####
 ##### Training handlers
@@ -127,9 +126,9 @@ end
 ##### Training loop
 #####
 
-function resize_memory!(env::Env{G,N,B}, n) where {G,N,B}
+function resize_memory!(env::Env, n)
   exp = get_experience(env.memory)
-  env.memory = MemoryBuffer{B}(n, exp)
+  env.memory = MemoryBuffer(env.gspec, n, exp)
   return
 end
 
@@ -164,9 +163,9 @@ function learning_step!(env::Env, handler)
   tloss, teval, ttrain = 0., 0., 0.
   experience = get_experience(env.memory)
   if env.params.use_symmetries
-    experience = augment_with_symmetries(GameType(env), experience)
+    experience = augment_with_symmetries(env.gspec, experience)
   end
-  trainer, tconvert = @timed Trainer(env.curnn, experience, lp)
+  trainer, tconvert = @timed Trainer(env.gspec, env.curnn, experience, lp)
   init_status = learning_status(trainer)
   Handlers.learning_started(handler, init_status)
   # Compute the number of batches between each checkpoint
@@ -220,7 +219,7 @@ function learning_step!(env::Env, handler)
   return report
 end
 
-function simple_memory_stats(env)
+function simple_memory_stats(env::Env)
   mem = get_experience(env)
   nsamples = length(mem)
   ndistinct = length(merge_by_state(mem))
@@ -234,7 +233,7 @@ function self_play_measurements(trace, _, player)
   return (trace=trace, mem=mem, edepth=edepth)
 end
 
-function self_play_step!(env::Env{G}, handler) where G
+function self_play_step!(env::Env, handler)
   params = env.params.self_play
   Handlers.self_play_started(handler)
   make_oracle() =
@@ -255,7 +254,7 @@ function self_play_step!(env::Env{G}, handler) where G
   # Add the collected samples in memory
   new_batch!(env.memory)
   for x in results
-    push_game!(env.memory, x.trace, params.mcts.gamma)
+    push_trace!(env.memory, x.trace, params.mcts.gamma)
   end
   speed = cur_batch_size(env.memory) / elapsed
   edepth = mean([x.edepth for x in results])
