@@ -111,9 +111,9 @@ function merge_by_state(samples)
   return [merge_samples(ss) for ss in values(dict)]
 end
 
-function apply_symmetry(game, sample, (symstate, aperm))
-  mask = GI.actions_mask(GI.new_env(game, sample.s))
-  symmask = GI.actions_mask(GI.new_env(game, symstate))
+function apply_symmetry(gspec, sample, (symstate, aperm))
+  mask = GI.actions_mask(GI.init(gspec, sample.s))
+  symmask = GI.actions_mask(GI.init(gspec, symstate))
   π = zeros(eltype(sample.π), length(mask))
   π[mask] = sample.π
   π = π[aperm]
@@ -123,8 +123,8 @@ function apply_symmetry(game, sample, (symstate, aperm))
     symstate, π, sample.z, sample.t, sample.n)
 end
 
-function augment_with_symmetries(game, samples)
-  symsamples = [apply_symmetry(game, s, sym)
-    for s in samples for sym in GI.symmetries(game, s.s)]
+function augment_with_symmetries(gspec, samples)
+  symsamples = [apply_symmetry(gspec, s, sym)
+    for s in samples for sym in GI.symmetries(gspec, s.s)]
   return [samples ; symsamples]
 end

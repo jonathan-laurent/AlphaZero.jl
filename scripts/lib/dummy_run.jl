@@ -53,12 +53,12 @@ function dummy_run_params(params, benchmark)
 end
 
 function dummy_run(GameModule; session_dir=nothing, nostdout=true)
-  Game = GameModule.Game
+  gspec = GameModule.GameSpec()
   Training = GameModule.Training
   Net = Training.Network
   netparams = Training.netparams
   params, benchmark = dummy_run_params(Training.params, Training.benchmark)
-  session = Session(Game, Net{Game}, params, netparams,
+  session = Session(gspec, params, Net, netparams,
     benchmark=benchmark, nostdout=nostdout, dir=session_dir)
   resume!(session)
   return true

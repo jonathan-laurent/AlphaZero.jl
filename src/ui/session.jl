@@ -325,6 +325,7 @@ function Session(
   
   logger = session_logger(dir, nostdout, autosave)
   if valid_session_dir(dir)
+    @warn "Valid session dir found"
     env = load_env(gspec, logger, dir, params=params)
     # The parameters must be unchanged
     same_json(x, y) = JSON3.write(x) == JSON3.write(y)
@@ -333,6 +334,7 @@ function Session(
     session = Session(env, dir, logger, autosave, save_intermediate, benchmark)
     session.report = load_session_report(dir, env.itc)
   else
+    @warn "No valid session dir found"
     network = mknet(gspec, netparams)
     env = Env(gspec, params, network)
     session = Session(env, dir, logger, autosave, save_intermediate, benchmark)

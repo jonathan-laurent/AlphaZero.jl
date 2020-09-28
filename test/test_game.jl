@@ -6,8 +6,7 @@ using AlphaZero
 
 # Generate a set of reachable states randomly
 function generate_states(gspec, n)
-  game = GI.init(gspec)
-  traces = [play_game(game, RandomPlayer()) for i in 1:n]
+  traces = [play_game(gspec, RandomPlayer()) for i in 1:n]
   return Set(s for t in traces for s in t.states)
 end
 
