@@ -1,4 +1,4 @@
-ENV["JULIA_CUDA_MEMORY_POOL"] = "split" # "binned" / "split"
+# Note: this script is currently unmaintained and may be outdated.
 
 using AlphaZero
 using AlphaZero.Log

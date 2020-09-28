@@ -3,8 +3,9 @@
 ##### This file can also be included directly in the REPL.
 #####
 
-# ENV["CUARRAYS_MEMORY_LIMIT"] = 7_500_000_000
-ENV["JULIA_CUDA_MEMORY_POOL"] = "split" # "binned" / "split"
+# For optimal performances, it is recommended to precompile CUDA.jl
+# to use a splitting memory pool.
+# ENV["JULIA_CUDA_MEMORY_POOL"] = "split" # "binned" / "split"
 
 # Enables running the script on a distant machine without an X server
 ENV["GKSwstype"]="nul"

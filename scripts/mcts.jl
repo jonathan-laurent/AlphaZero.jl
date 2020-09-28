@@ -1,5 +1,3 @@
-ENV["JULIA_CUDA_MEMORY_POOL"] = "split"
-
 using AlphaZero
 
 include("games.jl")

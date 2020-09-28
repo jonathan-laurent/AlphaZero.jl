@@ -37,8 +37,6 @@ mutable struct SimpleNet <: TwoHeadNetwork
 end
 
 function SimpleNet(gspec::AbstractGameSpec, hyper::SimpleNetHP)
-  indim = GI.state_dim(gspec)
-  outdim = GI.num_actions(gspec)
   bnmom = hyper.batch_norm_momentum
   function make_dense(indim, outdim)
     if hyper.use_batch_norm
@@ -49,6 +47,8 @@ function SimpleNet(gspec::AbstractGameSpec, hyper::SimpleNetHP)
       Dense(indim, outdim, relu)
     end
   end
+  indim = prod(GI.state_dim(gspec))
+  outdim = GI.num_actions(gspec)
   hsize = hyper.width
   hlayers(depth) = [make_dense(hsize, hsize) for i in 1:depth]
   common = Chain(

@@ -623,13 +623,18 @@ function select_move(::Human, game, turn)
 end
 
 """
+    interactive!(game)
+    interactive!(gspec)
     interactive!(game, player)
+    interactive!(gspec, player)
+    interactive!(game, white, black)
+    interactive!(gspec, white, black)
 
-Launch a possibly interactive session for `game::AbstractGameEnv` between players
-`white` and `black`. Both players have type `AbstractPlayer` and one of them
-is typically [`Human`](@ref).
+Launch a possibly interactive game session.
+
+This function takes either an `AbstractGameSpec` or `AbstractGameEnv` as an argument.
 """
-function interactive!(game, player)
+function interactive!(game::AbstractGameEnv, player)
   try
   GI.render(game)
   turn = 0
@@ -644,6 +649,8 @@ function interactive!(game, player)
     return
   end
 end
+
+interactive!(gspec::AbstractGameSpec, player) = interactive!(GI.init(gspec), player)
 
 interactive!(game, white, black) = interactive!(game, TwoPlayers(white, black))
 

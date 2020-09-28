@@ -10,13 +10,14 @@ addprocs(2, exeflags="--project")
 
 include("../lib/include_workaround.jl")
 include_everywhere("../../games/tictactoe/main.jl")
-using .Tictactoe: Game, Training
+using .Tictactoe: GameSpec, Training
 
 using ProgressMeter
 
+gspec = GameSpec()
 params = Training.params
-network = Training.Network{Game}(Training.netparams)
-env = AlphaZero.Env{Game}(params, network)
+network = Training.Network(gspec, Training.netparams)
+env = AlphaZero.Env(gspec, params, network)
 
 progress = Progress(params.self_play.num_games)
 struct Handler end

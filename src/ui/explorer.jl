@@ -175,10 +175,11 @@ through interactive play.
 
     Explorer(player::AbstractPlayer, game; memory=nothing)
 
-Build an explorer to investigate the behavior of `player` in a given `game`.
-Optionally, a reference to a memory buffer
-can be provided, in which case additional state statistics
-will be displayed.
+Build an explorer to investigate the behavior of `player` in a given `game`
+
+The `game` argument can be either an `AstractGameSpec` or `AbstractGameEnv`.
+Optionally, a reference to a memory buffer can be provided, in which case additional
+state statistics will be displayed.
 
     Explorer(env::Env, game; arena_mode=false)
 
@@ -217,6 +218,14 @@ function Explorer(
   net = Network.copy(env.bestnn, on_gpu=on_gpu, test_mode=true)
   player = MctsPlayer(net, mcts_params)
   return Explorer(player, game, memory=env.memory)
+end
+
+function Explorer(player::AbstractPlayer, gspec::AbstractGameSpec; memory=nothing)
+  return Explorer(player, GI.init(gspec), memory=memory)
+end
+
+function Explorer(env::Env; mcts_params=env.params.self_play.mcts, on_gpu=false)
+  return Explorer(env, GI.init(env.gspec), mcts_params=mcts_params, on_gpu=on_gpu)
 end
 
 function restart!(exp::Explorer)

@@ -1,5 +1,5 @@
 #####
-##### Generate a flame graph for self-play using ProfileView
+##### Generate a flame graph for self-play using ProfileSVG
 #####
 
 using AlphaZero
@@ -7,13 +7,14 @@ using AlphaZero
 include("../games.jl")
 GAME = get(ENV, "GAME", "connect-four")
 SelectedGame = GAME_MODULE[GAME]
-using .SelectedGame: Game, Training
+using .SelectedGame: GameSpec, Training
 
 include("../lib/dummy_run.jl")
 
+gspec = GameSpec()
 params, _ = dummy_run_params(Training.params, Training.benchmark)
-network = Training.Network{Game}(Training.netparams)
-env = AlphaZero.Env{Game}(params, network)
+network = Training.Network(gspec, Training.netparams)
+env = AlphaZero.Env(gspec, params, network)
 
 using Profile
 using ProfileSVG

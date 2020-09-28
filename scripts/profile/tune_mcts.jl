@@ -2,6 +2,8 @@
 ##### Tuning MCTS parameters
 #####
 
+# Note: this script is currently unmaintained and may be outdated.
+
 using AlphaZero
 using AlphaZero: Log, Util
 using Formatting
