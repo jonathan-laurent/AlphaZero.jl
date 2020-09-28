@@ -62,7 +62,7 @@ end
 
 GAME = ENV["GAME"]
 SelectedGame = GAME_MODULE[GAME]
-using .SelectedGame: Game, Training
+using .SelectedGame: GameSpec, Training
 
 const SESSION_DIR = joinpath("sessions", GAME)
 

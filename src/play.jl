@@ -167,7 +167,7 @@ end
 
 # Alternative constructor
 function MctsPlayer(
-    game_spec::AbstractGameSpec, oracle::MCTS.Oracle, params::MctsParams; timeout=nothing)
+    game_spec::AbstractGameSpec, oracle, params::MctsParams; timeout=nothing)
   mcts = MCTS.Env(game_spec, oracle,
     gamma=params.gamma,
     cpuct=params.cpuct,
@@ -286,20 +286,17 @@ end
 #####
 
 """
-    play_game(game::AbstractGameEnv, player; flip_probability=0.) :: Trace
+    play_game(gspec::AbstractGameSpec, player; flip_probability=0.) :: Trace
 
-Simulate a game by an [`AbstractPlayer`](@ref) starting from the current state
-of `game` and return a trace.
+Simulate a game by an [`AbstractPlayer`](@ref).
 
 - For two-player games, please use [`TwoPlayers`](@ref).
 - If the `flip_probability` argument is set to ``p``, the board
   is _flipped_ randomly at every turn with probability ``p``,
   using [`GI.apply_random_symmetry`](@ref).
-
-The `game` environment is left unchanged.
 """
-function play_game(game, player; flip_probability=0.)
-  game = GI.clone(game)
+function play_game(gspec, player; flip_probability=0.)
+  game = GI.init(gspec)
   trace = Trace(GI.current_state(game))
   while true
     if GI.game_terminated(game)
@@ -458,7 +455,7 @@ Policy for attributing colors in a duel between a baseline and a contender.
 
 
 """
-    simulate(::Simulator, ::AbstractGameEnv; <keyword arguments>)
+    simulate(::Simulator, ::AbstractGameSpec; <keyword arguments>)
 
 Play a series of games using a given [`Simulator`](@ref).
 
@@ -477,7 +474,7 @@ Return a vector of objects returned by `simulator.measure`.
 """
 function simulate(
     simulator::Simulator,
-    game::AbstractGameEnv;
+    gspec::AbstractGameSpec;
     num_games,
     num_workers,
     game_simulated,
@@ -509,7 +506,7 @@ function simulate(
         player_pf = player
       end
       # Play the game and generate a report
-      trace = play_game(game, player_pf, flip_probability=flip_probability)
+      trace = play_game(gspec, player_pf, flip_probability=flip_probability)
       report = simulator.measure(trace, colors_flipped, player)
       # Reset the player periodically
       if !isnothing(reset_every) && worker_sim_id % reset_every == 0
@@ -524,14 +521,14 @@ function simulate(
 end
 
 """
-    simulate_distributed(::Simulator, ::AbstractGameEnv; <keyword arguments>)
+    simulate_distributed(::Simulator, ::AbstractGameSpec; <keyword arguments>)
 
 Identical to [`simulate`](@ref) but splits the work
 across all available workers.
 """
 function simulate_distributed(
     simulator::Simulator,
-    game::AbstractGameEnv;
+    gspec::AbstractGameSpec;
     num_games,
     num_workers,
     game_simulated,
@@ -557,7 +554,7 @@ function simulate_distributed(
     Distributed.@spawnat w begin
       Util.@printing_errors begin
         simulate(
-          simulator, game,
+          simulator, gspec,
           num_games=(w == workers[1] ? num_each + rem : num_each),
           num_workers=num_workers,
           game_simulated=remote_game_simulated,

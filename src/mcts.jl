@@ -299,17 +299,17 @@ function average_exploration_depth(env)
 end
 
 """
-    MCTS.memory_footprint_per_node(game)
+    MCTS.memory_footprint_per_node(gspec)
 
 Return an estimate of the memory footprint of a single MCTS node
 for the given game (in bytes).
 """
-function memory_footprint_per_node(game)
+function memory_footprint_per_node(gspec)
   # The hashtable is at most twice the number of stored elements
   # For every element, a state and a pointer are stored
-  size_key = 2 * (GI.state_memsize(game) + sizeof(Int))
+  size_key = 2 * (GI.state_memsize(gspec) + sizeof(Int))
   dummy_stats = StateInfo([
-    ActionStats(0, 0, 0) for i in 1:GI.num_actions(game)], 0)
+    ActionStats(0, 0, 0) for i in 1:GI.num_actions(gspec)], 0)
   size_stats = Base.summarysize(dummy_stats)
   return size_key + size_stats
 end

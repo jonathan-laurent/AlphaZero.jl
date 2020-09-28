@@ -87,6 +87,11 @@ the current neural network with the best one seen so far
 # Remarks
 
 + See [`necessary_samples`](@ref) to make an informed choice for `num_games`.
++ In the case of single-player games, it does not make sense to have the most recent
+  network play against the best network seen so far. What we do instead is that we have
+  both the old and the new network play a series of games and see whether
+  ``\\frac{r'}{r} - 1`` exceeds `update_threshold`, where ``r``` and ``r'`` are the old
+  and new average rewards respectively.
 
 # AlphaGo Zero Parameters
 

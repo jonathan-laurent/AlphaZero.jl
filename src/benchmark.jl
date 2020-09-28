@@ -60,7 +60,7 @@ Subtypes must implement the following functions:
 """
 abstract type Player end
 
-# instantiate(::Player, nn)
+# instantiate(::Player, gspec, nn)
 function instantiate end
 
 # name(::Player) :: String
@@ -103,17 +103,16 @@ Run a benchmark duel and return a [`Benchmark.DuelOutcome`](@ref).
 If a `progress` is provided, `next!(progress)` is called
 after each simulated game.
 """
-function run(env::Env, duel::Duel, game::AbstractGameEnv, progress=nothing)
-  gspec = GI.spec(game)
+function run(env::Env, duel::Duel, progress=nothing)
   net() = Network.copy(env.bestnn, on_gpu=duel.use_gpu, test_mode=true)
   simulator = Simulator(net, record_trace) do net
-    player = instantiate(duel.player, gspec, net)
-    baseline = instantiate(duel.baseline, gspec, net)
+    player = instantiate(duel.player, env.gspec, net)
+    baseline = instantiate(duel.baseline, env.gspec, net)
     return TwoPlayers(player, baseline)
   end
   samples, elapsed = @timed simulate(
     simulator,
-    game,
+    env.gspec,
     num_games=duel.num_games,
     num_workers=duel.num_workers,
     game_simulated=(() -> next!(progress)),

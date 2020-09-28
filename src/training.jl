@@ -117,7 +117,7 @@ function initial_report(env::Env)
   num_network_parameters = Network.num_parameters(env.curnn)
   num_reg_params = Network.num_regularized_parameters(env.curnn)
   player = MctsPlayer(env.gspec, env.curnn, env.params.self_play.mcts)
-  mcts_footprint_per_node = MCTS.memory_footprint_per_node(player.mcts)
+  mcts_footprint_per_node = MCTS.memory_footprint_per_node(env.gspec)
   return Report.Initial(
     num_network_parameters, num_reg_params, mcts_footprint_per_node)
 end
@@ -244,7 +244,7 @@ function self_play_step!(env::Env, handler)
   # Run the simulations
   results, elapsed = @timed simulate_distributed(
     simulator,
-    GI.init(env.gspec),
+    env.gspec,
     num_games=params.num_games,
     num_workers=params.num_workers,
     game_simulated=()->Handlers.game_played(handler),
