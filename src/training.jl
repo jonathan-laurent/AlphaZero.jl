@@ -144,6 +144,7 @@ function evaluate_network(gspec, contender, baseline, params, handler)
   end
   samples = simulate(
     simulator,
+    gspec,
     num_games=params.arena.num_games,
     num_workers=params.arena.num_workers,
     game_simulated=(() -> Handlers.checkpoint_game_played(handler)),

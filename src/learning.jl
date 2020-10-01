@@ -40,7 +40,7 @@ function convert_samples(
     wp::SamplesWeighingPolicy,
     es::Vector{<:TrainingSample})
 
-  ces = [convert_sample(Game, wp, e) for e in es]
+  ces = [convert_sample(gspec, wp, e) for e in es]
   W = Util.superpose((e[1] for e in ces))
   X = Util.superpose((e[2] for e in ces))
   A = Util.superpose((e[3] for e in ces))
@@ -67,7 +67,7 @@ wmean(x, w) = sum(x .* w) / sum(w)
 function losses(nn, params, Wmean, Hp, (W, X, A, P, V))
   creg = params.l2_regularization
   cinv = params.nonvalidity_penalty
-  P̂, V̂, p_invalid = Network.evaluate(nn, X, A)
+  P̂, V̂, p_invalid = Network.forward_normalized(nn, X, A)
   Lp = klloss_wmean(P̂, P, W) - Hp
   Lv = mse_wmean(V̂, V, W)
   Lreg = iszero(creg) ?
@@ -148,7 +148,7 @@ function learning_status(tr::Trainer, samples)
   W, X, A, P, V = samples
   Ls = losses(tr.network, tr.params, tr.Wmean, tr.Hp, samples)
   Ls = Network.convert_output_tuple(tr.network, Ls)
-  Pnet, _ = Network.evaluate(tr.network, X, A)
+  Pnet, _ = Network.forward_normalized(tr.network, X, A)
   Hpnet = entropy_wmean(Pnet, W)
   Hpnet = Network.convert_output(tr.network, Hpnet)
   return Report.LearningStatus(Report.Loss(Ls...), tr.Hp, Hpnet)
@@ -183,7 +183,7 @@ function memory_report(
   )
   # It is important to load the neural network in test mode so as to not
   # overwrite the batch norm statistics based on biased data.
-  Tr(samples) = Trainer(nn, samples, learning_params, test_mode=true)
+  Tr(samples) = Trainer(mem.gspec, nn, samples, learning_params, test_mode=true)
   all_samples = samples_report(Tr(get_experience(mem)))
   latest_batch = isempty(last_batch(mem)) ?
     all_samples :

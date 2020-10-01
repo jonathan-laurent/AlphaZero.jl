@@ -166,7 +166,7 @@ end
 name(p::MctsRollouts) = "MCTS ($(p.params.num_iters_per_turn) rollouts)"
 
 function instantiate(p::MctsRollouts, gspec::AbstractGameSpec, nn::MCTS.Oracle)
-  return MctsPlayer(gspec, MCTS.RolloutOracle(), p.params)
+  return MctsPlayer(gspec, MCTS.RolloutOracle(gspec), p.params)
 end
 
 """
