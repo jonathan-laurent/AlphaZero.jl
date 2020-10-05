@@ -11,8 +11,9 @@ module UserInterface
   export Session, resume!, save, play_interactive_game
 
   using AlphaZero
-  import AlphaZero: AbstractGameEnv, AbstractGameSpec, Util, apply_temperature
   using AlphaZero.Util: Option
+  import AlphaZero: AbstractGameEnv, AbstractGameSpec, Experiment
+  import AlphaZero: Util, apply_temperature
 
   import Plots
   import Colors

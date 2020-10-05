@@ -15,6 +15,6 @@ end
 
 @testset "Dummy Runs" begin
   dir = "sessions/test-tictactoe"
-  @test dummy_run(Tictactoe, nostdout=false, session_dir=dir)
+  @test dummy_run(Tictactoe.Training.experiment, nostdout=false, session_dir=dir)
   #@test dummy_run(ConnectFour) # Takes a bit too long for Travis
 end

@@ -29,7 +29,7 @@ with_dummy_mcts(::Nothing) = nothing
 
 # Returned modified parameters where all num_games fields are set to 1.
 # The number of iterations is set to 2.
-function dummy_run_params(params, benchmark)
+function dummy_run_params(params)
   self_play = SelfPlayParams(
     with_dummy_mcts(params.self_play),
     num_games=1, num_workers=1)
@@ -41,25 +41,28 @@ function dummy_run_params(params, benchmark)
     params.learning,
     max_batches_per_checkpoint=2,
     num_checkpoints=min(params.learning.num_checkpoints, 2))
-  params = Params(
+  return Params(
     params, num_iters=2,
     self_play=self_play, arena=arena, learning=learning)
-  benchmark = [
+end
+
+function dummy_run_benchmark(benchmark)
+  return [
     Benchmark.Duel(
       with_dummy_mcts(d.player), with_dummy_mcts(d.baseline),
       num_games=1, num_workers=1, color_policy=d.color_policy)
     for d in benchmark ]
-  return params, benchmark
 end
 
-function dummy_run(GameModule; session_dir=nothing, nostdout=true)
-  gspec = GameModule.GameSpec()
-  Training = GameModule.Training
-  Net = Training.Network
-  netparams = Training.netparams
-  params, benchmark = dummy_run_params(Training.params, Training.benchmark)
-  session = Session(gspec, params, Net, netparams,
-    benchmark=benchmark, nostdout=nostdout, dir=session_dir)
+function dummy_run_experiment(e::Experiment)
+  params = dummy_run_params(e.params)
+  benchmark = dummy_run_benchmark(e.benchmark)
+  return Experiment(e.gspec, params, e.mknet, e.netparams, benchmark=benchmark)
+end
+
+function dummy_run(experiment::Experiment; session_dir=nothing, nostdout=true)
+  experiment = dummy_run_experiment(experiment)
+  session = Session(experiment, nostdout=nostdout, dir=session_dir)
   resume!(session)
   return true
 end

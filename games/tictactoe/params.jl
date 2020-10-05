@@ -72,3 +72,6 @@ benchmark = [
     num_workers=100,
     use_gpu=false,
     flip_probability=0.5)]
+
+experiment = Experiment(
+  "tictactoe", GameSpec(), params, Network, netparams, benchmark=benchmark)

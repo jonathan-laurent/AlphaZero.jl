@@ -86,3 +86,6 @@ make_duel(player, baseline) =
     color_policy=CONTENDER_WHITE)
 
 benchmark = [make_duel(p, b) for (p, b) in zip(players, baselines)]
+
+experiment = Experiment("connect-four",
+  GameSpec(), params, Network, netparams, benchmark=benchmark)

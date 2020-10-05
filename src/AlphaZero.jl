@@ -8,6 +8,7 @@ module AlphaZero
 # Submodules
 export MCTS, MinMax, GameInterface, GI, Report, Benchmark
 export Network, KnetLib, FluxLib, NetLib
+export Examples
 # AlphaZero parameters
 export Params, SelfPlayParams, LearningParams, ArenaParams
 export MctsParams, MemAnalysisParams
@@ -23,6 +24,8 @@ export ColorPolicy, ALTERNATE_COLORS, BASELINE_WHITE, CONTENDER_WHITE
 export AbstractNetwork, OptimiserSpec, Nesterov, CyclicNesterov, Adam
 # Training environments
 export Env, train!, get_experience
+# Experiments
+export Experiment
 # User interface
 export UserInterface
 export Session, resume!, save, play_interactive_game
@@ -74,12 +77,17 @@ include("networks/knet.jl")
 include("networks/flux.jl")
 # import .FluxLib
 
+include("experiment.jl")
+
 # The default user interface is included here for convenience but it could be
 # replaced or separated from the main AlphaZero.jl package (which would also
 # enable dropping some dependencies such as Crayons or JSON3).
 
 include("ui/ui.jl")
 using .UserInterface
+
+# A small library of standard examples
+include("examples.jl")
 
 # Choose the default DL framework based on an environment variable
 function __init__()

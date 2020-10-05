@@ -65,6 +65,7 @@ end
 ##### Save and load environments
 #####
 
+const GSPEC_FILE       =  "gspec.data"
 const BESTNN_FILE      =  "bestnn.data"
 const CURNN_FILE       =  "curnn.data"
 const MEM_FILE         =  "mem.data"
@@ -90,6 +91,8 @@ end
 
 function save_env(env::Env, dir)
   isdir(dir) || mkpath(dir)
+  # Saving spec
+  serialize(joinpath(dir, GSPEC_FILE), env.gspec)
   # Saving parameters
   open(joinpath(dir, PARAMS_FILE), "w") do io
     JSON2.pretty(io, JSON3.write(env.params))
@@ -121,8 +124,14 @@ function load_network(logger, net_file, netparams_file)
   return network
 end
 
-function load_env(gspec, logger, dir; params)
+function load_env(logger, dir; params)
   Log.section(logger, 1, "Loading environment")
+  # Load the game specification
+  gspec_file = joinpath(dir, GSPEC_FILE)
+  if !isfile(gspec_file)
+    error("File not found: $(gspec_file)")
+  end
+  gspec = deserialize(gspec_file)
   # Load the neural networks
   netparams_file = joinpath(dir, NET_PARAMS_FILE)
   bestnn = load_network(logger, joinpath(dir, BESTNN_FILE), netparams_file)
@@ -294,16 +303,9 @@ end
 #####
 
 """
-    Session(gspec, params, mknet, netparams)
+    Session(::Experiment; <optional kwargs>)
 
-Create a new session using the given parameters, or load it from disk if
-it already exists.
-
-# Arguments
-- `gspec` is the specification of the game to be played
-- `params` has type [`Params`](@ref)
-- `mknet` is a neural network constructor taking arguments `(netparams, gspec)`
-- `netparams` are the neural network hyperparameters                                                                                             
+Create a new session from an experiment.
 
 # Optional keyword arguments
 - `dir`: session directory in which all files and reports are saved; this
@@ -312,57 +314,34 @@ it already exists.
 - `autosave=true`: if set to `false`, the session won't be saved automatically nor
     any file will be generated
 - `nostdout=false`: disables logging on the standard output when set to `true`
-- `benchmark=[]`: vector of [`Benchmark.Duel`](@ref) to be used as a benchmark
 - `save_intermediate=false`: if set to true (along with `autosave`), all
     intermediate training environments are saved on disk so that
     the whole training process can be analyzed later. This can
     consume a lot of disk space.
 """
 function Session(
-    gspec, params, mknet, netparams;
-    dir=nothing, autosave=true, nostdout=false, benchmark=[],
+    e::Experiment;
+    dir=nothing,
+    autosave=true,
+    nostdout=false,
     save_intermediate=false)
   
   logger = session_logger(dir, nostdout, autosave)
   if valid_session_dir(dir)
-    @warn "Valid session dir found"
-    env = load_env(gspec, logger, dir, params=params)
+    env = load_env(logger, dir, params=e.params)
     # The parameters must be unchanged
     same_json(x, y) = JSON3.write(x) == JSON3.write(y)
-    same_json(env.params, params) || @info "Using modified parameters"
-    @assert same_json(Network.hyperparams(env.bestnn), netparams)
-    session = Session(env, dir, logger, autosave, save_intermediate, benchmark)
+    same_json(env.params, e.params) || @info "Using modified parameters"
+    @assert same_json(Network.hyperparams(env.bestnn), e.netparams)
+    session = Session(env, dir, logger, autosave, save_intermediate, e.benchmark)
     session.report = load_session_report(dir, env.itc)
   else
-    @warn "No valid session dir found"
-    network = mknet(gspec, netparams)
-    env = Env(gspec, params, network)
-    session = Session(env, dir, logger, autosave, save_intermediate, benchmark)
+    network = e.mknet(e.gspec, e.netparams)
+    env = Env(e.gspec, e.params, network)
+    session = Session(env, dir, logger, autosave, save_intermediate, e.benchmark)
     Log.section(session.logger, 1, "Initializing a new AlphaZero environment")
     zeroth_iteration!(session)
   end
-  return session
-end
-
-"""
-    Session(env::Env[, dir])
-
-Create a session from an initial environment.
-
-- The iteration counter of the environment must be equal to 0
-- If a session directory is provided, this directory must not exist yet
-
-This constructor features the optional keyword arguments
-`autosave`, `nostdout`, `benchmark` and `save_intermediate`.
-"""
-function Session(
-    env::Env, dir=nothing; autosave=true, nostdout=false, benchmark=[],
-    save_intermediate=false)
-  @assert isnothing(dir) || !isdir(dir)
-  @assert env.itc == 0
-  logger = session_logger(dir, nostdout, autosave)
-  session = Session(env, dir, logger, autosave, save_intermediate, benchmark)
-  zeroth_iteration!(session)
   return session
 end
 
@@ -582,7 +561,7 @@ end
 function run_duel(
     gspec::AbstractGameSpec, dir::String, duel::Benchmark.Duel; params=nothing)
   logger = Logger()
-  env = load_env(gspec, logger, dir, params=params)
+  env = load_env(logger, dir, params=params)
   run_duel(env, logger, duel)
 end
 
@@ -598,7 +577,7 @@ function run_new_benchmark(
     !isnothing(itcmax) && itc > itcmax && break
     Log.section(logger, 1, "Iteration: $itc")
     itdir = iterdir(session_dir, itc)
-    env = load_env(gspec, logger, itdir, params=params)
+    env = load_env(logger, itdir, params=params)
     report = [run_duel(env, logger, duel) for duel in benchmark]
     push!(reports, report)
     # Save the intermediate reports
