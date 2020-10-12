@@ -3,7 +3,6 @@
 #####
 
 using DataStructures: Stack
-import AlphaZero: MemoryBuffer
 
 # All state statistics and are expressed with respect to the current player
 

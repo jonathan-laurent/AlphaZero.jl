@@ -2,8 +2,6 @@
 ##### Session management
 #####
 
-import AlphaZero: Handlers, initial_report, get_experience
-
 """
     SessionReport
 

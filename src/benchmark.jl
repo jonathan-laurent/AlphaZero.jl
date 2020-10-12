@@ -7,12 +7,8 @@ compete against a set of baselines.
 """
 module Benchmark
 
-import ..Network, ..MinMax, ..GI, ..AbstractGameSpec, ..AbstractGameEnv
-import ..Env, ..MCTS, ..MctsParams, ..TwoPlayers
-import ..simulate, ..Simulator, ..rewards_and_redundancy, ..record_trace
-import ..ColorPolicy, ..ALTERNATE_COLORS
-import ..AbstractPlayer, ..EpsilonGreedyPlayer, ..NetworkPlayer, ..MctsPlayer
-import ..PlayerWithTemperature, ..ConstSchedule
+using AlphaZero: Network
+using AlphaZero.Training
 
 using ProgressMeter
 using Statistics: mean
@@ -165,7 +161,7 @@ end
 
 name(p::MctsRollouts) = "MCTS ($(p.params.num_iters_per_turn) rollouts)"
 
-function instantiate(p::MctsRollouts, gspec::AbstractGameSpec, nn::MCTS.Oracle)
+function instantiate(p::MctsRollouts, gspec::AbstractGameSpec, nn)
   return MctsPlayer(gspec, MCTS.RolloutOracle(gspec), p.params)
 end
 
@@ -219,7 +215,7 @@ end
 
 name(p::MinMaxTS) = "MinMax (depth $(p.depth))"
 
-function instantiate(p::MinMaxTS, ::AbstractGameSpec, ::MCTS.Oracle)
+function instantiate(p::MinMaxTS, ::AbstractGameSpec, nn)
   return MinMax.Player(
     depth=p.depth, amplify_rewards=p.amplify_rewards, τ=p.τ)
 end

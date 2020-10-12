@@ -10,10 +10,15 @@ module UserInterface
   export Explorer, start_explorer
   export Session, resume!, save, play_interactive_game
 
-  using AlphaZero
-  using AlphaZero.Util: Option
-  import AlphaZero: AbstractGameEnv, AbstractGameSpec, Experiment
-  import AlphaZero: Util, apply_temperature
+  using AlphaZero: Util, Benchmark, NetLib
+  using AlphaZero.GameInterface
+  using AlphaZero.Network
+  using AlphaZero.Training
+  using AlphaZero.Experiments
+
+  using AlphaZero.Util: Option, apply_temperature
+  
+import AlphaZero.Training: Handlers
 
   import Plots
   import Colors

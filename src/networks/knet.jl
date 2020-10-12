@@ -6,9 +6,10 @@ module KnetLib
 
 export SimpleNet, SimpleNetHP, ResNet, ResNetHP
 
-using ..Network
-using Base: @kwdef
-import ..GI, ..AbstractGameSpec, ..Util, ..CyclicSchedule
+using AlphaZero: Network, GI, Util
+using AlphaZero.GameInterface
+using AlphaZero.Network
+using AlphaZero.Training: CyclicSchedule
 
 import CUDA
 import Knet

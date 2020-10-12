@@ -6,11 +6,13 @@ module FluxLib
 
 export SimpleNet, SimpleNetHP, ResNet, ResNetHP
 
-using ..Network
-using Base: @kwdef
-import ..GI, ..AbstractGameSpec, ..Util, ..CyclicSchedule
+using AlphaZero: Network, GI, Util
+using AlphaZero.GameInterface
+using AlphaZero.Network
+using AlphaZero.Training: CyclicSchedule
 
 using CUDA
+using Base: @kwdef
 
 import Flux
 import Functors

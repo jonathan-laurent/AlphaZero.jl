@@ -7,7 +7,7 @@ module MCTS
 
 using Distributions: Categorical, Dirichlet
 
-import ..GI, ..AbstractGameSpec, ..Util
+using AlphaZero: GI, Util
 
 #####
 ##### Interface for External Oracles
@@ -139,7 +139,7 @@ mutable struct Env{State, Oracle}
   total_simulations :: Int64
   total_nodes_traversed :: Int64
   # Game specification
-  gspec :: AbstractGameSpec
+  gspec :: GI.AbstractGameSpec
 
   function Env(gspec, oracle;
       gamma=1., cpuct=1., noise_ϵ=0., noise_α=1., prior_temperature=1.)

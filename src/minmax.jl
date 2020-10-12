@@ -9,7 +9,9 @@ a baseline against AlphaZero. Heuristic board values are provided by the
 """
 module MinMax
 
-import ..GI, ..GameInterface, ..AbstractPlayer, ..think
+using AlphaZero: GI, GameInterface
+
+import AlphaZero.Simulations: AbstractPlayer, think
 
 amplify(r) = iszero(r) ? r : Inf * sign(r)
 

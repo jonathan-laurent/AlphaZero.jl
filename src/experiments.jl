@@ -1,3 +1,10 @@
+module Experiments
+
+using AlphaZero.Training
+using AlphaZero: Benchmark
+
+export Experiment
+
 """
     Experiment
 
@@ -25,4 +32,6 @@ struct Experiment
   function Experiment(name, gspec, params, mknet, netparams; benchmark=[])
     return new(name, gspec, params, mknet, netparams, benchmark)
   end
+end
+
 end

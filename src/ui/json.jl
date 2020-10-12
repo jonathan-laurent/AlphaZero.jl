@@ -12,8 +12,7 @@ for T in [
     # Benchmarks
     Benchmark.DuelOutcome,
     # Network Hyperparameters
-    FluxLib.SimpleNetHP, FluxLib.ResNetHP,
-    KnetLib.SimpleNetHP, KnetLib.ResNetHP,
+    NetLib.SimpleNetHP, NetLib.ResNetHP,
     # Parameters
     Params, SelfPlayParams, LearningParams, ArenaParams,
     MctsParams, MemAnalysisParams,

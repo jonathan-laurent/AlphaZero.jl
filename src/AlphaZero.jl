@@ -5,104 +5,73 @@
 
 module AlphaZero
 
-# Submodules
-export MCTS, MinMax, GameInterface, GI, Report, Benchmark
-export Network, KnetLib, FluxLib, NetLib
-export Examples
-# AlphaZero parameters
-export Params, SelfPlayParams, LearningParams, ArenaParams
-export MctsParams, MemAnalysisParams
-export SamplesWeighingPolicy, CONSTANT_WEIGHT, LOG_WEIGHT, LINEAR_WEIGHT
-export AbstractSchedule, ConstSchedule, PLSchedule, StepSchedule
-# Players and games
-export AbstractGameEnv, AbstractGameSpec, AbstractPlayer, TwoPlayers, Trace
-export think, select_move, reset_player!, player_temperature, apply_temperature
-export play_game, interactive!, total_reward
-export MctsPlayer, RandomPlayer, EpsilonGreedyPlayer, NetworkPlayer, Human
-export ColorPolicy, ALTERNATE_COLORS, BASELINE_WHITE, CONTENDER_WHITE
-# Networks
-export AbstractNetwork, OptimiserSpec, Nesterov, CyclicNesterov, Adam
-# Training environments
-export Env, train!, get_experience
-# Experiments
-export Experiment
-# User interface
-export UserInterface
-export Session, resume!, save, play_interactive_game
-export Explorer, start_explorer
-
+# Helper functions used internally
 include("util.jl")
-import .Util
-using .Util: Option, apply_temperature
 
+# A generic interface for single-player or zero-sum two-players games.
 include("game.jl")
-using .GameInterface
 const GI = GameInterface
 
+# A standalone, generic MCTS implementation
 include("mcts.jl")
-import .MCTS
 
+# A generic network interface
 include("networks/network.jl")
-using .Network
 
+# Utilities to batch oracle calls
 include("batchifier.jl")
-import .Batchifier
 
-using Formatting
-using Base: @kwdef
-using DataStructures: CircularBuffer
-using Distributions: Categorical, Dirichlet
-using Statistics: mean
+# Implementation of the core training algorithm
+include("simulations.jl")
 
-import Distributed
+# Implementation of the core training algorithm
+include("core.jl")
 
-include("schedule.jl")
-include("params.jl")
-include("report.jl")
-include("trace.jl")
-include("memory.jl")
-include("learning.jl")
-include("play.jl")
-include("training.jl")
-
+# A minmax player to be used as a baseline
 include("minmax.jl")
-import .MinMax
 
+# Utilities to write benchmarks
 include("benchmark.jl")
-using .Benchmark
 
-include("networks/knet.jl")
-# import .KnetLib
+# We provide a library of standard network, both in Knet and Flux.
+# Which backend is used to implement this library is determined during precompilation
+# based on the value of the ALPHAZERO_DEFAULT_DL_FRAMEWORK environment variable.
+const DEFAULT_DL_FRAMEWORK = get(ENV, "ALPHAZERO_DEFAULT_DL_FRAMEWORK", "FLUX")
 
-include("networks/flux.jl")
-# import .FluxLib
+if DEFAULT_DL_FRAMEWORK == "FLUX"
+  @info "Using the Flux implementation of AlphaZero.NetLib."
+  @eval begin
+    include("networks/flux.jl")
+    const NetLib = FluxLib
+  end
+elseif DEFAULT_DL_FRAMEWORK == "KNET"
+  @info "Using the Knet implementation of AlphaZero.NetLib."
+  @eval begin
+    include("networks/knet.jl")
+    const NetLib = KnetLib
+  end
+else
+  error("Unknown DL framework: $(DEFAULT_DL_FRAMEWORK)")
+end
 
-include("experiment.jl")
+# A structure that contains the information necessary to replicate a training session
+include("experiments.jl")
 
 # The default user interface is included here for convenience but it could be
 # replaced or separated from the main AlphaZero.jl package (which would also
 # enable dropping some dependencies such as Crayons or JSON3).
-
 include("ui/ui.jl")
-using .UserInterface
 
 # A small library of standard examples
 include("examples.jl")
 
-# Choose the default DL framework based on an environment variable
-function __init__()
-  @eval begin
-    const DEFAULT_DL_FRAMEWORK = get(ENV, "ALPHAZERO_DEFAULT_DL_FRAMEWORK", "FLUX")
-    const NetLib =
-      if DEFAULT_DL_FRAMEWORK == "FLUX"
-        @info "Using Flux."
-        FluxLib
-      elseif DEFAULT_DL_FRAMEWORK == "KNET"
-        @info "Using Knet."
-        KnetLib
-      else
-        error("Unknown DL framework: $(DEFAULT_DL_FRAMEWORK)")
-      end
+# Reexporting some names
+for m in [
+    GameInterface, GI, MCTS, Network, Simulations, Training,
+    MinMax, Benchmark, NetLib, UserInterface ]
+  for x in names(m)
+    println(x)
+    @eval export $x
   end
 end
 

@@ -1,6 +1,6 @@
 module Batchifier
 
-import ..MCTS, ..Util
+import AlphaZero: MCTS, Util
 
 export BatchedOracle
 
