@@ -1,9 +1,8 @@
 module Experiments
 
-using AlphaZero.Training
-using AlphaZero: Benchmark
-
 export Experiment
+
+using AlphaZero
 
 """
     Experiment

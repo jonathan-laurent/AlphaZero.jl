@@ -7,8 +7,7 @@
 
 module Solver
 
-using AlphaZero: GI, GameInterface, Benchmark
-import AlphaZero.Core: AbstractPlayer, think
+using AlphaZero
 
 import ..GameEnv, ..history, ..WHITE, ..NUM_CELLS
 

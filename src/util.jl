@@ -1,6 +1,6 @@
 module Util
 
-export Option
+export Option, apply_temperature
 
 import Random
 using Distributions: Categorical
@@ -73,9 +73,11 @@ For example, given the following struct:
       y :: Int
     end
 
-Th generated code is equivalent to:
+The generated code is equivalent to:
 
     Point(pt; x=pt.x, y=pt.y) = Point(x, y)
+
+** This function may be deprecated in favor of Setfield.jl in the future.**
 """
 function generate_update_constructor(T)
   fields = fieldnames(T)

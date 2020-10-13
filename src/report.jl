@@ -4,8 +4,7 @@ hyperparameters tuning.
 """
 module Report
 
-# Some imports for docstrings cross-references
-import ..MCTS, ..Network, ..MemAnalysisParams
+using AlphaZero
 
 """
     Report.Loss

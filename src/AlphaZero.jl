@@ -5,74 +5,152 @@
 
 module AlphaZero
 
-# Helper functions used internally
-include("util.jl")
+  import Distributed
+  using Formatting
+  using Base: @kwdef
+  using DataStructures: CircularBuffer
+  using Distributions: Categorical, Dirichlet
+  using Statistics: mean
 
-# A generic interface for single-player or zero-sum two-players games.
-include("game.jl")
-const GI = GameInterface
+  # Internal helper functions
+  include("util.jl")
+  using .Util
+  export Util
+  export apply_temperature
 
-# A standalone, generic MCTS implementation
-include("mcts.jl")
+  # A generic interface for single-player or zero-sum two-players games.
+  include("game.jl")
+  using .GameInterface
+  const GI = GameInterface
+  export GameInterface, GI
+  export AbstractGameEnv
+  export AbstractGameSpec
 
-# A generic network interface
-include("networks/network.jl")
+  # A standalone, generic MCTS implementation
+  include("mcts.jl")
+  using .MCTS
+  export MCTS
 
-# Utilities to batch oracle calls
-include("batchifier.jl")
+  # A generic network interface
+  include("networks/network.jl")
+  using .Network
+  export Network
+  export AbstractNetwork
+  export OptimiserSpec
+  export CyclicNesterov, Adam
 
-# Implementation of the core training algorithm
-include("simulations.jl")
+  # Utilities to batch oracle calls
+  include("batchifier.jl")
+  using .Batchifier
+  export Batchifier
 
-# Implementation of the core training algorithm
-include("core.jl")
+  # Schedules
+  include("schedule.jl")
+  export AbstractSchedule
+  export ConstSchedule, PLSchedule, StepSchedule, CyclicSchedule
 
-# A minmax player to be used as a baseline
-include("minmax.jl")
+  # Training params
+  include("params.jl")
+  export Params
+  export MctsParams
+  export SelfPlayParams
+  export LearningParams
+  export ArenaParams
+  export MemAnalysisParams
+  export SamplesWeighingPolicy, CONSTANT_WEIGHT, LOG_WEIGHT, LINEAR_WEIGHT
 
-# Utilities to write benchmarks
-include("benchmark.jl")
+  # Game traces
+  include("trace.jl")
+  export Trace
 
-# We provide a library of standard network, both in Knet and Flux.
-# Which backend is used to implement this library is determined during precompilation
-# based on the value of the ALPHAZERO_DEFAULT_DL_FRAMEWORK environment variable.
-const DEFAULT_DL_FRAMEWORK = get(ENV, "ALPHAZERO_DEFAULT_DL_FRAMEWORK", "FLUX")
+  # Players and games
+  include("play.jl")
+  export AbstractPlayer, think, select_move, reset_player!, player_temperature
+  export MctsPlayer
+  export RandomPlayer
+  export NetworkPlayer
+  export PlayerWithTemperature
+  export EpsilonGreedyPlayer
+  export TwoPlayers
+  export Human, interactive!
+  export play_game
 
-if DEFAULT_DL_FRAMEWORK == "FLUX"
-  @info "Using the Flux implementation of AlphaZero.NetLib."
-  @eval begin
-    include("networks/flux.jl")
-    const NetLib = FluxLib
+  # Utilities for distributed games simulation
+  include("simulations.jl")
+  export ColorPolicy, ALTERNATE_COLORS, BASELINE_WHITE, CONTENDER_WHITE
+  export Simulator, simulate, simulate_distributed
+  export record_trace
+  export rewards_and_redundancy
+
+  # Stats about training
+  include("report.jl")
+  export Report
+
+  # Memory buffer to hold samples generated during self-play
+  include("memory.jl")
+  export MemoryBuffer, get_experience
+
+  # Utilities to train the neural network based on collected samples
+  include("learning.jl")
+
+  # Main training algorithm
+  include("training.jl")
+  export Env, train!, initial_report
+  export Handlers
+
+  # A minmax player to be used as a baseline
+  include("minmax.jl")
+  using .MinMax
+  export MinMax
+
+  # Utilities to write benchmarks
+  include("benchmark.jl")
+  using .Benchmark
+  export Benchmark
+
+  # We provide a library of standard network, both in Knet and Flux.
+  # Which backend is used to implement this library is determined during precompilation
+  # based on the value of the ALPHAZERO_DEFAULT_DL_FRAMEWORK environment variable.
+  const DEFAULT_DL_FRAMEWORK = get(ENV, "ALPHAZERO_DEFAULT_DL_FRAMEWORK", "FLUX")
+
+  if DEFAULT_DL_FRAMEWORK == "FLUX"
+    @info "Using the Flux implementation of AlphaZero.NetLib."
+    @eval begin
+      include("networks/flux.jl")
+      const NetLib = FluxLib
+    end
+  elseif DEFAULT_DL_FRAMEWORK == "KNET"
+    @info "Using the Knet implementation of AlphaZero.NetLib."
+    @eval begin
+      include("networks/knet.jl")
+      const NetLib = KnetLib
+    end
+  else
+    error("Unknown DL framework: $(DEFAULT_DL_FRAMEWORK)")
   end
-elseif DEFAULT_DL_FRAMEWORK == "KNET"
-  @info "Using the Knet implementation of AlphaZero.NetLib."
-  @eval begin
-    include("networks/knet.jl")
-    const NetLib = KnetLib
-  end
-else
-  error("Unknown DL framework: $(DEFAULT_DL_FRAMEWORK)")
-end
 
-# A structure that contains the information necessary to replicate a training session
-include("experiments.jl")
+  using .NetLib
+  export NetLib
+  export SimpleNet, SimpleNetHP, ResNet, ResNetHP
 
-# The default user interface is included here for convenience but it could be
-# replaced or separated from the main AlphaZero.jl package (which would also
-# enable dropping some dependencies such as Crayons or JSON3).
-include("ui/ui.jl")
+  # A structure that contains the information necessary to replicate a training session
+  include("experiments.jl")
+  using .Experiments
+  export Experiments
+  export Experiment
 
-# A small library of standard examples
-include("examples.jl")
+  # The default user interface is included here for convenience but it could be
+  # replaced or separated from the main AlphaZero.jl package (which would also
+  # enable dropping some dependencies such as Crayons or JSON3).
+  include("ui/ui.jl")
+  export UserInterface
 
-# Reexporting some names
-for m in [
-    GameInterface, GI, MCTS, Network, Simulations, Training,
-    MinMax, Benchmark, NetLib, UserInterface ]
-  for x in names(m)
-    println(x)
-    @eval export $x
-  end
-end
+  # A small library of standard examples
+  include("examples.jl")
+  export Examples
+
+  # Scripts
+  include("scripts/scripts.jl")
+  export Scripts
 
 end

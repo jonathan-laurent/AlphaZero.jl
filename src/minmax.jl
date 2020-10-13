@@ -9,9 +9,7 @@ a baseline against AlphaZero. Heuristic board values are provided by the
 """
 module MinMax
 
-using AlphaZero: GI, GameInterface
-
-import AlphaZero.Simulations: AbstractPlayer, think
+using AlphaZero
 
 amplify(r) = iszero(r) ? r : Inf * sign(r)
 
@@ -86,7 +84,7 @@ struct Player <: AbstractPlayer
   end
 end
 
-function think(p::Player, game)
+function AlphaZero.think(p::Player, game)
   actions = GI.available_actions(game)
   n = length(actions)
   qs = [qvalue(p, game, a, p.depth) for a in actions]

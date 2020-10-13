@@ -21,8 +21,6 @@ Hyperparameters for the simplenet architecture.
   batch_norm_momentum :: Float32 = 0.6f0
 end
 
-Util.generate_update_constructor(SimpleNetHP) |> eval
-
 """
     SimpleNet <: TwoHeadNetwork
 

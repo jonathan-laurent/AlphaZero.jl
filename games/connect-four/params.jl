@@ -77,8 +77,8 @@ baselines = [
 
 make_duel(player, baseline) =
   Benchmark.Duel(
-    player,
-    baseline,
+    player=player,
+    baseline=baseline,
     num_games=128,
     num_workers=128,
     use_gpu=true,

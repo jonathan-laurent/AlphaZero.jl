@@ -1,20 +1,19 @@
 using AlphaZero
-using Test
+using AlphaZero.Examples
+using AlphaZero.Scripts: dummy_run
 
-include("../games/tictactoe/main.jl")
-include("../games/connect-four/main.jl")
-include("../scripts/lib/dummy_run.jl")
+using Test
 
 include("test_game.jl")
 
 @testset "Testing Games" begin
-  test_game(Tictactoe.GameSpec())
-  # test_game(ConnectFour.GameSpec())
+  #test_game(Tictactoe.GameSpec())
+  test_game(ConnectFour.GameSpec())
   @test true
 end
 
 # @testset "Dummy Runs" begin
 #   dir = "sessions/test-tictactoe"
 #   @test dummy_run(Tictactoe.Training.experiment, nostdout=false, session_dir=dir)
-#   #@test dummy_run(ConnectFour) # Takes a bit too long for Travis
+#   # @test dummy_run(ConnectFour) # Takes a bit too long for Travis
 # end

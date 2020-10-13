@@ -5,8 +5,7 @@ module Network
 
 export AbstractNetwork, OptimiserSpec, CyclicNesterov, Adam
 
-using AlphaZero: GI, Util
-using AlphaZero.GameInterface
+using AlphaZero
 
 using Base: @kwdef
 using Statistics: mean

@@ -7,11 +7,11 @@ compete against a set of baselines.
 """
 module Benchmark
 
-using AlphaZero: Network
-using AlphaZero.Training
+using AlphaZero
 
 using ProgressMeter
 using Statistics: mean
+using Base: @kwdef
 
 """
     Benchmark.DuelOutcome
@@ -63,32 +63,30 @@ function instantiate end
 function name end
 
 """
-    Benchmark.Duel(player, baseline; num_games)
+    Benchmark.Duel
 
-Specify a duel that consists in `num_games` games between
-`player` and `baseline`, each of them of type [`Benchmark.Player`](@ref).
+A duel that consists in `num_games` games between `player` and `baseline`
 
-# Optional keyword arguments
-- `reset_every`: if set, the MCTS tree is reset every `reset_mcts_every` games
-    to avoid running out of memory
-- `color_policy` has type [`ColorPolicy`](@ref) and is `ALTERNATE_COLORS`
-    by default
+| Parameter            | Type                  | Default            |
+|:---------------------|:----------------------|:-------------------|
+| `player`             | [`Player`](@ref)      |  -                 |
+| `baseline`           | [`Player`](@ref)      |  -                 |
+| `num_games`          | `Int`                 |  -                 |
+| `num_workers`        | `Int`                 |  -                 |
+| `use_gpu`            | `Bool`                | `false`            |
+| `flip_probability`   | `Float64`             | `0.`               |
+| `reset_mcts_every`   | `Union{Nothing, Int}` | `1`                |
+| `color_policy`       | [`ColorPolicy`](@ref) | `ALTERNATE_COLORS` |
 """
-struct Duel
-  num_games :: Int
-  num_workers :: Int
-  use_gpu :: Bool
-  reset_every :: Union{Nothing, Int}
-  flip_probability :: Float64
-  color_policy :: ColorPolicy
+@kwdef struct Duel
   player :: Player
   baseline :: Player
-  function Duel(player, baseline;
-      num_games, num_workers, use_gpu=false, reset_every=nothing,
-      color_policy=ALTERNATE_COLORS, flip_probability=0.)
-    return new(num_games, num_workers, use_gpu, reset_every,
-      flip_probability, color_policy, player, baseline)
-  end
+  num_games :: Int
+  num_workers :: Int
+  use_gpu :: Bool = false
+  reset_every :: Union{Nothing, Int} = nothing
+  flip_probability :: Float64 = 0.
+  color_policy :: ColorPolicy = ALTERNATE_COLORS
 end
 
 """
@@ -174,7 +172,6 @@ Argument `params` has type [`MctsParams`](@ref).
 """
 struct Full <: Player
   params :: MctsParams
-  Full(params) = new(params)
 end
 
 name(::Full) = "AlphaZero"
@@ -189,9 +186,8 @@ end
 Player that uses the policy output by the learnt network directly,
 instead of relying on MCTS.
 """
-struct NetworkOnly <: Player
-  τ :: Float64
-  NetworkOnly(;τ=1.0) = new(τ)
+@kwdef struct NetworkOnly <: Player
+  τ :: Float64 = 1.0
 end
 
 name(::NetworkOnly) = "Network Only"
@@ -206,11 +202,10 @@ end
 
 Minmax baseline, which relies on [`MinMax.Player`](@ref).
 """
-struct MinMaxTS <: Player
+@kwdef struct MinMaxTS <: Player
   depth :: Int
   amplify_rewards :: Bool
-  τ :: Float64
-  MinMaxTS(;depth, amplify_rewards, τ=0.) = new(depth, amplify_rewards, τ)
+  τ :: Float64 = 0.
 end
 
 name(p::MinMaxTS) = "MinMax (depth $(p.depth))"

@@ -36,8 +36,6 @@ filters per convolutional layer.
   batch_norm_momentum :: Float32 = 0.6f0
 end
 
-Util.generate_update_constructor(ResNetHP) |> eval
-
 """
     ResNet <: TwoHeadNetwork
 

@@ -59,15 +59,15 @@ params = Params(
 
 benchmark = [
   Benchmark.Duel(
-    Benchmark.Full(self_play.mcts),
-    Benchmark.MctsRollouts(self_play.mcts),
+    player=Benchmark.Full(self_play.mcts),
+    baseline=Benchmark.MctsRollouts(self_play.mcts),
     num_games=400,
     num_workers=100,
     use_gpu=false,
     flip_probability=0.5),
   Benchmark.Duel(
-    Benchmark.NetworkOnly(),
-    Benchmark.MinMaxTS(depth=6, amplify_rewards=true, τ=1.),
+    player=Benchmark.NetworkOnly(),
+    baseline=Benchmark.MinMaxTS(depth=6, amplify_rewards=true, τ=1.),
     num_games=400,
     num_workers=100,
     use_gpu=false,
