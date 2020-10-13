@@ -9,7 +9,7 @@ module GameInterface
 
 export AbstractGameSpec, AbstractGameEnv
 
-using AlphaZero: Util
+using ..AlphaZero: Util
 
 #####
 ##### Game environments and game specifications

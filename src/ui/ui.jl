@@ -10,7 +10,7 @@ module UserInterface
   export Explorer, start_explorer
   export Session, resume!, save, play_interactive_game
 
-  using AlphaZero
+  using ..AlphaZero
 
   import Plots
   import Colors

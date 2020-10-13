@@ -9,7 +9,7 @@ a baseline against AlphaZero. Heuristic board values are provided by the
 """
 module MinMax
 
-using AlphaZero
+using ..AlphaZero
 
 amplify(r) = iszero(r) ? r : Inf * sign(r)
 

@@ -7,7 +7,7 @@ module MCTS
 
 using Distributions: Categorical, Dirichlet
 
-using AlphaZero: GI, Util
+using ..AlphaZero: GI, Util
 
 #####
 ##### Interface for External Oracles

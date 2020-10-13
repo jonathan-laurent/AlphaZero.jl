@@ -3,7 +3,7 @@
 #####
 
 using DataStructures: Stack
-using AlphaZero.Util: Option
+using ..AlphaZero.Util: Option
 
 # All state statistics and are expressed with respect to the current player
 

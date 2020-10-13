@@ -2,7 +2,7 @@ module Experiments
 
 export Experiment
 
-using AlphaZero
+using ..AlphaZero
 
 """
     Experiment

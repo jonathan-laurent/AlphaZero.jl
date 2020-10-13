@@ -6,7 +6,7 @@ module KnetLib
 
 export SimpleNet, SimpleNetHP, ResNet, ResNetHP
 
-using AlphaZero
+using ..AlphaZero
 
 import CUDA
 import Knet

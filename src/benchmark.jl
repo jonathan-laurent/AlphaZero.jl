@@ -7,7 +7,7 @@ compete against a set of baselines.
 """
 module Benchmark
 
-using AlphaZero
+using ..AlphaZero
 
 using ProgressMeter
 using Statistics: mean

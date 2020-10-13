@@ -4,7 +4,7 @@ hyperparameters tuning.
 """
 module Report
 
-using AlphaZero
+using ..AlphaZero
 
 """
     Report.Loss
