@@ -4,6 +4,6 @@ include("main.jl")
 using .ConnectFour
 
 computer = ConnectFour.Solver.Player()
-human = Human{Game}()
+human = Human()
 
 interactive!(Game(), computer, human)

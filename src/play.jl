@@ -354,6 +354,8 @@ Launch a possibly interactive game session.
 
 This function takes either an `AbstractGameSpec` or `AbstractGameEnv` as an argument.
 """
+function interactive! end
+
 function interactive!(game::AbstractGameEnv, player)
   try
   GI.render(game)

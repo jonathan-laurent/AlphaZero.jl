@@ -2,8 +2,6 @@
 ##### GameInterface Tests
 #####
 
-using AlphaZero
-
 # Generate a set of reachable states randomly
 function generate_states(gspec, n)
   traces = [play_game(gspec, RandomPlayer()) for i in 1:n]

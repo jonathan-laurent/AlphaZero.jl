@@ -42,7 +42,7 @@ end
 
 function evaluate_qnet(oracle, game, action, gamma)
   @assert !GI.game_terminated(game)
-  next = copy(game)
+  next = GI.clone(game)
   GI.play!(next, action)
   wr = GI.white_reward(next)
   r = GI.white_playing(game) ? wr : -wr
@@ -165,67 +165,19 @@ end
 ##### Interactive exploration of the environment
 #####
 
-"""
-    Explorer
-
-A command interpreter to explore the internals of a player
-through interactive play.
-
-# Constructors
-
-    Explorer(player::AbstractPlayer, game; memory=nothing)
-
-Build an explorer to investigate the behavior of `player` in a given `game`
-
-The `game` argument can be either an `AstractGameSpec` or `AbstractGameEnv`.
-Optionally, a reference to a memory buffer can be provided, in which case additional
-state statistics will be displayed.
-
-    Explorer(env::Env, game; arena_mode=false)
-
-Build an explorer for the MCTS player based on neural network `env.bestnn`
-and on parameters `env.params.self_play.mcts` or `env.params.arena.mcts`
-(depending on the value of `arena_mode`).
-
-# Commands
-
-The following commands are currently implemented:
-
-  - `do [action]`: make the current player perform `action`.
-    By default, the action of highest score is played.
-  - `explore [num_sims]`: run `num_sims` MCTS simulations from the current
-    state (for MCTS players only).
-  - `go`: query the user for a state description and go to this state.
-  - `flip`: flip the board according to a random symmetry.
-  - `undo`: undo the effect of the previous command.
-  - `restart`: restart the explorer.
-"""
 mutable struct Explorer
   game :: AbstractGameEnv
   history :: Stack{AbstractGameEnv}
   player :: AbstractPlayer
   memory :: Option{MemoryBuffer}
   turn :: Int
-  function Explorer(player::AbstractPlayer, game::AbstractGameEnv; memory=nothing)
+  function Explorer(
+      player::AbstractPlayer,
+      game::AbstractGameEnv;
+      memory=nothing)
     history = Stack{AbstractGameEnv}()
     new(game, history, player, memory, 0)
   end
-end
-
-function Explorer(
-    env::Env, game::AbstractGameEnv; mcts_params=env.params.self_play.mcts, on_gpu=false)
-  GameEnv = typeof(game)
-  net = Network.copy(env.bestnn, on_gpu=on_gpu, test_mode=true)
-  player = MctsPlayer(net, mcts_params)
-  return Explorer(player, game, memory=env.memory)
-end
-
-function Explorer(player::AbstractPlayer, gspec::AbstractGameSpec; memory=nothing)
-  return Explorer(player, GI.init(gspec), memory=memory)
-end
-
-function Explorer(env::Env; mcts_params=env.params.self_play.mcts, on_gpu=false)
-  return Explorer(env, GI.init(env.gspec), mcts_params=mcts_params, on_gpu=on_gpu)
 end
 
 function restart!(exp::Explorer)
@@ -319,4 +271,44 @@ function start_explorer(exp::Explorer)
     end
     println("")
   end
+end
+
+#####
+##### The explore methods
+#####
+
+"""
+    explore(::AbstractPlayer, ::AbstractGameEnv;  [memory])
+    explore(::AbstractPlayer, ::AbstractGameSpec; [memory])
+
+Start a command interpreter to explore the internals of a player
+through interactive play.
+
+The `memory` argument is an optional reference to a memory buffer
+When provided, additional state statistics are displayed.
+
+# Commands
+
+The following commands are currently implemented:
+
+  - `do [action]`: make the current player perform `action`.
+    By default, the action of highest score is played.
+  - `explore [num_sims]`: run `num_sims` MCTS simulations from the current
+    state (for MCTS players only).
+  - `go`: query the user for a state description and go to this state.
+  - `flip`: flip the board according to a random symmetry.
+  - `undo`: undo the effect of the previous command.
+  - `restart`: restart the explorer.
+"""
+function explore end
+
+function explore(
+    player::AbstractPlayer,
+    game::AbstractGameEnv;
+    memory=nothing)
+  return start_explorer(Explorer(player, game, memory=memory))
+end
+
+function explore(player::AbstractPlayer, gspec::AbstractGameSpec; args...)
+  return explore(player, GI.init(gspec), args...)
 end

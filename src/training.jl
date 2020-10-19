@@ -300,3 +300,32 @@ function train!(env::Env, handler=nothing)
   end
   Handlers.training_finished(handler)
 end
+
+
+#####
+##### AlphaZero player
+#####
+
+function guess_mcts_arena_params(env::Env)
+  p = env.params
+  return isnothing(p.arena) ? p.self_play.mcts : p.arena.mcts
+end
+
+function guess_use_gpu(env::Env)
+  p = env.params
+  return isnothing(p.arena) ? p.self_play.use_gpu : p.arena.use_gpu
+end
+
+"""
+    AlphaZeroPlayer(::Env; [timeout, mcts_params, use_gpu])
+
+Create an AlphaZero player from the current training environment.
+
+Note that the returned player may be slow as it does not batch MCTS requests.
+"""
+function AlphaZeroPlayer(env::Env, timeout=2.0, mcts_params=nothing, use_gpu=nothing)
+  isnothing(mcts_params) && (mcts_params = guess_mcts_arena_params(env))
+  isnothing(use_gpu) && (use_gpu = guess_use_gpu(env))
+  net = Network.copy(env.bestnn, on_gpu=use_gpu, test_mode=true)
+  return MctsPlayer(env.gspec, net, mcts_params, timeout=timeout)
+end

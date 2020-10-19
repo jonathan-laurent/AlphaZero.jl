@@ -12,6 +12,20 @@ module AlphaZero
   using Distributions: Categorical, Dirichlet
   using Statistics: mean
 
+  # When running on a CPU, having multiple threads does not play
+  # well with BLAS multithreading
+  import LinearAlgebra
+  LinearAlgebra.BLAS.set_num_threads(1)
+
+  POOL_MSG =
+  """
+  For best performances, we recommend that you configure CUDA.jl to use a splitting pool.
+  To do so, you can set the JULIA_CUDA_MEMORY_POOL environment variable to "split".
+  """
+  if get(ENV, "JULIA_CUDA_MEMORY_POOL", "") != "split"
+    @info POOL_MSG
+  end
+
   # Internal helper functions
   include("util.jl")
   using .Util
@@ -97,6 +111,7 @@ module AlphaZero
   include("training.jl")
   export Env, train!, initial_report
   export Handlers
+  export AlphaZeroPlayer
 
   # A minmax player to be used as a baseline
   include("minmax.jl")
@@ -111,10 +126,16 @@ module AlphaZero
   # We provide a library of standard network, both in Knet and Flux.
   # Which backend is used to implement this library is determined during precompilation
   # based on the value of the ALPHAZERO_DEFAULT_DL_FRAMEWORK environment variable.
-  const DEFAULT_DL_FRAMEWORK = get(ENV, "ALPHAZERO_DEFAULT_DL_FRAMEWORK", "FLUX")
+  const DEFAULT_DL_FRAMEWORK = get(ENV, "ALPHAZERO_DEFAULT_DL_FRAMEWORK", "KNET")
 
   if DEFAULT_DL_FRAMEWORK == "FLUX"
     @info "Using the Flux implementation of AlphaZero.NetLib."
+    KNET_ADVICE =
+    """
+    For optimal performances, we recommend that you configure AlphaZero.jl
+    to use Knet as a backend by setting ALPHAZERO_DEFAULT_DL_FRAMEWORK to KNET.
+    """
+    @info KNET_ADVICE
     @eval begin
       include("networks/flux.jl")
       const NetLib = FluxLib
@@ -143,7 +164,10 @@ module AlphaZero
   # replaced or separated from the main AlphaZero.jl package (which would also
   # enable dropping some dependencies such as Crayons or JSON3).
   include("ui/ui.jl")
+  using .UserInterface
   export UserInterface
+  export Session, resume!, save
+  export explore
 
   # A small library of standard examples
   include("examples.jl")

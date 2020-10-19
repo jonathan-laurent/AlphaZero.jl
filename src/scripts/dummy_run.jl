@@ -45,6 +45,7 @@ end
 
 function dummy_run(experiment::Experiment; session_dir=nothing, nostdout=true)
   experiment = dummy_run_experiment(experiment)
+  isnothing(session_dir) && (session_dir = "sessions/test-$(experiment.name)")
   session = Session(experiment, nostdout=nostdout, dir=session_dir)
   resume!(session)
   return true

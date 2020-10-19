@@ -2,6 +2,8 @@
 ##### Session management
 #####
 
+const DEFAULT_SESSIONS_DIR = "sessions"
+
 """
     SessionReport
 
@@ -43,7 +45,7 @@ In particular, it implements the [`Handlers`](@ref) interface.
 """
 mutable struct Session{Env}
   env :: Env
-  dir :: Option{String}
+  dir :: String
   logger :: Logger
   autosave :: Bool
   save_intermediate :: Bool
@@ -69,7 +71,8 @@ const CURNN_FILE       =  "curnn.data"
 const MEM_FILE         =  "mem.data"
 const ITC_FILE         =  "iter.txt"
 const REPORT_FILE      =  "report.json"
-const PARAMS_FILE      =  "params.json"
+const PARAMS_FILE      =  "params.data"
+const PARAMS_JSON_FILE =  "params.json"      # not used when loading envs
 const NET_PARAMS_FILE  =  "netparams.json"
 const BENCHMARK_FILE   =  "benchmark.json"
 const LOG_FILE         =  "log.txt"
@@ -79,7 +82,6 @@ const ITERS_DIR        =  "iterations"
 iterdir(dir, i) = joinpath(dir, ITERS_DIR, "$i")
 
 function valid_session_dir(dir)
-  !isnothing(dir) &&
   isfile(joinpath(dir, PARAMS_FILE)) &&
   isfile(joinpath(dir, BESTNN_FILE)) &&
   isfile(joinpath(dir, CURNN_FILE)) &&
@@ -89,16 +91,14 @@ end
 
 function save_env(env::Env, dir)
   isdir(dir) || mkpath(dir)
-  # Saving spec
   serialize(joinpath(dir, GSPEC_FILE), env.gspec)
-  # Saving parameters
-  open(joinpath(dir, PARAMS_FILE), "w") do io
+  serialize(joinpath(dir, PARAMS_FILE), env.params)
+  open(joinpath(dir, PARAMS_JSON_FILE), "w") do io
     JSON2.pretty(io, JSON3.write(env.params))
   end
   open(joinpath(dir, NET_PARAMS_FILE), "w") do io
     JSON2.pretty(io, JSON3.write(Network.hyperparams(env.bestnn)))
   end
-  # Saving state
   serialize(joinpath(dir, BESTNN_FILE), env.bestnn)
   serialize(joinpath(dir, CURNN_FILE), env.curnn)
   serialize(joinpath(dir, MEM_FILE), get_experience(env))
@@ -107,53 +107,13 @@ function save_env(env::Env, dir)
   end
 end
 
-function load_network(logger, net_file, netparams_file)
-  # Try to load network or otherwise network params
-  if isfile(net_file)
-    network = deserialize(net_file)
-    Log.print(logger, "Loading network from: $(net_file)")
-  else
-    Log.print(logger, Log.RED, "No network file: $(net_file)")
-    network = open(netparams_file, "r") do io
-      params = JSON3.read(io, HyperParams(Network))
-      Network(params)
-    end
-  end
-  return network
-end
-
-function load_env(logger, dir; params)
-  Log.section(logger, 1, "Loading environment")
-  # Load the game specification
-  gspec_file = joinpath(dir, GSPEC_FILE)
-  if !isfile(gspec_file)
-    error("File not found: $(gspec_file)")
-  end
-  gspec = deserialize(gspec_file)
-  # Load the neural networks
-  netparams_file = joinpath(dir, NET_PARAMS_FILE)
-  bestnn = load_network(logger, joinpath(dir, BESTNN_FILE), netparams_file)
-  curnn = load_network(logger, joinpath(dir, CURNN_FILE), netparams_file)
-  # Load memory
-  mem_file = joinpath(dir, MEM_FILE)
-  if isfile(mem_file)
-    experience = deserialize(mem_file)
-    Log.print(logger, "Loading memory from: $(mem_file)")
-  else
-    experience = []
-    Log.print(logger, Log.RED, "Starting with an empty memory")
-  end
-  # Load instructions counter
-  itc_file = joinpath(dir, ITC_FILE)
-  if isfile(itc_file)
-    itc = open(itc_file, "r") do io
-      JSON3.read(io)
-    end
-    Log.print(logger, "Loaded iteration counter from: $(itc_file)")
-  else
-    itc = 0
-    Log.print(logger, Log.RED, "File not found: $(itc_file)")
-  end
+function load_env(dir)
+  gspec = deserialize(joinpath(dir, GSPEC_FILE))
+  params = deserialize(joinpath(dir, PARAMS_FILE))
+  curnn = deserialize(joinpath(dir, CURNN_FILE))
+  bestnn = deserialize(joinpath(dir, BESTNN_FILE))
+  experience = deserialize(joinpath(dir, MEM_FILE))
+  itc = open(JSON3.read, joinpath(dir, ITC_FILE), "r") 
   return Env(gspec, params, curnn, bestnn, experience, itc)
 end
 
@@ -168,13 +128,11 @@ function load_session_report(dir::String, niters)
     ifile = joinpath(idir, REPORT_FILE)
     bfile = joinpath(idir, BENCHMARK_FILE)
     # Load the benchmark report
-    isfile(bfile) || error("Not found: $bfile")
     open(bfile, "r") do io
       push!(rep.benchmark, JSON3.read(io, Benchmark.Report))
     end
     # Load the iteration report
     if itc > 0
-      isfile(ifile) || error("Not found: $ifile")
       open(ifile, "r") do io
         push!(rep.iterations, JSON3.read(io, Report.Iteration))
       end
@@ -238,7 +196,7 @@ function show_space_after_progress_bar(logger)
   end
 end
 
-function run_duel(env::Env, logger, duel)
+function run_duel(env::Env, duel; logger)
   player_name = Benchmark.name(duel.player)
   baseline_name = Benchmark.name(duel.baseline)
   legend = "$player_name against $baseline_name"
@@ -264,10 +222,10 @@ function run_duel(env::Env, logger, duel)
   return outcome
 end
 
-function run_benchmark(session)
+function run_benchmark(session::Session)
   report = Benchmark.Report()
   for duel in session.benchmark
-    outcome = run_duel(session.env, session.logger, duel)
+    outcome = run_duel(session.env, duel, logger=session.logger)
     push!(report, outcome)
   end
   return report
@@ -281,12 +239,19 @@ function zeroth_iteration!(session::Session)
   save_increment!(session, bench)
 end
 
+function missing_zeroth_iteration(session::Session)
+  return isempty(session.report.iterations) && isempty(session.report.benchmark)
+end
+
+
 #####
-##### Building the logger
+##### Session constructors
 #####
 
+default_session_dir(experiment) = "$(DEFAULT_SESSIONS_DIR)/$(experiment.name)"
+
 function session_logger(dir, nostdout, autosave)
-  if !isnothing(dir) && autosave
+  if autosave
     isdir(dir) || mkpath(dir)
     logfile = open(joinpath(dir, LOG_FILE), "a")
   else
@@ -296,19 +261,14 @@ function session_logger(dir, nostdout, autosave)
   return Logger(out, logfile=logfile)
 end
 
-#####
-##### Session constructors
-#####
-
 """
     Session(::Experiment; <optional kwargs>)
 
 Create a new session from an experiment.
 
 # Optional keyword arguments
-- `dir`: session directory in which all files and reports are saved; this
-    argument is either a string or `nothing` (default), in which case the
-    session won't be saved automatically and no file will be generated
+- `dir`: session directory in which all files and reports are saved; if this argument
+    is not provided, "sessions/<experiment-name>" is chosen by default.
 - `autosave=true`: if set to `false`, the session won't be saved automatically nor
     any file will be generated
 - `nostdout=false`: disables logging on the standard output when set to `true`
@@ -324,9 +284,11 @@ function Session(
     nostdout=false,
     save_intermediate=false)
   
+  isnothing(dir) && (dir = default_session_dir(e))
   logger = session_logger(dir, nostdout, autosave)
   if valid_session_dir(dir)
-    env = load_env(logger, dir, params=e.params)
+    Log.section(logger, 1, "Loading environment from: $dir")
+    env = load_env(dir)
     # The parameters must be unchanged
     same_json(x, y) = JSON3.write(x) == JSON3.write(y)
     same_json(env.params, e.params) || @info "Using modified parameters"
@@ -338,7 +300,6 @@ function Session(
     env = Env(e.gspec, e.params, network)
     session = Session(env, dir, logger, autosave, save_intermediate, e.benchmark)
     Log.section(session.logger, 1, "Initializing a new AlphaZero environment")
-    zeroth_iteration!(session)
   end
   return session
 end
@@ -346,6 +307,9 @@ end
 #####
 ##### Public interface
 #####
+
+
+
 
 """
     resume!(session::Session)
@@ -355,7 +319,11 @@ by sending a SIGKILL signal.
 """
 function resume!(session::Session)
   try
-    train!(session.env, session)
+    if missing_zeroth_iteration(session)
+      zeroth_iteration!(session)
+    else
+      train!(session.env, session)
+    end
   catch e
     isa(e, InterruptException) || rethrow(e)
     Log.section(session.logger, 1, "Interrupted by the user")
@@ -375,31 +343,16 @@ function save(session::Session, dir=session.dir)
 end
 
 """
-    start_explorer(session::Session)
+    explore(session::Session, [mcts_params, use_gpu])
 
-Start an explorer session for the current environment. See [`Explorer`](@ref).
+Start an explorer session for the current environment.
 """
-function start_explorer(session::Session; mcts_params=nothing, on_gpu=false)
-  isnothing(mcts_params) && (mcts_params = session.env.params.self_play.mcts)
+function explore(session::Session; args...)
   Log.section(session.logger, 1, "Starting interactive exploration")
-  explorer = Explorer(session.env, mcts_params=mcts_params, on_gpu=on_gpu)
-  start_explorer(explorer)
+  explore(AlphaZeroPlayer(session.env; args...), session.env.gspec)
 end
 
-"""
-    play_interactive_game(session::Session; timeout=2.)
-
-Start an interactive game against AlphaZero, allowing it
-`timeout` seconds of thinking time for each move.
-"""
-function play_interactive_game(
-    session::Session; timeout=2., mcts_params=nothing, on_gpu=false)
-  gspec = session.env.gspec
-  net = Network.copy(session.env.bestnn, on_gpu=on_gpu, test_mode=true)
-  isnothing(mcts_params) && (mcts_params = session.env.params.self_play.mcts)
-  player = MctsPlayer(net, mcts_params, timeout=timeout)
-  interactive!(GI.init(gspec), player, Human())
-end
+AlphaZero.AlphaZeroPlayer(s::Session; args...) = AlphaZero.AlphaZeroPlayer(s.env; args...)
 
 #####
 ##### Utilities for printing reports
@@ -556,27 +509,24 @@ end
 ##### Launch new experiments on an existing session
 #####
 
-function run_duel(
-    gspec::AbstractGameSpec, dir::String, duel::Benchmark.Duel; params=nothing)
-  logger = Logger()
-  env = load_env(logger, dir, params=params)
-  run_duel(env, logger, duel)
+function run_duel(session_dir::String, duel)
+  env = load_env(session_dir)
+  run_duel(env, duel)
 end
 
-function run_new_benchmark(
-    gspec, session_dir, name, benchmark; params=nothing, itcmax=nothing)
+function run_new_benchmark(session_dir::String, benchmark; itcmax=nothing)
   outdir = joinpath(session_dir, name)
   isdir(outdir) || mkpath(outdir)
   logger = Logger()
-  Log.section(logger, 1, "Computing new benchmark: $name")
+  Log.section(logger, 1, "Computing benchmark")
   itc = 0
   reports = Benchmark.Report[]
   while valid_session_dir(iterdir(session_dir, itc))
     !isnothing(itcmax) && itc > itcmax && break
     Log.section(logger, 1, "Iteration: $itc")
     itdir = iterdir(session_dir, itc)
-    env = load_env(logger, itdir, params=params)
-    report = [run_duel(env, logger, duel) for duel in benchmark]
+    env = load_env(itdir)
+    report = [run_duel(env, duel) for duel in benchmark]
     push!(reports, report)
     # Save the intermediate reports
     open(joinpath(outdir, BENCHMARK_FILE), "w") do io

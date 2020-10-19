@@ -8,11 +8,12 @@ module Examples
   include("../games/connect-four/main.jl")
   export ConnectFour
 
-  const experiments_list = [
-    Tictactoe.Training.experiment,
-    ConnectFour.Training.experiment
-  ]
+  const games = Dict(
+    "tictactoe" => Tictactoe.GameSpec(),
+    "connect-four" => ConnectFour.GameSpec())
 
-  const experiments = Dict((e.name, e) for e in experiments_list)
+  const experiments = Dict(
+    "tictactoe" => Tictactoe.Training.experiment,
+    "connect-four" => ConnectFour.Training.experiment)
 
 end

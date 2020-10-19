@@ -8,6 +8,8 @@ export SimpleNet, SimpleNetHP, ResNet, ResNetHP
 
 using ..AlphaZero
 
+using Base: @kwdef
+
 import CUDA
 import Knet
 
