@@ -308,9 +308,6 @@ end
 ##### Public interface
 #####
 
-
-
-
 """
     resume!(session::Session)
 
@@ -321,9 +318,8 @@ function resume!(session::Session)
   try
     if missing_zeroth_iteration(session)
       zeroth_iteration!(session)
-    else
-      train!(session.env, session)
     end
+    train!(session.env, session)
   catch e
     isa(e, InterruptException) || rethrow(e)
     Log.section(session.logger, 1, "Interrupted by the user")
@@ -472,7 +468,9 @@ end
 function Handlers.checkpoint_started(session::Session)
   Log.section(session.logger, 3, "Launching a checkpoint evaluation")
   num_games = session.env.params.arena.num_games
-  session.progress = Log.Progress(session.logger, num_games)
+  # In single player games, each game has to be played twice (with both networks)
+  n = GI.two_players(session.env.gspec) ? num_games : 2 * num_games
+  session.progress = Log.Progress(session.logger, n)
 end
 
 function Handlers.checkpoint_game_played(session::Session)

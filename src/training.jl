@@ -93,8 +93,6 @@ module Handlers
 
 end
 
-import .Handlers
-
 #####
 ##### Public utilities
 #####
@@ -132,7 +130,9 @@ function resize_memory!(env::Env, n)
   return
 end
 
-function evaluate_network(gspec, contender, baseline, params, handler)
+# Have a "contender" network play against a "baseline" network
+# Used for two-player games
+function compare_networks__two_players(gspec, contender, baseline, params, handler)
   use_gpu = params.arena.use_gpu
   make_oracles() = (
     Network.copy(contender, on_gpu=use_gpu, test_mode=true),
@@ -154,6 +154,42 @@ function evaluate_network(gspec, contender, baseline, params, handler)
   gamma = params.self_play.mcts.gamma
   rewards, redundancy = rewards_and_redundancy(samples, gamma=gamma)
   return mean(rewards), redundancy
+end
+
+# Evaluate the average reward of a single network
+# Used for one-player games
+function evaluate_network(gspec, net, params, handler)
+  use_gpu = params.arena.use_gpu
+  make_oracles() = Network.copy(net, on_gpu=use_gpu, test_mode=true)
+  simulator = Simulator(make_oracles, record_trace) do oracle
+    MctsPlayer(gspec, oracle, params.arena.mcts)
+  end
+  samples = simulate(
+    simulator,
+    gspec,
+    num_games=params.arena.num_games,
+    num_workers=params.arena.num_workers,
+    game_simulated=(() -> Handlers.checkpoint_game_played(handler)),
+    reset_every=params.arena.reset_mcts_every,
+    flip_probability=params.arena.flip_probability,
+    color_policy=ALTERNATE_COLORS)
+  gamma = params.self_play.mcts.gamma
+  rewards, redundancy = rewards_and_redundancy(samples, gamma=gamma)
+  return mean(rewards), redundancy
+end
+
+function compare_networks__one_player(gspec, contender, baseline, params, handler)
+  rc, redc = evaluate_network(gspec, contender, params, handler)
+  rb, redb = evaluate_network(gspec, baseline, params, handler)
+  return rc - rb, mean(redc, redb)
+end
+
+function compare_networks(gspec, contender, baseline, params, handler)
+  if GI.two_players(gspec)
+    return compare_networks__two_players(gspec, contender, baseline, params, handler)
+  else
+    return compare_networks__one_player(gspec, contender, baseline, params, handler)
+  end
 end
 
 function learning_step!(env::Env, handler)
@@ -197,7 +233,7 @@ function learning_step!(env::Env, handler)
       Handlers.checkpoint_started(handler)
       env.curnn = get_trained_network(trainer)
       (evalz, redundancy), dteval = @timed begin
-        evaluate_network(env.gspec, env.curnn, env.bestnn, env.params, handler)
+        compare_networks(env.gspec, env.curnn, env.bestnn, env.params, handler)
       end
       teval += dteval
       # If eval is good enough, replace network
@@ -300,7 +336,6 @@ function train!(env::Env, handler=nothing)
   end
   Handlers.training_finished(handler)
 end
-
 
 #####
 ##### AlphaZero player
