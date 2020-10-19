@@ -2,7 +2,7 @@ Network = NetLib.SimpleNet
 
 netparams = NetLib.SimpleNetHP(
   width=200,
-  depth_common=8,
+  depth_common=6,
   use_batch_norm=true,
   batch_norm_momentum=1.)
 

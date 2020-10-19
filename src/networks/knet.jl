@@ -124,7 +124,6 @@ end
 function Network.gc(::KNetwork)
   CUDA.functional() || return
   GC.gc(true)
-  Knet.gc()
 end
 
 #####
