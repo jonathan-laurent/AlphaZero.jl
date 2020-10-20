@@ -57,6 +57,45 @@ In the original AlphaGo Zero paper:
 end
 
 """
+    SimParams
+
+Parameters for parallel game simulations.
+
+These parameters are common to self-play data generation, neural network evaluation
+and benchmarking.
+
+| Parameter            | Type                  | Default        |
+|:---------------------|:----------------------|:---------------|
+| `num_games`          | `Int`                 |  -             |
+| `num_workers`        | `Int`                 |  -             |
+| `use_gpu`            | `Bool`                | `false`        |
+| `fill_batches`       | `Bool`                | `true`         |
+| `flip_probability`   | `Float64`             | `0.`           |
+| `reset_every`        | `Union{Nothing, Int}` | `1`            |
+| `alternate_colors`   | `Float64`             | `false`        |
+
+## Explanations
+
+  + If `fill_batches` is set to `true`, we make sure that batches sent to the
+    neural network for inference have constant size.
+  + Both players are reset (e.g. their MCTS trees are emptied)
+    every `reset_every` games (or never if `nothing` is passed).
+  + To add randomization and before every game turn, the game board is "flipped"
+    according to a symmetric transformation with probability `flip_probability`.
+  + In the case of (symmetric) two-player games and if `alternate_colors` is set to`true`,
+    then the colors of both players are swapped between each simulated game.
+"""
+@kwdef struct SimParams
+  num_games :: Int
+  num_workers :: Int
+  use_gpu :: Bool = false
+  fill_batches :: Bool = true
+  reset_every :: Union{Nothing, Int} = 1
+  flip_probability :: Float64 = 0.
+  alternate_colors :: Bool = false
+end
+
+"""
     ArenaParams
 
 Parameters that govern the evaluation process that compares
@@ -66,32 +105,25 @@ the current neural network with the best one seen so far
 | Parameter            | Type                  | Default        |
 |:---------------------|:----------------------|:---------------|
 | `mcts`               | [`MctsParams`](@ref)  |  -             |
-| `num_games`          | `Int`                 |  -             |
-| `num_workers`        | `Int`                 |  -             |
-| `flip_probability`   | `Float64`             | `0.`           |
-| `reset_mcts_every`   | `Union{Nothing, Int}` | `1`            |
+| `sim`                | [`SimParams`](@ref)   |  -             |
 | `update_threshold`   | `Float64`             |  -             |
 
-# Explanation
+# Explanation (two-player games)
 
 + The two competing networks are instantiated into two MCTS players
-  of parameter `mcts` and then play `num_games` games, switching color
-  after each game.
-+ The evaluated network is to replace the current best if its
+  of parameter `mcts` and then play `sim.num_games` games.
++ The evaluated network replaces the current best one if its
   average collected reward is greater or equal than `update_threshold`.
-+ The MCTS trees of both players are
-  reset every `reset_mcts_every` games (or never if `nothing` is passed).
-+ To add randomization and before every game turn, the game board is "flipped"
-  according to a symmetric transformation with probability `flip_probability`.
+
+# Explanation (single-player games)
+
++ The two competing networks play `sim.num_games` games each.
++ The evaluated network replaces the current best one if its average collected rewards
+  exceeds the average collected reward of the old one by `update_threshold` at least. 
 
 # Remarks
 
-+ See [`necessary_samples`](@ref) to make an informed choice for `num_games`.
-+ In the case of single-player games, it does not make sense to have the most recent
-  network play against the best network seen so far. What we do instead is that we have
-  both the old and the new network play a series of games and see whether
-  ``r' - r`` exceeds `update_threshold`, where ``r`` and ``r'`` are the old
-  and new average rewards respectively.
++ See [`necessary_samples`](@ref) to make an informed choice for `sim.num_games`.
 
 # AlphaGo Zero Parameters
 
@@ -100,12 +132,8 @@ and the `update_threshold` parameter is set to a value that corresponds to a
 55% win rate.
 """
 @kwdef struct ArenaParams
-  num_games :: Int
-  num_workers :: Int
-  use_gpu :: Bool = false
-  reset_mcts_every :: Union{Nothing, Int} = 1
-  flip_probability :: Float64 = 0.
   mcts :: MctsParams
+  sim :: SimParams
   update_threshold :: Float64
 end
 
@@ -117,27 +145,16 @@ Parameters governing self-play.
 | Parameter            | Type                  | Default        |
 |:---------------------|:----------------------|:---------------|
 | `mcts`               | [`MctsParams`](@ref)  |  -             |
-| `num_games`          | `Int`                 |  -             |
-| `num_workers`        | `Int`                 |  -             |
-| `use_gpu`            | `Bool`                | `false`        |
-| `reset_mcts_every`   | `Union{Int, Nothing}` | `1`            |
-
-# Explanation
-
-+ The MCTS tree is reset every `reset_mcts_every` games
-  (or never if `nothing` is passed).
+| `sim`                | [`SimParams`](@ref)   |  -             |
 
 # AlphaGo Zero Parameters
 
-In the original AlphaGo Zero paper, `num_games=25_000` (5 millions games
+In the original AlphaGo Zero paper, `sim.num_games=25_000` (5 millions games
 of self-play across 200 iterations).
 """
 @kwdef struct SelfPlayParams
-  num_games :: Int
-  num_workers :: Int
-  use_gpu :: Bool = false
-  reset_mcts_every :: Union{Nothing, Int} = 1
   mcts :: MctsParams
+  sim :: SimParams
 end
 
 """
@@ -303,7 +320,7 @@ In the original AlphaGo Zero paper:
   mem_buffer_size :: PLSchedule{Int}
 end
 
-for T in [MctsParams, ArenaParams, SelfPlayParams, LearningParams, Params]
+for T in [MctsParams, SimParams, ArenaParams, SelfPlayParams, LearningParams, Params]
   Util.generate_update_constructor(T) |> eval
 end
 

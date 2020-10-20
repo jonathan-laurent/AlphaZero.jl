@@ -14,11 +14,11 @@ collected during a training session.
 - `iterations`: vector of ``n`` iteration reports with type
     [`Report.Iteration`](@ref)
 - `benchmark`: vector of ``n+1`` benchmark reports with type
-    [`Benchmark.Report`](@ref)
+    [`Report.Benchmark`](@ref)
 """
 struct SessionReport
   iterations :: Vector{Report.Iteration}
-  benchmark :: Vector{Benchmark.Report}
+  benchmark :: Vector{Report.Benchmark}
   SessionReport() = new([], [])
 end
 
@@ -129,7 +129,7 @@ function load_session_report(dir::String, niters)
     bfile = joinpath(idir, BENCHMARK_FILE)
     # Load the benchmark report
     open(bfile, "r") do io
-      push!(rep.benchmark, JSON3.read(io, Benchmark.Report))
+      push!(rep.benchmark, JSON3.read(io, Report.Benchmark))
     end
     # Load the iteration report
     if itc > 0
@@ -186,10 +186,6 @@ end
 ##### Run benchmarks
 #####
 
-win_rate(z) = round(Int, 100 * (z + 1) / 2)
-
-percentage(x, total) = round(Int, 100 * (x / total))
-
 function show_space_after_progress_bar(logger)
   Log.console_only(logger) do
     Log.sep(logger, force=true)
@@ -201,29 +197,17 @@ function run_duel(env::Env, duel; logger)
   baseline_name = Benchmark.name(duel.baseline)
   legend = "$player_name against $baseline_name"
   Log.section(logger, 2, "Running benchmark: $legend")
-  progress = Log.Progress(logger, duel.num_games)
-  outcome = Benchmark.run(env, duel, progress)
+  progress = Log.Progress(logger, duel.sim.num_games)
+  report = Benchmark.run(env, duel, progress)
   show_space_after_progress_bar(logger)
-  z = fmt("+.2f", outcome.avgr)
-  if env.params.ternary_rewards
-    stats = Benchmark.TernaryOutcomeStatistics(outcome)
-    n = length(outcome.rewards)
-    pwon = percentage(stats.num_won, n)
-    pdraw = percentage(stats.num_draw, n)
-    plost = percentage(stats.num_lost, n)
-    details = "$pwon% won, $pdraw% draw, $plost% lost"
-  else
-    wr = win_rate(outcome.avgr)
-    details = "win rate of $wr%"
-  end
-  red = fmt(".1f", 100 * outcome.redundancy)
-  msg = "Average reward: $z ($details), redundancy: $red%"
-  Log.print(logger, msg)
-  return outcome
+  print_report(
+    logger, report,
+    ternary_rewards=env.params.ternary_rewards)
+  return report
 end
 
 function run_benchmark(session::Session)
-  report = Benchmark.Report()
+  report = Report.Benchmark()
   for duel in session.benchmark
     outcome = run_duel(session.env, duel, logger=session.logger)
     push!(report, outcome)
@@ -242,7 +226,6 @@ end
 function missing_zeroth_iteration(session::Session)
   return isempty(session.report.iterations) && isempty(session.report.benchmark)
 end
-
 
 #####
 ##### Session constructors
@@ -425,6 +408,41 @@ function print_report(logger::Logger, report::Report.Initial)
   Log.print(logger, "Memory footprint per MCTS node: $(mfpn) bytes")
 end
 
+percentage(x, total) = round(Int, 100 * (x / total))
+
+function print_report(
+    logger::Logger,
+    report::Report.Evaluation;
+    nn_replaced=false,
+    ternary_rewards=false)
+
+  r = fmt("+.2f", report.avgr)
+  if ternary_rewards
+    n = length(report.rewards)
+    stats = Benchmark.TernaryOutcomeStatistics(report)
+    pwon = percentage(stats.num_won, n)
+    pdraw = percentage(stats.num_draw, n)
+    plost = percentage(stats.num_lost, n)
+    details = "$pwon% won, $pdraw% draw, $plost% lost"
+  else
+    wr = round(Int, 100 * (report.avgr + 1) / 2)
+    details = "win rate of $wr%"
+  end
+  if nn_replaced
+     details *= ", network replaced"
+  end
+  red = fmt(".1f", 100 * report.redundancy)
+  msg = "Average reward: $r ($details), redundancy: $red%"
+  Log.print(logger, msg)
+end
+
+function print_report(logger::Logger, report::Report.Checkpoint; ternary_rewards=false)
+  print_report(
+    logger, report.evaluation,
+    nn_replaced=report.nn_replaced,
+    ternary_rewards=ternary_rewards)
+end
+
 #####
 ##### Event handlers
 #####
@@ -435,7 +453,7 @@ function Handlers.iteration_started(session::Session)
 end
 
 function Handlers.self_play_started(session::Session)
-  ngames = session.env.params.self_play.num_games
+  ngames = session.env.params.self_play.sim.num_games
   Log.section(session.logger, 2, "Starting self-play")
   session.progress = Log.Progress(session.logger, ngames)
 end
@@ -467,7 +485,7 @@ end
 
 function Handlers.checkpoint_started(session::Session)
   Log.section(session.logger, 3, "Launching a checkpoint evaluation")
-  num_games = session.env.params.arena.num_games
+  num_games = session.env.params.arena.sim.num_games
   # In single player games, each game has to be played twice (with both networks)
   n = GI.two_players(session.env.gspec) ? num_games : 2 * num_games
   session.progress = Log.Progress(session.logger, n)
@@ -479,12 +497,8 @@ end
 
 function Handlers.checkpoint_finished(session::Session, report)
   show_space_after_progress_bar(session.logger)
-  avgr = fmt("+.2f", report.reward)
-  wr = win_rate(report.reward)
-  red = fmt(".1f", report.redundancy * 100)
-  nnr = report.nn_replaced ? ", network replaced" : ""
-  msg = "Average reward: $avgr (win rate of $wr%$nnr), redundancy: $red%"
-  Log.print(session.logger, msg)
+  ternary_rewards = session.env.params.ternary_rewards
+  print_report(session.logger, report, ternary_rewards=ternary_rewards)
   Log.section(session.logger, 3, "Optimizing the loss")
 end
 
@@ -518,7 +532,7 @@ function run_new_benchmark(session_dir::String, benchmark; itcmax=nothing)
   logger = Logger()
   Log.section(logger, 1, "Computing benchmark")
   itc = 0
-  reports = Benchmark.Report[]
+  reports = Report.Benchmark[]
   while valid_session_dir(iterdir(session_dir, itc))
     !isnothing(itcmax) && itc > itcmax && break
     Log.section(logger, 1, "Iteration: $itc")

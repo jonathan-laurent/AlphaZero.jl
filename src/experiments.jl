@@ -27,7 +27,7 @@ struct Experiment
   params :: Params
   mknet :: Any
   netparams :: Any
-  benchmark :: Vector{<:Benchmark.Duel}
+  benchmark :: Vector{<:Benchmark.Evaluation}
   function Experiment(name, gspec, params, mknet, netparams; benchmark=[])
     return new(name, gspec, params, mknet, netparams, benchmark)
   end

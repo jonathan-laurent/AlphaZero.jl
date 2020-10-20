@@ -14,37 +14,6 @@ using Statistics: mean
 using Base: @kwdef
 
 """
-    Benchmark.DuelOutcome
-
-The outcome of a duel between two players.
-
-# Fields
-- `player` and `baseline` are `String` fields containing the names of
-    both players involved in the duel
-- `avgr` is the averagereward collected by `player`
-- `rewards` is the sequence of rewards collected by `player` (one per game)
-- `redundancy` is the ratio of duplicate positions encountered during the
-   evaluation, not counting the initial position. If this number is too high,
-   you may want to increase the move selection temperature.
-- `time` is the computing time spent running the duel, in seconds
-"""
-struct DuelOutcome
-  player :: String
-  baseline :: String
-  avgr :: Float64
-  rewards :: Vector{Float64}
-  redundancy :: Float64
-  time :: Float64
-end
-
-"""
-    Benchmark.Report = Vector{Benchmark.DuelOutcome}
-
-A benchmark report is a vector of [`Benchmark.DuelOutcome`](@ref) objects.
-"""
-const Report = Vector{DuelOutcome}
-
-"""
     Benchmark.Player
 
 Abstract type to specify a player that can be featured in a benchmark duel.
@@ -62,62 +31,54 @@ function instantiate end
 # name(::Player) :: String
 function name end
 
-"""
-    Benchmark.Duel
+abstract type Evaluation end
 
-A duel that consists in `num_games` games between `player` and `baseline`
-
-| Parameter            | Type                  | Default            |
-|:---------------------|:----------------------|:-------------------|
-| `player`             | [`Player`](@ref)      |  -                 |
-| `baseline`           | [`Player`](@ref)      |  -                 |
-| `num_games`          | `Int`                 |  -                 |
-| `num_workers`        | `Int`                 |  -                 |
-| `use_gpu`            | `Bool`                | `false`            |
-| `flip_probability`   | `Float64`             | `0.`               |
-| `reset_mcts_every`   | `Union{Nothing, Int}` | `1`                |
-| `color_policy`       | [`ColorPolicy`](@ref) | `ALTERNATE_COLORS` |
-"""
-@kwdef struct Duel
+@kwdef struct Single <: Evaluation
   player :: Player
-  baseline :: Player
-  num_games :: Int
-  num_workers :: Int
-  use_gpu :: Bool = false
-  reset_every :: Union{Nothing, Int} = nothing
-  flip_probability :: Float64 = 0.
-  color_policy :: ColorPolicy = ALTERNATE_COLORS
+  sim :: SimParams
 end
 
-"""
-    Benchmark.run(env::Env, duel::Benchmark.Duel, progress=nothing)
+@kwdef struct Duel <: Evaluation
+  player :: Player
+  baseline :: Player
+  sim :: SimParams
+end
 
-Run a benchmark duel and return a [`Benchmark.DuelOutcome`](@ref).
+name(s::Single) = name(s.player)
+
+name(d::Duel) = "$(name(d.player)) / $(name(d.baseline))"
+
+"""
+    Benchmark.run(env::Env, duel::Benchmark.Evaluation, progress=nothing)
+
+Run a benchmark duel and return a [`Report.Evaluation outcome`](@ref).
 
 If a `progress` is provided, `next!(progress)` is called
 after each simulated game.
 """
-function run(env::Env, duel::Duel, progress=nothing)
-  net() = Network.copy(env.bestnn, on_gpu=duel.use_gpu, test_mode=true)
-  simulator = Simulator(net, record_trace) do net
-    player = instantiate(duel.player, env.gspec, net)
-    baseline = instantiate(duel.baseline, env.gspec, net)
-    return TwoPlayers(player, baseline)
+function run end
+
+function run(env::Env, eval::Evaluation, progress=nothing)
+  net() = Network.copy(env.bestnn, on_gpu=eval.sim.use_gpu, test_mode=true)
+  if isa(eval, Single)
+    simulator = Simulator(net, record_trace) do net
+      instantiate(single.player, env.gspec, net)
+    end
+  else
+    @assert isa(eval, Duel)
+    simulator = Simulator(net, record_trace) do net
+      player = instantiate(eval.player, env.gspec, net)
+      baseline = instantiate(eval.baseline, env.gspec, net)
+      return TwoPlayers(player, baseline)
+    end
   end
   samples, elapsed = @timed simulate(
-    simulator,
-    env.gspec,
-    num_games=duel.num_games,
-    num_workers=duel.num_workers,
-    game_simulated=(() -> next!(progress)),
-    reset_every=duel.reset_every,
-    flip_probability=duel.flip_probability,
-    color_policy=duel.color_policy)
+    simulator, env.gspec, eval.sim,
+    game_simulated=(() -> next!(progress)))
   gamma = env.params.self_play.mcts.gamma
   rewards, redundancy = rewards_and_redundancy(samples, gamma=gamma)
-  avgr = mean(rewards)
-  return DuelOutcome(
-    name(duel.player), name(duel.baseline), avgr, rewards, redundancy, elapsed)
+  return Report.Evaluation(
+    name(eval), mean(rewards), redundancy, rewards, nothing, elapsed)
 end
 
 #####
@@ -138,8 +99,8 @@ function TernaryOutcomeStatistics(rewards::AbstractVector{<:Number})
   return TernaryOutcomeStatistics(num_won, num_draw, num_lost)
 end
 
-function TernaryOutcomeStatistics(outcome::DuelOutcome)
-  return TernaryOutcomeStatistics(outcome.rewards)
+function TernaryOutcomeStatistics(report::Report.Evaluation)
+  return TernaryOutcomeStatistics(report.rewards)
 end
 
 #####

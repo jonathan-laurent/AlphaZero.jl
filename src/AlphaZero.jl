@@ -67,11 +67,16 @@ module AlphaZero
   include("params.jl")
   export Params
   export MctsParams
+  export SimParams
   export SelfPlayParams
   export LearningParams
   export ArenaParams
   export MemAnalysisParams
   export SamplesWeighingPolicy, CONSTANT_WEIGHT, LOG_WEIGHT, LINEAR_WEIGHT
+
+  # Stats about training
+  include("report.jl")
+  export Report
 
   # Game traces
   include("trace.jl")
@@ -91,14 +96,9 @@ module AlphaZero
 
   # Utilities for distributed games simulation
   include("simulations.jl")
-  export ColorPolicy, ALTERNATE_COLORS, BASELINE_WHITE, CONTENDER_WHITE
   export Simulator, simulate, simulate_distributed
   export record_trace
   export rewards_and_redundancy
-
-  # Stats about training
-  include("report.jl")
-  export Report
 
   # Memory buffer to hold samples generated during self-play
   include("memory.jl")

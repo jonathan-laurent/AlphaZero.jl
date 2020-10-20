@@ -109,12 +109,12 @@ across multiple threads and multiple machines.
 # Arguments
 
     - `make_oracles`: a function that takes no argument and returns
-       the oracles used by the player, which can be either
-      `nothing`, a single oracle or a pair of oracles.
+        the oracles used by the player, which can be either `nothing`,
+        a single oracle or a pair of oracles.
     - `make_player`: a function that takes as an argument the `oracles` field
-      above and nuild a player from it.
+        above and builds a player from it.
     - `measure(trace, colors_flipped, player)`: the function that is used to
-      take measurements after each game simulation.
+        take measurements after each game simulation.
 """
 struct Simulator{MakePlayer, Oracles, Measure}
   make_player :: MakePlayer
@@ -131,69 +131,47 @@ named tuples with two fields: `trace::Trace` and `colors_flipped::Bool`.
 record_trace(t, cf, p) = (trace=t, colors_flipped=cf)
 
 """
-    @enum ColorPolicy ALTERNATE_COLORS BASELINE_WHITE CONTENDER_WHITE
-
-Policy for attributing colors in a duel between a baseline and a contender.
-"""
-@enum ColorPolicy ALTERNATE_COLORS BASELINE_WHITE CONTENDER_WHITE
-
-
-"""
-    simulate(::Simulator, ::AbstractGameSpec; <keyword arguments>)
+    simulate(::Simulator, ::AbstractGameSpec; ::SimParams; <kwargs>)
 
 Play a series of games using a given [`Simulator`](@ref).
 
 # Keyword Arguments
 
-  - `num_games`: number of games to play
-  - `num_workers`: number of workers tasks to spawn
-  - `game_simulated`: called every time a game simulation is completed
-  - `reset_every`: if set, players are reset every `reset_every` games
-  - `color_policy`: either `nothing` or a [`ColorPolicy`](@ref)
-  - `flip_probability=0.`: see [`play_game`](@ref)
+  - `game_simulated` is called every time a game simulation is completed with no arguments
 
 # Return
 
-Return a vector of objects returned by `simulator.measure`.
+Return a vector of objects computed by `simulator.measure`.
 """
 function simulate(
     simulator::Simulator,
-    gspec::AbstractGameSpec;
-    num_games,
-    num_workers,
-    game_simulated,
-    reset_every=nothing,
-    fill_batches=true,
-    flip_probability=0.,
-    color_policy=nothing)
+    gspec::AbstractGameSpec,
+    p::SimParams;
+    game_simulated)
 
   oracles = simulator.make_oracles()
   spawn_oracles, done =
-    batchify_oracles(oracles, fill_batches, num_workers)
-  return Util.mapreduce(1:num_games, num_workers, vcat, []) do
+    batchify_oracles(oracles, p.fill_batches, p.num_workers)
+  return Util.mapreduce(1:p.num_games, p.num_workers, vcat, []) do
     oracles = spawn_oracles()
     player = simulator.make_player(oracles)
     worker_sim_id = 0
     # For each worker
     function simulate_game(sim_id)
       worker_sim_id += 1
-      # Switch players' colors if necessary
-      if !isnothing(color_policy)
-        @assert isa(player, TwoPlayers)
-        colors_flipped =
-          (color_policy == BASELINE_WHITE) ||
-          (color_policy == ALTERNATE_COLORS && sim_id % 2 == 1)
-        # "_pf" stands for "possibly flipped"
+      # Switch players' colors if necessary: "_pf" stands for "possibly flipped"
+      if isa(player, TwoPlayers) && p.alternate_colors
+        colors_flipped = sim_id % 2 == 1
         player_pf = colors_flipped ? flipped_colors(player) : player
       else
         colors_flipped = false
         player_pf = player
       end
       # Play the game and generate a report
-      trace = play_game(gspec, player_pf, flip_probability=flip_probability)
+      trace = play_game(gspec, player_pf, flip_probability=p.flip_probability)
       report = simulator.measure(trace, colors_flipped, player)
       # Reset the player periodically
-      if !isnothing(reset_every) && worker_sim_id % reset_every == 0
+      if !isnothing(p.reset_every) && worker_sim_id % p.reset_every == 0
         reset_player!(player)
       end
       # Signal that a game has been simulated
@@ -205,47 +183,37 @@ function simulate(
 end
 
 """
-    simulate_distributed(::Simulator, ::AbstractGameSpec; <keyword arguments>)
+    simulate_distributed(::Simulator, ::AbstractGameSpec, ::SimParams; <kwargs>)
 
-Identical to [`simulate`](@ref) but splits the work
-across all available workers.
+Identical to [`simulate`](@ref) but splits the work across all available workers.
 """
 function simulate_distributed(
     simulator::Simulator,
-    gspec::AbstractGameSpec;
-    num_games,
-    num_workers,
-    game_simulated,
-    reset_every=nothing,
-    fill_batches=true,
-    flip_probability=0.,
-    color_policy=nothing)
+    gspec::AbstractGameSpec,
+    p::SimParams;
+    game_simulated)
 
   # Spawning a task to keep count of completed simulations
   chan = Distributed.RemoteChannel(()->Channel{Nothing}(1))
   Threads.@spawn begin
-    for i in 1:num_games
+    for i in 1:p.num_games
       take!(chan)
       game_simulated()
     end
   end
   remote_game_simulated() = put!(chan, nothing)
   # Distributing the simulations across workers
-  num_each, rem = divrem(num_games, Distributed.nworkers())
+  num_each, rem = divrem(p.num_games, Distributed.nworkers())
   @assert num_each >= 1
   workers = Distributed.workers()
   tasks = map(workers) do w
     Distributed.@spawnat w begin
       Util.@printing_errors begin
         simulate(
-          simulator, gspec,
-          num_games=(w == workers[1] ? num_each + rem : num_each),
-          num_workers=num_workers,
-          game_simulated=remote_game_simulated,
-          reset_every=reset_every,
-          fill_batches=fill_batches,
-          flip_probability=flip_probability,
-          color_policy=color_policy)
+          simulator,
+          gspec,
+          SimParams(p; num_games=(w == workers[1] ? num_each + rem : num_each)),
+          game_simulated=remote_game_simulated)
         end
     end
   end
