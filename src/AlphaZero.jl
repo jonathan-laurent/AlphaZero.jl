@@ -81,6 +81,7 @@ module AlphaZero
   # Game traces
   include("trace.jl")
   export Trace
+  export total_reward
 
   # Players and games
   include("play.jl")
