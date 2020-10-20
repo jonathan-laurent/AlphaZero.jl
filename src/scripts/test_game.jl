@@ -21,7 +21,7 @@ function test_symmetry(gspec, state, (symstate, aperm))
 end
 
 # Testing compliance with AlphaZero.jl game interface
-function test_game(gspec, n=100)
+function test_game(gspec::AbstractGameSpec; n=100)
   @assert isa(GI.two_players(gspec), Bool)
 
   # Testing initial states
