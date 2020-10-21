@@ -8,6 +8,7 @@ const CI = get(ENV, "CI", nothing) == "true"
 const FULL = !CI
 
 @testset "Testing Games" begin
+  test_game(games["grid-world"])
   test_game(games["tictactoe"])
   test_game(games["connect-four"])
   @test true

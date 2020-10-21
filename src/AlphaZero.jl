@@ -170,6 +170,10 @@ module AlphaZero
   export Session, resume!, save
   export explore
 
+  # Bridge with CommonRLInterface.jl
+  include("common_rl_intf.jl")
+  export CommonRLInterfaceWrapper
+
   # A small library of standard examples
   include("examples.jl")
   export Examples

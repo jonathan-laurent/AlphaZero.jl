@@ -23,7 +23,11 @@ module Scripts
 
   function play(e::Experiment, args...)
     session = Session(e, args...)
-    interactive!(session.env.gspec, AlphaZeroPlayer(session), Human())
+    if GI.two_players(e.gspec)
+      interactive!(session.env.gspec, AlphaZeroPlayer(session), Human())
+    else
+      interactive!(session.env.gspec, Human())
+    end
   end
 
   play(s::String, args...) = play(Examples.experiments[s]; args...)

@@ -200,7 +200,7 @@ function action_string end
 """
     parse_action(::AbstractGameSpec, str::String)
 
-Return the action described by string `str` or `nothing`if `str` does not
+Return the action described by string `str` or `nothing` if `str` does not
 denote a valid action.
 """
 function parse_action end
