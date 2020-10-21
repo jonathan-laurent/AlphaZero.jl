@@ -49,7 +49,7 @@ mutable struct Session{Env}
   logger :: Logger
   autosave :: Bool
   save_intermediate :: Bool
-  benchmark :: Vector{Benchmark.Duel}
+  benchmark :: Vector{Benchmark.Evaluation}
   # Temporary state for logging
   progress :: Option{Progress}
   report :: SessionReport
@@ -193,9 +193,14 @@ function show_space_after_progress_bar(logger)
 end
 
 function run_duel(env::Env, duel; logger)
-  player_name = Benchmark.name(duel.player)
-  baseline_name = Benchmark.name(duel.baseline)
-  legend = "$player_name against $baseline_name"
+  if isa(duel, Benchmark.Duel)
+    player_name = Benchmark.name(duel.player)
+    baseline_name = Benchmark.name(duel.baseline)
+    legend = "$player_name against $baseline_name"
+  else
+    @assert isa(duel, Benchmark.Single)
+    legend = Benchmark.name(duel.player)
+  end
   Log.section(logger, 2, "Running benchmark: $legend")
   progress = Log.Progress(logger, duel.sim.num_games)
   report = Benchmark.run(env, duel, progress)
@@ -434,16 +439,17 @@ function print_report(
     pwon = percentage(stats.num_won, n)
     pdraw = percentage(stats.num_draw, n)
     plost = percentage(stats.num_lost, n)
-    details = "$pwon% won, $pdraw% draw, $plost% lost"
+    details = ["$pwon% won, $pdraw% draw, $plost% lost"]
   else
     wr = round(Int, 100 * (report.avgr + 1) / 2)
-    details = "win rate of $wr%"
+    details = []
   end
   if nn_replaced
-     details *= ", network replaced"
+     push!(details, "network replaced")
   end
+  details = isempty(details) ? "" : " (" * join(details, ", ") * ")"
   red = fmt(".1f", 100 * report.redundancy)
-  msg = "Average reward: $r ($details), redundancy: $red%"
+  msg = "Average reward: $r$details, redundancy: $red%"
   Log.print(logger, msg)
 end
 

@@ -43,7 +43,7 @@ function Base.length(t::Trace)
 end
 
 function total_reward(t::Trace, gamma=1.)
-  return sum(gamma^(i-1) * r for (i, r) in enumerate(t.rewards))
+  return sum([gamma^(i-1) * r for (i, r) in enumerate(t.rewards)])
 end
 
 function debug_trace(gspec::AbstractGameSpec, t::Trace)

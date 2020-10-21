@@ -34,6 +34,7 @@ arena = ArenaParams(
 learning = LearningParams(
   use_gpu=false,
   samples_weighing_policy=LOG_WEIGHT,
+  rewards_renormalization=10,
   l2_regularization=1e-3,
   optimiser=Adam(lr=5e-3),
   batch_size=32,
@@ -55,13 +56,15 @@ params = Params(
 
 benchmark_sim = SimParams(
   arena.sim;
-  num_games=400,
-  num_workers=100)
+  num_games=200,
+  num_workers=10)
 
 benchmark = [
-  Benchmark.Duel(
+  Benchmark.Single(
     Benchmark.Full(self_play.mcts),
-    Benchmark.MctsRollouts(self_play.mcts),
+    benchmark_sim),
+  Benchmark.Single(
+    Benchmark.NetworkOnly(),
     benchmark_sim)]
 
 experiment = Experiment(

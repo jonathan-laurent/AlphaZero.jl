@@ -68,6 +68,8 @@ function losses(nn, params, Wmean, Hp, (W, X, A, P, V))
   creg = params.l2_regularization
   cinv = params.nonvalidity_penalty
   P̂, V̂, p_invalid = Network.forward_normalized(nn, X, A)
+  V = V ./ params.rewards_renormalization
+  V̂ = V̂ ./ params.rewards_renormalization
   Lp = klloss_wmean(P̂, P, W) - Hp
   Lv = mse_wmean(V̂, V, W)
   Lreg = iszero(creg) ?
@@ -98,7 +100,7 @@ struct Trainer
     end
     data = convert_samples(gspec, params.samples_weighing_policy, samples)
     network = Network.copy(network, on_gpu=params.use_gpu, test_mode=test_mode)
-    W, X, A, P, V = data
+    W, X, A, P, V = data  
     Wmean = mean(W)
     Hp = entropy_wmean(P, W)
     batches_stream = Util.random_batches_stream(data, params.batch_size) do x

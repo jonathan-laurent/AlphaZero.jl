@@ -184,6 +184,7 @@ the neural network is updated to fit the data in the memory buffer.
 | `samples_weighing_policy`     | [`SamplesWeighingPolicy`](@ref) |  -         |
 | `optimiser`                   | [`OptimiserSpec`](@ref)         |  -         |
 | `l2_regularization`           | `Float32`                       |  -         |
+| `rewards_renormalization`     | `Float32`                       | `1f0`      |
 | `nonvalidity_penalty`         | `Float32`                       | `1f0`      |
 | `batch_size`                  | `Int`                           |  -         |
 | `loss_computation_batch_size` | `Int`                           |  -         |
@@ -210,6 +211,7 @@ the current network is evaluated against the best network so far
 + `batch_size` is the batch size used for gradient descent.
 + `loss_computation_batch_size` is the batch size that is used to compute
   the loss between each epochs.
++ All rewards are divided by `rewards_renormalization` before the MSE loss is computed.
 + If `use_position_averaging` is set to true, samples in memory that correspond
   to the same board position are averaged together. The merged sample is
   reweighted according to `samples_weighing_policy`.
@@ -231,6 +233,7 @@ In the original AlphaGo Zero paper:
   samples_weighing_policy :: SamplesWeighingPolicy
   optimiser :: OptimiserSpec
   l2_regularization :: Float32
+  rewards_renormalization :: Float32 = 1f0
   nonvalidity_penalty :: Float32 = 1f0
   batch_size :: Int
   loss_computation_batch_size :: Int

@@ -6,6 +6,8 @@ module Scripts
   include("dummy_run.jl")
   export dummy_run
 
+  dummy_run(s::String; args...) = dummy_run(Examples.experiments[s]; args...)
+
   include("test_game.jl")
   export test_game
 

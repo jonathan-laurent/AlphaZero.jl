@@ -183,6 +183,13 @@ function resize_memory!(env::Env, n)
   return
 end
 
+function dummy_learning_report()
+  eps = 1e-16
+  dummy_loss = Report.Loss(0, 0, 0, 0, 0)
+  dummy_status = Report.LearningStatus(dummy_loss, 0, 0)
+  return Report.Learning(eps, eps, eps, eps, dummy_status, [], [], false)
+end
+
 function learning_step!(env::Env, handler)
   ap = env.params.arena
   lp = env.params.learning
@@ -192,6 +199,10 @@ function learning_step!(env::Env, handler)
   experience = get_experience(env.memory)
   if env.params.use_symmetries
     experience = augment_with_symmetries(env.gspec, experience)
+  end
+  if isempty(experience)
+    # Skipping the learning phase
+    return dummy_learning_report()
   end
   trainer, tconvert = @timed Trainer(env.gspec, env.curnn, experience, lp)
   init_status = learning_status(trainer)

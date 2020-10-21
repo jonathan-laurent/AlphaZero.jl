@@ -53,9 +53,9 @@ function dummy_run_experiment(e::Experiment)
   return Experiment(e.name, e.gspec, params, e.mknet, e.netparams, benchmark=benchmark)
 end
 
-function dummy_run(experiment::Experiment; session_dir=nothing, nostdout=true)
+function dummy_run(experiment::Experiment; session_dir=nothing, nostdout=false)
   experiment = dummy_run_experiment(experiment)
-  isnothing(session_dir) && (session_dir = "sessions/test-$(experiment.name)")
+  isnothing(session_dir) && (session_dir = "sessions/dummy-$(experiment.name)")
   session = Session(experiment, nostdout=nostdout, dir=session_dir)
   resume!(session)
   return

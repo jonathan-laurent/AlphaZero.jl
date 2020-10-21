@@ -62,7 +62,7 @@ function run(env::Env, eval::Evaluation, progress=nothing)
   net() = Network.copy(env.bestnn, on_gpu=eval.sim.use_gpu, test_mode=true)
   if isa(eval, Single)
     simulator = Simulator(net, record_trace) do net
-      instantiate(single.player, env.gspec, net)
+      instantiate(eval.player, env.gspec, net)
     end
   else
     @assert isa(eval, Duel)
