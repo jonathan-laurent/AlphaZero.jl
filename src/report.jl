@@ -254,6 +254,8 @@ struct Initial
   num_network_parameters :: Int
   num_network_regularized_parameters :: Int
   mcts_footprint_per_node :: Int
+  errors :: Vector{String}
+  warnings :: Vector{String}
 end
 
 #####

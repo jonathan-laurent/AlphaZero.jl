@@ -215,12 +215,16 @@ function run_benchmark(session::Session)
   return report
 end
 
+# return whether or not critical problems were found
 function zeroth_iteration!(session::Session)
   @assert session.env.itc == 0
   Log.section(session.logger, 2, "Initial report")
-  print_report(session.logger, initial_report(session.env))
+  report = initial_report(session.env)
+  print_report(session.logger, report)
+  isempty(report.errors) || return false
   bench = run_benchmark(session)
   save_increment!(session, bench)
+  return true
 end
 
 function missing_zeroth_iteration(session::Session)
@@ -300,7 +304,8 @@ by sending a SIGKILL signal.
 function resume!(session::Session)
   try
     if missing_zeroth_iteration(session)
-      zeroth_iteration!(session)
+      success = zeroth_iteration!(session)
+      success || return
     end
     train!(session.env, session)
   catch e
@@ -406,6 +411,12 @@ function print_report(logger::Logger, report::Report.Initial)
   Log.print(logger, "Number of regularized network parameters: $nnregparams")
   mfpn = report.mcts_footprint_per_node
   Log.print(logger, "Memory footprint per MCTS node: $(mfpn) bytes")
+  for w in report.warnings
+    Log.print(logger, crayon"yellow", "Warning: ", w)
+  end
+  for e in report.errors
+    Log.print(logger, crayon"red", "Error: ", e)
+  end
 end
 
 percentage(x, total) = round(Int, 100 * (x / total))

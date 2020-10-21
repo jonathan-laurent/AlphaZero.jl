@@ -16,8 +16,8 @@ end
 
 @testset "Dummy Runs" begin
   dir = "sessions/test-tictactoe"
-  @test dummy_run(experiments["tictactoe"], nostdout=false)
+  @test dummy_run(experiments["tictactoe"], nostdout=false) == nothing
   if FULL
-    @test dummy_run(experiments["connect-four"], nostdout=false)
+    @test dummy_run(experiments["connect-four"], nostdout=false) == nothing
   end
 end

@@ -300,7 +300,9 @@ to the current game state (see [`symmetries`](@ref)).
 """
 function apply_random_symmetry(game::AbstractGameEnv)
   gspec = spec(game)
-  symstate, _ = rand(symmetries(gspec, current_state(game)))
+  syms = symmetries(gspec, current_state(game))
+  @assert !isempty(syms) "no symmetries were declared for this game"
+  symstate, _ = rand(syms)
   return init(gspec, symstate)
 end
 

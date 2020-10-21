@@ -340,3 +340,30 @@ This bound is based on [Hoeffding's inequality
 ](https://en.wikipedia.org/wiki/Hoeffding%27s_inequality).
 """
 necessary_samples(ϵ, β) = log(1 / β) / (2 * ϵ^2)
+
+#####
+##### Consistency checking
+#####
+
+# This function checks for inconsistencies in the parameters.
+# It returns a pair of lists of strings: `(errors, warnings)`.
+# TODO: add more consistency checks.
+function check_params(gspec::AbstractGameSpec, p::Params)
+  errors = String[]
+  warns = String[]
+  # Collecting all relevant params
+  mctss = [p.self_play.mcts]
+  sims = [p.self_play.sim]
+  if !isnothing(p.arena)
+    push!(mctss, p.arena.mcts)
+    push!(sims, p.arena.sim)
+  end
+  # Detecing non-provided symmetries
+  if any(sim.flip_probability != 0 for sim in sims)
+    state = GI.current_state(GI.init(gspec))
+    if isempty(GI.symmetries(gspec, state))
+      push!(errors, "You must specify some game symmetries to use flip_probability>0.")
+    end
+  end
+  return (errors, warns)
+end

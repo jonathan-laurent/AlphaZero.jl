@@ -100,8 +100,7 @@ end
 """
     get_experience(env::Env)
 
-Return the content of the agent's memory as a
-vector of [`TrainingSample`](@ref).
+Return the content of the agent's memory as a vector of [`TrainingSample`](@ref).
 """
 get_experience(env::Env) = get_experience(env.memory)
 
@@ -116,8 +115,9 @@ function initial_report(env::Env)
   num_reg_params = Network.num_regularized_parameters(env.curnn)
   player = MctsPlayer(env.gspec, env.curnn, env.params.self_play.mcts)
   mcts_footprint_per_node = MCTS.memory_footprint_per_node(env.gspec)
+  errs, warns = check_params(env.gspec, env.params)
   return Report.Initial(
-    num_network_parameters, num_reg_params, mcts_footprint_per_node)
+    num_network_parameters, num_reg_params, mcts_footprint_per_node, errs, warns)
 end
 
 #####
