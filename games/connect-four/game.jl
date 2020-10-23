@@ -47,11 +47,9 @@ function GI.init(::GameSpec)
   return GameEnv(board, curplayer, finished, winner, amask, history)
 end
 
-function GI.init(::GameSpec, state)
-  board = state.board
-  g = GI.init(GameSpec())
+function GI.set_state!(g::GameEnv, state)
   g.history = nothing
-  g.board = board
+  g.board = state.board
   g.curplayer = state.curplayer
   update_actions_mask!(g)
   any(g.amask) || (g.finished = true)
@@ -59,14 +57,14 @@ function GI.init(::GameSpec, state)
     top = first_free(g.board, col)
     top == 1 && continue
     row = top - 1
-    c = board[col, row]
-    if c != EMPTY && winning_pattern_at(board, c, (col, row))
+    c = state.board[col, row]
+    if c != EMPTY && winning_pattern_at(state.board, c, (col, row))
       g.winner = c
       g.finished = true
       break
     end
   end
-  return g
+  return
 end
 
 GI.two_players(::GameSpec) = true

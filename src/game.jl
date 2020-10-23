@@ -46,10 +46,6 @@ abstract type AbstractGameEnv end
     init(::AbstractGameSpec) :: AbstractGameEnv
 
 Create a new game environment in a (possibly random) initial state.
-
-    init(::AbstractGameSpec, state) :: AbstractGameEnv
-
-Create a new game environment, initialized in a given state.
 """
 function init end
 
@@ -88,6 +84,13 @@ function vectorize_state end
 #####
 ##### Operations on envs
 #####
+
+"""
+    set_state!(game::AbstractGameEnv, state)
+
+Modify the state of a game environment in place.
+"""
+function set_state! end
 
 """
     current_state(game::AbstractGameEnv)
@@ -269,6 +272,17 @@ Return the total number of actions associated with a game.
 """
 num_actions(game_spec::AbstractGameSpec) = length(actions(game_spec))
 
+"""
+    init(::AbstractGameSpec, state) :: AbstractGameEnv
+
+Create a new game environment, initialized in a given state.
+"""
+function init(gspec::AbstractGameSpec, state)
+  env = init(gspec)
+  set_state!(env, state)
+  return env
+end
+
 #####
 ##### Derived env functions
 #####
@@ -293,17 +307,18 @@ function available_actions(game::AbstractGameEnv)
 end
 
 """
-    apply_random_symmetry(::AbstractGameEnv)
+    apply_random_symmetry!(::AbstractGameEnv)
 
-Return a fresh copy of an environment where a random symmetry has been applied
-to the current game state (see [`symmetries`](@ref)).
+Update a game environment by applying a random symmetry
+to the current state (see [`symmetries`](@ref)).
 """
-function apply_random_symmetry(game::AbstractGameEnv)
+function apply_random_symmetry!(game::AbstractGameEnv)
   gspec = spec(game)
   syms = symmetries(gspec, current_state(game))
   @assert !isempty(syms) "no symmetries were declared for this game"
   symstate, _ = rand(syms)
-  return init(gspec, symstate)
+  set_state!(game, symstate)
+  return
 end
 
 end

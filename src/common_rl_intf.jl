@@ -78,6 +78,8 @@ Spec(rlenv::RL.AbstractEnv; funs...) = Spec(Env(rlenv; funs...))
 
 GI.clone(env::Env) = @set env.rlenv = RL.clone(env.rlenv)
 
+GI.set_state!(env::Env, state) = RL.setstate!(env.rlenv, state)
+
 function GI.init(spec::Spec)
   env = GI.clone(spec.env)
   RL.reset!(env.rlenv)

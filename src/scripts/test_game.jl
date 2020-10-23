@@ -46,6 +46,8 @@ function test_game(gspec::AbstractGameSpec; n=100)
   for state in generate_states(gspec, n)
     game = GI.init(gspec, state)
     @assert GI.current_state(game) == state
+    GI.set_state!(game, state)
+    @assert GI.current_state(game) == state
     @assert isa(GI.current_state(game), State)
     @assert same_state(GI.clone(game), GI.init(gspec, state))
 

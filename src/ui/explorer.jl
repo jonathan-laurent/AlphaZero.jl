@@ -230,7 +230,7 @@ function interpret!(exp::Explorer, stats, cmd, args=[])
     return true
   elseif cmd == "flip"
     save_game!(exp)
-    exp.game = GI.apply_random_symmetry(exp.game)
+    GI.apply_random_symmetry!(exp.game)
     return true
   elseif cmd == "explore"
     isa(exp.player, MctsPlayer) || (return false)

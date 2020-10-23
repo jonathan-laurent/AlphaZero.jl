@@ -293,7 +293,7 @@ Simulate a game by an [`AbstractPlayer`](@ref).
 - For two-player games, please use [`TwoPlayers`](@ref).
 - If the `flip_probability` argument is set to ``p``, the board
   is _flipped_ randomly at every turn with probability ``p``,
-  using [`GI.apply_random_symmetry`](@ref).
+  using [`GI.apply_random_symmetry!`](@ref).
 """
 function play_game(gspec, player; flip_probability=0.)
   game = GI.init(gspec)
@@ -303,7 +303,7 @@ function play_game(gspec, player; flip_probability=0.)
       return trace
     end
     if !iszero(flip_probability) && rand() < flip_probability
-      game = GI.apply_random_symmetry(game)
+      GI.apply_random_symmetry!(game)
     end
     actions, π_target = think(player, game)
     τ = player_temperature(player, game, length(trace))

@@ -27,6 +27,11 @@ GI.spec(::GameEnv) = GameSpec()
 
 GI.two_players(::GameSpec) = true
 
+function GI.set_state!(g::GameEnv, state)
+  g.board = state.board
+  g.curplayer = state.curplayer
+end
+
 #####
 ##### Defining winning conditions
 #####
