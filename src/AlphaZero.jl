@@ -84,7 +84,7 @@ using .UserInterface
 # Choose the default DL framework based on an environment variable
 function __init__()
   @eval begin
-    const DEFAULT_DL_FRAMEWORK = get(ENV, "ALPHAZERO_DEFAULT_DL_FRAMEWORK", "FLUX")
+    const DEFAULT_DL_FRAMEWORK = get(ENV, "ALPHAZERO_DEFAULT_DL_FRAMEWORK", "KNET")
     const NetLib =
       if DEFAULT_DL_FRAMEWORK == "FLUX"
         @info "Using Flux."
