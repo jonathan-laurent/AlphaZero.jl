@@ -144,7 +144,7 @@ end
 function load_alphazero_env(dir)
   return AlphaZero.UserInterface.load_env(
     Game, Training.Network{Game},
-    AlphaZero.Log.Logger(devnull), dir, params=Training.params)
+    AlphaZero.Log.Logger(devnull), dir, params=Training.params())
 end
 
 ####
