@@ -4,8 +4,7 @@ hyperparameters tuning.
 """
 module Report
 
-# Some imports for docstrings cross-references
-import ..MCTS, ..Network, ..MemAnalysisParams
+using ..AlphaZero
 
 """
     Report.Loss
@@ -47,25 +46,62 @@ struct LearningStatus
 end
 
 """
+    Report.Evaluation
+
+The outcome of evaluating a player against a baseline player.
+
+# Two-player Games
+
+- `rewards` is the sequence of rewards collected by the evaluated player
+- `avgr` is the average reward collected by the evaluated player
+- `baseline_rewards` is `nothing`
+
+# Single-player Games
+
+- `rewards` is the sequence of rewards collected by the evaluated player
+- `baseline_rewards` is the sequence of rewards collected by the baseline player
+- `avgr` is equal to `mean(rewards) - mean(baseline_rewards)`
+
+# Common Fields
+
+- `legend` is a string describing the evaluation
+- `redundancy` is the ratio of duplicate positions encountered during the
+   evaluation, not counting the initial position. If this number is too high,
+   you may want to increase the move selection temperature.
+- `time` is the computing time spent running the evaluation, in seconds
+"""
+struct Evaluation
+  legend :: String
+  avgr :: Float64
+  redundancy :: Float64
+  rewards :: Vector{Float64}
+  baseline_rewards :: Union{Nothing, Vector{Float64}}
+  time :: Float64
+end
+
+"""
+    const Report.Benchmark = Vector{Report.Evaluation}
+
+A benchmark report is a vector of [`Evaluation`](@ref) objects.
+"""
+const Benchmark = Vector{Evaluation}
+
+"""
     Report.Checkpoint
 
 Report generated after a checkpoint evaluation.
 
 - `batch_id`: number of batches after which the checkpoint was computed
+- `evaluation`: evaluation report from the arena, of type [`Report.Evaluation`](@ref)
 - `status_after`: learning status at the checkpoint, as an object of type
    [`Report.LearningStatus`](@ref)
-- `reward`: average reward collected by the contender network
-- `redundancy`: ratio of duplicate positions encountered during the evaluation,
-   not counting the initial position. If this number is too high, you may
-   want to increase the move selection temperature.
 - `nn_replaced`: true if the current best neural network was updated after
    the checkpoint
 """
 struct Checkpoint
   batch_id :: Int
+  evaluation :: Evaluation
   status_after :: LearningStatus
-  reward :: Float64
-  redundancy :: Float64
   nn_replaced :: Bool
 end
 
@@ -218,6 +254,8 @@ struct Initial
   num_network_parameters :: Int
   num_network_regularized_parameters :: Int
   mcts_footprint_per_node :: Int
+  errors :: Vector{String}
+  warnings :: Vector{String}
 end
 
 #####

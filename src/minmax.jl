@@ -9,7 +9,7 @@ a baseline against AlphaZero. Heuristic board values are provided by the
 """
 module MinMax
 
-import ..GI, ..GameInterface, ..AbstractPlayer, ..think
+using ..AlphaZero
 
 amplify(r) = iszero(r) ? r : Inf * sign(r)
 
@@ -27,7 +27,7 @@ end
 
 function qvalue(player, game, action, depth)
   @assert !GI.game_terminated(game)
-  next = copy(game)
+  next = GI.clone(game)
   GI.play!(next, action)
   wr = GI.white_reward(next)
   r = GI.white_playing(game) ? wr : -wr
@@ -46,11 +46,11 @@ function minmax(player, game, actions, depth)
 end
 
 """
-    MinMax.Player{Game} <: AbstractPlayer{Game}
+    MinMax.Player <: AbstractPlayer
 
 A stochastic minmax player, to be used as a baseline.
 
-    MinMax.Player{Game}(;depth, amplify_rewards, τ=0.)
+    MinMax.Player(;depth, amplify_rewards, τ=0.)
 
 The minmax player explores the game tree exhaustively at depth `depth`
 to build an estimate of the Q-value of each available action. Then, it
@@ -74,17 +74,17 @@ Otherwise,
 If the `amplify_rewards` option is set to true, every received positive reward
 is converted to ``∞`` and every negative reward is converted to ``-∞``.
 """
-struct Player{G} <: AbstractPlayer{G}
+struct Player <: AbstractPlayer
   depth :: Int
   amplify_rewards :: Bool
   τ :: Float64
   gamma :: Float64
-  function Player{G}(;depth, amplify_rewards, τ=0., γ=1.) where G
-    return new{G}(depth, amplify_rewards, τ, γ)
+  function Player(;depth, amplify_rewards, τ=0., γ=1.)
+    return new(depth, amplify_rewards, τ, γ)
   end
 end
 
-function think(p::Player, game)
+function AlphaZero.think(p::Player, game)
   actions = GI.available_actions(game)
   n = length(actions)
   qs = [qvalue(p, game, a, p.depth) for a in actions]

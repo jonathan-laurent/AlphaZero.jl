@@ -2,7 +2,7 @@
 ##### Repository of Available Games
 #####
 
-const AVAILABLE_GAMES = ["tictactoe", "connect-four","indexfunds" #=, "mancala" =#]
+const AVAILABLE_GAMES = ["tictactoe", "connect-four", "connect-four-cpu" #=, "mancala" =#]
 
 for game in AVAILABLE_GAMES
   file = "../games/$game/main.jl"

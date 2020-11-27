@@ -6,16 +6,14 @@ import JSON3
 
 for T in [
     # Reports
-    Report.Loss, Report.LearningStatus, Report.Checkpoint,
+    Report.Loss, Report.LearningStatus, Report.Evaluation, Report.Checkpoint,
     Report.Learning, Report.Samples, Report.StageSamples, Report.Memory,
     Report.SelfPlay, Report.Perfs, Report.Iteration, Report.Initial,
-    # Benchmarks
-    Benchmark.DuelOutcome,
     # Network Hyperparameters
-    SimpleNetHP, ResNetHP,
+    NetLib.SimpleNetHP, NetLib.ResNetHP,
     # Parameters
     Params, SelfPlayParams, LearningParams, ArenaParams,
-    MctsParams, MemAnalysisParams,
+    SimParams, MctsParams, MemAnalysisParams,
     # Optimisers
     CyclicNesterov, Adam,
     # Schedules

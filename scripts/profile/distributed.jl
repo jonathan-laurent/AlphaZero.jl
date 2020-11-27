@@ -8,7 +8,7 @@ addprocs(2, exeflags="--project")
 
 @everywhere using AlphaZero
 
-include("../distributed/include_workaround.jl")
+include("../lib/include_workaround.jl")
 include_everywhere("../../games/tictactoe/main.jl")
 using .Tictactoe: Game, Training
 

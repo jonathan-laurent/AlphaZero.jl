@@ -63,6 +63,7 @@ children(c::Conv) = (c.W,)
 
 mapchildren(f, c::Conv) = Conv(f(c.W), c.pad)
 
+
 #####
 ##### BatchNorm
 #####

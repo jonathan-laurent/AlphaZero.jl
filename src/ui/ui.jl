@@ -7,25 +7,19 @@ be replaced easily.
 module UserInterface
 
   export Log
-  export Explorer, start_explorer
-  export Session, resume!, save, play_interactive_game
+  export explore
+  export Session, resume!, save
 
-  using AlphaZero
-  import AlphaZero: Util, GameType, apply_temperature
-  using AlphaZero.Util: Option
+  using ..AlphaZero
 
   import Plots
-  import Colors
-  import JSON2
-  import JSON3
-
+  import JSON2, JSON3
   using Base: @kwdef
   using Statistics: mean
-  using Formatting
-  using Crayons
+  using Formatting: format, fmt
+  using Crayons: @crayon_str
   using Colors: @colorant_str
   using ProgressMeter
-
   using Serialization: serialize, deserialize
 
   include("log.jl")

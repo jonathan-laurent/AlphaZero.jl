@@ -2,15 +2,14 @@
 This module provides utilities to build neural networks with Flux,
 along with a library of standard architectures.
 """
-module FluxNets
+module FluxLib
 
-export SimpleNet, SimpleNetHP, ResNet, ResNetHP
+export SimpleNet, SimpleNetHP, ResNet, ResNetHP, LSTMNet, LSTMNetHP
 
-using ..Network
-using Base: @kwdef
-import ..GameInterface, ..Util, ..CyclicSchedule
+using ..AlphaZero
 
 using CUDA
+using Base: @kwdef
 
 import Flux
 import Functors
@@ -20,8 +19,9 @@ array_on_gpu(::Array) = false
 array_on_gpu(::CuArray) = true
 array_on_gpu(arr) = error("Usupported array type: ", typeof(arr))
 
-using Flux: relu, softmax, flatten
-using Flux: Chain, Dense, Conv, BatchNorm, SkipConnection
+using Flux: relu, softmax, flatten, onehot, chunk, batchseq
+using Flux: Chain, Dense, Conv, BatchNorm, SkipConnection, LSTM
+using Base.Iterators: partition
 import Zygote
 
 #####
@@ -29,7 +29,7 @@ import Zygote
 #####
 
 """
-    FluxNetwork{Game} <: AbstractNetwork{Game}
+    FluxNetwork <: AbstractNetwork
 
 Abstract type for neural networks implemented using the _Flux_ framework.
 
@@ -41,7 +41,7 @@ network interface with the following exceptions:
 [`Network.HyperParams`](@ref), [`Network.hyperparams`](@ref),
 [`Network.forward`](@ref) and [`Network.on_gpu`](@ref).
 """
-abstract type FluxNetwork{Game} <: AbstractNetwork{Game} end
+abstract type FluxNetwork <: AbstractNetwork end
 
 function Base.copy(nn::Net) where Net <: FluxNetwork
   #new = Net(Network.hyperparams(nn))
@@ -145,20 +145,20 @@ end
 #####
 
 """
-    TwoHeadNetwork{Game} <: FluxNetwork{G}
+    TwoHeadNetwork <: FluxNetwork
 
 An abstract type for two-head neural networks implemented with Flux.
 
 Subtypes are assumed to have fields
-`hyper`, `common`, `vhead` and `phead`. Based on those, an implementation
-is provided for [`Network.hyperparams`](@ref), [`Network.forward`](@ref) and
-[`Network.on_gpu`](@ref), leaving only [`Network.HyperParams`](@ref) to
-be implemented.
+`hyper`, `gspec`, `common`, `vhead` and `phead`. Based on those, an implementation
+is provided for [`Network.hyperparams`](@ref), [`Network.game_spec`](@ref),
+[`Network.forward`](@ref) and [`Network.on_gpu`](@ref), leaving only
+[`Network.HyperParams`](@ref) to be implemented.
 """
-abstract type TwoHeadNetwork{G} <: FluxNetwork{G} end
+abstract type TwoHeadNetwork <: FluxNetwork end
 
-function Network.forward(nn::TwoHeadNetwork, board)
-  c = nn.common(board)
+function Network.forward(nn::TwoHeadNetwork, state)
+  c = nn.common(state)
   v = nn.vhead(c)
   p = nn.phead(c)
   return (p, v)
@@ -167,11 +167,13 @@ end
 # Flux.@functor does not work do to Network being parametric
 function Flux.functor(nn::Net) where Net <: TwoHeadNetwork
   children = (nn.common, nn.vhead, nn.phead)
-  constructor = cs -> Net(nn.hyper, cs...)
+  constructor = cs -> Net(nn.gspec, nn.hyper, cs...)
   return (children, constructor)
 end
 
 Network.hyperparams(nn::TwoHeadNetwork) = nn.hyper
+
+Network.game_spec(nn::TwoHeadNetwork) = nn.gspec
 
 Network.on_gpu(nn::TwoHeadNetwork) = array_on_gpu(nn.vhead[end].b)
 
@@ -181,5 +183,6 @@ Network.on_gpu(nn::TwoHeadNetwork) = array_on_gpu(nn.vhead[end].b)
 
 include("architectures/simplenet.jl")
 include("architectures/resnet.jl")
+include("architectures/lstmnet.jl")
 
 end
