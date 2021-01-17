@@ -63,7 +63,12 @@ function Env(
     parse_action    = default_parse_action,
     read_state      = default_read_state)
 
-  two_players = isa(rlenv, RL.AbstractZeroSumEnv)
+  # TODO: how to compute the number of players with CommonRLInterface?
+  #nplayers = length(RL.player_indices(rl))
+  #@assert nplayers == 1 || nplayers == 2
+  #two_players = nplayers == 2
+  two_players = false
+
   return Env(
     rlenv, 0., two_players,
     heuristic_value, vectorize_state, symmetries,
@@ -109,8 +114,6 @@ GI.current_state(env::Env) = RL.state(env.rlenv)
 GI.game_terminated(env::Env) = RL.terminated(env.rlenv)
 
 GI.white_playing(env::Env) = RL.player(env.rlenv) == 1
-
-GI.white_playing(::Env{<:RL.AbstractMarkovEnv}) = true
 
 GI.actions_mask(env::Env) = RL.valid_action_mask(env.rlenv)
 
