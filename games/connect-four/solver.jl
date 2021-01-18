@@ -78,7 +78,7 @@ end
 
 function qvalue(player, game, action)
   @assert !GI.game_terminated(game)
-  next = copy(game)
+  next = GI.clone(game)
   GI.play!(next, action)
   qnext = value(player, next)
   if GI.white_playing(game) != GI.white_playing(next)

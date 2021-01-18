@@ -12,7 +12,7 @@ const SAVE_FILE = "pons-benchmark-results.json"
 const PLOT_FILE = "pons-benchmark-results.png"
 const ITC_STRIDE = 5
 const NUM_WORKERS = 128
-const DEBUG_MODE = false # Launches a quick run on a tiny dataset to help debug
+const DEBUG_MODE = true # Launches a quick run on a tiny dataset to help debug
 
 # A benchmark to evaluate connect-four agents is available at:
 #   http://blog.gamesolver.org/solving-connect-four/02-test-protocol/
@@ -81,14 +81,15 @@ const BENCHMARKS = load_benchmarks(BENCHMARKS_DIR)
 ####
 
 using AlphaZero
-include("../main.jl")
-using .ConnectFour: Game, Solver, Training
+using .Examples.ConnectFour: GameSpec, Solver, Training
 using ProgressMeter
 using Formatting
 using Statistics: mean
 
+const gspec = GameSpec()
+
 function state_of_string(str)
-  g = Game()
+  g = GI.init(gspec)
   for c in str
     a = parse(Int, c)
     GI.play!(g, a)
@@ -141,12 +142,6 @@ function test_player(make_player, oracle)
   return errs
 end
 
-function load_alphazero_env(dir)
-  return AlphaZero.UserInterface.load_env(
-    Game, Training.Network{Game},
-    AlphaZero.Log.Logger(devnull), dir, params=Training.params)
-end
-
 ####
 #### Running all the tests
 ####
@@ -166,19 +161,19 @@ function test_alphazero(env)
     dirichlet_noise_ϵ=0.)
   net = Network.copy(env.bestnn, on_gpu=true, test_mode=true)
   return test_player(net) do net
-    return MctsPlayer(net, mcts_params)
+    return MctsPlayer(gspec, net, mcts_params)
   end
 end
 
 function generate_data(session_dir)
   println("Testing the minmax baseline")
   minmax_errs = test_player(nothing) do _
-     MinMax.Player{Game}(depth=5, amplify_rewards=true, τ=0)
+     MinMax.Player(depth=5, amplify_rewards=true, τ=0)
   end
   println("")
 
   println("Testing AlphaZero")
-  env = load_alphazero_env(session_dir)
+  env = AlphaZero.UserInterface.load_env(session_dir)
   az_errs = test_alphazero(env)
   println("")
 
@@ -187,10 +182,17 @@ function generate_data(session_dir)
   itc = 0
   while true
     itdir = joinpath(session_dir, "iterations", "$itc")
-    AlphaZero.UserInterface.valid_session_dir(itdir) || break
+    if !AlphaZero.UserInterface.valid_session_dir(itdir)
+      if isdir(itdir)
+        error("""
+        The directory '$itdir' does not contain a valid environment.
+        Did you run the training session using `save_intermediate=true`?""")
+      end
+      break
+    end
     DEBUG_MODE && itc > 10 && break
     println("Iteration $itc")
-    env = load_alphazero_env(itdir)
+    env = AlphaZero.UserInterface.load_env(itdir)
     push!(az_training_errs, (itc, test_alphazero(env)))
     itc += ITC_STRIDE
   end
