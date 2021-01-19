@@ -2,6 +2,7 @@
 ##### Utilities to manage inference servers
 #####
 
+# Note: this function may modify `batch` in place.
 function fill_and_evaluate(net, batch; batch_size, fill)
   n = length(batch)
   @assert n > 0
@@ -101,7 +102,7 @@ end
 #####
 
 """
-    Simulator(make_player, oracles, measure)
+    Simulator(make_player, make_oracles, measure)
 
 A distributed simulator that encapsulates the details of running simulations
 across multiple threads and multiple machines.
@@ -111,8 +112,10 @@ across multiple threads and multiple machines.
     - `make_oracles`: a function that takes no argument and returns
         the oracles used by the player, which can be either `nothing`,
         a single oracle or a pair of oracles.
-    - `make_player`: a function that takes as an argument the `oracles` field
-        above and builds a player from it.
+    - `make_player`: a function that takes as an argument the result of `make_oracles`
+        and builds a player from it. In practice, an oracle returned by `make_oracles`
+        may be replaced by a `BatchedOracle` before it is passed to `make_player`, which
+        is why these two functions are specified separately.
     - `measure(trace, colors_flipped, player)`: the function that is used to
         take measurements after each game simulation.
 """
@@ -185,7 +188,8 @@ end
 """
     simulate_distributed(::Simulator, ::AbstractGameSpec, ::SimParams; <kwargs>)
 
-Identical to [`simulate`](@ref) but splits the work across all available workers.
+Identical to [`simulate`](@ref) but splits the work across all available distributed
+workers, whose number is given by `Distributed.nworkers()`.
 """
 function simulate_distributed(
     simulator::Simulator,
