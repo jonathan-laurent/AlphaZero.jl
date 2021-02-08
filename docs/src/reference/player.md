@@ -18,6 +18,7 @@ player_temperature
 
 ```@docs
 MctsPlayer
+AlphaZeroPlayer
 RandomPlayer
 NetworkPlayer
 EpsilonGreedyPlayer
@@ -40,7 +41,6 @@ Human
 ```@docs
 Simulator
 record_trace
-ColorPolicy
 simulate
 simulate_distributed
 ```

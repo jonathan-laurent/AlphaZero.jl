@@ -7,11 +7,31 @@ omitted from the manual for brievety.
 CurrentModule = AlphaZero
 ```
 
+## Batchifying oracles
+
 ```@docs
-GameType
+Batchifier
 Batchifier.launch_server
+Batchifier.client_done!
+Batchifier.BatchedOracle
 ```
+
+# Experiments
+
+```@docs
+Experiments.Experiment
+```
+
+## Utilities
 
 ```@autodocs
 Modules = [AlphaZero.Util]
+```
+
+## KnetLib and FluxLib
+
+```@docs
+KnetLib
+KnetLib.KNetwork
+KnetLib.TwoHeadNetwork
 ```

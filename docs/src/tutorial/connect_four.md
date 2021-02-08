@@ -120,7 +120,7 @@ The `redundancy` indicator is helpful to diagnose a lack of randomization. It
 measures the quantity ``1 - u / n`` where ``u`` is the total number of unique
 states that have been encountered (excluding the initial state) and ``n`` is the
 total number of encountered states, excluding the initial state and counting
-duplicates (see [`Benchmark.DuelOutcome`](@ref)).
+duplicates (see [`Report.Evaluation`](@ref)).
 
 !!! note "On leveraging symmetries"
     Another trick that we use to add randomization is to leverage the symmetry

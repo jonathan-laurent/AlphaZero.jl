@@ -31,13 +31,30 @@ function instantiate end
 # name(::Player) :: String
 function name end
 
+"""
+    Evaluation
+
+Abstract type for a benchmark item specification.
+"""
 abstract type Evaluation end
 
+
+"""
+    Single <: Evaluation
+
+Evaluating a single player in a one-player game.
+"""
 @kwdef struct Single <: Evaluation
   player :: Player
   sim :: SimParams
 end
 
+
+"""
+    Duel <: Evaluation
+
+Evaluating a player by pitting it against a baseline player in a two-player game.
+"""
 @kwdef struct Duel <: Evaluation
   player :: Player
   baseline :: Player
@@ -51,7 +68,7 @@ name(d::Duel) = "$(name(d.player)) / $(name(d.baseline))"
 """
     Benchmark.run(env::Env, duel::Benchmark.Evaluation, progress=nothing)
 
-Run a benchmark duel and return a [`Report.Evaluation outcome`](@ref).
+Run a benchmark duel and return a [`Report.Evaluation`](@ref).
 
 If a `progress` is provided, `next!(progress)` is called
 after each simulated game.

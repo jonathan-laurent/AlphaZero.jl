@@ -6,14 +6,14 @@ CurrentModule = AlphaZero
 
 ```@docs
 Benchmark
-Benchmark.Report
 ```
 
-## Duels
+## Evaluations
 
 ```@docs
+Benchmark.Evaluation
+Benchmark.Single
 Benchmark.Duel
-Benchmark.DuelOutcome
 Benchmark.run
 ```
 
@@ -25,7 +25,6 @@ Benchmark.Full
 Benchmark.NetworkOnly
 Benchmark.MctsRollouts
 Benchmark.MinMaxTS
-Benchmark.Solver
 ```
 
 ## Minmax Baseline

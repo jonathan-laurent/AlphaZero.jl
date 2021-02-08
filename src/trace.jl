@@ -7,7 +7,7 @@
 
 An object that collects all states visited during a game, along with the
 rewards obtained at each step and the successive player policies to be used
-as targets.
+as targets for the neural network.
 
 # Constructor
 
@@ -23,7 +23,7 @@ mutable struct Trace{State}
   end
 end
 
-function trace_invariant(t::Trace)
+function valid_trace(t::Trace)
   return length(t.policies) == length(t.rewards) == length(t.states) - 1
 end
 

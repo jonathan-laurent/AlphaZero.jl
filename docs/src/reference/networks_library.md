@@ -4,29 +4,16 @@
 CurrentModule = AlphaZero
 ```
 
+## [Convolutional ResNet](@id conv_resnet)
+
 ```@docs
-KNets
+NetLib.ResNet
+NetLib.ResNetHP
 ```
 
-## Knet Utilities
+## [Simple Network](@id simplenet)
 
 ```@docs
-KNets.KNetwork
-KNets.TwoHeadNetwork
-```
-
-## Networks Library
-
-### [Convolutional ResNet](@id conv_resnet)
-
-```@docs
-KNets.ResNet
-KNets.ResNetHP
-```
-
-### [Simple Network](@id simplenet)
-
-```@docs
-KNets.SimpleNet
-KNets.SimpleNetHP
+NetLib.SimpleNet
+NetLib.SimpleNetHP
 ```

@@ -1,8 +1,25 @@
 #####
-##### Utilities to manage inference servers
+##### Utilities for distributed game simulation
 #####
 
-# Note: this function may modify `batch` in place.
+# This code factorizes out all the complexity of:
+#   1. Batching inference requests across game simulations
+#   2. Distributing simulations across multiple machines (optional)
+
+#####
+##### Inference server
+#####
+
+# """
+#    fill_and_evaluate(net, batch; batch_size, fill)
+
+# Evaluate a neural network on a batch of inputs.
+
+# If `fill=true`, the batch is padded with dummy inputs until it has size `batch_size`
+# before it is sent to the network.
+
+# This function is typically called by inference servers.
+# """
 function fill_and_evaluate(net, batch; batch_size, fill)
   n = length(batch)
   @assert n > 0
@@ -14,15 +31,38 @@ function fill_and_evaluate(net, batch; batch_size, fill)
     if nmissing == 0
       return Network.evaluate_batch(net, batch)
     else
-      append!(batch, [batch[1] for _ in 1:nmissing])
+      batch = vcat(batch, [batch[1] for _ in 1:nmissing])
       return Network.evaluate_batch(net, batch)[1:n]
     end
   end
 end
 
-# Start a server that processes inference requests for TWO networks
-# Expected queries must have fields `state` and `netid`.
-function inference_server(
+# """
+#     launch_inference_server(net, nworkers; fill_batches)
+
+# Start a server that processes inference requests for a single neural network.
+
+# Return a request channel (see [`Batchifier.launch_server`](@ref)).
+# """
+function launch_inference_server(net::AbstractNetwork, nworkers; fill_batches)
+  return Batchifier.launch_server(nworkers) do batch
+    fill_and_evaluate(net, batch; batch_size=nworkers, fill=fill_batches)
+  end
+end
+
+# """
+#     launch_inference_server(net1, net2, nworkers; fill_batches)
+# 
+# Start a server that processes inference requests for TWO networks.
+# This is needed when pitting two players together that rely on distinct networks for
+# example. The reason we do not spawn two separate servers in this case is that each
+# server would not know how many queries to wait for.
+# 
+# Such a server expects modified queries that are named tuples with field `query` and
+# `netid`. The latter must be an integer in {1, 2} indicating whether `net1` or `net2`
+# is queried.
+# """
+function launch_inference_server(
     net1::AbstractNetwork,
     net2::AbstractNetwork,
     nworkers;
@@ -51,12 +91,22 @@ function inference_server(
   end
 end
 
-# Start an inference server for one agent
-function inference_server(net::AbstractNetwork, n; fill_batches)
-  return Batchifier.launch_server(n) do batch
-    fill_and_evaluate(net, batch; batch_size=n, fill=fill_batches)
-  end
-end
+# """
+#     batchify_oracles(oracles, fill_batches, num_workers)
+
+# Take some oracles, launch a server to call them by batches if needed and return a pair
+# of functions to be called by each concurrent worker:
+
+#   - A `spawn_oracles()` function that expects no argument and returns `BatchedOracle`s
+#     to be used by the worker.
+#   - A `done!()` function to be called when the worker is finished and won't make anymore
+#     query.
+
+# The `oracles` argument can be either an oracle or a pair of oracles. If one of the two
+# oracles at least is a neural network, an inference server will be launched using 
+# [`launch_inference_server`](@ref).
+# """
+function batchify_oracles() end
 
 ret_oracle(x) = () -> x
 do_nothing!() = nothing
@@ -65,20 +115,20 @@ zipthunk(f1, f2) = () -> (f1(), f2())
 
 # Two neural network oracles
 function batchify_oracles(os::Tuple{AbstractNetwork, AbstractNetwork}, fill, n)
-  reqc = inference_server(os[1], os[2], n, fill_batches=fill)
-  make1() = Batchifier.BatchedOracle(st -> (state=st, netid=1), reqc)
-  make2() = Batchifier.BatchedOracle(st -> (state=st, netid=2), reqc)
+  reqc = launch_inference_server(os[1], os[2], n, fill_batches=fill)
+  make1() = Batchifier.BatchedOracle(reqc, st -> (state=st, netid=1))
+  make2() = Batchifier.BatchedOracle(reqc, st -> (state=st, netid=2))
   return zipthunk(make1, make2), send_done!(reqc)
 end
 
 function batchify_oracles(os::Tuple{<:Any, AbstractNetwork}, fill, n)
-  reqc = inference_server(os[2], n, fill_batches=fill)
+  reqc = launch_inference_server(os[2], n, fill_batches=fill)
   make2() = Batchifier.BatchedOracle(reqc)
   return zipthunk(ret_oracle(os[1]), make2), send_done!(reqc)
 end
 
 function batchify_oracles(os::Tuple{AbstractNetwork, <:Any}, fill, n)
-  reqc = inference_server(os[1], n, fill_batches=fill)
+  reqc = launch_inference_server(os[1], n, fill_batches=fill)
   make1() = Batchifier.BatchedOracle(reqc)
   return zipthunk(make1, ret_oracle(os[2])), send_done!(reqc)
 end
@@ -88,7 +138,7 @@ function batchify_oracles(os::Tuple{<:Any, <:Any}, fill, n)
 end
 
 function batchify_oracles(o::AbstractNetwork, fill, n)
-  reqc = inference_server(o, n, fill_batches=fill)
+  reqc = launch_inference_server(o, n, fill_batches=fill)
   make() = Batchifier.BatchedOracle(reqc)
   return make, send_done!(reqc)
 end
@@ -140,7 +190,8 @@ Play a series of games using a given [`Simulator`](@ref).
 
 # Keyword Arguments
 
-  - `game_simulated` is called every time a game simulation is completed with no arguments
+  - `game_simulated` is called every time a game simulation is completed
+    (with no arguments)
 
 # Return
 
@@ -236,7 +287,8 @@ function compute_redundancy(states)
   return 1. - length(unique) / length(states)
 end
 
-# samples is a vector of named tuples with fields `trace` and `colors_flipped`
+# From a vector of measures, extract all rewards w.r.t. white and compute redundancy
+# `samples` is a vector of named tuples with fields `trace` and `colors_flipped`
 function rewards_and_redundancy(samples; gamma)
   rewards = map(samples) do s
     wr = total_reward(s.trace, gamma)

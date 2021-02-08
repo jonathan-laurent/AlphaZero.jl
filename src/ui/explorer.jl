@@ -250,11 +250,6 @@ function interpret!(exp::Explorer, stats, cmd, args=[])
   return false
 end
 
-"""
-    start_explorer(exp::Explorer)
-
-Start an interactive explorer session.
-"""
 function start_explorer(exp::Explorer)
   while true
     # Print the state

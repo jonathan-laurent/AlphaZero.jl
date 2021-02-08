@@ -14,6 +14,7 @@ Network
 AbstractNetwork
 HyperParams
 hyperparams
+game_spec
 forward
 train!
 set_test_mode!
@@ -42,6 +43,7 @@ gc
 ### Evaluation Function
 
 ```@docs
+forward_normalized
 evaluate
 evaluate_batch
 ```

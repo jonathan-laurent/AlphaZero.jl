@@ -1,3 +1,18 @@
+#####
+##### Utilities to batch oracles
+#####
+
+
+"""
+Utilities for batchifying oracle evaluation.
+
+The typical workflow should be the following:
+
+  1. Launch an inference server using `launch_server` to obtain a request channel.
+  2. Create several `BatchedOracle` that send queries along this channel.
+  3. When a client to the server is done, it calls `client_done!` so that the server
+     does not have to wait for its next query anymore.
+"""
 module Batchifier
 
 using ..AlphaZero: MCTS, Util
@@ -44,10 +59,7 @@ function launch_server(f, num_workers)
       @assert length(pending) <= num_active
       if length(pending) == num_active && num_active > 0
         batch = [p.query for p in pending]
-        results = f(batch)
-        for i in eachindex(pending)
-          put!(pending[i].answer_channel, results[i])
-        end
+        results = f(batch)client_done
         empty!(pending)
       end
     end
@@ -55,22 +67,46 @@ function launch_server(f, num_workers)
   return channel
 end
 
+"""
+    client_done!(reqc)
+
+This function is to be called every time a client to the inference server identified
+by request channel `reqc` is done and won't send queries anymore.
+
+It should be called ``n`` times in total, where ``n`` is the number of workers that was
+indicated to [`launch_server`](@ref).
+
+!!! note
+    
+    This function does not take a `BatchedOracle` as an argument as there can be several
+    oracles per worker (e.g. a worker can simulate games between two players that each
+    rely on a neural network).
+
+"""
 client_done!(reqc) = put!(reqc, :done)
 
+"""
+    BatchedOracle(reqc, preprocess=(x->x))
+
+Create an oracle that delegates its job to an inference server.
+
+- When called on a state, this oracle sends a query to the server identified by
+  request channel `reqc`. This call is blocking until every other active worker also
+  sends its query.
+- A `preprocess` function can be provided to ransform the passed state before it is
+  sent to the server as a query.
+"""
 struct BatchedOracle{F} <: MCTS.Oracle
-  make_query :: F # turn state into a query (this is usually the identity)
+  preprocess :: F
   reqchan :: Channel
   anschan :: Channel
-  function BatchedOracle(f, reqchan)
-    return new{typeof(f)}(f, reqchan, Channel(1))
+  function BatchedOracle(reqchan, preprocess=(x->x))
+    return new{typeof(preprocess)}(preprocess, reqchan, Channel(1))
   end
-
 end
 
-BatchedOracle(reqchan) = BatchedOracle(x -> x, reqchan)
-
 function (oracle::BatchedOracle)(state)
-  query = oracle.make_query(state)
+  query = oracle.preprocess(state)
   put!(oracle.reqchan, (query=query, answer_channel=oracle.anschan))
   answer = take!(oracle.anschan)
   return answer
