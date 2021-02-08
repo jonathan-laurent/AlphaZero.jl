@@ -59,7 +59,10 @@ function launch_server(f, num_workers)
       @assert length(pending) <= num_active
       if length(pending) == num_active && num_active > 0
         batch = [p.query for p in pending]
-        results = f(batch)client_done
+        results = f(batch)
+        for i in eachindex(pending)
+          put!(pending[i].answer_channel, results[i])
+        end
         empty!(pending)
       end
     end

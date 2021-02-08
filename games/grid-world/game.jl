@@ -52,6 +52,7 @@ end
 
 # optional functions
 @provide RL.player(env::World) = 1 # An MDP is a one player game
+@provide RL.players(env::World) = [1]
 @provide RL.observations(env::World) = [SA[x, y] for x in 1:env.size[1], y in 1:env.size[2]]
 @provide RL.clone(env::World) = World(env.size, copy(env.rewards), env.state, env.time)
 @provide RL.state(env::World) = env.state
