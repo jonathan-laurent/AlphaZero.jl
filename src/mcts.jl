@@ -2,6 +2,18 @@
 A generic, standalone implementation of Monte Carlo Tree Search.
 It can be used on any game that implements `GameInterface`
 and with any external oracle.
+
+## Oracle Interface
+
+An oracle can be any function or callable object.
+  
+   oracle(state)
+
+evaluates a single state from the current player's perspective and returns 
+a pair `(P, V)` where:
+
+  - `P` is a probability vector on `GI.available_actions(GI.init(gspec, state))`
+  - `V` is a scalar estimating the value or win probability for white.
 """
 module MCTS
 
@@ -10,33 +22,17 @@ using Distributions: Categorical, Dirichlet
 using ..AlphaZero: GI, Util
 
 #####
-##### Interface for External Oracles
+##### Standard Oracles
 #####
 
 """
-    MCTS.Oracle <: Function
-
-Abstract base type for an oracle. An oracle must be a function or a callable object.
-
-    (::Oracle)(state)
-
-Evaluate a single state from the current player's perspective.
-
-Return a pair `(P, V)` where:
-
-  - `P` is a probability vector on `GI.available_actions(GI.init(gspec, state))`
-  - `V` is a scalar estimating the value or win probability for white.
-"""
-abstract type Oracle <: Function end
-
-"""
-    MCTS.RolloutOracle(game_spec::AbstractGameSpec, γ=1.) :: MCTS.Oracle
+    MCTS.RolloutOracle(game_spec::AbstractGameSpec, γ=1.) <: Function
 
 This oracle estimates the value of a position by simulating a random game
 from it (a rollout). Moreover, it puts a uniform prior on available actions.
 Therefore, it can be used to implement the "vanilla" MCTS algorithm.
 """
-struct RolloutOracle{GameSpec} <: Oracle
+struct RolloutOracle{GameSpec} <: Function
   gspec :: GameSpec
   gamma :: Float64
   RolloutOracle(gspec, γ=1.) = new{typeof(gspec)}(gspec, γ)
@@ -62,7 +58,7 @@ function (r::RolloutOracle)(state)
   return P, V
 end
 
-struct RandomOracle{GameSpec} <: Oracle
+struct RandomOracle{GameSpec}
   gspec :: GameSpec
 end
 

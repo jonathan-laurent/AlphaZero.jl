@@ -236,7 +236,7 @@ end
 """
     forward_normalized(network::AbstractNetwork, states, actions_mask)
 
-Evaluate a batch of states. This function is a wrapper
+Evaluate a batch of vectorized states. This function is a wrapper
 on [`forward`](@ref) that puts a zero weight on invalid actions.
 
 # Arguments
@@ -244,7 +244,7 @@ on [`forward`](@ref) that puts a zero weight on invalid actions.
   - `states` is a tensor whose last dimension has size `bach_size`
   - `actions_mask` is a binary matrix of size `(num_actions, batch_size)`
 
-# Return
+# Returned value
 
 Return a `(P, V, Pinv)` triple where:
 
@@ -271,7 +271,13 @@ from_singletons(x) = reshape(x, size(x)[1:end-1])
 """
     evaluate(::AbstractNetwork, state)
 
-Evaluate a single state position.
+    (nn::AbstractNetwork)(state) = evaluate(nn, state)
+
+Evaluate the neural network as an MCTS oracle on a single state.
+
+Note, however, that evaluating state positions once at a time is slow and so you
+may want to use a `BatchedOracle` along with an inference server that uses
+[`evaluate_batch`](@ref).
 """
 function evaluate(nn::AbstractNetwork, state)
   gspec = game_spec(nn)
@@ -284,20 +290,15 @@ function evaluate(nn::AbstractNetwork, state)
   return (p[actions_mask], v[1])
 end
 
-"""
-    (nn::AbstractNetwork)(state) = evaluate(nn, state)
-
-Allow a neural network to be used directly as an MCTS oracle function.
-
-Note, however, that evaluating state positions once at a time is slow and so you
-may want to wrap your neural network into a `BatchedOracle`.
-"""
 (nn::AbstractNetwork)(state) = evaluate(nn, state)
 
 """
     evaluate_batch(::AbstractNetwork, batch)
 
-Evaluate a batch of positions at once.
+Evaluate the neural network as an MCTS oracle on a batch of states at once.
+
+Take a list of states as input and return a list of `(P, V)` pairs as defined in the
+MCTS oracle interface.
 """
 function evaluate_batch(nn::AbstractNetwork, batch)
   gspec = game_spec(nn)

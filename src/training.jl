@@ -348,7 +348,7 @@ end
 """
     AlphaZeroPlayer(::Env; [timeout, mcts_params, use_gpu])
 
-Create an AlphaZero player from the current training environment.
+Create an AlphaZero player from the current [training environment](@ref environment).
 
 Note that the returned player may be slow as it does not batch MCTS requests.
 """

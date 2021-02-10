@@ -16,22 +16,16 @@ Batchifier.client_done!
 Batchifier.BatchedOracle
 ```
 
-# Experiments
-
-```@docs
-Experiments.Experiment
-```
-
-## Utilities
-
-```@autodocs
-Modules = [AlphaZero.Util]
-```
-
 ## KnetLib and FluxLib
 
 ```@docs
 KnetLib
 KnetLib.KNetwork
 KnetLib.TwoHeadNetwork
+```
+
+## Utilities
+
+```@autodocs
+Modules = [AlphaZero.Util]
 ```

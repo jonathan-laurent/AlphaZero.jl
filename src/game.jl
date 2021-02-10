@@ -95,9 +95,18 @@ function set_state! end
 """
     current_state(game::AbstractGameEnv)
 
-Return the game state (which is persistent).
+Return the game state.
+
+!!! warn
+
+    The state returned by this function may be stored (e.g. in the MCTS tree) and must
+    therefore either be fresh or persistent. If in doubt, you should make a copy.
+
 """
 function current_state end
+
+# TODO: maybe MCTS should make the copy itself. The performance cost should not be great
+# and it would probably avoid people a lot of pain.
 
 """
     game_terminated(::AbstractGameEnv)
@@ -177,6 +186,11 @@ Note that the current state of the passed environment is ignored by this functio
 In the game of tic-tac-toe, there are eight symmetries that can be
 obtained by composing reflexions and rotations of the board (including the
 identity symmetry).
+
+# Property
+
+If `(s2, σ)` is a symmetry for state `s1`, then `mask2 == mask1[σ]` must hold where
+`mask1` and `mask2` are the available action masks for `s1` and `s2` respectively.
 """
 function symmetries(::AbstractGameSpec, state)
   return Tuple{typeof(state), Vector{Int}}[]

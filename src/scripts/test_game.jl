@@ -11,13 +11,19 @@ end
 same_state(game1, game2) = GI.current_state(game1) == GI.current_state(game2)
 
 # Test that the same (symmetric) actions are still available in a symmetric state
+# function test_symmetry(gspec, state, (symstate, aperm))
+#   mask = GI.actions_mask(GI.init(gspec, state))
+#   symmask = GI.actions_mask(GI.init(gspec, symstate))
+#   v = falses(length(symmask))
+#   v[mask] .= true
+#   v = v[aperm]
+#   return all(v[symmask]) && !any(v[.~symmask])
+# end
+
 function test_symmetry(gspec, state, (symstate, aperm))
   mask = GI.actions_mask(GI.init(gspec, state))
   symmask = GI.actions_mask(GI.init(gspec, symstate))
-  v = falses(length(symmask))
-  v[mask] .= true
-  v = v[aperm]
-  return all(v[symmask]) && !any(v[.~symmask])
+  return symmask == mask[aperm]
 end
 
 # Testing compliance with AlphaZero.jl game interface

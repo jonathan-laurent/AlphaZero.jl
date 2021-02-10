@@ -259,8 +259,8 @@ end
 Create a new session from an experiment.
 
 # Optional keyword arguments
-- `dir`: session directory in which all files and reports are saved; if this argument
-    is not provided, "sessions/<experiment-name>" is chosen by default.
+- `dir="sessions/<experiment-name>"`: session directory in which all files and reports
+    are saved.
 - `autosave=true`: if set to `false`, the session won't be saved automatically nor
     any file will be generated
 - `nostdout=false`: disables logging on the standard output when set to `true`

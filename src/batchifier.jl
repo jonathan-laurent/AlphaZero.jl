@@ -99,7 +99,7 @@ Create an oracle that delegates its job to an inference server.
 - A `preprocess` function can be provided to ransform the passed state before it is
   sent to the server as a query.
 """
-struct BatchedOracle{F} <: MCTS.Oracle
+struct BatchedOracle{F}
   preprocess :: F
   reqchan :: Channel
   anschan :: Channel

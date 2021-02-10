@@ -1,10 +1,5 @@
 """
-Enable using AlphaZero.jl on RL environments that implement CommonRLInterface.jl.
-
-# Requirements
-
-In addition to the mandatory functions, this bridge relies on the following
-optional functions: `clone`, `state`, `setstate!` and `valid_action_mask`.
+Utilities for using AlphaZero.jl on RL environments that implement CommonRLInterface.jl.
 """
 module CommonRLInterfaceWrapper
 
@@ -17,6 +12,13 @@ const RL = CommonRLInterface
 #####
 ##### Wrappers
 #####
+
+# TODO: Currently, functions from GameInterface that are not provided by
+# CommonRLInterface.jl are specified using the keyword arguments of the `Env`
+# constructor. An alternative design would be to ask the user to implement them
+# directly on the RL.AbstractEnv environment. A problem with this approach is that
+# in OpenSpiel.jl for example, there might not be a distinct type for each game
+# environment on which to use multiple dispatch.
 
 mutable struct Env{E, H} <: AbstractGameEnv
   rlenv :: E
@@ -40,8 +42,8 @@ end
 #####
 
 function default_vectorize_state(rl, state)
-  err = "Your state is not a vector and so you should define `vectorize_state`"
-  @assert isa(state, Array{<:Number}) err
+  @assert isa(state, Array{<:Number}) "
+  Your state is not a vector and so you should define `vectorize_state`"
   return convert(Array{Float32}, state)
 end
 
@@ -53,6 +55,34 @@ default_action_string(rl, a) = error("Undefined: action_string")
 default_parse_action(rl, s)  = error("Undefined: parse_action")
 default_read_state(rl)       = error("Undefined: read_state")
 
+"""
+    Env(rlenv::CommonRLInterface.AbstractEnv; <kwargs>) <: AbstractGameEnv
+
+Wrap an environment implementing the interface defined in CommonRLInterface.jl into
+an `AbstractGameEnv`.
+
+# Requirements
+
+The following optional methods must be implemented for `rlenv`:
+
+  - `clone`
+  - `state`
+  - `setstate!`
+  - `valid_action_mask`
+
+# Keyword arguments
+
+The following optional functions from `GameInterface` can be provided as keyword
+arguments:
+
+  - `vectorize_state`: must be provided unless states already have type `Array{<:Number}`
+  - `heuristic_value`
+  - `symmetries`
+  - `render`
+  - `action_string`
+  - `parse_action`
+  - `read_state`
+"""
 function Env(
     rlenv :: RL.AbstractEnv;
     heuristic_value = default_heurisic_value,
@@ -74,6 +104,9 @@ function Env(
     render, action_string, parse_action, read_state)
 end
 
+"""
+    Spec(rlenv::RL.AbstractEnv; kwargs...) = spec(Env(rlenv; kwargs...))
+"""
 Spec(rlenv::RL.AbstractEnv; funs...) = Spec(Env(rlenv; funs...))
 
 #####

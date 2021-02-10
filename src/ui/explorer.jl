@@ -279,7 +279,7 @@ end
 Start a command interpreter to explore the internals of a player
 through interactive play.
 
-The `memory` argument is an optional reference to a memory buffer
+The `memory` argument is an optional reference to a memory buffer.
 When provided, additional state statistics are displayed.
 
 # Commands

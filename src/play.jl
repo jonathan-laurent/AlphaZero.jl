@@ -148,7 +148,7 @@ Construct a player from an MCTS environment. When computing each move:
 The temperature parameter `τ` can be either a real number or a
 [`AbstractSchedule`](@ref).
 
-    MctsPlayer(game_spec::AbstractGameSpec, oracle::MCTS.Oracle,
+    MctsPlayer(game_spec::AbstractGameSpec, oracle,
                params::MctsParams; timeout=nothing)
 
 Construct an MCTS player from an oracle and an [`MctsParams`](@ref) structure.
