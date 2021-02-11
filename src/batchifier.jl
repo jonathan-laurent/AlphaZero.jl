@@ -84,7 +84,6 @@ indicated to [`launch_server`](@ref).
     This function does not take a `BatchedOracle` as an argument as there can be several
     oracles per worker (e.g. a worker can simulate games between two players that each
     rely on a neural network).
-
 """
 client_done!(reqc) = put!(reqc, :done)
 
