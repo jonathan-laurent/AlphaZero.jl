@@ -3,7 +3,8 @@
 ##### https://github.com/PascalPons/connect4
 #####
 
-# Problem: no Connect4 module. We can change this:
+# TODO: at some point, I should use ConnectFourSolver.jl
+# To represent state "031", we must do `p = Position(); p(0); p(3); p(1); p`.
 
 module Solver
 

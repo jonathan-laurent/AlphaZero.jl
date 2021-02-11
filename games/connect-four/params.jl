@@ -1,3 +1,7 @@
+#####
+##### Training hyperparameters
+#####
+
 Network = NetLib.ResNet
 
 netparams = NetLib.ResNetHP(
@@ -55,13 +59,17 @@ params = Params(
   arena=arena,
   self_play=self_play,
   learning=learning,
-  num_iters=20,
+  num_iters=15,
   ternary_rewards=true,
   use_symmetries=true,
   memory_analysis=nothing,
   mem_buffer_size=PLSchedule(
-  [      0,        40],
-  [400_000, 2_000_000]))
+  [      0,        15],
+  [400_000, 1_000_000]))
+
+#####
+##### Evaluation benchmark
+#####
 
 mcts_baseline =
   Benchmark.MctsRollouts(
@@ -75,13 +83,9 @@ minmax_baseline = Benchmark.MinMaxTS(
   τ=0.2,
   amplify_rewards=true)
 
-players = [
-  Benchmark.Full(arena.mcts),
-  Benchmark.NetworkOnly(τ=0.5)]
+alphazero_player = Benchmark.Full(arena.mcts)
 
-baselines = [
-  mcts_baseline,
-  mcts_baseline]
+network_player = Benchmark.NetworkOnly(τ=0.5)
 
 benchmark_sim = SimParams(
   arena.sim;
@@ -90,8 +94,15 @@ benchmark_sim = SimParams(
   alternate_colors=false)
 
 benchmark = [
-  Benchmark.Duel(p, b, benchmark_sim)
-  for (p, b) in zip(players, baselines)]
+  Benchmark.Duel(alphazero_player, mcts_baseline,   benchmark_sim),
+# Benchmark.Duel(alphazero_player, minmax_baseline, benchmark_sim),
+  Benchmark.Duel(network_player,   mcts_baseline,   benchmark_sim),
+# Benchmark.Duel(network_player,   minmax_baseline, benchmark_sim)
+]
+
+#####
+##### Wrapping up in an experiment
+#####
 
 experiment = Experiment("connect-four",
   GameSpec(), params, Network, netparams, benchmark=benchmark)

@@ -10,9 +10,10 @@ const SOLVER_ERROR =
 const SESSION_DIR = "sessions/connect-four"
 const SAVE_FILE = "pons-benchmark-results.json"
 const PLOT_FILE = "pons-benchmark-results.png"
-const ITC_STRIDE = 5
+const ITC_MAX = 15  # Number of iterations taken into account in learning curves
+const ITC_STRIDE = 1  # A benchmark is run every ITC_STRIDE iteration
 const NUM_WORKERS = 128
-const DEBUG_MODE = true # Launches a quick run on a tiny dataset to help debug
+const DEBUG_MODE = false # Launches a quick run on a tiny dataset to help debug
 
 # A benchmark to evaluate connect-four agents is available at:
 #   http://blog.gamesolver.org/solving-connect-four/02-test-protocol/
@@ -191,6 +192,7 @@ function generate_data(session_dir)
       break
     end
     DEBUG_MODE && itc > 10 && break
+    itc > ITC_MAX && break
     println("Iteration $itc")
     env = AlphaZero.UserInterface.load_env(itdir)
     push!(az_training_errs, (itc, test_alphazero(env)))

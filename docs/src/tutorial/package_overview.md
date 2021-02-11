@@ -6,44 +6,29 @@ also being sufficiently powerful and fast to enable meaningful experiments on
 limited computing resources.
 
 On this page, we describe some key features of AlphaZero.jl:
-  - An asynchronous MCTS implementation
+  - A standalone and straightforward [MCTS implementation](@ref mcts)
+  - Some facilities for asynchronous and distributed simulation
   - A series of opt-in optimizations to increase training efficiency
   - Generic interfaces for games and neural networks
   - A simple user interface to get started quickly and diagnose problems
 
-### [Asynchronous MCTS](@id async_mcts)
+### Asynchronous and Distributed Simulations
 
-A key MCTS optimization that is implemented in AlphaZero.jl is to allow several
-workers to explore the search tree asynchronously. Doing so requires a bit of
-care to ensure that all workers are not always exploring the same branch
-simultaneously, which is done by introducing a [virtual
-loss](https://blogs.oracle.com/developers/lessons-from-alpha-zero-part-5:-performance-optimization)
-mechanism.
+A key aspect of generating self-play data efficiently is to simulate a large number of games asynchronously and batch requests to the neural network across all simulations. Indeed,
+evaluating board positions one at a time would be terribly slow and lead to low GPU
+utilization.
 
-Perhaps surprisingly, our implementation is fully sequential and workers are
-*not* scheduled on multiple cores. However, the real gain comes from enabling
-game positions to be evaluated by the neural network in large batches, thereby
-maximizing the GPU utilization.
+Thanks to Julia's great [abstractions](https://docs.julialang.org/en/v1/manual/asynchronous-programming/) for asynchronous programming, the complexity of dealing with asynchronous simulations and batching is factored out in a single place and does not
+affect most of the codebase. In particular, the standalone [MCTS module](@ref mcts) does
+not have to deal with batching and can be implemented in a straightforward,
+textbook fashion.
 
-We plot below the resulting speedup on self-play data generation for our
-[connect four agent](@ref connect_four) as a function of the number of
-asynchronous workers. Using `scripts/profile/async_mcts.jl` on our machine (a
-desktop computer with an Intel Core i5 9600K processor and an 8GB Nvidia RTX
-2070 GPU), we obtain a 25x speedup for 128 workers:
-
-![Async speedup](../assets/img/connect-four/async-profiling/mcts_speed.png)
-
-Note that the virtual loss induces an exploration bias that can become
-significant when the number of workers gets too close to the total number of
-MCTS simulations performed. For this reason, we only use 32 workers in our
-[connect four experiment](@ref connect_four) and settle for a 14x speedup.
-
-We implemented MCTS (both synchronous and asynchronous) in a standalone
-[module](@ref mcts). Thanks to Julia's great support for
-[coroutines](https://docs.julialang.org/en/v1/manual/control-flow/#man-tasks-1),
-adding support for asynchronicity to a vanilla implementation only required some
-minor refactoring and a few dozens lines of additional code.
-
+Moreover, leveraging Julia's [Distributed](https://docs.julialang.org/en/v1/manual/distributed-computing/) module, simulations are automatically distributed over all
+available Julia processes. This makes it possible to train an agent on a cluster of
+machines as easily as on a single computer, without writing any additional code.
+This capability was demonstrated during Julia Computing's
+[sponsor talk](https://www.youtube.com/watch?v=JVUJ5Oohuhs) at
+JuliaCon 2020.
 
 ### Training Optimizations
 

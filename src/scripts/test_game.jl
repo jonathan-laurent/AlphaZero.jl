@@ -26,7 +26,14 @@ function test_symmetry(gspec, state, (symstate, aperm))
   return symmask == mask[aperm]
 end
 
-# Testing compliance with AlphaZero.jl game interface
+"""
+
+    test_game(::AbstractGameSpec)
+    test_game(experiment)
+
+Perform some sanity checks regarding the compliance of a game with the
+AlphaZero.jl [Game Interface](@ref game_interface).
+"""
 function test_game(gspec::AbstractGameSpec; n=100)
   @assert isa(GI.two_players(gspec), Bool)
 

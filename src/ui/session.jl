@@ -240,7 +240,8 @@ end
 ##### Session constructors
 #####
 
-default_session_dir(experiment) = "$(DEFAULT_SESSIONS_DIR)/$(experiment.name)"
+default_session_dir(e::Experiment) = default_session_dir(e.name)
+default_session_dir(exp_name::String) = "$(DEFAULT_SESSIONS_DIR)/$exp_name"
 
 function session_logger(dir, nostdout, autosave)
   if autosave
@@ -538,12 +539,12 @@ end
 ##### Launch new experiments on an existing session
 #####
 
-function run_duel(session_dir::String, duel)
+function run_duel(session_dir::String, duel; logger)
   env = load_env(session_dir)
-  run_duel(env, duel)
+  run_duel(env, duel; logger)
 end
 
-function run_new_benchmark(session_dir::String, benchmark; itcmax=nothing)
+function run_new_benchmark(session_dir, name, benchmark; logger, itcmax=nothing)
   outdir = joinpath(session_dir, name)
   isdir(outdir) || mkpath(outdir)
   logger = Logger()
@@ -555,7 +556,7 @@ function run_new_benchmark(session_dir::String, benchmark; itcmax=nothing)
     Log.section(logger, 1, "Iteration: $itc")
     itdir = iterdir(session_dir, itc)
     env = load_env(itdir)
-    report = [run_duel(env, duel) for duel in benchmark]
+    report = [run_duel(env, duel; logger) for duel in benchmark]
     push!(reports, report)
     # Save the intermediate reports
     open(joinpath(outdir, BENCHMARK_FILE), "w") do io

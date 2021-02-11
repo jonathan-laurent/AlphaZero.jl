@@ -53,10 +53,20 @@ function dummy_run_experiment(e::Experiment)
   return Experiment(e.name, e.gspec, params, e.mknet, e.netparams, benchmark=benchmark)
 end
 
-function dummy_run(experiment::Experiment; session_dir=nothing, nostdout=false)
+"""
+
+    dummy_run(experiment; [dir, nostdout])
+
+Launch a training session where hyperparameters are altered so that training
+finishes as quickly as possible.
+
+This is useful to ensure the absence of runtime errors before
+a real training session is started.
+"""
+function dummy_run(experiment::Experiment; dir=nothing, nostdout=false)
   experiment = dummy_run_experiment(experiment)
-  isnothing(session_dir) && (session_dir = "sessions/dummy-$(experiment.name)")
-  session = Session(experiment, nostdout=nostdout, dir=session_dir)
+  isnothing(dir) && (dir = "sessions/dummy-$(experiment.name)")
+  session = Session(experiment; dir, nostdout)
   resume!(session)
   return
 end

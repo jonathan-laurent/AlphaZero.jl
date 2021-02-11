@@ -51,7 +51,7 @@ end
 
 experiment = Examples.experiments[experiment_name]
 
-session_dir = joinpath("sessions", experiment_name)
+session_dir = UserInterface.default_session_dir(experiment_name)
 
 if cmd == "check-game"
   Scripts.test_game(experiment.gspec)
