@@ -13,13 +13,6 @@ const RL = CommonRLInterface
 ##### Wrappers
 #####
 
-# TODO: Currently, functions from GameInterface that are not provided by
-# CommonRLInterface.jl are specified using the keyword arguments of the `Env`
-# constructor. An alternative design would be to ask the user to implement them
-# directly on the RL.AbstractEnv environment. A problem with this approach is that
-# in OpenSpiel.jl for example, there might not be a distinct type for each game
-# environment on which to use multiple dispatch.
-
 mutable struct Env{E, H} <: AbstractGameEnv
   rlenv :: E
   last_reward :: Float64
@@ -41,19 +34,23 @@ end
 ##### Default functions and constructors
 #####
 
-function default_vectorize_state(rl, state)
+function GI.vectorize_state(::RL.AbstractEnv, state)
   @assert isa(state, Array{<:Number}) "
   Your state is not a vector and so you should define `vectorize_state`"
   return convert(Array{Float32}, state)
 end
 
-default_symmetries(rl, state) = Tuple{typeof(state), Vector{Int}}[]
+default_vectorize_state(rl, state) = GI.vectorize_state(rl, state)
 
-default_heurisic_value(rl)   = error("Undefined: heuristic_value")
-default_render(rl)           = error("Undefined: render")
-default_action_string(rl, a) = error("Undefined: action_string")
-default_parse_action(rl, s)  = error("Undefined: parse_action")
-default_read_state(rl)       = error("Undefined: read_state")
+GI.symmetries(::RL.AbstractEnv, state) = Tuple{typeof(state), Vector{Int}}[]
+
+default_symmetries(rl, state) = GI.symmetries(rl, state)
+
+default_heurisic_value(rl)   = GI.heuristic_value(rl)
+default_render(rl)           = GI.render(rl)
+default_action_string(rl, a) = GI.action_string(rl, a)
+default_parse_action(rl, s)  = GI.parse_action(rl, s)
+default_read_state(rl)       = GI.read_state(rl)
 
 """
     Env(rlenv::CommonRLInterface.AbstractEnv; <kwargs>) <: AbstractGameEnv
@@ -72,8 +69,8 @@ The following optional methods must be implemented for `rlenv`:
 
 # Keyword arguments
 
-The following optional functions from `GameInterface` can be provided as keyword
-arguments:
+The following optional functions from `GameInterface` are not present in
+CommonRLInterface.jl and can be provided as keyword arguments:
 
   - `vectorize_state`: must be provided unless states already have type `Array{<:Number}`
   - `heuristic_value`
@@ -82,6 +79,9 @@ arguments:
   - `action_string`
   - `parse_action`
   - `read_state`
+
+If `f` is not provided, the default implementation calls
+`GI.f(::CommonRLInterface.AbstractEnv, ...)`.
 """
 function Env(
     rlenv :: RL.AbstractEnv;
