@@ -157,7 +157,7 @@ end
 
 GI.white_reward(env::Env) = env.last_reward
 
-GI.heuristic_value(env) = env.heuristic_value(env.rlenv)
+GI.heuristic_value(env::Env) = env.heuristic_value(env.rlenv)
 
 # Symmetries
 

@@ -115,6 +115,6 @@ function GI.read_state(env::World)
   end
 end
 
-GI.heuristic_value(::World, s) = 0.
+GI.heuristic_value(::World) = 0.
 
 GameSpec() = CommonRLInterfaceWrapper.Spec(World())
