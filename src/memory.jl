@@ -28,27 +28,24 @@ end
 sample_state_type(::Type{<:TrainingSample{S}}) where S = S
 
 """
-    MemoryBuffer{State}
+    MemoryBuffer(game_spec, size, experience=[])
 
 A circular buffer to hold memory samples.
-
-# Constructor
-
-    MemoryBuffer{State}(size, experience=[])
-
 """
-mutable struct MemoryBuffer{State}
+mutable struct MemoryBuffer{GameSpec, State}
+  gspec :: GameSpec
   buf :: CircularBuffer{TrainingSample{State}}
   cur_batch_size :: Int
-  function MemoryBuffer{S}(size, experience=[]) where S
-    buf = CircularBuffer{TrainingSample{S}}(size)
+  function MemoryBuffer(gspec, size, experience=[])
+    State = GI.state_type(gspec)
+    buf = CircularBuffer{TrainingSample{State}}(size)
     append!(buf, experience)
-    new{S}(buf, 0)
+    new{typeof(gspec), State}(gspec, buf, 0)
   end
 end
 
 """
-    get_experience(::MemoryBuffer{S}) where S :: Vector{TrainingSample{S}}
+    get_experience(::MemoryBuffer) :: Vector{<:TrainingSample}
 
 Return all samples in the memory buffer.
 """
@@ -68,20 +65,20 @@ end
 Base.length(mem::MemoryBuffer) = length(mem.buf)
 
 """
-    push_game!(mem::MemoryBuffer, trace::Trace, gamma)
+    push_trace!(mem::MemoryBuffer, trace::Trace, gamma)
 
 Collect samples out of a game trace and add them to the memory buffer.
 
 Here, `gamma` is the reward discount factor.
 """
-function push_game!(mem::MemoryBuffer, trace, gamma)
+function push_trace!(mem::MemoryBuffer, trace, gamma)
   n = length(trace)
   wr = 0.
   for i in reverse(1:n)
     wr = gamma * wr + trace.rewards[i]
     s = trace.states[i]
     π = trace.policies[i]
-    wp = GI.white_playing(GameType(trace), s)
+    wp = GI.white_playing(GI.init(mem.gspec, s))
     z = wp ? wr : -wr
     t = float(n - i + 1)
     push!(mem.buf, TrainingSample(s, π, z, t, 1))
@@ -114,9 +111,9 @@ function merge_by_state(samples)
   return [merge_samples(ss) for ss in values(dict)]
 end
 
-function apply_symmetry(Game, sample, (symstate, aperm))
-  mask = GI.actions_mask(Game(sample.s))
-  symmask = GI.actions_mask(Game(symstate))
+function apply_symmetry(gspec, sample, (symstate, aperm))
+  mask = GI.actions_mask(GI.init(gspec, sample.s))
+  symmask = GI.actions_mask(GI.init(gspec, symstate))
   π = zeros(eltype(sample.π), length(mask))
   π[mask] = sample.π
   π = π[aperm]
@@ -126,8 +123,8 @@ function apply_symmetry(Game, sample, (symstate, aperm))
     symstate, π, sample.z, sample.t, sample.n)
 end
 
-function augment_with_symmetries(Game, samples)
-  symsamples = [apply_symmetry(Game, s, sym)
-    for s in samples for sym in GI.symmetries(Game, s.s)]
+function augment_with_symmetries(gspec, samples)
+  symsamples = [apply_symmetry(gspec, s, sym)
+    for s in samples for sym in GI.symmetries(gspec, s.s)]
   return [samples ; symsamples]
 end

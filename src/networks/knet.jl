@@ -6,10 +6,11 @@ module KnetLib
 
 export SimpleNet, SimpleNetHP, ResNet, ResNetHP
 
-using ..Network
-using Base: @kwdef
-import ..GameInterface, ..Util, ..CyclicSchedule
+using ..AlphaZero
 
+using Base: @kwdef
+
+import CUDA
 import Knet
 
 include("knet/layers.jl")
@@ -51,7 +52,7 @@ end
 #####
 
 """
-    KNetwork{Game} <: AbstractNetwork{Game}
+    KNetwork <: AbstractNetwork
 
 Abstract type for neural networks implemented using the _Knet_ framework.
 
@@ -67,14 +68,12 @@ with the following exceptions:
 [`Network.HyperParams`](@ref), [`Network.hyperparams`](@ref),
 [`Network.forward`](@ref) and [`Network.on_gpu`](@ref).
 """
-abstract type KNetwork{Game} <: AbstractNetwork{Game} end
+abstract type KNetwork <: AbstractNetwork end
 
 Base.copy(nn::KNetwork) = Base.deepcopy(nn)
 
-const GPU_AVAILABLE = Knet.gpu() >= 0
-
-Network.to_gpu(nn::KNetwork) = GPU_AVAILABLE ? Knet.gpucopy(nn) : nn
-Network.to_cpu(nn::KNetwork) = GPU_AVAILABLE ? Knet.cpucopy(nn) : nn
+Network.to_gpu(nn::KNetwork) = CUDA.functional() ? Knet.gpucopy(nn) : nn
+Network.to_cpu(nn::KNetwork) = CUDA.functional() ? Knet.cpucopy(nn) : nn
 
 params_(x) = []
 params_(x::Knet.Param) = [x]
@@ -123,9 +122,8 @@ function Network.train!(callback, nn::KNetwork, opt::Adam, loss, data, n)
 end
 
 function Network.gc(::KNetwork)
-  GPU_AVAILABLE || return
+  CUDA.functional() || return
   GC.gc(true)
-  Knet.gc()
 end
 
 #####
@@ -133,20 +131,20 @@ end
 #####
 
 """
-    TwoHeadNetwork{Game} <: KNetwork{G}
+    TwoHeadNetwork <: KNetwork
 
 An abstract type for two-head neural networks implemented with Knet.
 
-Subtypes are assumed to have the following fields:
-`hyper`, `common`, `vhead` and `phead`. Based on those, an implementation
-is provided for [`Network.hyperparams`](@ref), [`Network.forward`](@ref) and
-[`Network.on_gpu`](@ref), leaving only [`Network.HyperParams`](@ref) to
-be implemented.
+Subtypes are assumed to have fields
+`hyper`, `gspec`, `common`, `vhead` and `phead`. Based on those, an implementation
+is provided for [`Network.hyperparams`](@ref), [`Network.game_spec`](@ref),
+[`Network.forward`](@ref) and [`Network.on_gpu`](@ref), leaving only
+[`Network.HyperParams`](@ref) to be implemented.
 """
-abstract type TwoHeadNetwork{G} <: KNetwork{G} end
+abstract type TwoHeadNetwork <: KNetwork end
 
-function Network.forward(nn::TwoHeadNetwork, board)
-  c = nn.common(board)
+function Network.forward(nn::TwoHeadNetwork, state)
+  c = nn.common(state)
   v = nn.vhead(c)
   p = nn.phead(c)
   return (p, v)
@@ -155,10 +153,12 @@ end
 children(nn::TwoHeadNetwork) = (nn.common, nn.vhead, nn.phead)
 
 function mapchildren(f, nn::Net) where Net <: TwoHeadNetwork
-  Net(nn.hyper, f(nn.common), f(nn.vhead), f(nn.phead))
+  Net(nn.gspec, nn.hyper, f(nn.common), f(nn.vhead), f(nn.phead))
 end
 
 Network.hyperparams(nn::TwoHeadNetwork) = nn.hyper
+
+Network.game_spec(nn::TwoHeadNetwork) = nn.gspec
 
 function Network.on_gpu(nn::TwoHeadNetwork)
   b = nn.vhead.layers[end].b

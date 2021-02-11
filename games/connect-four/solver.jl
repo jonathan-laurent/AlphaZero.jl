@@ -3,16 +3,18 @@
 ##### https://github.com/PascalPons/connect4
 #####
 
-# Problem: no Connect4 module. We can change this:
+# TODO: at some point, I should use ConnectFourSolver.jl
+# To represent state "031", we must do `p = Position(); p(0); p(3); p(1); p`.
 
 module Solver
 
-import ..Game, ..history, ..WHITE, ..NUM_CELLS
-import AlphaZero: GI, GameInterface, Benchmark, AbstractPlayer, think
+using AlphaZero
+
+import ..GameEnv, ..history, ..WHITE, ..NUM_CELLS
 
 const DEFAULT_SOLVER_DIR = joinpath(@__DIR__, "solver", "connect4")
 
-struct Player <: AbstractPlayer{Game}
+struct Player <: AbstractPlayer
   process :: Base.Process
   lock :: ReentrantLock
   function Player(;
@@ -77,7 +79,7 @@ end
 
 function qvalue(player, game, action)
   @assert !GI.game_terminated(game)
-  next = copy(game)
+  next = GI.clone(game)
   GI.play!(next, action)
   qnext = value(player, next)
   if GI.white_playing(game) != GI.white_playing(next)
@@ -95,7 +97,5 @@ function think(p::Player, g)
   π[opt] .= 1 / length(opt)
   return as, π
 end
-
-Benchmark.PerfectPlayer(::Type{Game}) = Player
 
 end

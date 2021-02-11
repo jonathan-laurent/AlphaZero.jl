@@ -1,4 +1,4 @@
-# [Players](@id player)
+# [Players and Simulations](@id player)
 
 ```@meta
 CurrentModule = AlphaZero
@@ -17,6 +17,7 @@ player_temperature
 ## Player Instances
 
 ```@docs
+AlphaZeroPlayer
 MctsPlayer
 RandomPlayer
 NetworkPlayer
@@ -25,22 +26,34 @@ PlayerWithTemperature
 TwoPlayers
 ```
 
-## Derived Functions
+## Game Simulations
+
+### Simulation traces
+
+```@docs
+Trace
+Base.push!(::Trace, π, r, s)
+
+```
+
+### Playing a single game
 
 ```@docs
 play_game
-Trace
-Base.push!(::Trace, π, r, s)
-interactive!
-Human
 ```
 
-### Distributed Simulator
+### Playing multiple games in a distibuted fashion
 
 ```@docs
 Simulator
 record_trace
-ColorPolicy
 simulate
 simulate_distributed
+```
+
+### Utilities for playing interactive games
+
+```@docs
+Human
+interactive!
 ```

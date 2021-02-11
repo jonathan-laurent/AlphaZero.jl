@@ -1,32 +1,28 @@
 #####
 ##### Simple CLI for AlphaZero.jl
-##### This file can also be included directly in the REPL.
 #####
 
-# ENV["CUARRAYS_MEMORY_LIMIT"] = 7_500_000_000
-ENV["JULIA_CUDA_MEMORY_POOL"] = "split" # "binned" / "split"
+# We recommend using a splitting pool but this may require precompiling CUDA.jl again.
+# ENV["JULIA_CUDA_MEMORY_POOL"] = "split" # "binned" / "split"
 
 # Enables running the script on a distant machine without an X server
 ENV["GKSwstype"]="nul"
 
-# When running on a CPU, having multiple threads does not play
-# well with BLAS multithreading
-using LinearAlgebra
-BLAS.set_num_threads(1)
-
 using AlphaZero
-import Distributed
-include("games.jl")
-
-#####
-##### Parse arguments
-#####
-
 using ArgParse
-argstab = ArgParseSettings()
-@add_arg_table! argstab begin
-  "--game"
-    help = "Select a game ($(join(AVAILABLE_GAMES, "/")))"
+import Distributed
+
+available_experiments = keys(Examples.experiments)
+
+settings = ArgParseSettings()
+
+@add_arg_table! settings begin
+  "experiment"
+    help = "Select an experiment ($(join(available_experiments, ", ")))"
+    required=true
+  "--save-intermediate"
+    action = :store_true
+    help = "Save all intermediate states during training"
   "train"
     action = :command
     help = "Resume the training session"
@@ -42,56 +38,38 @@ argstab = ArgParseSettings()
   "check-game"
     action = :command
     help = "Check that the current game respects all expected invariants"
-  "--save-intermediate"
-    action = :store_true
-    help = "Save all intermediate states during training"
 end
-args = parse_args(isempty(ARGS) ? ["train"] : ARGS, argstab)
-!isnothing(args["game"]) && (ENV["GAME"] = args["game"])
+
+args = parse_args(settings)
 cmd = args["%COMMAND%"]
+experiment_name = args["experiment"]
 
-if !haskey(ENV, "GAME")
-  println(stderr, "You must specify a game.")
-  exit()
+if experiment_name ∉ available_experiments
+  println(stderr, "Unknown experiment: $(experiment_name)")
+  exit(1)
 end
 
-#####
-##### Main
-#####
+experiment = Examples.experiments[experiment_name]
 
-GAME = ENV["GAME"]
-SelectedGame = GAME_MODULE[GAME]
-using .SelectedGame: Game, Training
-
-const SESSION_DIR = joinpath("sessions", GAME)
-
-params = Training.params
-netparams = Training.netparams
-benchmark = Training.benchmark
-
-include("lib/dummy_run.jl")
-include("../test/test_game.jl")
-
-if get(ENV, "DUMMY_RUN", "false") == "true"
-  @warn "Running dummy run"
-  params, benchmark = dummy_run_params(Training.params, Training.benchmark)
-end
+session_dir = UserInterface.default_session_dir(experiment_name)
 
 if cmd == "check-game"
-  test_game(Game)
+  Scripts.test_game(experiment.gspec)
   @info "All tests passed."
 else
   println("\nUsing $(Distributed.nworkers()) distributed worker(s).\n")
-  session = Session(
-    Game, Training.Network{Game}, params, netparams, benchmark=benchmark,
-    dir=SESSION_DIR, autosave=true, save_intermediate=args["save-intermediate"])
+  session = UserInterface.Session(
+    experiment,
+    dir=session_dir,
+    autosave=true,
+    save_intermediate=args["save-intermediate"])
   if cmd == "train"
-    resume!(session)
+    UserInterface.resume!(session)
   elseif cmd == "explore"
-    start_explorer(session, mcts_params=Training.arena.mcts, on_gpu=true)
+    UserInterface.explore(session)
   elseif cmd == "play"
-    play_interactive_game(session, mcts_params=Training.arena.mcts, on_gpu=true)
+    interactive!(experiment.gspec, AlphaZeroPlayer(session), Human())
   elseif cmd == "replot"
-    AlphaZero.UserInterface.regenerate_plots(session)
+    UserInterface.regenerate_plots(session)
   end
 end

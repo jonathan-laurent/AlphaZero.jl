@@ -26,7 +26,9 @@ makedocs(
       "reference/environment.md",
       "reference/benchmark.md",
       "reference/reports.md",
-      "reference/ui.md"
+      "reference/experiment.md",
+      "reference/ui.md",
+      "reference/scripts.md"
     ],
     "Contributing" => [
       "contributing/guide.md",

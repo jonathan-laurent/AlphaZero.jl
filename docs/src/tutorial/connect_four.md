@@ -12,77 +12,68 @@ challenge for reinforcement learning.[^1]
 
 ## Setup and Training
 
+AlphaZero.jl requires Julia version 1.6 or higher.
+
 To run the experiments in this tutorial, we recommend having a CUDA compatible
 GPU with 4GB of memory or more. A 2GB GPU should work fine but you may have to
-reduce batch size. Each training iteration took between one and two hours on a
-desktop computer with an Intel Core i5 9600K processor and an 8GB Nvidia RTX
-2070 GPU.
+reduce the batch size or the size of the neural network. Each training iteration took
+between one and two hours on a desktop computer with an Intel Core i5 9600K processor and
+an 8GB Nvidia RTX 2070 GPU.
 
 To download AlphaZero.jl and start a new training session, just run the
 following:
 
 ```sh
-git clone --branch v0.3.0 https://github.com/jonathan-laurent/AlphaZero.jl.git
+export JULIA_CUDA_MEMORY_POOL split # optional (for better GPU performances)
+
+git clone --branch v0.4.0 https://github.com/jonathan-laurent/AlphaZero.jl.git
 cd AlphaZero.jl
-julia --project -e "import Pkg; Pkg.instantiate()"
-julia --project --color=yes scripts/alphazero.jl --game connect-four train
+julia --project -e 'import Pkg; Pkg.instantiate()'
+julia --project -e 'using AlphaZero; Scripts.train("connect-four")'
 ```
 
-Instead of using `scripts/alphazero.jl`, one can also run the following using
-the Julia REPL:
+!!! note "Configuring CUDA.jl to use a splitting pool"
+
+    The first line is optional and it makes sure that CUDA.jl is precompiled to use a
+    splitting memory pool. Indeed, the splitting pool performs better than the default binned pool on AlphaZero's workload as it does not require to run the garbage collector as frequently.
+
+Instead of using [`Scripts.train`](@ref), one can do things more manually and run the following inside the Julia REPL:
 
 ```julia
-ENV["CUARRAYS_MEMORY_POOL"] = "split"
-
 using AlphaZero
-
-include("games/connect-four/main.jl")
-using .ConnectFour: Game, Training
-
-const SESSION_DIR = "sessions/connect-four"
-
-session = AlphaZero.Session(
-    Game,
-    Training.Network{ConnectFour.Game},
-    Training.params,
-    Training.netparams,
-    benchmark=Training.benchmark,
-    dir=SESSION_DIR)
-
+experiment = Examples.experiments["connect-four"]
+session = Session(experiment, dir="sessions/connect-four")
 resume!(session)
 ```
 
-The first line configures CuArrays to use a splitting memory pool, which
-performs better than the default binned pool on AlphaZero's workload as it does
-not require to run the garbage collector as frequently. Then, a new AlphaZero
-[session](@ref ui) is created with the following arguments:
+The second line loads a predefined [experiment](@ref experiment) from the
+`AlphaZero.Examples` module. An experiment bundles together all the information
+necessary to spawn a training session and it is defined by the followng fields:
 
-| Argument             | Description                                                                     |
-|:---------------------|:--------------------------------------------------------------------------------|
-| `Game`               | Game type, which implements the [game interface](@ref game_interface).          |
-| `Training.Network`   | Network type, which implements the [network interface](@ref network_interface). |
-| `Training.params`    | AlphaZero [hyperparameters](@ref params).                                            |
-| `Training.netparams` | Network [hyperparameters](@ref conv_resnet).                                    |
-| `Training.benchmark` | [Benchmark](@ref benchmark) that is run between training iterations.            |
-| `SESSION_DIR`        | Directory in which all session files are saved.                                 |
+| Field       | Description                                                                     |
+|:------------|:--------------------------------------------------------------------------------|
+| `gspec`     | Game to be played, which implements the [game interface](@ref game_interface).  |
+| `params`    | AlphaZero [hyperparameters](@ref params).                                            |
+| `mknet`     | Constructor for a neural network implementing the [network interface](@ref network_interface). |
+| `netparams` | Network [hyperparameters](@ref conv_resnet).                                    |
+| `benchmark` | [Benchmark](@ref benchmark) that is run between training iterations.            |
 
-The `ConnectFour.Training` module specifies the hyperparameters and
-benchmarks that are used in this tutorial. Its content can be examined in file
+The `connect-four` experiment is defined in file
 `games/connect-four/params.jl`. We copy it for reference [at the end of this
 tutorial](@ref c4-config). Here are some highlights:
 
 - We use a [two-headed convolutional ResNet](@ref conv_resnet) similar to the
   one introduced in the AlphaGo Zero paper, although much smaller. Its tower
-  consists of 5 residual blocks with 64 convolutional filters per layer, for a
-  total of about 470K parameters (in contrast, the neural network from the
+  consists of 5 residual blocks with 128 convolutional filters per layer, for a
+  total of about 1.6M parameters (in contrast, the neural network from the
   AlphaGo Zero paper has about 100M parameters).
-- During each iteration, the current agent plays 1000 games against itself,
+- During each iteration, the current agent plays 5000 games against itself,
   running 600 MCTS simulations to plan each move.[^2] The move selection
-  temperature is set to 1.0 during the first ten moves of every game and then
-  decreased to 0.5.
+  temperature is set to 1.0 during the first twenty moves of every game and then
+  decreased progressively to 0.3.
 - Self-play data is accumulated in a memory buffer whose capacity grows from
-  200K samples (initially) to 1M samples (at iteration 60). For reference,
-  assuming an average game duration of 35 moves, about 35 x 1000 = 35K
+  400K samples (initially) to 1M samples (at iteration 15). For reference,
+  assuming an average game duration of 35 moves, about 35 x 5000 = 175K
   new samples are generated at each iteration.
 
 [^2]:
@@ -93,8 +84,8 @@ tutorial](@ref c4-config). Here are some highlights:
 
 ### Initial Benchmarks
 
-After launching the training script for the first time, you should see the
-following:
+After launching the training script for the first time, you should see something like
+this:
 
 ![Session CLI (init)](../assets/img/ui-init.png)
 
@@ -120,7 +111,7 @@ The `redundancy` indicator is helpful to diagnose a lack of randomization. It
 measures the quantity ``1 - u / n`` where ``u`` is the total number of unique
 states that have been encountered (excluding the initial state) and ``n`` is the
 total number of encountered states, excluding the initial state and counting
-duplicates (see [`Benchmark.DuelOutcome`](@ref)).
+duplicates (see [`Report.Evaluation`](@ref)).
 
 !!! note "On leveraging symmetries"
     Another trick that we use to add randomization is to leverage the symmetry
@@ -140,7 +131,7 @@ decisions.
 ### Training
 
 After the initial benchmarks are done, the first training iteration can start.
-Each training iteration took between 30 and 50 minutes on our hardware. The
+Each training iteration took between one and two hours on our hardware. The
 first iterations are typically on the shorter end, as games of self-play
 terminate more quickly and the memory buffer has yet to reach its final size.
 
@@ -157,7 +148,7 @@ A description of all reported metrics can be found in [Training Reports](@ref re
 At the end of every iteration, benchmarks are run, summary plots are generated
 and the state of the current environment is saved on disk. This way, if training
 is interrupted for any reason, it can be resumed from the last saved state by
-simply running `scripts/alphazero.jl` again.
+simply running `Scripts.train("connect-four")` again.
 
 All summary plots generated during the training of our agent can be downloaded
 [here](../assets/download/c4-plots.zip).
@@ -168,21 +159,21 @@ At any time during training, you can start an [interactive command
 interpreter](@ref explorer) to investigate the current agent:
 
 ```
-julia --project --color=yes scripts/alphazero.jl --game connect-four explore
+julia --project -e 'using AlphaZero; Scripts.explore("connect-four")'
 ```
 
 ![Explorer](../assets/img/explorer.png)
 
-If you just want to play and not be bothered with metrics, you can substitute `explore` by
-`play` in the command above.
+If you just want to play and not be bothered with metrics, you can use
+[`Scripts.play`](@ref) instead of [`Scripts.explore`](@ref).
 
 ## Experimental Results
 
 We plot below the evolution of the win rate of our AlphaZero agent against our
-two baselines:
+two baselines.
 
 ![Win rate evolution
-(AlphaZero)](../assets/img/connect-four/plots/benchmark_won_games.png)
+(AlphaZero)](../assets/img/connect-four/benchs/alphazero/benchmark_won_games.png)
 
 It is important to note that the AlphaZero agent is never exposed to those
 baselines during training and therefore cannot learn from them.
@@ -192,7 +183,7 @@ baselines: instead of plugging it into MCTS, we just play the action that is
 assigned the highest prior probability at each state.
 
 ![Win rate evolution (network
-only)](../assets/img/connect-four/net-only/benchmark_won_games.png)
+only)](../assets/img/connect-four/benchs/netonly/benchmark_won_games.png)
 
 Unsurprisingly, the network alone is initially unable to win a single game.
 However, it ends up significantly stronger than the minmax baseline despite not
@@ -279,8 +270,8 @@ We are looking forward to seeing how you can improve our Connect Four agent, wit
 
 ## [Full Training Configuration](@id c4-config)
 
-Here, we copy the full content of the configuration file
-`games/connect-four/params.jl` for reference.
+Here, we copy the full definition of the `connect-four` experiment from
+`games/connect-four/params.jl`.
 
 Note that, in addition to having standard keyword constructors, parameter types
 have constructors that implement the _record update_ operation from functional
@@ -288,12 +279,14 @@ languages. For example, `Params(p, num_iters=100)` builds a `Params` object that
 is identical to `p` for every field, except `num_iters` which is set to `100`.
 
 ```julia
-# Hyperparameters
+#####
+##### Training hyperparameters
+#####
 
-Network = ResNet
+Network = NetLib.ResNet
 
-netparams = ResNetHP(
-  num_filters=64,
+netparams = NetLib.ResNetHP(
+  num_filters=128,
   num_blocks=5,
   conv_kernel_size=(3, 3),
   num_policy_head_filters=32,
@@ -301,83 +294,97 @@ netparams = ResNetHP(
   batch_norm_momentum=0.1)
 
 self_play = SelfPlayParams(
-  num_games=2000,
-  reset_mcts_every=50,
-  mcts=MctsParams(
+  sim=SimParams(
+    num_games=5000,
+    num_workers=128,
     use_gpu=true,
-    num_workers=32,
+    reset_every=2,
+    flip_probability=0.,
+    alternate_colors=false),
+  mcts=MctsParams(
     num_iters_per_turn=600,
-    cpuct=3.0,
-    prior_temperature=0.7,
-    temperature=PLSchedule([0, 20], [1.0, 0.3]),
-    dirichlet_noise_ϵ=0.2,
+    cpuct=2.0,
+    prior_temperature=1.0,
+    temperature=PLSchedule([0, 20, 30], [1.0, 1.0, 0.3]),
+    dirichlet_noise_ϵ=0.25,
     dirichlet_noise_α=1.0))
 
 arena = ArenaParams(
-  num_games=100,
-  reset_mcts_every=50,
-  flip_probability=0.5,
-  update_threshold=0.1,
+  sim=SimParams(
+    num_games=128,
+    num_workers=128,
+    use_gpu=true,
+    reset_every=2,
+    flip_probability=0.5,
+    alternate_colors=true),
   mcts=MctsParams(
     self_play.mcts,
     temperature=ConstSchedule(0.2),
-    dirichlet_noise_ϵ=0.05))
+    dirichlet_noise_ϵ=0.05),
+  update_threshold=0.05)
 
 learning = LearningParams(
   use_gpu=true,
   use_position_averaging=true,
   samples_weighing_policy=LOG_WEIGHT,
-  batch_size=2048,
-  loss_computation_batch_size=2048,
-  optimiser=Adam(lr=1e-3),
+  batch_size=1024,
+  loss_computation_batch_size=1024,
+  optimiser=Adam(lr=2e-3),
   l2_regularization=1e-4,
   nonvalidity_penalty=1.,
   min_checkpoints_per_epoch=1,
-  max_batches_per_checkpoint=1000,
+  max_batches_per_checkpoint=2000,
   num_checkpoints=1)
 
 params = Params(
   arena=arena,
   self_play=self_play,
   learning=learning,
-  num_iters=50,
+  num_iters=15,
   ternary_rewards=true,
   use_symmetries=true,
-  memory_analysis=MemAnalysisParams(
-    num_game_stages=4),
+  memory_analysis=nothing,
   mem_buffer_size=PLSchedule(
-  [      0,        60],
-  [200_000, 1_000_000]))
+  [      0,        15],
+  [400_000, 1_000_000]))
 
-# Benchmarks
+#####
+##### Evaluation benchmark
+#####
 
 mcts_baseline =
   Benchmark.MctsRollouts(
     MctsParams(
       arena.mcts,
       num_iters_per_turn=1000,
-      num_workers=1,
       cpuct=1.))
 
-minmax_baseline = Benchmark.MinMaxTS(depth=5, amplify_rewards=true, τ=0.2)
+minmax_baseline = Benchmark.MinMaxTS(
+  depth=5,
+  τ=0.2,
+  amplify_rewards=true)
 
-players = [
-  Benchmark.Full(arena.mcts),
-  Benchmark.Full(arena.mcts),
-  Benchmark.NetworkOnly(τ=0.5, use_gpu=true)]
+alphazero_player = Benchmark.Full(arena.mcts)
 
-baselines = [
-  mcts_baseline,
-  minmax_baseline,
-  mcts_baseline]
+network_player = Benchmark.NetworkOnly(τ=0.5)
 
-make_duel(player, baseline) =
-  Benchmark.Duel(
-    player,
-    baseline,
-    num_games=50,
-    flip_probability=0.5,
-    color_policy=CONTENDER_WHITE)
+benchmark_sim = SimParams(
+  arena.sim;
+  num_games=256,
+  num_workers=256,
+  alternate_colors=false)
 
-benchmark = [make_duel(p, b) for (p, b) in zip(players, baselines)]
+benchmark = [
+  Benchmark.Duel(alphazero_player, mcts_baseline,   benchmark_sim),
+  Benchmark.Duel(alphazero_player, minmax_baseline, benchmark_sim),
+  Benchmark.Duel(network_player,   mcts_baseline,   benchmark_sim),
+  Benchmark.Duel(network_player,   minmax_baseline, benchmark_sim)
+]
+
+#####
+##### Wrapping up in an experiment
+#####
+
+experiment = Experiment("connect-four",
+  GameSpec(), params, Network, netparams, benchmark=benchmark)
 ```

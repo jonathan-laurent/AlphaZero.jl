@@ -8,10 +8,9 @@ CurrentModule = AlphaZero.MCTS
 MCTS
 ```
 
-## Oracles
+## Standard Oracles
 
 ```@docs
-Oracle
 RolloutOracle
 ```
 

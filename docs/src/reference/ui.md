@@ -21,22 +21,16 @@ Session
 ![Session CLI (first iteration)](../assets/img/ui-first-iter.png)
 
 ```@docs
-Session(::Env) # Strangely, this includes all constructors...
+Session(::Experiment) # Strangely, this includes all constructors...
 resume!
 save
-play_interactive_game
-start_explorer(::Session)
 SessionReport
 ```
 
 ## [Explorer](@id explorer)
 
-```@docs
-Explorer
-```
-
 ![Explorer](../assets/img/explorer.png)
 
 ```@docs
-start_explorer(::Explorer)
+explore
 ```

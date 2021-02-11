@@ -26,6 +26,9 @@ Deepmind's AlphaZero algorithm:
 * Being between one and two orders of magnitude faster than competing
   alternatives written in Python, this implementation enables to solve
   nontrivial games on a standard desktop computer with a GPU.
+* The same agent can be trained on a
+  [cluster of machines](https://www.youtube.com/watch?v=JVUJ5Oohuhs) as easily as on a
+  single computer and without modifying a single line of code.
 
 ### Why should I care about AlphaZero?
 
@@ -54,11 +57,17 @@ We found the [Julia language](https://julialang.org/) to be instrumental in achi
 To download AlphaZero.jl and start training a Connect Four agent, just run:
 
 ```
-git clone --branch v0.3.0 https://github.com/jonathan-laurent/AlphaZero.jl.git
+export JULIA_CUDA_MEMORY_POOL split # optional (for better GPU performances)
+
+git clone https://github.com/jonathan-laurent/AlphaZero.jl.git
 cd AlphaZero.jl
-julia --project -e "import Pkg; Pkg.instantiate()"
-julia --project --color=yes scripts/alphazero.jl --game connect-four train
+julia --project -e 'import Pkg; Pkg.instantiate()'
+julia --project -e 'using AlphaZero; Scripts.train("connect-four")'
 ```
+
+**Note:** the latest version of AlphaZero.jl needs Julia version 1.6 or higher to run.
+For instructions on how to run the old v0.3 release, please see
+[here](https://jonathan-laurent.github.io/AlphaZero.jl/v0.3/tutorial/connect_four/).
 
 <div>
 <img src="./docs/src/assets/img/ui-first-iter-cut.png" width="48%" />
@@ -72,14 +81,14 @@ julia --project --color=yes scripts/alphazero.jl --game connect-four train
 
 <br/>
 
-Each training iteration takes between 30 and 50 minutes on a desktop
+Each training iteration takes between one and two hours on a desktop
 computer with an Intel Core i5 9600K processor and an 8GB Nvidia RTX
 2070 GPU. We plot below the evolution of the win rate of our AlphaZero agent against two baselines (a vanilla MCTS baseline and a minmax agent that plans at depth 5 using a handcrafted heuristic):
 
 <br/>
 <div align="center">
 <img
-  src="./docs/src/assets/img/connect-four/plots/benchmark_won_games.png"
+  src="./docs/src/assets/img/connect-four/benchs/alphazero/benchmark_won_games.png"
   width="60%"/>
 </div>
 <br/>
@@ -94,7 +103,7 @@ assigned the highest prior probability at each state:
 <br/>
 <div align="center">
 <img
-  src="./docs/src/assets/img/connect-four/net-only/benchmark_won_games.png"
+  src="./docs/src/assets/img/connect-four/benchs/netonly/benchmark_won_games.png"
   width="60%"/>
 </div>
 <br/>
@@ -115,8 +124,9 @@ For more information on training a Connect Four agent using AlphaZero.jl, see ou
 
 ### Contributors
 
-* Main developer: Jonathan Laurent
-* Logo design: Pavel Dimens
+* Jonathan Laurent: main developer
+* Pavel Dimens: logo design
+* Marek Kaluba: hyperparameters tuning for the grid-world example
 
 Contributions to AlphaZero.jl are most welcome. Many contribution ideas are available in our [contribution guide](https://jonathan-laurent.github.io/AlphaZero.jl/dev/contributing/guide/).
 Please do not hesitate to open a Github
@@ -126,7 +136,7 @@ any idea, feedback or suggestion.
 ### Acknowledgements
 
 This material is based upon work supported by the United States Air Force and
-DARPA under Contract No. FA8750-18-C-0092. Any opinions, findings and
-conclusions or recommendations expressed in this material are those of the
-author(s) and do not necessarily reflect the views of the United States
+DARPA under Contract No. FA9550-16-1-0288 and FA8750-18-C-0092.
+Any opinions, findings and conclusions or recommendations expressed in this material are
+those of the author(s) and do not necessarily reflect the views of the United States
 Air Force and DARPA.

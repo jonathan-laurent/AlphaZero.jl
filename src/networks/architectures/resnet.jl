@@ -36,15 +36,14 @@ filters per convolutional layer.
   batch_norm_momentum :: Float32 = 0.6f0
 end
 
-Util.generate_update_constructor(ResNetHP) |> eval
-
 """
-    ResNet{Game} <: TwoHeadNetwork{Game}
+    ResNet <: TwoHeadNetwork
 
 The convolutional residual network architecture that is used
 in the original AlphaGo Zero paper.
 """
-mutable struct ResNet{Game} <: TwoHeadNetwork{Game}
+mutable struct ResNet <: TwoHeadNetwork
+  gspec
   hyper
   common
   vhead
@@ -63,9 +62,9 @@ function ResNetBlock(size, n, bnmom)
     x -> relu.(x))
 end
 
-function ResNet{G}(hyper::ResNetHP) where G
-  bsize = GameInterface.state_dim(G)
-  outdim = GameInterface.num_actions(G)
+function ResNet(gspec::AbstractGameSpec, hyper::ResNetHP)
+  indim = GI.state_dim(gspec)
+  outdim = GI.num_actions(gspec)
   ksize = hyper.conv_kernel_size
   @assert all(ksize .% 2 .== 1)
   pad = ksize .÷ 2
@@ -74,22 +73,22 @@ function ResNet{G}(hyper::ResNetHP) where G
   nvf = hyper.num_value_head_filters
   bnmom = hyper.batch_norm_momentum
   common = Chain(
-    Conv(ksize, bsize[3]=>nf, pad=pad),
+    Conv(ksize, indim[3]=>nf, pad=pad),
     BatchNorm(nf, relu, momentum=bnmom),
     [ResNetBlock(ksize, nf, bnmom) for i in 1:hyper.num_blocks]...)
   phead = Chain(
     Conv((1, 1), nf=>npf),
     BatchNorm(npf, relu, momentum=bnmom),
     flatten,
-    Dense(bsize[1] * bsize[2] * npf, outdim),
+    Dense(indim[1] * indim[2] * npf, outdim),
     softmax)
   vhead = Chain(
     Conv((1, 1), nf=>nvf),
     BatchNorm(nvf, relu, momentum=bnmom),
     flatten,
-    Dense(bsize[1] * bsize[2] * nvf, nf, relu),
+    Dense(indim[1] * indim[2] * nvf, nf, relu),
     Dense(nf, 1, tanh))
-  ResNet{G}(hyper, common, vhead, phead)
+  ResNet(gspec, hyper, common, vhead, phead)
 end
 
 Network.HyperParams(::Type{<:ResNet}) = ResNetHP

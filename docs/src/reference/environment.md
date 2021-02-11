@@ -5,9 +5,9 @@ CurrentModule = AlphaZero
 ```
 
 ```@docs
-Env{Game, Network, Board}
+Env
 Handlers
-get_experience
+get_experience(::Env)
 initial_report
 train!(env::Env)
 ```

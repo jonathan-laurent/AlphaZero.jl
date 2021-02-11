@@ -1,6 +1,6 @@
 module Util
 
-export Option
+export Option, apply_temperature
 
 import Random
 using Distributions: Categorical
@@ -73,9 +73,11 @@ For example, given the following struct:
       y :: Int
     end
 
-Th generated code is equivalent to:
+The generated code is equivalent to:
 
     Point(pt; x=pt.x, y=pt.y) = Point(x, y)
+
+** This function may be deprecated in favor of Setfield.jl in the future.**
 """
 function generate_update_constructor(T)
   fields = fieldnames(T)
@@ -232,19 +234,34 @@ function threads_pmap(f, xs)
   return fetch.([Threads.@spawn @printing_errors f(x) for x in xs])
 end
 
-# TODO: this can probably be made much prettier
-# Also, this function makes one call to reduce per computed element,
-# and so it should only be used when the associated symchronization cost
-# is small compared to the cost of computing individual elements.
-function mapreduce(f, args, num_workers, reduce, unit)
+# TODO: the `mapreduce` function should ultimately be removed and replaced by a
+# more sandard solution.
+
+"""
+    mapreduce(make_worker, args, num_workers, combine, init)
+
+In spirit, this computes `reduce(combine, map(f, args); init)` on `num_workers`
+where `f` is defined below.
+
+The `make_worker` function must create a worker `w` with two fields:
+  - a `process` function such that `w.process(x)` evaluates to `f(x)`
+  - a `terminate` function to be called with no argument when the worker terminates.
+
+!!! note
+
+    This function makes one call to `combine` per computed element
+    and so it should only be used when the associated synchronization cost
+    is small compared to the cost of computing individual elements.
+"""
+function mapreduce(make_worker, args, num_workers, combine, init)
   next = 1
-  ret = unit
+  ret = init
   lock = ReentrantLock()
   tasks = []
   for w in 1:num_workers
     task = Threads.@spawn Util.@printing_errors begin
       local k = 0
-      worker = f()
+      worker = make_worker()
       while true
         Base.lock(lock)
         if next > length(args)
@@ -256,7 +273,7 @@ function mapreduce(f, args, num_workers, reduce, unit)
         Base.unlock(lock)
         y = worker.process(args[k])
         Base.lock(lock)
-        ret = reduce(ret, y)
+        ret = combine(ret, y)
         Base.unlock(lock)
       end
       worker.terminate()
@@ -269,14 +286,14 @@ end
 
 # Same semantics than mapreduce but sequential: to be used for
 # debugging purposes only.
-function mapreduce_sequential(f, args, num_workers, merge, unit)
+function mapreduce_sequential(make_worker, args, num_workers, combine, unit)
   ys = map(args) do x
     worker = f()
     y = worker.process(x)
     worker.terminate()
     return y
   end
-  return reduce(merge, ys, init=unit)
+  return reduce(combine, ys, init=unit)
 end
 
 end

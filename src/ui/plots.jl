@@ -35,7 +35,7 @@ function learning_iter_plot(rep::Report.Learning, params::Params)
       title="Checkpoints")
     Plots.plot!(checkpoints_plot,
       [c.batch_id for c in rep.checkpoints],
-      [c.reward for c in rep.checkpoints],
+      [c.evaluation.avgr for c in rep.checkpoints],
       ylims=(-1.0, 1.0),
       t=:scatter,
       legend=:none)
@@ -113,7 +113,7 @@ end
 
 function plot_benchmark(
     params::Params,
-    benchs::Vector{Benchmark.Report},
+    benchs::Vector{Report.Benchmark},
     dir::String)
   isempty(benchs) && return
   n = length(benchs) - 1
@@ -121,13 +121,13 @@ function plot_benchmark(
   nduels >= 1 || return
   @assert all(length(b) == nduels for b in benchs)
   isdir(dir) || mkpath(dir)
-  labels = ["$(d.player) / $(d.baseline)" for _ in 1:1, d in benchs[1]]
+  labels = [b.legend for _ in 1:1, b in benchs[1]]
   # Average reward
   avgr_data = [[b[i].avgr for b in benchs] for i in 1:nduels]
   avgr = Plots.plot(0:n,
     avgr_data,
     title="Average Reward",
-    ylims=(-1.0, 1.0),
+    ylims=(params.ternary_rewards ? (-1.0, 1.0) : nothing),
     legend=:bottomright,
     label=labels,
     xlabel="Iteration number")
@@ -188,7 +188,7 @@ function plot_training(
   # Performances during evaluation
   if all(it -> !isempty(it.learning.checkpoints), iterations)
     arena = Plots.plot(1:n, [
-      maximum(c.reward for c in it.learning.checkpoints)
+      maximum(c.evaluation.avgr for c in it.learning.checkpoints)
       for it in iterations],
       title="Arena Results",
       ylims=(-1, 1),

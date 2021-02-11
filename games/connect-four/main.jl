@@ -1,8 +1,9 @@
 module ConnectFour
-  export Game, Board
+  export GameSpec, GameEnv, Board
   include("game.jl")
   module Training
     using AlphaZero
+    import ..GameSpec
     include("params.jl")
   end
   include("solver.jl")

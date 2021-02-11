@@ -14,7 +14,11 @@
 # Note that the weight of a sample is computed as an increasing
 # function of its `n` field.
 
-function convert_sample(Game, wp, e::TrainingSample)
+function convert_sample(
+    gspec::AbstractGameSpec,
+    wp::SamplesWeighingPolicy,
+    e::TrainingSample)
+
   if wp == CONSTANT_WEIGHT
     w = Float32[1]
   elseif wp == LOG_WEIGHT
@@ -23,16 +27,20 @@ function convert_sample(Game, wp, e::TrainingSample)
     @assert wp == LINEAR_WEIGHT
     w = Float32[n]
   end
-  x = GI.vectorize_state(Game, e.s)
-  a = GI.actions_mask(Game(e.s))
+  x = GI.vectorize_state(gspec, e.s)
+  a = GI.actions_mask(GI.init(gspec, e.s))
   p = zeros(size(a))
   p[a] = e.π
   v = [e.z]
   return (w, x, a, p, v)
 end
 
-function convert_samples(Game, wp, es::Vector{<:TrainingSample})
-  ces = [convert_sample(Game, wp, e) for e in es]
+function convert_samples(
+    gspec::AbstractGameSpec,
+    wp::SamplesWeighingPolicy,
+    es::Vector{<:TrainingSample})
+
+  ces = [convert_sample(gspec, wp, e) for e in es]
   W = Util.superpose((e[1] for e in ces))
   X = Util.superpose((e[2] for e in ces))
   A = Util.superpose((e[3] for e in ces))
@@ -59,7 +67,9 @@ wmean(x, w) = sum(x .* w) / sum(w)
 function losses(nn, params, Wmean, Hp, (W, X, A, P, V))
   creg = params.l2_regularization
   cinv = params.nonvalidity_penalty
-  P̂, V̂, p_invalid = Network.evaluate(nn, X, A)
+  P̂, V̂, p_invalid = Network.forward_normalized(nn, X, A)
+  V = V ./ params.rewards_renormalization
+  V̂ = V̂ ./ params.rewards_renormalization
   Lp = klloss_wmean(P̂, P, W) - Hp
   Lv = mse_wmean(V̂, V, W)
   Lreg = iszero(creg) ?
@@ -84,14 +94,13 @@ struct Trainer
   Wmean :: Float32
   Hp :: Float32
   batches_stream # infinite stateful iterator of training batches
-  function Trainer(network, samples, params; test_mode=false)
+  function Trainer(gspec, network, samples, params; test_mode=false)
     if params.use_position_averaging
       samples = merge_by_state(samples)
     end
-    Game = GameType(network)
-    data = convert_samples(Game, params.samples_weighing_policy, samples)
+    data = convert_samples(gspec, params.samples_weighing_policy, samples)
     network = Network.copy(network, on_gpu=params.use_gpu, test_mode=test_mode)
-    W, X, A, P, V = data
+    W, X, A, P, V = data  
     Wmean = mean(W)
     Hp = entropy_wmean(P, W)
     batches_stream = Util.random_batches_stream(data, params.batch_size) do x
@@ -141,7 +150,7 @@ function learning_status(tr::Trainer, samples)
   W, X, A, P, V = samples
   Ls = losses(tr.network, tr.params, tr.Wmean, tr.Hp, samples)
   Ls = Network.convert_output_tuple(tr.network, Ls)
-  Pnet, _ = Network.evaluate(tr.network, X, A)
+  Pnet, _ = Network.forward_normalized(tr.network, X, A)
   Hpnet = entropy_wmean(Pnet, W)
   Hpnet = Network.convert_output(tr.network, Hpnet)
   return Report.LearningStatus(Report.Loss(Ls...), tr.Hp, Hpnet)
@@ -176,7 +185,7 @@ function memory_report(
   )
   # It is important to load the neural network in test mode so as to not
   # overwrite the batch norm statistics based on biased data.
-  Tr(samples) = Trainer(nn, samples, learning_params, test_mode=true)
+  Tr(samples) = Trainer(mem.gspec, nn, samples, learning_params, test_mode=true)
   all_samples = samples_report(Tr(get_experience(mem)))
   latest_batch = isempty(last_batch(mem)) ?
     all_samples :

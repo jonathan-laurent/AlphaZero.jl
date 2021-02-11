@@ -3,7 +3,7 @@
 #####
 
 using DataStructures: Stack
-import AlphaZero: MemoryBuffer
+using ..AlphaZero.Util: Option
 
 # All state statistics and are expressed with respect to the current player
 
@@ -32,7 +32,7 @@ end
 player_reward(game, white_reward) =
   GI.white_playing(game) ? white_reward : - white_reward
 
-function evaluate_vnet(oracle::MCTS.Oracle, game)
+function evaluate_vnet(oracle, game)
   if GI.game_terminated(game)
     return 0.0
   else
@@ -40,9 +40,9 @@ function evaluate_vnet(oracle::MCTS.Oracle, game)
   end
 end
 
-function evaluate_qnet(oracle::MCTS.Oracle, game, action, gamma)
+function evaluate_qnet(oracle, game, action, gamma)
   @assert !GI.game_terminated(game)
-  next = copy(game)
+  next = GI.clone(game)
   GI.play!(next, action)
   wr = GI.white_reward(next)
   r = GI.white_playing(game) ? wr : -wr
@@ -120,7 +120,7 @@ end
 ##### Displaying state statistics
 #####
 
-function print_state_statistics(::Type{G}, stats::StateStats) where G
+function print_state_statistics(gspec, stats::StateStats)
   prob   = Log.ColType(nothing, x -> fmt(".1f", 100 * x) * "%")
   val    = Log.ColType(nothing, x -> fmt("+.2f", x))
   bigint = Log.ColType(nothing, n -> format(ceil(Int, n), commas=true))
@@ -132,7 +132,7 @@ function print_state_statistics(::Type{G}, stats::StateStats) where G
     ("Vnet",  val,    r -> r.Vnet)],
     header_style=Log.BOLD)
   atable = Log.Table([
-    ("",      alabel, r -> GI.action_string(G, r[1])),
+    ("",      alabel, r -> GI.action_string(gspec, r[1])),
     ("",      prob,   r -> r[2].P),
     ("Pmcts", prob,   r -> r[2].Pmcts),
     ("Pnet",  prob,   r -> r[2].Pnet),
@@ -154,7 +154,7 @@ end
 function compute_and_print_state_statistics(exp)
   if !GI.game_terminated(exp.game)
     stats = state_statistics(exp.game, exp.player, exp.turn, exp.memory)
-    print_state_statistics(GameType(exp), stats)
+    print_state_statistics(GI.spec(exp.game), stats)
     return stats
   else
     return nothing
@@ -165,84 +165,40 @@ end
 ##### Interactive exploration of the environment
 #####
 
-"""
-    Explorer{Game}
-
-A command interpreter to explore the internals of a player
-through interactive play.
-
-# Constructors
-
-    Explorer(player::AbstractPlayer, game=nothing; memory=nothing)
-
-Build an explorer to investigate the behavior of `player` in a given `game`
-(by default, in the initial state). Optionally, a reference to a memory buffer
-can be provided, in which case additional state statistics
-will be displayed.
-
-    Explorer(env::Env, game=nothing; arena_mode=false)
-
-Build an explorer for the MCTS player based on neural network `env.bestnn`
-and on parameters `env.params.self_play.mcts` or `env.params.arena.mcts`
-(depending on the value of `arena_mode`).
-
-# Commands
-
-The following commands are currently implemented:
-
-  - `do [action]`: make the current player perform `action`.
-    By default, the action of highest score is played.
-  - `explore [num_sims]`: run `num_sims` MCTS simulations from the current
-    state (for MCTS players only).
-  - `go`: query the user for a state description and go to this state.
-  - `flip`: flip the board according to a random symmetry.
-  - `undo`: undo the effect of the previous command.
-  - `restart`: restart the explorer.
-"""
-mutable struct Explorer{Game}
-  game :: Game
-  history :: Stack{Game}
-  player :: AbstractPlayer{Game}
+mutable struct Explorer
+  game :: AbstractGameEnv
+  history :: Stack{AbstractGameEnv}
+  player :: AbstractPlayer
   memory :: Option{MemoryBuffer}
   turn :: Int
-  function Explorer(player::AbstractPlayer, game=nothing; memory=nothing)
-    Game = GameType(player)
-    isnothing(game) && (game = Game())
-    history = Stack{Game}()
-    new{Game}(game, history, player, memory, 0)
+  function Explorer(
+      player::AbstractPlayer,
+      game::AbstractGameEnv;
+      memory=nothing)
+    history = Stack{AbstractGameEnv}()
+    new(game, history, player, memory, 0)
   end
-end
-
-GameType(::Explorer{Game}) where Game = Game
-
-function Explorer(
-    env::Env, game=nothing; mcts_params=env.params.self_play.mcts, on_gpu=false)
-  Game = GameType(env)
-  isnothing(game) && (game = Game())
-  net = Network.copy(env.bestnn, on_gpu=on_gpu, test_mode=true)
-  player = MctsPlayer(net, mcts_params)
-  return Explorer(player, game, memory=env.memory)
 end
 
 function restart!(exp::Explorer)
   reset_player!(exp.player)
   empty!(exp.history)
-  exp.game = GameType(exp)()
+  exp.game = GI.init(GI.spec(exp.game))
   exp.turn = 0
 end
 
-save_game!(exp::Explorer) = push!(exp.history, copy(exp.game))
+save_game!(exp::Explorer) = push!(exp.history, GI.clone(exp.game))
 
 # Return true if the command is valid, false otherwise
 function interpret!(exp::Explorer, stats, cmd, args=[])
-  Game = GameType(exp)
+  gspec = GI.spec(exp.game)
   if cmd == "go"
-    st = GI.read_state(Game)
+    st = GI.read_state(gspec)
     if isnothing(st)
       println("Invalid state description.")
       return false
     end
-    g = Game(st)
+    g = GI.init(gspec, st)
     if !isnothing(st)
       save_game!(exp)
       exp.game = g
@@ -264,7 +220,7 @@ function interpret!(exp::Explorer, stats, cmd, args=[])
       a = stats.actions[1][1]
     else
       length(args) == 1 || return false
-      a = GI.parse_action(exp.game, args[1])
+      a = GI.parse_action(GI.spec(exp.game), args[1])
       isnothing(a) && return false
       a ∈ GI.available_actions(exp.game) || return false
     end
@@ -274,7 +230,7 @@ function interpret!(exp::Explorer, stats, cmd, args=[])
     return true
   elseif cmd == "flip"
     save_game!(exp)
-    exp.game = GI.apply_random_symmetry(exp.game)
+    GI.apply_random_symmetry!(exp.game)
     return true
   elseif cmd == "explore"
     isa(exp.player, MctsPlayer) || (return false)
@@ -294,11 +250,6 @@ function interpret!(exp::Explorer, stats, cmd, args=[])
   return false
 end
 
-"""
-    start_explorer(exp::Explorer)
-
-Start an interactive explorer session.
-"""
 function start_explorer(exp::Explorer)
   while true
     # Print the state
@@ -315,4 +266,44 @@ function start_explorer(exp::Explorer)
     end
     println("")
   end
+end
+
+#####
+##### The explore methods
+#####
+
+"""
+    explore(::AbstractPlayer, ::AbstractGameEnv;  [memory])
+    explore(::AbstractPlayer, ::AbstractGameSpec; [memory])
+
+Start a command interpreter to explore the internals of a player
+through interactive play.
+
+The `memory` argument is an optional reference to a memory buffer.
+When provided, additional state statistics are displayed.
+
+# Commands
+
+The following commands are currently implemented:
+
+  - `do [action]`: make the current player perform `action`.
+    By default, the action of highest score is played.
+  - `explore [num_sims]`: run `num_sims` MCTS simulations from the current
+    state (for MCTS players only).
+  - `go`: query the user for a state description and go to this state.
+  - `flip`: flip the board according to a random symmetry.
+  - `undo`: undo the effect of the previous command.
+  - `restart`: restart the explorer.
+"""
+function explore end
+
+function explore(
+    player::AbstractPlayer,
+    game::AbstractGameEnv;
+    memory=nothing)
+  return start_explorer(Explorer(player, game, memory=memory))
+end
+
+function explore(player::AbstractPlayer, gspec::AbstractGameSpec; args...)
+  return explore(player, GI.init(gspec), args...)
 end

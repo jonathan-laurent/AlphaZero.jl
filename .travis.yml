@@ -3,8 +3,7 @@ language: julia
 os:
   - linux
 julia:
-  - 1.4
-  - nightly
+  - 1.6
 
 notifications:
   email: false
@@ -23,7 +22,7 @@ jobs:
     - julia: nightly
   include:
     - stage: Documentation
-      julia: 1.4
+      julia: 1.6
       os: linux
       script: julia --project -e '
           using Pkg;

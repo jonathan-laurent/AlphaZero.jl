@@ -36,3 +36,10 @@ Report.Checkpoint
 Report.LearningStatus
 Report.Loss
 ```
+
+## Evaluatons and benchmarks
+
+```@docs
+Report.Evaluation
+Report.Benchmark
+```

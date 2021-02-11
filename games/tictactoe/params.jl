@@ -2,15 +2,19 @@ Network = NetLib.SimpleNet
 
 netparams = NetLib.SimpleNetHP(
   width=200,
-  depth_common=8,
+  depth_common=6,
   use_batch_norm=true,
   batch_norm_momentum=1.)
 
 self_play = SelfPlayParams(
-  num_games=1000,
-  num_workers=128,
-  reset_mcts_every=4,
-  mcts = MctsParams(
+  sim=SimParams(
+    num_games=1000,
+    num_workers=128,
+    use_gpu=false,
+    reset_every=4,
+    flip_probability=0.,
+    alternate_colors=false),
+  mcts=MctsParams(
     num_iters_per_turn=400,
     cpuct=1.0,
     temperature=ConstSchedule(1.0),
@@ -18,16 +22,18 @@ self_play = SelfPlayParams(
     dirichlet_noise_α=1.0))
 
 arena = ArenaParams(
-  num_games=100,
-  num_workers=100,
-  use_gpu=false,
-  reset_mcts_every=1,
-  update_threshold=0.00,
-  flip_probability=0.5,
+  sim=SimParams(
+    num_games=100,
+    num_workers=100,
+    use_gpu=false,
+    reset_every=1,
+    flip_probability=0.5,
+    alternate_colors=true),
   mcts = MctsParams(
     self_play.mcts,
     temperature=ConstSchedule(0.3),
-    dirichlet_noise_ϵ=0.1))
+    dirichlet_noise_ϵ=0.1),
+  update_threshold=0.00)
 
 learning = LearningParams(
   use_gpu=false,
@@ -57,18 +63,20 @@ params = Params(
   use_symmetries=true,
   mem_buffer_size=PLSchedule(80_000))
 
+benchmark_sim = SimParams(
+  arena.sim;
+  num_games=400,
+  num_workers=100)
+
 benchmark = [
   Benchmark.Duel(
     Benchmark.Full(self_play.mcts),
     Benchmark.MctsRollouts(self_play.mcts),
-    num_games=400,
-    num_workers=100,
-    use_gpu=false,
-    flip_probability=0.5),
+    benchmark_sim),
   Benchmark.Duel(
     Benchmark.NetworkOnly(),
     Benchmark.MinMaxTS(depth=6, amplify_rewards=true, τ=1.),
-    num_games=400,
-    num_workers=100,
-    use_gpu=false,
-    flip_probability=0.5)]
+    benchmark_sim)]
+
+experiment = Experiment(
+  "tictactoe", GameSpec(), params, Network, netparams, benchmark=benchmark)

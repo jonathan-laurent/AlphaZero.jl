@@ -27,3 +27,13 @@ Initial release, as announced on [Julia's discourse](@ref https://discourse.juli
   fixed by doing so as the MCTS baseline now outperforms the MinMax baseline
   at Connect Four. Also, the Connect Four agent can now score a 100% win rate
   against both baselines after a couple hours of training.
+
+## Version 0.4
+
+- Added support for CommonRLInterface.jl.
+- Added a grid-world MDP example illustrating this new interface.
+- Added support for distributed training: it is now equally easy to train an agent on
+  a cluster of machines than on a single computer.
+- Replaced the async MCTS implementation by a more straightforward synchronous
+  implementation. Network inference requests are now batched across game simulations.
+- Added the Experiment and Scripts module to simplify common tasks.

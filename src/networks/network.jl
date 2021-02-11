@@ -5,13 +5,13 @@ module Network
 
 export AbstractNetwork, OptimiserSpec, CyclicNesterov, Adam
 
-import ..MCTS, ..GI, ..Util
+using ..AlphaZero
 
 using Base: @kwdef
 using Statistics: mean
 
 """
-    AbstractNetwork{Game} <: MCTS.Oracle{Game}
+    AbstractNetwork
 
 Abstract base type for a neural network.
 
@@ -20,12 +20,12 @@ Abstract base type for a neural network.
 Any subtype `Network` must implement `Base.copy` along with
 the following constructor:
 
-    Network(hyperparams)
+    Network(game_spec, hyperparams)
 
 where the expected type of `hyperparams` is given by
 [`HyperParams(Network)`](@ref HyperParams).
 """
-abstract type AbstractNetwork{G} <: MCTS.Oracle{G} end
+abstract type AbstractNetwork end
 
 #####
 ##### Interface
@@ -44,6 +44,13 @@ function HyperParams end
 Return the hyperparameters of a network.
 """
 function hyperparams end
+
+"""
+    game_spec(::AbstractNetwork)
+
+Return the game specification that was passed to the network's constructor.
+"""
+function game_spec end
 
 """
     to_gpu(::AbstractNetwork)
@@ -106,11 +113,11 @@ function convert_output_tuple(nn::AbstractNetwork, output::Tuple)
 end
 
 """
-    forward(::AbstractNetwork, boards)
+    forward(::AbstractNetwork, states)
 
 Compute the forward pass of a network on a batch of inputs.
 
-Expect a `Float32` tensor `boards` whose batch dimension is the last one.
+Expect a `Float32` tensor `states` whose batch dimension is the last one.
 
 Return a `(P, V)` triple where:
 
@@ -227,17 +234,17 @@ function mean_weight(nn::AbstractNetwork)
 end
 
 """
-    evaluate(network::AbstractNetwork, boards, actions_mask)
+    forward_normalized(network::AbstractNetwork, states, actions_mask)
 
-Evaluate a batch of board positions. This function is a wrapper
+Evaluate a batch of vectorized states. This function is a wrapper
 on [`forward`](@ref) that puts a zero weight on invalid actions.
 
 # Arguments
 
-  - `boards` is a tensor whose last dimension has size `bach_size`
+  - `states` is a tensor whose last dimension has size `bach_size`
   - `actions_mask` is a binary matrix of size `(num_actions, batch_size)`
 
-# Return
+# Returned value
 
 Return a `(P, V, Pinv)` triple where:
 
@@ -249,8 +256,8 @@ Return a `(P, V, Pinv)` triple where:
 
 All tensors manipulated by this function have elements of type `Float32`.
 """
-function evaluate(nn::AbstractNetwork, board, actions_mask)
-  p, v = forward(nn, board)
+function forward_normalized(nn::AbstractNetwork, state, actions_mask)
+  p, v = forward(nn, state)
   p = p .* actions_mask
   sp = sum(p, dims=1)
   p = p ./ (sp .+ eps(eltype(p)))
@@ -261,26 +268,44 @@ end
 to_singletons(x) = reshape(x, size(x)..., 1)
 from_singletons(x) = reshape(x, size(x)[1:end-1])
 
-function (nn::AbstractNetwork{Game})(board) where Game
-  actions_mask = GI.actions_mask(Game(board))
-  x = GI.vectorize_state(Game, board)
+"""
+    evaluate(::AbstractNetwork, state)
+
+    (nn::AbstractNetwork)(state) = evaluate(nn, state)
+
+Evaluate the neural network as an MCTS oracle on a single state.
+
+Note, however, that evaluating state positions once at a time is slow and so you
+may want to use a `BatchedOracle` along with an inference server that uses
+[`evaluate_batch`](@ref).
+"""
+function evaluate(nn::AbstractNetwork, state)
+  gspec = game_spec(nn)
+  actions_mask = GI.actions_mask(GI.init(gspec, state))
+  x = GI.vectorize_state(gspec, state)
   a = Float32.(actions_mask)
   xnet, anet = to_singletons.(convert_input_tuple(nn, (x, a)))
-  net_output = evaluate(nn, xnet, anet)
+  net_output = forward_normalized(nn, xnet, anet)
   p, v, _ = from_singletons.(convert_output_tuple(nn, net_output))
   return (p[actions_mask], v[1])
 end
 
+(nn::AbstractNetwork)(state) = evaluate(nn, state)
+
 """
     evaluate_batch(::AbstractNetwork, batch)
 
-Evaluate a batch of positions at once.
+Evaluate the neural network as an MCTS oracle on a batch of states at once.
+
+Take a list of states as input and return a list of `(P, V)` pairs as defined in the
+MCTS oracle interface.
 """
-function evaluate_batch(nn::AbstractNetwork{Game}, batch) where Game
-  X = Util.superpose((GI.vectorize_state(Game, b) for b in batch))
-  A = Util.superpose((GI.actions_mask(Game(b)) for b in batch))
+function evaluate_batch(nn::AbstractNetwork, batch)
+  gspec = game_spec(nn)
+  X = Util.superpose((GI.vectorize_state(gspec, b) for b in batch))
+  A = Util.superpose((GI.actions_mask(GI.init(gspec, b)) for b in batch))
   Xnet, Anet = convert_input_tuple(nn, (X, Float32.(A)))
-  P, V, _ = convert_output_tuple(nn, evaluate(nn, Xnet, Anet))
+  P, V, _ = convert_output_tuple(nn, forward_normalized(nn, Xnet, Anet))
   return [(P[A[:,i],i], V[1,i]) for i in eachindex(batch)]
 end
 

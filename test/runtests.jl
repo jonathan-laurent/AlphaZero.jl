@@ -1,20 +1,23 @@
 using AlphaZero
+using AlphaZero.Examples: games, experiments
+using AlphaZero.Scripts: dummy_run, test_game
+
 using Test
 
-include("../games/tictactoe/main.jl")
-include("../games/connect-four/main.jl")
-include("../scripts/lib/dummy_run.jl")
-
-include("test_game.jl")
+const CI = get(ENV, "CI", nothing) == "true"
+const FULL = !CI
 
 @testset "Testing Games" begin
-  test_game(Tictactoe.Game)
-  test_game(ConnectFour.Game)
+  test_game(games["grid-world"])
+  test_game(games["tictactoe"])
+  test_game(games["connect-four"])
   @test true
 end
 
 @testset "Dummy Runs" begin
   dir = "sessions/test-tictactoe"
-  @test dummy_run(Tictactoe, nostdout=false, session_dir=dir)
-  #@test dummy_run(ConnectFour) # Takes a bit too long for Travis
+  @test dummy_run(experiments["tictactoe"], nostdout=false) == nothing
+  if FULL
+    @test dummy_run(experiments["connect-four"], nostdout=false) == nothing
+  end
 end

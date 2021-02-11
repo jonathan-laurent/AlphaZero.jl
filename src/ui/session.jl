@@ -2,7 +2,7 @@
 ##### Session management
 #####
 
-import AlphaZero: Handlers, initial_report, get_experience
+const DEFAULT_SESSIONS_DIR = "sessions"
 
 """
     SessionReport
@@ -14,11 +14,11 @@ collected during a training session.
 - `iterations`: vector of ``n`` iteration reports with type
     [`Report.Iteration`](@ref)
 - `benchmark`: vector of ``n+1`` benchmark reports with type
-    [`Benchmark.Report`](@ref)
+    [`Report.Benchmark`](@ref)
 """
 struct SessionReport
   iterations :: Vector{Report.Iteration}
-  benchmark :: Vector{Benchmark.Report}
+  benchmark :: Vector{Report.Benchmark}
   SessionReport() = new([], [])
 end
 
@@ -45,11 +45,11 @@ In particular, it implements the [`Handlers`](@ref) interface.
 """
 mutable struct Session{Env}
   env :: Env
-  dir :: Option{String}
+  dir :: String
   logger :: Logger
   autosave :: Bool
   save_intermediate :: Bool
-  benchmark :: Vector{Benchmark.Duel}
+  benchmark :: Vector{Benchmark.Evaluation}
   # Temporary state for logging
   progress :: Option{Progress}
   report :: SessionReport
@@ -61,18 +61,18 @@ mutable struct Session{Env}
   end
 end
 
-AlphaZero.GameType(::Session{<:Env{G}}) where {G} = G
-
 #####
 ##### Save and load environments
 #####
 
+const GSPEC_FILE       =  "gspec.data"
 const BESTNN_FILE      =  "bestnn.data"
 const CURNN_FILE       =  "curnn.data"
 const MEM_FILE         =  "mem.data"
 const ITC_FILE         =  "iter.txt"
 const REPORT_FILE      =  "report.json"
-const PARAMS_FILE      =  "params.json"
+const PARAMS_FILE      =  "params.data"
+const PARAMS_JSON_FILE =  "params.json"      # not used when loading envs
 const NET_PARAMS_FILE  =  "netparams.json"
 const BENCHMARK_FILE   =  "benchmark.json"
 const LOG_FILE         =  "log.txt"
@@ -82,7 +82,6 @@ const ITERS_DIR        =  "iterations"
 iterdir(dir, i) = joinpath(dir, ITERS_DIR, "$i")
 
 function valid_session_dir(dir)
-  !isnothing(dir) &&
   isfile(joinpath(dir, PARAMS_FILE)) &&
   isfile(joinpath(dir, BESTNN_FILE)) &&
   isfile(joinpath(dir, CURNN_FILE)) &&
@@ -92,14 +91,14 @@ end
 
 function save_env(env::Env, dir)
   isdir(dir) || mkpath(dir)
-  # Saving parameters
-  open(joinpath(dir, PARAMS_FILE), "w") do io
+  serialize(joinpath(dir, GSPEC_FILE), env.gspec)
+  serialize(joinpath(dir, PARAMS_FILE), env.params)
+  open(joinpath(dir, PARAMS_JSON_FILE), "w") do io
     JSON2.pretty(io, JSON3.write(env.params))
   end
   open(joinpath(dir, NET_PARAMS_FILE), "w") do io
     JSON2.pretty(io, JSON3.write(Network.hyperparams(env.bestnn)))
   end
-  # Saving state
   serialize(joinpath(dir, BESTNN_FILE), env.bestnn)
   serialize(joinpath(dir, CURNN_FILE), env.curnn)
   serialize(joinpath(dir, MEM_FILE), get_experience(env))
@@ -108,50 +107,14 @@ function save_env(env::Env, dir)
   end
 end
 
-function load_network(logger, net_file, netparams_file)
-  # Try to load network or otherwise network params
-  if isfile(net_file)
-    network = deserialize(net_file)
-    Log.print(logger, "Loading network from: $(net_file)")
-  else
-    Log.print(logger, Log.RED, "No network file: $(net_file)")
-    network = open(netparams_file, "r") do io
-      params = JSON3.read(io, HyperParams(Network))
-      Network(params)
-    end
-  end
-  return network
-end
-
-function load_env(
-    ::Type{Game}, ::Type{Network}, logger, dir; params
-  ) where {Game, Network}
-  Log.section(logger, 1, "Loading environment")
-  # Load the neural networks
-  netparams_file = joinpath(dir, NET_PARAMS_FILE)
-  bestnn = load_network(logger, joinpath(dir, BESTNN_FILE), netparams_file)
-  curnn = load_network(logger, joinpath(dir, CURNN_FILE), netparams_file)
-  # Load memory
-  mem_file = joinpath(dir, MEM_FILE)
-  if isfile(mem_file)
-    experience = deserialize(mem_file)
-    Log.print(logger, "Loading memory from: $(mem_file)")
-  else
-    experience = []
-    Log.print(logger, Log.RED, "Starting with an empty memory")
-  end
-  # Load instructions counter
-  itc_file = joinpath(dir, ITC_FILE)
-  if isfile(itc_file)
-    itc = open(itc_file, "r") do io
-      JSON3.read(io)
-    end
-    Log.print(logger, "Loaded iteration counter from: $(itc_file)")
-  else
-    itc = 0
-    Log.print(logger, Log.RED, "File not found: $(itc_file)")
-  end
-  return Env{Game}(params, curnn, bestnn, experience, itc)
+function load_env(dir)
+  gspec = deserialize(joinpath(dir, GSPEC_FILE))
+  params = deserialize(joinpath(dir, PARAMS_FILE))
+  curnn = deserialize(joinpath(dir, CURNN_FILE))
+  bestnn = deserialize(joinpath(dir, BESTNN_FILE))
+  experience = deserialize(joinpath(dir, MEM_FILE))
+  itc = open(JSON3.read, joinpath(dir, ITC_FILE), "r") 
+  return Env(gspec, params, curnn, bestnn, experience, itc)
 end
 
 #####
@@ -165,13 +128,11 @@ function load_session_report(dir::String, niters)
     ifile = joinpath(idir, REPORT_FILE)
     bfile = joinpath(idir, BENCHMARK_FILE)
     # Load the benchmark report
-    isfile(bfile) || error("Not found: $bfile")
     open(bfile, "r") do io
-      push!(rep.benchmark, JSON3.read(io, Benchmark.Report))
+      push!(rep.benchmark, JSON3.read(io, Report.Benchmark))
     end
     # Load the iteration report
     if itc > 0
-      isfile(ifile) || error("Not found: $ifile")
       open(ifile, "r") do io
         push!(rep.iterations, JSON3.read(io, Report.Iteration))
       end
@@ -225,65 +186,65 @@ end
 ##### Run benchmarks
 #####
 
-win_rate(z) = round(Int, 100 * (z + 1) / 2)
-
-percentage(x, total) = round(Int, 100 * (x / total))
-
 function show_space_after_progress_bar(logger)
   Log.console_only(logger) do
     Log.sep(logger, force=true)
   end
 end
 
-function run_duel(env, logger, duel)
-  player_name = Benchmark.name(duel.player)
-  baseline_name = Benchmark.name(duel.baseline)
-  legend = "$player_name against $baseline_name"
-  Log.section(logger, 2, "Running benchmark: $legend")
-  progress = Log.Progress(logger, duel.num_games)
-  outcome = Benchmark.run(env, duel, progress)
-  show_space_after_progress_bar(logger)
-  z = fmt("+.2f", outcome.avgr)
-  if env.params.ternary_rewards
-    stats = Benchmark.TernaryOutcomeStatistics(outcome)
-    n = length(outcome.rewards)
-    pwon = percentage(stats.num_won, n)
-    pdraw = percentage(stats.num_draw, n)
-    plost = percentage(stats.num_lost, n)
-    details = "$pwon% won, $pdraw% draw, $plost% lost"
+function run_duel(env::Env, duel; logger)
+  if isa(duel, Benchmark.Duel)
+    player_name = Benchmark.name(duel.player)
+    baseline_name = Benchmark.name(duel.baseline)
+    legend = "$player_name against $baseline_name"
   else
-    wr = win_rate(outcome.avgr)
-    details = "win rate of $wr%"
+    @assert isa(duel, Benchmark.Single)
+    legend = Benchmark.name(duel.player)
   end
-  red = fmt(".1f", 100 * outcome.redundancy)
-  msg = "Average reward: $z ($details), redundancy: $red%"
-  Log.print(logger, msg)
-  return outcome
+  Log.section(logger, 2, "Running benchmark: $legend")
+  progress = Log.Progress(logger, duel.sim.num_games)
+  report = Benchmark.run(env, duel, progress)
+  show_space_after_progress_bar(logger)
+  print_report(
+    logger, report,
+    ternary_rewards=env.params.ternary_rewards)
+  return report
 end
 
-function run_benchmark(session)
-  report = Benchmark.Report()
+function run_benchmark(session::Session)
+  report = Report.Benchmark()
   for duel in session.benchmark
-    outcome = run_duel(session.env, session.logger, duel)
+    outcome = run_duel(session.env, duel, logger=session.logger)
     push!(report, outcome)
   end
   return report
 end
 
+# return whether or not critical problems were found
 function zeroth_iteration!(session::Session)
   @assert session.env.itc == 0
   Log.section(session.logger, 2, "Initial report")
-  print_report(session.logger, initial_report(session.env))
+  report = initial_report(session.env)
+  print_report(session.logger, report)
+  isempty(report.errors) || return false
   bench = run_benchmark(session)
   save_increment!(session, bench)
+  return true
+end
+
+function missing_zeroth_iteration(session::Session)
+  return isempty(session.report.iterations) && isempty(session.report.benchmark)
 end
 
 #####
-##### Building the logger
+##### Session constructors
 #####
 
+default_session_dir(e::Experiment) = default_session_dir(e.name)
+default_session_dir(exp_name::String) = "$(DEFAULT_SESSIONS_DIR)/$exp_name"
+
 function session_logger(dir, nostdout, autosave)
-  if !isnothing(dir) && autosave
+  if autosave
     isdir(dir) || mkpath(dir)
     logfile = open(joinpath(dir, LOG_FILE), "a")
   else
@@ -293,78 +254,46 @@ function session_logger(dir, nostdout, autosave)
   return Logger(out, logfile=logfile)
 end
 
-#####
-##### Session constructors
-#####
-
 """
-    Session(::Type{Game}, ::Type{Net}, params, netparams) where {Game, Net}
+    Session(::Experiment; <optional kwargs>)
 
-Create a new session using the given parameters, or load it from disk if
-it already exists.
-
-# Arguments
-- `Game` is the type ot the game that is being learnt
-- `Net` is the type of the network that is being used
-- `params` has type [`Params`](@ref)
-- `netparams` has type [`Network.HyperParams(Net)`](@ref Network.HyperParams)
+Create a new session from an experiment.
 
 # Optional keyword arguments
-- `dir`: session directory in which all files and reports are saved; this
-    argument is either a string or `nothing` (default), in which case the
-    session won't be saved automatically and no file will be generated
+- `dir="sessions/<experiment-name>"`: session directory in which all files and reports
+    are saved.
 - `autosave=true`: if set to `false`, the session won't be saved automatically nor
     any file will be generated
 - `nostdout=false`: disables logging on the standard output when set to `true`
-- `benchmark=[]`: vector of [`Benchmark.Duel`](@ref) to be used as a benchmark
 - `save_intermediate=false`: if set to true (along with `autosave`), all
     intermediate training environments are saved on disk so that
     the whole training process can be analyzed later. This can
     consume a lot of disk space.
 """
 function Session(
-    ::Type{Game}, ::Type{Net}, params, netparams;
-    dir=nothing, autosave=true, nostdout=false, benchmark=[],
-    save_intermediate=false
-  ) where {Game, Net}
+    e::Experiment;
+    dir=nothing,
+    autosave=true,
+    nostdout=false,
+    save_intermediate=false)
+  
+  isnothing(dir) && (dir = default_session_dir(e))
   logger = session_logger(dir, nostdout, autosave)
   if valid_session_dir(dir)
-    env = load_env(Game, Net, logger, dir, params=params)
+    Log.section(logger, 1, "Loading environment from: $dir")
+    env = load_env(dir)
     # The parameters must be unchanged
     same_json(x, y) = JSON3.write(x) == JSON3.write(y)
-    same_json(env.params, params) || @info "Using modified parameters"
-    @assert same_json(Network.hyperparams(env.bestnn), netparams)
-    session = Session(env, dir, logger, autosave, save_intermediate, benchmark)
+    same_json(env.params, e.params) || @info "Using modified parameters"
+    @assert same_json(Network.hyperparams(env.bestnn), e.netparams)
+    session = Session(env, dir, logger, autosave, save_intermediate, e.benchmark)
     session.report = load_session_report(dir, env.itc)
   else
-    network = Net(netparams)
-    env = Env{Game}(params, network)
-    session = Session(env, dir, logger, autosave, save_intermediate, benchmark)
+    network = e.mknet(e.gspec, e.netparams)
+    env = Env(e.gspec, e.params, network)
+    session = Session(env, dir, logger, autosave, save_intermediate, e.benchmark)
     Log.section(session.logger, 1, "Initializing a new AlphaZero environment")
-    zeroth_iteration!(session)
   end
-  return session
-end
-
-"""
-    Session(env::Env[, dir])
-
-Create a session from an initial environment.
-
-- The iteration counter of the environment must be equal to 0
-- If a session directory is provided, this directory must not exist yet
-
-This constructor features the optional keyword arguments
-`autosave`, `nostdout`, `benchmark` and `save_intermediate`.
-"""
-function Session(
-    env::Env, dir=nothing; autosave=true, nostdout=false, benchmark=[],
-    save_intermediate=false)
-  @assert isnothing(dir) || !isdir(dir)
-  @assert env.itc == 0
-  logger = session_logger(dir, nostdout, autosave)
-  session = Session(env, dir, logger, autosave, save_intermediate, benchmark)
-  zeroth_iteration!(session)
   return session
 end
 
@@ -380,6 +309,10 @@ by sending a SIGKILL signal.
 """
 function resume!(session::Session)
   try
+    if missing_zeroth_iteration(session)
+      success = zeroth_iteration!(session)
+      success || return
+    end
     train!(session.env, session)
   catch e
     isa(e, InterruptException) || rethrow(e)
@@ -400,31 +333,16 @@ function save(session::Session, dir=session.dir)
 end
 
 """
-    start_explorer(session::Session)
+    explore(session::Session, [mcts_params, use_gpu])
 
-Start an explorer session for the current environment. See [`Explorer`](@ref).
+Start an explorer session for the current environment.
 """
-function start_explorer(session::Session; mcts_params=nothing, on_gpu=false)
-  isnothing(mcts_params) && (mcts_params = session.env.params.self_play.mcts)
+function explore(session::Session; args...)
   Log.section(session.logger, 1, "Starting interactive exploration")
-  explorer = Explorer(session.env, mcts_params=mcts_params, on_gpu=on_gpu)
-  start_explorer(explorer)
+  explore(AlphaZeroPlayer(session.env; args...), session.env.gspec)
 end
 
-"""
-    play_interactive_game(session::Session; timeout=2.)
-
-Start an interactive game against AlphaZero, allowing it
-`timeout` seconds of thinking time for each move.
-"""
-function play_interactive_game(
-    session::Session; timeout=2., mcts_params=nothing, on_gpu=false)
-  Game = GameType(session)
-  net = Network.copy(session.env.bestnn, on_gpu=on_gpu, test_mode=true)
-  isnothing(mcts_params) && (mcts_params = session.env.params.self_play.mcts)
-  player = MctsPlayer(net, mcts_params, timeout=timeout)
-  interactive!(Game(), player, Human{Game}())
-end
+AlphaZero.AlphaZeroPlayer(s::Session; args...) = AlphaZero.AlphaZeroPlayer(s.env; args...)
 
 #####
 ##### Utilities for printing reports
@@ -486,7 +404,7 @@ function print_report(logger::Logger, report::Report.SelfPlay)
   avgdepth = fmt(".1f", report.average_exploration_depth)
   Log.print(logger, "Average exploration depth: $avgdepth")
   memf = format(report.mcts_memory_footprint, autoscale=:metric, precision=2)
-  Log.print(logger, "MCTS memory footprint: $(memf)B")
+  Log.print(logger, "MCTS memory footprint per worker: $(memf)B")
   mems = format(report.memory_size, commas=true)
   memd = format(report.memory_num_distinct_boards, commas=true)
   Log.print(logger, "Experience buffer size: $(mems) ($(memd) distinct boards)")
@@ -499,6 +417,48 @@ function print_report(logger::Logger, report::Report.Initial)
   Log.print(logger, "Number of regularized network parameters: $nnregparams")
   mfpn = report.mcts_footprint_per_node
   Log.print(logger, "Memory footprint per MCTS node: $(mfpn) bytes")
+  for w in report.warnings
+    Log.print(logger, crayon"yellow", "Warning: ", w)
+  end
+  for e in report.errors
+    Log.print(logger, crayon"red", "Error: ", e)
+  end
+end
+
+percentage(x, total) = round(Int, 100 * (x / total))
+
+function print_report(
+    logger::Logger,
+    report::Report.Evaluation;
+    nn_replaced=false,
+    ternary_rewards=false)
+
+  r = fmt("+.2f", report.avgr)
+  if ternary_rewards
+    n = length(report.rewards)
+    stats = Benchmark.TernaryOutcomeStatistics(report)
+    pwon = percentage(stats.num_won, n)
+    pdraw = percentage(stats.num_draw, n)
+    plost = percentage(stats.num_lost, n)
+    details = ["$pwon% won, $pdraw% draw, $plost% lost"]
+  else
+    wr = round(Int, 100 * (report.avgr + 1) / 2)
+    details = []
+  end
+  if nn_replaced
+     push!(details, "network replaced")
+  end
+  details = isempty(details) ? "" : " (" * join(details, ", ") * ")"
+  red = fmt(".1f", 100 * report.redundancy)
+  msg = "Average reward: $r$details, redundancy: $red%"
+  Log.print(logger, msg)
+end
+
+function print_report(logger::Logger, report::Report.Checkpoint; ternary_rewards=false)
+  print_report(
+    logger, report.evaluation,
+    nn_replaced=report.nn_replaced,
+    ternary_rewards=ternary_rewards)
 end
 
 #####
@@ -511,7 +471,7 @@ function Handlers.iteration_started(session::Session)
 end
 
 function Handlers.self_play_started(session::Session)
-  ngames = session.env.params.self_play.num_games
+  ngames = session.env.params.self_play.sim.num_games
   Log.section(session.logger, 2, "Starting self-play")
   session.progress = Log.Progress(session.logger, ngames)
 end
@@ -543,8 +503,10 @@ end
 
 function Handlers.checkpoint_started(session::Session)
   Log.section(session.logger, 3, "Launching a checkpoint evaluation")
-  num_games = session.env.params.arena.num_games
-  session.progress = Log.Progress(session.logger, num_games)
+  num_games = session.env.params.arena.sim.num_games
+  # In single player games, each game has to be played twice (with both networks)
+  n = GI.two_players(session.env.gspec) ? num_games : 2 * num_games
+  session.progress = Log.Progress(session.logger, n)
 end
 
 function Handlers.checkpoint_game_played(session::Session)
@@ -553,12 +515,8 @@ end
 
 function Handlers.checkpoint_finished(session::Session, report)
   show_space_after_progress_bar(session.logger)
-  avgr = fmt("+.2f", report.reward)
-  wr = win_rate(report.reward)
-  red = fmt(".1f", report.redundancy * 100)
-  nnr = report.nn_replaced ? ", network replaced" : ""
-  msg = "Average reward: $avgr (win rate of $wr%$nnr), redundancy: $red%"
-  Log.print(session.logger, msg)
+  ternary_rewards = session.env.params.ternary_rewards
+  print_report(session.logger, report, ternary_rewards=ternary_rewards)
   Log.section(session.logger, 3, "Optimizing the loss")
 end
 
@@ -581,29 +539,24 @@ end
 ##### Launch new experiments on an existing session
 #####
 
-function run_duel(
-    ::Type{G}, ::Type{N}, dir::String, duel::Benchmark.Duel;
-    params=nothing) where {G, N}
-  logger = Logger()
-  env = load_env(G, N, logger, dir, params=params)
-  run_duel(env, logger, duel)
+function run_duel(session_dir::String, duel; logger)
+  env = load_env(session_dir)
+  run_duel(env, duel; logger)
 end
 
-function run_new_benchmark(
-  ::Type{G}, ::Type{N}, session_dir, name, benchmark;
-  params=nothing, itcmax=nothing) where {G, N}
+function run_new_benchmark(session_dir, name, benchmark; logger, itcmax=nothing)
   outdir = joinpath(session_dir, name)
   isdir(outdir) || mkpath(outdir)
   logger = Logger()
-  Log.section(logger, 1, "Computing new benchmark: $name")
+  Log.section(logger, 1, "Computing benchmark")
   itc = 0
-  reports = Benchmark.Report[]
+  reports = Report.Benchmark[]
   while valid_session_dir(iterdir(session_dir, itc))
     !isnothing(itcmax) && itc > itcmax && break
     Log.section(logger, 1, "Iteration: $itc")
     itdir = iterdir(session_dir, itc)
-    env = load_env(G, N, logger, itdir, params=params)
-    report = [run_duel(env, logger, duel) for duel in benchmark]
+    env = load_env(itdir)
+    report = [run_duel(env, duel; logger) for duel in benchmark]
     push!(reports, report)
     # Save the intermediate reports
     open(joinpath(outdir, BENCHMARK_FILE), "w") do io

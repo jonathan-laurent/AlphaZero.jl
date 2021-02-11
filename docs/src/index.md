@@ -10,6 +10,9 @@ Deepmind's AlphaZero algorithm:
 * Being between one and two orders of magnitude faster than its Python alternatives,
   this implementation enables solving nontrivial games on
   a standard desktop computer with a GPU.
+* The same agent can be trained on a
+  [cluster of machines](https://www.youtube.com/watch?v=JVUJ5Oohuhs) as easily as on a
+  single computer and without modifying a single line of code.
 
 ### Why should I care about AlphaZero?
 
@@ -42,17 +45,13 @@ This gain comes mostly from two sources:
   much from being written in Python as most of the computation happens within
   heavily optimized matrix manipulation routines. This is not the case with
   AlphaZero, where tree search is also a possible bottleneck.
-- **An asynchronous MCTS implementation:** even more importantly, a key
-  aspect in making MCTS scale is to enable several workers to explore the
-  search tree asynchronously. This is a huge win even on a single machine,
-  as it enables to perform neural-network inference on large batches rather
-  than evaluating board positions separately, thereby maximizing the GPU
-  utilization (see [benchmark](@ref async_mcts)).
+- **An asynchronous simulation mechanism** that enables batching requests to the neural
+  network across several simulation threads, thereby maximizing GPU utilization.
 
 ### Acknowledgements
 
 This material is based upon work supported by the United States Air Force and
-DARPA under Contract No. FA8750-18-C-0092. Any opinions, findings and
-conclusions or recommendations expressed in this material are those of the
-author(s) and do not necessarily reflect the views of the United States
+DARPA under Contract No. FA9550-16-1-0288 and FA8750-18-C-0092.
+Any opinions, findings and conclusions or recommendations expressed in this material are
+those of the author(s) and do not necessarily reflect the views of the United States
 Air Force and DARPA.

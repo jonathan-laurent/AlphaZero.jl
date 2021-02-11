@@ -3,7 +3,7 @@
 #####
 
 """
-    Env{Game, Network, Board}
+    Env
 
 Type for an AlphZero environment.
 
@@ -13,10 +13,10 @@ and an iteration counter.
 
 # Constructor
 
-    Env{Game}(params, curnn, bestnn=copy(curnn), experience=[], itc=0)
+    Env(game_spec, params, curnn, bestnn=copy(curnn), experience=[], itc=0)
 
-Construct a new AlphaZero environment.
-- `Game` is the type of the game being played
+Construct a new AlphaZero environment:
+- `game_spec` specified the game being played
 - `params` has type [`Params`](@ref)
 - `curnn` is the current neural network and has type [`AbstractNetwork`](@ref)
 - `bestnn` is the best neural network so far, which is used for data generation
@@ -24,23 +24,22 @@ Construct a new AlphaZero environment.
    as a vector of [`TrainingSample`](@ref)
 - `itc` is the value of the iteration counter (0 at the start of training)
 """
-mutable struct Env{Game, Network, Board}
+mutable struct Env{GameSpec, Network, State}
+  gspec  :: GameSpec
   params :: Params
   curnn  :: Network
   bestnn :: Network
-  memory :: MemoryBuffer{Board}
+  memory :: MemoryBuffer{GameSpec, State}
   itc    :: Int
-  function Env{Game}(
-      params, curnn, bestnn=copy(curnn), experience=[], itc=0) where Game
-    Board = GI.State(Game)
+  function Env(
+      gspec::AbstractGameSpec,
+      params, curnn, bestnn=copy(curnn), experience=[], itc=0)
     msize = max(params.mem_buffer_size[itc], length(experience))
-    memory = MemoryBuffer{Board}(msize, experience)
-    return new{Game, typeof(curnn), Board}(
-      params, curnn, bestnn, memory, itc)
+    memory = MemoryBuffer(gspec, msize, experience)
+    return new{typeof(gspec), typeof(curnn), GI.state_type(gspec)}(
+      gspec, params, curnn, bestnn, memory, itc)
   end
 end
-
-GameType(env::Env{Game}) where Game = Game
 
 #####
 ##### Training handlers
@@ -94,8 +93,6 @@ module Handlers
 
 end
 
-import .Handlers
-
 #####
 ##### Public utilities
 #####
@@ -103,8 +100,7 @@ import .Handlers
 """
     get_experience(env::Env)
 
-Return the content of the agent's memory as a
-vector of [`TrainingSample`](@ref).
+Return the content of the agent's memory as a vector of [`TrainingSample`](@ref).
 """
 get_experience(env::Env) = get_experience(env.memory)
 
@@ -117,43 +113,81 @@ as an object of type [`Report.Initial`](@ref).
 function initial_report(env::Env)
   num_network_parameters = Network.num_parameters(env.curnn)
   num_reg_params = Network.num_regularized_parameters(env.curnn)
-  player = MctsPlayer(env.curnn, env.params.self_play.mcts)
-  mcts_footprint_per_node = MCTS.memory_footprint_per_node(player.mcts)
+  player = MctsPlayer(env.gspec, env.curnn, env.params.self_play.mcts)
+  mcts_footprint_per_node = MCTS.memory_footprint_per_node(env.gspec)
+  errs, warns = check_params(env.gspec, env.params)
   return Report.Initial(
-    num_network_parameters, num_reg_params, mcts_footprint_per_node)
+    num_network_parameters, num_reg_params, mcts_footprint_per_node, errs, warns)
 end
 
 #####
-##### Training loop
+##### Evaluating networks
 #####
 
-function resize_memory!(env::Env{G,N,B}, n) where {G,N,B}
-  exp = get_experience(env.memory)
-  env.memory = MemoryBuffer{B}(n, exp)
-  return
-end
-
-function evaluate_network(contender, baseline, params, handler)
-  use_gpu = params.arena.use_gpu
+# Have a "contender" network play against a "baseline" network (params::ArenaParams)
+# Return (rewards vector, redundancy)
+# Version for two-player games
+function pit_networks(gspec, contender, baseline, params, handler)
   make_oracles() = (
-    Network.copy(contender, on_gpu=use_gpu, test_mode=true),
-    Network.copy(baseline, on_gpu=use_gpu, test_mode=true))
+    Network.copy(contender, on_gpu=params.sim.use_gpu, test_mode=true),
+    Network.copy(baseline, on_gpu=params.sim.use_gpu, test_mode=true))
   simulator = Simulator(make_oracles, record_trace) do oracles
-    white = MctsPlayer(oracles[1], params.arena.mcts)
-    black = MctsPlayer(oracles[2], params.arena.mcts)
+    white = MctsPlayer(gspec, oracles[1], params.mcts)
+    black = MctsPlayer(gspec, oracles[2], params.mcts)
     return TwoPlayers(white, black)
   end
   samples = simulate(
-    simulator,
-    num_games=params.arena.num_games,
-    num_workers=params.arena.num_workers,
-    game_simulated=(() -> Handlers.checkpoint_game_played(handler)),
-    reset_every=params.arena.reset_mcts_every,
-    flip_probability=params.arena.flip_probability,
-    color_policy=ALTERNATE_COLORS)
-  gamma = params.self_play.mcts.gamma
-  rewards, redundancy = rewards_and_redundancy(samples, gamma=gamma)
-  return mean(rewards), redundancy
+    simulator, gspec, params.sim,
+    game_simulated=(() -> Handlers.checkpoint_game_played(handler)))
+  return rewards_and_redundancy(samples, gamma=params.mcts.gamma)
+end
+
+# Evaluate a single neural network for a one-player game (params::ArenaParams)
+function evaluate_network(gspec, net, params, handler)
+  make_oracles() = Network.copy(net, on_gpu=params.sim.use_gpu, test_mode=true)
+  simulator = Simulator(make_oracles, record_trace) do oracle
+    MctsPlayer(gspec, oracle, params.mcts)
+  end
+  samples = simulate(
+    simulator, gspec, params.sim,
+    game_simulated=(() -> Handlers.checkpoint_game_played(handler)))
+  return rewards_and_redundancy(samples, gamma=params.mcts.gamma)
+end
+
+# Compare two versions of a neural network (params::ArenaParams)
+# Works for both two-player and single-player games
+function compare_networks(gspec, contender, baseline, params, handler)
+  legend = "Most recent NN versus best NN so far"
+  if GI.two_players(gspec)
+    (rewards_c, red), t =
+      @timed pit_networks(gspec, contender, baseline, params, handler)
+    avgr = mean(rewards_c)
+    rewards_b = nothing
+  else
+    (rewards_c, red_c), tc = @timed evaluate_network(gspec, contender, params, handler)
+    (rewards_b, red_b), tb = @timed evaluate_network(gspec, baseline, params, handler)
+    avgr = mean(rewards_c) - mean(rewards_b)
+    red = mean([red_c, red_b])
+    t = tc + tb
+  end
+  return Report.Evaluation(legend, avgr, red, rewards_c, rewards_b, t)
+end
+
+#####
+##### Training Loop
+#####
+
+function resize_memory!(env::Env, n)
+  exp = get_experience(env.memory)
+  env.memory = MemoryBuffer(env.gspec, n, exp)
+  return
+end
+
+function dummy_learning_report()
+  eps = 1e-16
+  dummy_loss = Report.Loss(0, 0, 0, 0, 0)
+  dummy_status = Report.LearningStatus(dummy_loss, 0, 0)
+  return Report.Learning(eps, eps, eps, eps, dummy_status, [], [], false)
 end
 
 function learning_step!(env::Env, handler)
@@ -164,9 +198,13 @@ function learning_step!(env::Env, handler)
   tloss, teval, ttrain = 0., 0., 0.
   experience = get_experience(env.memory)
   if env.params.use_symmetries
-    experience = augment_with_symmetries(GameType(env), experience)
+    experience = augment_with_symmetries(env.gspec, experience)
   end
-  trainer, tconvert = @timed Trainer(env.curnn, experience, lp)
+  if isempty(experience)
+    # Skipping the learning phase
+    return dummy_learning_report()
+  end
+  trainer, tconvert = @timed Trainer(env.gspec, env.curnn, experience, lp)
   init_status = learning_status(trainer)
   Handlers.learning_started(handler, init_status)
   # Compute the number of batches between each checkpoint
@@ -176,7 +214,7 @@ function learning_step!(env::Env, handler)
     nbatches = min(nbatches, ntotal ÷ lp.min_checkpoints_per_epoch)
   end
   # Loop state variables
-  best_evalz = isnothing(ap) ? nothing : ap.update_threshold
+  best_evalr = isnothing(ap) ? nothing : ap.update_threshold
   nn_replaced = false
 
   for k in 1:lp.num_checkpoints
@@ -196,19 +234,18 @@ function learning_step!(env::Env, handler)
     else
       Handlers.checkpoint_started(handler)
       env.curnn = get_trained_network(trainer)
-      (evalz, redundancy), dteval = @timed begin
-        evaluate_network(env.curnn, env.bestnn, env.params, handler)
-      end
-      teval += dteval
+      eval_report =
+        compare_networks(env.gspec, env.curnn, env.bestnn, ap, handler)
+      teval += eval_report.time
       # If eval is good enough, replace network
-      success = (evalz >= best_evalz)
+      success = (eval_report.avgr >= best_evalr)
       if success
         nn_replaced = true
         env.bestnn = copy(env.curnn)
-        best_evalz = evalz
+        best_evalr = eval_report.avgr
       end
-      checkpoint_report = Report.Checkpoint(
-        k * nbatches, status, evalz, redundancy, success)
+      checkpoint_report =
+        Report.Checkpoint(k * nbatches, eval_report, status, success)
       push!(checkpoints, checkpoint_report)
       Handlers.checkpoint_finished(handler, checkpoint_report)
     end
@@ -220,7 +257,7 @@ function learning_step!(env::Env, handler)
   return report
 end
 
-function simple_memory_stats(env)
+function simple_memory_stats(env::Env)
   mem = get_experience(env)
   nsamples = length(mem)
   ndistinct = length(merge_by_state(mem))
@@ -234,28 +271,22 @@ function self_play_measurements(trace, _, player)
   return (trace=trace, mem=mem, edepth=edepth)
 end
 
-function self_play_step!(env::Env{G}, handler) where G
+function self_play_step!(env::Env, handler)
   params = env.params.self_play
   Handlers.self_play_started(handler)
   make_oracle() =
-    Network.copy(env.bestnn, on_gpu=params.use_gpu, test_mode=true)
+    Network.copy(env.bestnn, on_gpu=params.sim.use_gpu, test_mode=true)
   simulator = Simulator(make_oracle, self_play_measurements) do oracle
-    return MctsPlayer(oracle, params.mcts)
+    return MctsPlayer(env.gspec, oracle, params.mcts)
   end
   # Run the simulations
   results, elapsed = @timed simulate_distributed(
-    simulator,
-    num_games=params.num_games,
-    num_workers=params.num_workers,
-    game_simulated=()->Handlers.game_played(handler),
-    reset_every=params.reset_mcts_every,
-    fill_batches=true,
-    flip_probability=0.,
-    color_policy=nothing)
+    simulator, env.gspec, params.sim,
+    game_simulated=()->Handlers.game_played(handler))
   # Add the collected samples in memory
   new_batch!(env.memory)
   for x in results
-    push_game!(env.memory, x.trace, params.mcts.gamma)
+    push_trace!(env.memory, x.trace, params.mcts.gamma)
   end
   speed = cur_batch_size(env.memory) / elapsed
   edepth = mean([x.edepth for x in results])
@@ -298,4 +329,32 @@ function train!(env::Env, handler=nothing)
     Handlers.iteration_finished(handler, rep)
   end
   Handlers.training_finished(handler)
+end
+
+#####
+##### AlphaZero player
+#####
+
+function guess_mcts_arena_params(env::Env)
+  p = env.params
+  return isnothing(p.arena) ? p.self_play.mcts : p.arena.mcts
+end
+
+function guess_use_gpu(env::Env)
+  p = env.params
+  return isnothing(p.arena) ? p.self_play.sim.use_gpu : p.arena.sim.use_gpu
+end
+
+"""
+    AlphaZeroPlayer(::Env; [timeout, mcts_params, use_gpu])
+
+Create an AlphaZero player from the current [training environment](@ref environment).
+
+Note that the returned player may be slow as it does not batch MCTS requests.
+"""
+function AlphaZeroPlayer(env::Env; timeout=2.0, mcts_params=nothing, use_gpu=nothing)
+  isnothing(mcts_params) && (mcts_params = guess_mcts_arena_params(env))
+  isnothing(use_gpu) && (use_gpu = guess_use_gpu(env))
+  net = Network.copy(env.bestnn, on_gpu=use_gpu, test_mode=true)
+  return MctsPlayer(env.gspec, net, mcts_params, timeout=timeout)
 end

@@ -57,6 +57,45 @@ In the original AlphaGo Zero paper:
 end
 
 """
+    SimParams
+
+Parameters for parallel game simulations.
+
+These parameters are common to self-play data generation, neural network evaluation
+and benchmarking.
+
+| Parameter            | Type                  | Default        |
+|:---------------------|:----------------------|:---------------|
+| `num_games`          | `Int`                 |  -             |
+| `num_workers`        | `Int`                 |  -             |
+| `use_gpu`            | `Bool`                | `false`        |
+| `fill_batches`       | `Bool`                | `true`         |
+| `flip_probability`   | `Float64`             | `0.`           |
+| `reset_every`        | `Union{Nothing, Int}` | `1`            |
+| `alternate_colors`   | `Float64`             | `false`        |
+
+## Explanations
+
+  + If `fill_batches` is set to `true`, we make sure that batches sent to the
+    neural network for inference have constant size.
+  + Both players are reset (e.g. their MCTS trees are emptied)
+    every `reset_every` games (or never if `nothing` is passed).
+  + To add randomization and before every game turn, the game board is "flipped"
+    according to a symmetric transformation with probability `flip_probability`.
+  + In the case of (symmetric) two-player games and if `alternate_colors` is set to`true`,
+    then the colors of both players are swapped between each simulated game.
+"""
+@kwdef struct SimParams
+  num_games :: Int
+  num_workers :: Int
+  use_gpu :: Bool = false
+  fill_batches :: Bool = true
+  reset_every :: Union{Nothing, Int} = 1
+  flip_probability :: Float64 = 0.
+  alternate_colors :: Bool = false
+end
+
+"""
     ArenaParams
 
 Parameters that govern the evaluation process that compares
@@ -66,27 +105,25 @@ the current neural network with the best one seen so far
 | Parameter            | Type                  | Default        |
 |:---------------------|:----------------------|:---------------|
 | `mcts`               | [`MctsParams`](@ref)  |  -             |
-| `num_games`          | `Int`                 |  -             |
-| `num_workers`        | `Int`                 |  -             |
-| `flip_probability`   | `Float64`             | `0.`           |
-| `reset_mcts_every`   | `Union{Nothing, Int}` | `1`            |
+| `sim`                | [`SimParams`](@ref)   |  -             |
 | `update_threshold`   | `Float64`             |  -             |
 
-# Explanation
+# Explanation (two-player games)
 
 + The two competing networks are instantiated into two MCTS players
-  of parameter `mcts` and then play `num_games` games, switching color
-  after each game.
-+ The evaluated network is to replace the current best if its
+  of parameter `mcts` and then play `sim.num_games` games.
++ The evaluated network replaces the current best one if its
   average collected reward is greater or equal than `update_threshold`.
-+ The MCTS trees of both players are
-  reset every `reset_mcts_every` games (or never if `nothing` is passed).
-+ To add randomization and before every game turn, the game board is "flipped"
-  according to a symmetric transformation with probability `flip_probability`.
+
+# Explanation (single-player games)
+
++ The two competing networks play `sim.num_games` games each.
++ The evaluated network replaces the current best one if its average collected rewards
+  exceeds the average collected reward of the old one by `update_threshold` at least. 
 
 # Remarks
 
-+ See [`necessary_samples`](@ref) to make an informed choice for `num_games`.
++ See [`necessary_samples`](@ref) to make an informed choice for `sim.num_games`.
 
 # AlphaGo Zero Parameters
 
@@ -95,12 +132,8 @@ and the `update_threshold` parameter is set to a value that corresponds to a
 55% win rate.
 """
 @kwdef struct ArenaParams
-  num_games :: Int
-  num_workers :: Int
-  use_gpu :: Bool = false
-  reset_mcts_every :: Union{Nothing, Int} = 1
-  flip_probability :: Float64 = 0.
   mcts :: MctsParams
+  sim :: SimParams
   update_threshold :: Float64
 end
 
@@ -112,27 +145,16 @@ Parameters governing self-play.
 | Parameter            | Type                  | Default        |
 |:---------------------|:----------------------|:---------------|
 | `mcts`               | [`MctsParams`](@ref)  |  -             |
-| `num_games`          | `Int`                 |  -             |
-| `num_workers`        | `Int`                 |  -             |
-| `use_gpu`            | `Bool`                | `false`        |
-| `reset_mcts_every`   | `Union{Int, Nothing}` | `1`            |
-
-# Explanation
-
-+ The MCTS tree is reset every `reset_mcts_every` games
-  (or never if `nothing` is passed).
+| `sim`                | [`SimParams`](@ref)   |  -             |
 
 # AlphaGo Zero Parameters
 
-In the original AlphaGo Zero paper, `num_games=25_000` (5 millions games
+In the original AlphaGo Zero paper, `sim.num_games=25_000` (5 millions games
 of self-play across 200 iterations).
 """
 @kwdef struct SelfPlayParams
-  num_games :: Int
-  num_workers :: Int
-  use_gpu :: Bool = false
-  reset_mcts_every :: Union{Nothing, Int} = 1
   mcts :: MctsParams
+  sim :: SimParams
 end
 
 """
@@ -162,6 +184,7 @@ the neural network is updated to fit the data in the memory buffer.
 | `samples_weighing_policy`     | [`SamplesWeighingPolicy`](@ref) |  -         |
 | `optimiser`                   | [`OptimiserSpec`](@ref)         |  -         |
 | `l2_regularization`           | `Float32`                       |  -         |
+| `rewards_renormalization`     | `Float32`                       | `1f0`      |
 | `nonvalidity_penalty`         | `Float32`                       | `1f0`      |
 | `batch_size`                  | `Int`                           |  -         |
 | `loss_computation_batch_size` | `Int`                           |  -         |
@@ -188,6 +211,7 @@ the current network is evaluated against the best network so far
 + `batch_size` is the batch size used for gradient descent.
 + `loss_computation_batch_size` is the batch size that is used to compute
   the loss between each epochs.
++ All rewards are divided by `rewards_renormalization` before the MSE loss is computed.
 + If `use_position_averaging` is set to true, samples in memory that correspond
   to the same board position are averaged together. The merged sample is
   reweighted according to `samples_weighing_policy`.
@@ -209,6 +233,7 @@ In the original AlphaGo Zero paper:
   samples_weighing_policy :: SamplesWeighingPolicy
   optimiser :: OptimiserSpec
   l2_regularization :: Float32
+  rewards_renormalization :: Float32 = 1f0
   nonvalidity_penalty :: Float32 = 1f0
   batch_size :: Int
   loss_computation_batch_size :: Int
@@ -253,7 +278,7 @@ The AlphaZero training hyperparameters.
 |:---------------------------|:------------------------------------|:----------|
 | `self_play`                | [`SelfPlayParams`](@ref)            |  -        |
 | `learning`                 | [`LearningParams`](@ref)            |  -        |
-| `arena`                    | [`Union{Nothing, ArenaParams`}]     |  -        |
+| `arena`                    | `Union{Nothing, ArenaParams`}       |  -        |
 | `memory_analysis`          | `Union{Nothing, MemAnalysisParams}` | `nothing` |
 | `num_iters`                | `Int`                               |  -        |
 | `use_symmetries`           | `Bool`                              | `false`   |
@@ -298,7 +323,7 @@ In the original AlphaGo Zero paper:
   mem_buffer_size :: PLSchedule{Int}
 end
 
-for T in [MctsParams, ArenaParams, SelfPlayParams, LearningParams, Params]
+for T in [MctsParams, SimParams, ArenaParams, SelfPlayParams, LearningParams, Params]
   Util.generate_update_constructor(T) |> eval
 end
 
@@ -318,3 +343,30 @@ This bound is based on [Hoeffding's inequality
 ](https://en.wikipedia.org/wiki/Hoeffding%27s_inequality).
 """
 necessary_samples(ϵ, β) = log(1 / β) / (2 * ϵ^2)
+
+#####
+##### Consistency checking
+#####
+
+# This function checks for inconsistencies in the parameters.
+# It returns a pair of lists of strings: `(errors, warnings)`.
+# TODO: add more consistency checks.
+function check_params(gspec::AbstractGameSpec, p::Params)
+  errors = String[]
+  warns = String[]
+  # Collecting all relevant params
+  mctss = [p.self_play.mcts]
+  sims = [p.self_play.sim]
+  if !isnothing(p.arena)
+    push!(mctss, p.arena.mcts)
+    push!(sims, p.arena.sim)
+  end
+  # Detecing non-provided symmetries
+  if any(sim.flip_probability != 0 for sim in sims)
+    state = GI.current_state(GI.init(gspec))
+    if isempty(GI.symmetries(gspec, state))
+      push!(errors, "You must specify some game symmetries to use flip_probability>0.")
+    end
+  end
+  return (errors, warns)
+end

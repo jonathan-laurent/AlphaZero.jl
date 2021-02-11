@@ -21,21 +21,20 @@ Hyperparameters for the simplenet architecture.
   batch_norm_momentum :: Float32 = 0.6f0
 end
 
-Util.generate_update_constructor(SimpleNetHP) |> eval
-
 """
-    SimpleNet{Game} <: TwoHeadNetwork{Game}
+    SimpleNet <: TwoHeadNetwork
 
 A simple two-headed architecture with only dense layers.
 """
-mutable struct SimpleNet{Game} <: TwoHeadNetwork{Game}
+mutable struct SimpleNet <: TwoHeadNetwork
+  gspec
   hyper
   common
   vhead
   phead
 end
 
-function SimpleNet{G}(hyper::SimpleNetHP) where G
+function SimpleNet(gspec::AbstractGameSpec, hyper::SimpleNetHP)
   bnmom = hyper.batch_norm_momentum
   function make_dense(indim, outdim)
     if hyper.use_batch_norm
@@ -46,8 +45,8 @@ function SimpleNet{G}(hyper::SimpleNetHP) where G
       Dense(indim, outdim, relu)
     end
   end
-  indim = prod(GameInterface.state_dim(G))
-  outdim = GameInterface.num_actions(G)
+  indim = prod(GI.state_dim(gspec))
+  outdim = GI.num_actions(gspec)
   hsize = hyper.width
   hlayers(depth) = [make_dense(hsize, hsize) for i in 1:depth]
   common = Chain(
@@ -61,7 +60,7 @@ function SimpleNet{G}(hyper::SimpleNetHP) where G
     hlayers(hyper.depth_phead)...,
     Dense(hsize, outdim),
     softmax)
-  SimpleNet{G}(hyper, common, vhead, phead)
+  SimpleNet(gspec, hyper, common, vhead, phead)
 end
 
-Network.HyperParams(::Type{<:SimpleNet}) = SimpleNetHP
+Network.HyperParams(::Type{SimpleNet}) = SimpleNetHP

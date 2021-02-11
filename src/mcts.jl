@@ -2,46 +2,40 @@
 A generic, standalone implementation of Monte Carlo Tree Search.
 It can be used on any game that implements `GameInterface`
 and with any external oracle.
+
+## Oracle Interface
+
+An oracle can be any function or callable object.
+  
+   oracle(state)
+
+evaluates a single state from the current player's perspective and returns 
+a pair `(P, V)` where:
+
+  - `P` is a probability vector on `GI.available_actions(GI.init(gspec, state))`
+  - `V` is a scalar estimating the value or win probability for white.
 """
 module MCTS
 
 using Distributions: Categorical, Dirichlet
 
-using ..Util: apply_temperature
-import ..GI, ..GameType
+using ..AlphaZero: GI, Util
 
 #####
-##### Interface for External Oracles
+##### Standard Oracles
 #####
 
 """
-    MCTS.Oracle{Game}
-
-Abstract base type for an oracle. Oracles must be callable:
-
-  (::Oracle)(state)
-
-Evaluate a single state from the current player's perspective.
-
-Return a pair `(P, V)` where:
-
-  - `P` is a probability vector on `GI.available_actions(Game(state))`
-  - `V` is a scalar estimating the value or win probability for white.
-"""
-abstract type Oracle{Game} end
-
-GameType(::Oracle{G}) where G = G
-
-"""
-    MCTS.RolloutOracle{Game}(γ=1.)
+    MCTS.RolloutOracle(game_spec::AbstractGameSpec, γ=1.) <: Function
 
 This oracle estimates the value of a position by simulating a random game
 from it (a rollout). Moreover, it puts a uniform prior on available actions.
 Therefore, it can be used to implement the "vanilla" MCTS algorithm.
 """
-struct RolloutOracle{Game} <: Oracle{Game}
+struct RolloutOracle{GameSpec} <: Function
+  gspec :: GameSpec
   gamma :: Float64
-  RolloutOracle{G}(γ=1.) where G = new{G}(γ)
+  RolloutOracle(gspec, γ=1.) = new{typeof(gspec)}(gspec, γ)
 end
 
 function rollout!(game, γ=1.)
@@ -54,21 +48,23 @@ function rollout!(game, γ=1.)
   return r
 end
 
-function (r::RolloutOracle{Game})(state) where Game
-  game = Game(state)
-  wp = GI.white_playing(game)
-  n = length(GI.available_actions(game))
+function (r::RolloutOracle)(state)
+  g = GI.init(r.gspec, state)
+  wp = GI.white_playing(g)
+  n = length(GI.available_actions(g))
   P = ones(n) ./ n
-  wr = rollout!(game, r.gamma)
+  wr = rollout!(g, r.gamma)
   V = wp ? wr : -wr
   return P, V
 end
 
-struct RandomOracle{Game} <: Oracle{Game} end
+struct RandomOracle{GameSpec}
+  gspec :: GameSpec
+end
 
-function (::RandomOracle{Game})(state) where Game
-  s = Game(state)
-  n = length(GI.available_actions(s))
+function (::RandomOracle)(state)
+  g = GI.init(r.gspec, state)
+  n = length(GI.available_actions(g))
   P = ones(n) ./ n
   V = 0.
   return P, V
@@ -96,7 +92,7 @@ Ntot(b::StateInfo) = sum(s.N for s in b.stats)
 #####
 
 """
-    MCTS.Env{Game}(oracle; <keyword args>) where Game
+    MCTS.Env(game_spec::AbstractGameSpec, oracle; <keyword args>)
 
 Create and initialize an MCTS environment with a given `oracle`.
 
@@ -124,7 +120,7 @@ by the neural network in the UCT formula, one uses ``(1-ϵ)p + ϵη`` where ``η
 is drawn once per call to [`MCTS.explore!`](@ref) from a Dirichlet distribution
 of parameter ``α``.
 """
-mutable struct Env{Game, State, Oracle}
+mutable struct Env{State, Oracle}
   # Store (nonterminal) state statistics assuming player one is to play
   tree :: Dict{State, StateInfo}
   # External oracle to evaluate positions
@@ -138,34 +134,33 @@ mutable struct Env{Game, State, Oracle}
   # Performance statistics
   total_simulations :: Int64
   total_nodes_traversed :: Int64
+  # Game specification
+  gspec :: GI.AbstractGameSpec
 
-  function Env{G}(oracle;
-      gamma=1., cpuct=1., noise_ϵ=0., noise_α=1., prior_temperature=1.) where G
-    S = GI.State(G)
+  function Env(gspec, oracle;
+      gamma=1., cpuct=1., noise_ϵ=0., noise_α=1., prior_temperature=1.)
+    S = GI.state_type(gspec)
     tree = Dict{S, StateInfo}()
     total_simulations = 0
     total_nodes_traversed = 0
-    new{G, S, typeof(oracle)}(
+    new{S, typeof(oracle)}(
       tree, oracle, gamma, cpuct, noise_ϵ, noise_α, prior_temperature,
-      total_simulations, total_nodes_traversed)
+      total_simulations, total_nodes_traversed, gspec)
   end
 end
-
-GameType(::Env{Game}) where Game = Game
 
 #####
 ##### Access and initialize state information
 #####
 
 function init_state_info(P, V, prior_temperature)
-  P = apply_temperature(P, prior_temperature)
+  P = Util.apply_temperature(P, prior_temperature)
   stats = [ActionStats(p, 0, 0) for p in P]
   return StateInfo(stats, V)
 end
 
 # Returns statistics for the current player, along with a boolean indicating
 # whether or not a new node has been created.
-# Synchronous version
 function state_info(env, state)
   if haskey(env.tree, state)
     return (env.tree[state], false)
@@ -245,7 +240,7 @@ function explore!(env::Env, game, nsims)
   η = dirichlet_noise(game, env.noise_α)
   for i in 1:nsims
     env.total_simulations += 1
-    run_simulation!(env, copy(game), η=η)
+    run_simulation!(env, GI.clone(game), η=η)
   end
 end
 
@@ -296,21 +291,22 @@ Return the average number of nodes that are traversed during an
 MCTS simulation, not counting the root.
 """
 function average_exploration_depth(env)
+  env.total_simulations == 0 && (return 0)
   return env.total_nodes_traversed / env.total_simulations
 end
 
 """
-    MCTS.memory_footprint_per_node(env)
+    MCTS.memory_footprint_per_node(gspec)
 
-Return an estimate of the memory footprint of a single node
-of the MCTS tree (in bytes).
+Return an estimate of the memory footprint of a single MCTS node
+for the given game (in bytes).
 """
-function memory_footprint_per_node(env::Env{G}) where G
+function memory_footprint_per_node(gspec)
   # The hashtable is at most twice the number of stored elements
   # For every element, a state and a pointer are stored
-  size_key = 2 * (GI.state_memsize(G) + sizeof(Int))
+  size_key = 2 * (GI.state_memsize(gspec) + sizeof(Int))
   dummy_stats = StateInfo([
-    ActionStats(0, 0, 0) for i in 1:GI.num_actions(G)], 0)
+    ActionStats(0, 0, 0) for i in 1:GI.num_actions(gspec)], 0)
   size_stats = Base.summarysize(dummy_stats)
   return size_key + size_stats
 end
@@ -321,7 +317,7 @@ end
 Return an estimate of the memory footprint of the MCTS tree (in bytes).
 """
 function approximate_memory_footprint(env::Env)
-  return memory_footprint_per_node(env) * length(env.tree)
+  return memory_footprint_per_node(env.gspec) * length(env.tree)
 end
 
 # Possibly very slow for large trees
