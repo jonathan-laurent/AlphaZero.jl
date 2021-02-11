@@ -127,7 +127,7 @@ function plot_benchmark(
   avgr = Plots.plot(0:n,
     avgr_data,
     title="Average Reward",
-    ylims=(-1.0, 1.0),
+    ylims=(params.ternary_rewards ? (-1.0, 1.0) : nothing),
     legend=:bottomright,
     label=labels,
     xlabel="Iteration number")
