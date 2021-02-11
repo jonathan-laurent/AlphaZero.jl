@@ -50,7 +50,6 @@ function RL.act!(env::World, a)
   return get(env.rewards, env.state, 0.0)
 end
 
-# optional functions
 @provide RL.player(env::World) = 1 # An MDP is a one player game
 @provide RL.players(env::World) = [1]
 @provide RL.observations(env::World) = [SA[x, y] for x in 1:env.size[1], y in 1:env.size[2]]
@@ -59,9 +58,12 @@ end
 @provide RL.setstate!(env::World, s) = (env.state = s)
 @provide RL.valid_action_mask(env::World) = BitVector([1, 1, 1, 1])
 
-# Additional functions defined for AlphaZero.jl
+# Additional functions needed by AlphaZero.jl that are not present in 
+# CommonRlInterface.jl. Here, we provide them by overriding some functions from
+# GameInterface. An alternative would be to pass them as keyword arguments to
+# CommonRLInterfaceWrapper.
 
-function render_ascii(env::World)
+function GI.render(env::World)
   for y in reverse(1:env.size[2])
     for x in 1:env.size[1]
       s = SA[x, y]
@@ -81,7 +83,7 @@ function render_ascii(env::World)
   end
 end
 
-function vectorize_state(env::World, state)
+function GI.vectorize_state(env::World, state)
   v = zeros(Float32, env.size[1], env.size[2])
   v[state[1], state[2]] = 1
   return v
@@ -89,17 +91,17 @@ end
 
 const action_names = ["r", "l", "u", "d"]
 
-function action_string(env::World, a)
+function GI.action_string(env::World, a)
   idx = findfirst(==(a), RL.actions(env))
   return isnothing(idx) ? "?" : action_names[idx]
 end
 
-function parse_action(env::World, s)
+function GI.parse_action(env::World, s)
   idx = findfirst(==(s), action_names)
   return isnothing(idx) ? nothing : RL.actions(env)[idx]
 end
 
-function read_state(env::World)
+function GI.read_state(env::World)
   try
     s = split(readline())
     @assert length(s) == 2
@@ -113,13 +115,6 @@ function read_state(env::World)
   end
 end
 
-# Bridge with AlphaZero.jl
+GI.heuristic_value(::World, s) = 0.
 
-GameSpec() = CommonRLInterfaceWrapper.Spec(
-  World(),
-  heuristic_value=(s->0.),
-  vectorize_state=vectorize_state,
-  render=render_ascii,
-  action_string=action_string,
-  parse_action=parse_action,
-  read_state=read_state)
+GameSpec() = CommonRLInterfaceWrapper.Spec(World())

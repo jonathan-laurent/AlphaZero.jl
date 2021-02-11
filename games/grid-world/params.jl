@@ -8,9 +8,9 @@ netparams = NetLib.SimpleNetHP(
 self_play = SelfPlayParams(
   sim=SimParams(
     num_games=1000,
-    num_workers=10,
+    num_workers=4,
     use_gpu=false,
-    reset_every=4,
+    reset_every=16,
     flip_probability=0.,
     alternate_colors=false),
   mcts=MctsParams(
@@ -33,14 +33,15 @@ arena = ArenaParams(
 
 learning = LearningParams(
   use_gpu=false,
-  samples_weighing_policy=LOG_WEIGHT,
+  use_position_averaging=false,
+  samples_weighing_policy=CONSTANT_WEIGHT,
   rewards_renormalization=10,
-  l2_regularization=1e-3,
+  l2_regularization=1e-4,
   optimiser=Adam(lr=5e-3),
-  batch_size=32,
+  batch_size=64,
   loss_computation_batch_size=2048,
   nonvalidity_penalty=1.,
-  min_checkpoints_per_epoch=0,
+  min_checkpoints_per_epoch=1,
   max_batches_per_checkpoint=5_000,
   num_checkpoints=1)
 
@@ -48,15 +49,15 @@ params = Params(
   arena=arena,
   self_play=self_play,
   learning=learning,
-  num_iters=2,
+  num_iters=5,
   memory_analysis=nothing,
   ternary_rewards=false,
-  use_symmetries=true,
+  use_symmetries=false,
   mem_buffer_size=PLSchedule(80_000))
 
 benchmark_sim = SimParams(
   arena.sim;
-  num_games=200,
+  num_games=500,
   num_workers=10)
 
 benchmark = [
