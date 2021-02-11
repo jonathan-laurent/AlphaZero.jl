@@ -65,6 +65,10 @@ julia --project -e 'import Pkg; Pkg.instantiate()'
 julia --project -e 'using AlphaZero; Scripts.train("connect-four")'
 ```
 
+**Note:** the latest version of AlphaZero.jl needs Julia version 1.6 or higher to run.
+For instructions on how to run the old v0.3 release, please see
+[here](https://jonathan-laurent.github.io/AlphaZero.jl/v0.3/tutorial/connect_four/).
+
 <div>
 <img src="./docs/src/assets/img/ui-first-iter-cut.png" width="48%" />
 <img src="./docs/src/assets/img/explorer.png" width="48%" />
