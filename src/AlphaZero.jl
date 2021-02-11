@@ -166,7 +166,8 @@ module AlphaZero
   # enable dropping some dependencies such as Crayons or JSON3).
   include("ui/ui.jl")
   using .UserInterface
-  export UserInterface
+  const UI = UserInterface
+  export UserInterface, UI
   export Session, resume!, save
   export explore
 
