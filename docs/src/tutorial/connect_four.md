@@ -386,5 +386,5 @@ benchmark = [
 #####
 
 experiment = Experiment("connect-four",
-  GameSpec(), params, Network, netparams, benchmark=benchmark)
+  GameSpec(), params, Network, netparams, benchmark)
 ```

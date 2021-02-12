@@ -50,7 +50,7 @@ dummy_run_benchmark(benchmark) = map(dummy_run_evaluation, benchmark)
 function dummy_run_experiment(e::Experiment)
   params = dummy_run_params(e.params)
   benchmark = dummy_run_benchmark(e.benchmark)
-  return Experiment(e.name, e.gspec, params, e.mknet, e.netparams, benchmark=benchmark)
+  return Experiment(e.name, e.gspec, params, e.mknet, e.netparams, benchmark)
 end
 
 """

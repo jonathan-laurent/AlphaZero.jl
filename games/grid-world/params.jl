@@ -69,4 +69,4 @@ benchmark = [
     benchmark_sim)]
 
 experiment = Experiment(
-  "grid-world", GameSpec(), params, Network, netparams, benchmark=benchmark)
+  "grid-world", GameSpec(), params, Network, netparams, benchmark)

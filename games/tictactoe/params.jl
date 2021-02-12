@@ -79,4 +79,4 @@ benchmark = [
     benchmark_sim)]
 
 experiment = Experiment(
-  "tictactoe", GameSpec(), params, Network, netparams, benchmark=benchmark)
+  "tictactoe", GameSpec(), params, Network, netparams, benchmark)
