@@ -40,8 +40,6 @@ The simplest way to contribute to AlphaZero.jl is to demonstrate it on
 new games. Interesting candidates include:
 Othello, [Gobblet](https://en.wikipedia.org/wiki/Gobblet), Go 9x9, Chess...
 
-Guidelines for adding support for new games are available [here](@ref add_game).
-
 ---
 
 #### Help with hyperparameter tuning
