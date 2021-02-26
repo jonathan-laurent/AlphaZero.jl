@@ -127,7 +127,9 @@ module AlphaZero
   # We provide a library of standard network, both in Knet and Flux.
   # Which backend is used to implement this library is determined during precompilation
   # based on the value of the ALPHAZERO_DEFAULT_DL_FRAMEWORK environment variable.
-  const DEFAULT_DL_FRAMEWORK = get(ENV, "ALPHAZERO_DEFAULT_DL_FRAMEWORK", "KNET")
+  const DEFAULT_DL_FRAMEWORK = get(ENV, "ALPHAZERO_DEFAULT_DL_FRAMEWORK", "FLUX")
+
+  # Only Flux works with CUDA,NNlib#master right now.
 
   if DEFAULT_DL_FRAMEWORK == "FLUX"
     @info "Using the Flux implementation of AlphaZero.NetLib."
