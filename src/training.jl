@@ -62,8 +62,8 @@ and sometimes a second argment `r` that consists in a report.
 | `game_played(h)`            | called after each game of self play            |
 | `self_play_finished(h, r)`  | sends report: [`Report.SelfPlay`](@ref)        |
 | `memory_analyzed(h, r)`     | sends report: [`Report.Memory`](@ref)          |
-| `learning_started(h, r)`    | sends report: [`Report.LearningStatus`](@ref)  |
-| `updates_started(h)`        | called before each series of batch updates     |
+| `learning_started(h)`       | called at the beginning of the learning phase  |
+| `updates_started(h, r)`     | sends report: [`Report.LearningStatus`](@ref)  |
 | `updates_finished(h, r)`    | sends report: [`Report.LearningStatus`](@ref)  |
 | `checkpoint_started(h)`     | called before a checkpoint evaluation starts   |
 | `checkpoint_game_played(h)` | called after each arena game                   |
@@ -81,7 +81,7 @@ module Handlers
   function game_played(h)            return end
   function self_play_finished(h, r)  return end
   function memory_analyzed(h, r)     return end
-  function learning_started(h, r)    return end
+  function learning_started(h)       return end
   function updates_started(h)        return end
   function updates_finished(h, r)    return end
   function checkpoint_started(h)     return end
@@ -206,7 +206,8 @@ function learning_step!(env::Env, handler)
   end
   trainer, tconvert = @timed Trainer(env.gspec, env.curnn, experience, lp)
   init_status = learning_status(trainer)
-  Handlers.learning_started(handler, init_status)
+  status = init_status
+  Handlers.learning_started(handler)
   # Compute the number of batches between each checkpoint
   nbatches = lp.max_batches_per_checkpoint
   if !iszero(lp.min_checkpoints_per_epoch)
@@ -219,7 +220,7 @@ function learning_step!(env::Env, handler)
 
   for k in 1:lp.num_checkpoints
     # Execute a series of batch updates
-    Handlers.updates_started(handler)
+    Handlers.updates_started(handler, status)
     dlosses, dttrain = @timed batch_updates!(trainer, nbatches)
     status, dtloss = @timed learning_status(trainer)
     Handlers.updates_finished(handler, status)

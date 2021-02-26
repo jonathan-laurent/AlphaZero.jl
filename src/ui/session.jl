@@ -491,10 +491,13 @@ function Handlers.memory_analyzed(session::Session, report)
   print_report(session.logger, report)
 end
 
-function Handlers.learning_started(session::Session, initial_status)
+function Handlers.learning_started(session::Session)
   Log.section(session.logger, 2, "Starting learning")
+end
+
+function Handlers.updates_started(session::Session, status)
   Log.section(session.logger, 3, "Optimizing the loss")
-  print_report(session.logger, initial_status, style=Log.BOLD)
+  print_report(session.logger, status, style=Log.BOLD)
 end
 
 function Handlers.updates_finished(session::Session, report)
@@ -517,7 +520,6 @@ function Handlers.checkpoint_finished(session::Session, report)
   show_space_after_progress_bar(session.logger)
   ternary_rewards = session.env.params.ternary_rewards
   print_report(session.logger, report, ternary_rewards=ternary_rewards)
-  Log.section(session.logger, 3, "Optimizing the loss")
 end
 
 function Handlers.learning_finished(session::Session, report)
