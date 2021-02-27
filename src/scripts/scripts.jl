@@ -52,4 +52,9 @@ module Scripts
   """
   play(s::String; args...) = play(Examples.experiments[s]; args...)
 
+  include("test_grad_updates.jl")
+
+  test_grad_updates(s::String; args...) =
+    test_grad_updates(Examples.experiments[s]; args...)
+
 end

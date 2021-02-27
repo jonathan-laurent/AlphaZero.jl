@@ -19,8 +19,12 @@ The first argument of every script specifies what experiment to load. This can b
 
 ```@docs
 Scripts.test_game
-Scripts.dummy_run
 Scripts.train
 Scripts.play
 Scripts.explore
+```
+
+```@docs
+Scripts.dummy_run
+Scripts.test_grad_updates
 ```
