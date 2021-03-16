@@ -1,5 +1,5 @@
 """
-    test_grad_updates(experiment; num_games=5000)
+    test_grad_updates(experiment; [num_games])
 
 Run a gradient update phase using dummy data.
 

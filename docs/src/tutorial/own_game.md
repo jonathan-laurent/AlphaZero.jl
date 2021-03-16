@@ -16,7 +16,9 @@ Here are some recommended steps for using AlphaZero.jl on your own game.
    [`Experiment`](@ref). Once again, you may draw inspiration from the provided examples.
 4. Before running a complete training session, you can use
    [`Scripts.dummy_run`](@ref) to check the absence of potential runtime errors in your
-   code.
+   code. You can also use [`Scripts.test_grad_updates`](@ref) to run a gradient update
+   step on dummy data in order to check that your GPU has enough
+   memory to accomodate your current choice of hyperparameters.
 5. Run a training session using [`Scripts.train`](@ref). You can interrupt training at any
    moment and resume it later since the current state of your agent is saved automatically
    in the `sessions` folder after each iteration.

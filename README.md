@@ -57,8 +57,6 @@ We found the [Julia language](https://julialang.org/) to be instrumental in achi
 To download AlphaZero.jl and start training a Connect Four agent, just run:
 
 ```sh
-export JULIA_CUDA_MEMORY_POOL split # optional (for better GPU performances)
-
 git clone https://github.com/jonathan-laurent/AlphaZero.jl.git
 cd AlphaZero.jl
 julia --project -e 'import Pkg; Pkg.instantiate()'

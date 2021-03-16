@@ -23,7 +23,9 @@ module AlphaZero
   To do so, you can set the JULIA_CUDA_MEMORY_POOL environment variable to "split".
   """
   if get(ENV, "JULIA_CUDA_MEMORY_POOL", "") != "split"
-    @info POOL_MSG
+    # Disabling this warning since the `JULIA_CUDA_MEMORY_POOL=cuda` option
+    # that is now chosen by default on CUDA 11.2 or higher is actually preferable.
+    # @info POOL_MSG
   end
 
   # Internal helper functions
