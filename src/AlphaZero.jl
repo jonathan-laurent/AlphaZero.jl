@@ -138,7 +138,8 @@ module AlphaZero
     For optimal performances, we recommend that you configure AlphaZero.jl
     to use Knet as a backend by setting ALPHAZERO_DEFAULT_DL_FRAMEWORK to KNET.
     """
-    @info KNET_ADVICE
+    # Knet does not work with the latest CUDA.jl so we disable this advice for now.
+    # @info KNET_ADVICE
     @eval begin
       include("networks/flux.jl")
       const NetLib = FluxLib
