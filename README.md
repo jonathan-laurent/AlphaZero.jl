@@ -131,6 +131,13 @@ Please do not hesitate to open a Github
 [issue](https://github.com/jonathan-laurent/AlphaZero.jl/issues) to share
 any idea, feedback or suggestion.
 
+### Supporting and Citing
+
+If you want to support this project and help it gain visibility, please consider starring
+the repository. Doing well on such metrics may also help us secure academic funding in the
+future. Also, if you use this software as part of your research, we would appreciate that
+you include the following [citation](./CITATION.bib) in your paper.
+
 ### Acknowledgements
 
 This material is based upon work supported by the United States Air Force and
