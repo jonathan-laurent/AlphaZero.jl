@@ -114,7 +114,7 @@ regularized_params_(l::Flux.Dense) = [l.W]
 regularized_params_(l::Flux.Conv) = [l.weight]
 
 function Network.regularized_params(net::FluxNetwork)
-  return [w for l in Flux.modules(net) for w in regularized_params_(l)]
+  return (w for l in Flux.modules(net) for w in regularized_params_(l))
 end
 
 function Network.gc(::FluxNetwork)
