@@ -1064,10 +1064,12 @@ uuid = "3161d3a3-bdf6-5164-811a-617609db77b4"
 version = "1.4.8+0"
 
 [[Zygote]]
-deps = ["AbstractFFTs", "ChainRules", "DiffRules", "Distributed", "FillArrays", "ForwardDiff", "IRTools", "InteractiveUtils", "LinearAlgebra", "MacroTools", "NaNMath", "Random", "Requires", "SpecialFunctions", "Statistics", "ZygoteRules"]
-git-tree-sha1 = "47dd50e831959f8785f8a9854783a2eebac8e1bd"
+deps = ["AbstractFFTs", "ChainRules", "ChainRulesCore", "DiffRules", "Distributed", "FillArrays", "ForwardDiff", "IRTools", "InteractiveUtils", "LinearAlgebra", "MacroTools", "NaNMath", "Random", "Requires", "SpecialFunctions", "Statistics", "ZygoteRules"]
+git-tree-sha1 = "c21f19d8f0dd1a3bdd320b37ca9a01d47da213f1"
+repo-rev = "dg/typejoin"
+repo-url = "https://github.com/FluxML/Zygote.jl.git"
 uuid = "e88e6eb3-aa80-5325-afca-941959d7151f"
-version = "0.6.4"
+version = "0.6.9"
 
 [[ZygoteRules]]
 deps = ["MacroTools"]
