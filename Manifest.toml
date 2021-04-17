@@ -19,9 +19,9 @@ version = "3.3.0"
 
 [[ArgParse]]
 deps = ["Logging", "TextWrap"]
-git-tree-sha1 = "e928ca0a49f7b0564044b39108c70c160f03e05a"
+git-tree-sha1 = "3102bce13da501c9104df33549f511cd25264d7d"
 uuid = "c7e460c6-2fb9-53a9-8c5b-16f535851c63"
-version = "1.1.2"
+version = "1.1.4"
 
 [[ArgTools]]
 uuid = "0dad84c5-d112-42e6-8d28-ef12dabb789f"
@@ -83,9 +83,9 @@ version = "0.7.0"
 
 [[ColorSchemes]]
 deps = ["ColorTypes", "Colors", "FixedPointNumbers", "Random", "StaticArrays"]
-git-tree-sha1 = "3141757b5832ee7a0386db87997ee5a23ff20f4d"
+git-tree-sha1 = "9d7dfad1326b1ad29afa1366587806a14d727745"
 uuid = "35d6a980-a343-548e-a6ea-1d62b119f2f4"
-version = "3.10.2"
+version = "3.12.0"
 
 [[ColorTypes]]
 deps = ["FixedPointNumbers", "Random"]
@@ -94,10 +94,10 @@ uuid = "3da002f7-5984-5a60-b8a6-cbb66c0b333f"
 version = "0.10.12"
 
 [[Colors]]
-deps = ["ColorTypes", "FixedPointNumbers", "InteractiveUtils", "Reexport"]
-git-tree-sha1 = "ac5f2213e56ed8a34a3dd2f681f4df1166b34929"
+deps = ["ColorTypes", "FixedPointNumbers", "Reexport"]
+git-tree-sha1 = "82f4e6ff9f847eca3e5ebc666ea2cd7b48e8b47e"
 uuid = "5ae59095-9a9b-59fe-a467-6f913c188581"
-version = "0.12.6"
+version = "0.12.7"
 
 [[CommonRLInterface]]
 deps = ["MacroTools"]
@@ -324,10 +324,10 @@ uuid = "61eb1bfa-7361-4325-ad38-22787b887f55"
 version = "0.10.0"
 
 [[GR]]
-deps = ["Base64", "DelimitedFiles", "GR_jll", "HTTP", "JSON", "LinearAlgebra", "Pkg", "Printf", "Random", "Serialization", "Sockets", "Test", "UUIDs"]
-git-tree-sha1 = "12d971c928b7ecf19b748a2c7df6a365690dbf2c"
+deps = ["Base64", "DelimitedFiles", "GR_jll", "HTTP", "JSON", "Libdl", "LinearAlgebra", "Pkg", "Printf", "Random", "Serialization", "Sockets", "Test", "UUIDs"]
+git-tree-sha1 = "011458b83178ac913dc4eb73b229af45bdde5d83"
 uuid = "28b8d3ca-fb5f-59d9-8090-bfdbd6d07a71"
-version = "0.55.0"
+version = "0.57.4"
 
 [[GR_jll]]
 deps = ["Artifacts", "Bzip2_jll", "Cairo_jll", "FFMPEG_jll", "Fontconfig_jll", "GLFW_jll", "JLLWrappers", "JpegTurbo_jll", "Libdl", "Libtiff_jll", "Pixman_jll", "Pkg", "Qt5Base_jll", "Zlib_jll", "libpng_jll"]
@@ -416,9 +416,9 @@ version = "0.3.2"
 
 [[JSON3]]
 deps = ["Dates", "Mmap", "Parsers", "StructTypes", "UUIDs"]
-git-tree-sha1 = "f60c1aac37195252ed40895350e289147b42d5c5"
+git-tree-sha1 = "980b210df4b9bc6a45f7accd5cbb263ee6fb2768"
 uuid = "0f8b85d8-7281-11e9-16c2-39a750bddbf1"
-version = "1.7.2"
+version = "1.8.0"
 
 [[JpegTurbo_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -681,9 +681,9 @@ version = "1.0.10"
 
 [[Plots]]
 deps = ["Base64", "Contour", "Dates", "FFMPEG", "FixedPointNumbers", "GR", "GeometryBasics", "JSON", "Latexify", "LinearAlgebra", "Measures", "NaNMath", "PlotThemes", "PlotUtils", "Printf", "REPL", "Random", "RecipesBase", "RecipesPipeline", "Reexport", "Requires", "Scratch", "Showoff", "SparseArrays", "Statistics", "StatsBase", "UUIDs"]
-git-tree-sha1 = "40031283dbb5ae602aa132f423daedfc18c82069"
+git-tree-sha1 = "cc4eb1be2576984d7a0f7f51478827dee816138b"
 uuid = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
-version = "1.11.0"
+version = "1.11.2"
 
 [[Preferences]]
 deps = ["TOML"]
@@ -783,9 +783,9 @@ uuid = "1a1011a3-84de-559e-8e89-a11a2f7dc383"
 
 [[Showoff]]
 deps = ["Dates", "Grisu"]
-git-tree-sha1 = "ee010d8f103468309b8afac4abb9be2e18ff1182"
+git-tree-sha1 = "236dd0ddad6e3764cce8d8b09c0bbba6df2e194f"
 uuid = "992d4aef-0814-514b-bc4d-f2e9a6c4116f"
-version = "0.3.2"
+version = "1.0.2"
 
 [[Sockets]]
 uuid = "6462fe0b-24de-5631-8697-dd941f90decc"
@@ -808,9 +808,9 @@ version = "1.3.0"
 
 [[StaticArrays]]
 deps = ["LinearAlgebra", "Random", "Statistics"]
-git-tree-sha1 = "9da72ed50e94dbff92036da395275ed114e04d49"
+git-tree-sha1 = "2f01a51c23eed210ff4a1be102c4cc8236b66e5b"
 uuid = "90137ffa-7385-5640-81b9-e52037218182"
-version = "1.0.1"
+version = "1.1.0"
 
 [[Statistics]]
 deps = ["LinearAlgebra", "SparseArrays"]
