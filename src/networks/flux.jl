@@ -12,7 +12,6 @@ using CUDA
 using Base: @kwdef
 
 import Flux
-import Functors
 
 CUDA.allowscalar(false)
 array_on_gpu(::Array) = false
@@ -110,7 +109,7 @@ function Network.train!(
 end
 
 regularized_params_(l) = []
-regularized_params_(l::Flux.Dense) = [l.W]
+regularized_params_(l::Flux.Dense) = [l.weight]
 regularized_params_(l::Flux.Conv) = [l.weight]
 
 function Network.regularized_params(net::FluxNetwork)
