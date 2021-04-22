@@ -237,10 +237,17 @@ end
 
 # GI.action(::Type{GameEnv}, id) = id
 
+function flip_colors(board)
+  stores = @SVector [INITIAL_BOARD.stores[2],INITIAL_BOARD.stores[1]]
+  houses = SMatrix{2, NUM_HOUSES_PER_PLAYER, UInt8, NUM_HOUSES}([INITIAL_BOARD.houses[2,:]'; INITIAL_BOARD.houses[1,:]'])
+  return Board(stores, houses)
+end
+
 function GI.vectorize_state(::GameSpec, state) # TODO: change to vectorize_state
+  board = state.curplayer == WHITE ? state.board : flip_colors(state.board)
   function cell(pos, chan)
     if chan == :nstones
-      return read_pos(state.board, pos)
+      return read_pos(board, pos)
     elseif chan == :whouse
       return isa(pos, HousePos) && pos.player == WHITE
     elseif chan == :wstore
