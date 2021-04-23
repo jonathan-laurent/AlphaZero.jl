@@ -1,6 +1,5 @@
 import AlphaZero.GI
 
-using Printf
 using Crayons
 using StaticArrays
 
@@ -31,18 +30,47 @@ const INITIAL_BOARD =
     Board(stores, houses)
   end end
 
-mutable struct Game
+const INITIAL_STATE = (board=INITIAL_BOARD, curplayer=WHITE)
+
+# mutable struct GameEnv
+#   board :: Board
+#   curplayer :: Player
+#   function GameEnv(board::Board=INITIAL_BOARD, white_playing::Bool=true)
+#     new(board, white_playing ? WHITE : BLACK)
+#   end
+# end
+
+struct GameSpec <: GI.AbstractGameSpec end
+
+mutable struct GameEnv <: GI.AbstractGameEnv
   board :: Board
   curplayer :: Player
-  function Game(board::Board=INITIAL_BOARD, white_playing::Bool=true)
-    new(board, white_playing ? WHITE : BLACK)
-  end
+  finished :: Bool
+  winner :: Player
+  # amask :: trues(2, NUM_HOUSES_PER_PLAYER)
+  # history :: Union{Nothing, Vector{Int}}
 end
 
-GI.Board(::Type{Game}) = Board
-GI.Action(::Type{Game}) = Int
+function GI.init(::GameSpec)
+  board = INITIAL_STATE.board
+  curplayer = INITIAL_STATE.curplayer
+  finished = false
+  winner = 0
+  # amask :: Vector{Bool} # actions mask
+  return GameEnv(board, curplayer, finished, winner)
+end
 
-Base.copy(g::Game) = Game(g.board, g.curplayer == WHITE)
+GI.spec(::GameEnv) = GameSpec()
+
+GI.two_players(::GameSpec) = true
+
+function GI.set_state!(g::GameEnv, state)
+  g.board = state.board
+  g.curplayer = state.curplayer
+end
+
+const ACTIONS = collect(1:NUM_HOUSES_PER_PLAYER)
+GI.actions(::GameSpec) = ACTIONS
 
 #####
 ##### Position system to ease board manipulation
@@ -59,54 +87,71 @@ end
 
 const Pos = Union{HousePos, StorePos}
 
-function next_pos(pos, player)
-  if isa(pos, HousePos)
-    if pos.num > 1
-      return HousePos(pos.player, pos.num - 1)
-    elseif pos.num == 1
-      if pos.player == player
-        return StorePos(player)
-      else
-        return HousePos(player, NUM_HOUSES_PER_PLAYER)
-      end
+function next_pos(pos::HousePos, player)
+  if pos.num > 1
+    return HousePos(pos.player, pos.num - 1)
+  elseif pos.num == 1
+    if pos.player == player
+      return StorePos(player)
     else
-      @assert false
+      return HousePos(player, NUM_HOUSES_PER_PLAYER)
     end
-  elseif isa(pos, StorePos)
-    @assert pos.player == player
-    return HousePos(other(player), NUM_HOUSES_PER_PLAYER)
   else
     @assert false
   end
 end
 
-function read_pos(b::Board, pos)
-  isa(pos, HousePos) ?
-    b.houses[pos.player, pos.num] :
-    b.stores[pos.player]
+function next_pos(pos::StorePos, player)
+  @assert pos.player == player
+  return HousePos(other(player), NUM_HOUSES_PER_PLAYER)
 end
 
-function write_pos(b::Board, pos, v)
-  if isa(pos, HousePos)
-    houses = setindex(b.houses, v, pos.player, pos.num)
-    return Board(b.stores, houses)
-  else
-    stores = setindex(b.stores, v, pos.player)
-    return Board(stores, b.houses)
-  end
+read_pos(b::Board, pos::HousePos) = b.houses[pos.player, pos.num]
+read_pos(b::Board, pos::StorePos) = b.stores[pos.player]
+
+function write_pos(b::Board, pos::HousePos, v)
+  houses = setindex(b.houses, v, pos.player, pos.num)
+  return Board(b.stores, houses)
 end
+
+function write_pos(b::Board, pos::StorePos, v)
+  stores = setindex(b.stores, v, pos.player)
+  return Board(stores, b.houses)
+end
+
+function opposite_pos(pos::HousePos)
+  return HousePos(other(pos.player), NUM_HOUSES_PER_PLAYER - pos.num + 1)
+end
+
 
 #####
 ##### Defining game rules
 #####
 
-GI.available_actions(g::Game, player) = findall(>(0), g.board.houses[player,:])
+GI.actions_mask(g::GameEnv, player) = map(>(0), g.board.houses[player,:])
 
-GI.available_actions(g::Game) = GI.available_actions(g, g.curplayer)
+GI.actions_mask(g::GameEnv) = GI.actions_mask(g, g.curplayer)
+
+function capture_last_and_opposite(b::Board, pos::HousePos)
+  # @assert read_pos(b ,pos) == 1
+  new_store = b.stores[pos.player] + read_pos(b, opposite_pos(pos)) + 1
+  stores = setindex(b.stores, new_store, pos.player)
+  b = write_pos(b, pos, 0)
+  b = write_pos(b, opposite_pos(pos), 0)
+  return Board(stores, b.houses)
+end
 
 sum_houses(b::Board, player) = sum(b.houses[player,:])
 
-function GI.play!(g::Game, a)
+function capture_leftovers(b::Board, player)
+  # @assert sum_houses(b, other(player)) == 0
+  new_store = b.stores[player] + sum_houses(b, player)
+  stores = setindex(b.stores, new_store, player)
+  return Board(stores, zero(typeof(b.houses)))
+end
+
+# TODO tide up ending conditions
+function GI.play!(g::GameEnv, a)
   pos = HousePos(g.curplayer, a)
   nseeds = read_pos(g.board, pos)
   @assert nseeds > 0
@@ -115,35 +160,45 @@ function GI.play!(g::Game, a)
     pos = next_pos(pos, g.curplayer)
     g.board = write_pos(g.board, pos, read_pos(g.board, pos) + 1)
   end
+  
   # Check endgame
   if sum_houses(g.board, g.curplayer) == 0
-    other_sum = sum_houses(g.board, other(g.curplayer))
-    new_store = g.board.stores[g.curplayer] + other_sum
-    stores = setindex(g.board.stores, new_store, g.curplayer)
-    g.board = Board(stores, zero(typeof(g.board.houses)))
-  # Free turn is last seed was put in a store
+    g.board = capture_leftovers(g.board, other(g.curplayer))
+    g.finished = true
+  
   elseif isa(pos, HousePos)
+    # Capture opposite house if last seed was put in empty house on your side # MUST CHECK ENDGAME AFTER
+    if read_pos(g.board, pos) == 1 && g.curplayer == pos.player
+      g.board = capture_last_and_opposite(g.board, pos)
+      # if captured last pieces of opposite player then game ends
+      if sum_houses(g.board, other(g.curplayer)) == 0
+        g.board = capture_leftovers(g.board, g.curplayer)
+        g.finished = true
+        return
+      end
+      if sum_houses(g.board, g.curplayer) == 0
+        g.board = capture_leftovers(g.board, other(g.curplayer))
+        g.finished = true
+        return
+      end
+    end
+    # Free turn if last seed was put in a store
     g.curplayer = other(g.curplayer)
   end
   return
 end
 
-GI.board(g::Game) = g.board
+GI.current_state(g::GameEnv) = (board=g.board, curplayer=g.curplayer)
 
-function GI.board_symmetric(g::Game) :: Board
-  b = g.board
-  stores = @SVector[b.stores[2], b.stores[1]]
-  houses = vcat(b.houses[2,:]', b.houses[1,:]')
-  Board(stores, houses)
-end
-
-GI.white_playing(g::Game) = g.curplayer == WHITE
-
-game_terminated(g::Game) = all(==(0), g.board.houses)
+GI.white_playing(g::GameEnv) = g.curplayer == WHITE
 
 #####
 ##### Reward shaping
 #####
+
+function GI.game_terminated(g::GameEnv)
+  return g.finished
+end
 
 function zero_one_reward(nw, nb)
   nw > nb && return 1.
@@ -153,12 +208,12 @@ end
 
 linear_reward(nw, nb) = (nw - nb) / NUM_SEEDS
 
-function GI.terminal_white_reward(g::Game)
-  if game_terminated(g)
+function GI.white_reward(g::GameEnv)
+  if g.finished
     nw, nb = g.board.stores
     return zero_one_reward(nw, nb) # + linear_reward(nw, nb)
   else
-    return nothing
+    return 0.
   end
 end
 
@@ -166,13 +221,19 @@ end
 ##### ML interface
 #####
 
-GI.num_actions(::Type{Game}) = NUM_HOUSES_PER_PLAYER
 
-GI.action_id(::Type{Game}, a) = a
+# GI.action_id(::Type{GameEnv}, a) = a
 
-GI.action(::Type{Game}, id) = id
+# GI.action(::Type{GameEnv}, id) = id
 
-function GI.vectorize_board(::Type{Game}, board)
+function flip_colors(board)
+  stores = @SVector [INITIAL_BOARD.stores[2],INITIAL_BOARD.stores[1]]
+  houses = SMatrix{2, NUM_HOUSES_PER_PLAYER, UInt8, NUM_HOUSES}([INITIAL_BOARD.houses[2,:]'; INITIAL_BOARD.houses[1,:]'])
+  return Board(stores, houses)
+end
+
+function GI.vectorize_state(::GameSpec, state) # TODO: change to vectorize_state
+  board = state.curplayer == WHITE ? state.board : flip_colors(state.board)
   function cell(pos, chan)
     if chan == :nstones
       return read_pos(board, pos)
@@ -203,9 +264,9 @@ end
 ##### User interface
 #####
 
-GI.action_string(::Type{Game}, a) = string(a)
+GI.action_string(::GameSpec, a) = string(a)
 
-function GI.parse_action(g::Game, str)
+function GI.parse_action(::GameSpec, str)
   try
     p = parse(Int, str)
     1 <= p <= NUM_HOUSES_PER_PLAYER ? p : nothing
@@ -222,13 +283,13 @@ end
 #  +----+----+----+----+----+----+----+----+
 #          6    5    4    3    2    1
 
-function GI.print_state(g::Game, with_position_names=true)
+function GI.render(g::GameEnv, with_position_names=true)
   b = g.board
   gray(s...) = print(crayon"blue", s..., crayon"reset")
   white(s...) = print(crayon"white", s..., crayon"reset")
   bold(s...) = print(crayon"yellow", s..., crayon"reset")
   blank_cell() = repeat(" ", 4)
-  num_cell(n) = n == 0 ? blank_cell() : @sprintf(" %2d ", n)
+  num_cell(n) = n == 0 ? blank_cell() : (n < 10 ? "  $n " : " $n ")
   function show_labels(labels)
     print(" "); print(blank_cell()); print(" ")
     for i in labels
@@ -269,7 +330,7 @@ function GI.print_state(g::Game, with_position_names=true)
   show_labels(reverse(1:NUM_HOUSES_PER_PLAYER))
 end
 
-function GI.read_state(::Type{Game})
+function GI.read_state(::Type{GameEnv})
   try
     function read_houses(player)
       print("Player $(player) houses: ")
@@ -297,7 +358,7 @@ function GI.read_state(::Type{Game})
     print("Current player (1/2): ")
     curplayer = parse(Int, readline())
     @assert 1 <= curplayer <= 2
-    return Game(board, curplayer == WHITE)
+    return GameEnv(board, curplayer == WHITE)
   catch
     return nothing
   end
