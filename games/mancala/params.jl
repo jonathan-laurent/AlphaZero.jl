@@ -74,7 +74,6 @@ self_play = SelfPlayParams(
     num_workers=128,
     use_gpu=true,
     reset_every=2,
-    flip_probability=0.,
     alternate_colors=false),
   mcts=MctsParams(
     num_iters_per_turn=600,
@@ -90,7 +89,6 @@ arena = ArenaParams(
     num_workers=128,
     use_gpu=true,
     reset_every=2,
-    flip_probability=0.5,
     alternate_colors=true),
   mcts=MctsParams(
     self_play.mcts,
@@ -134,10 +132,10 @@ mcts_baseline =
       num_iters_per_turn=1000,
       cpuct=1.))
 
-minmax_baseline = Benchmark.MinMaxTS(
-  depth=5,
-  τ=0.2,
-  amplify_rewards=true)
+# minmax_baseline = Benchmark.MinMaxTS(
+#   depth=5,
+#   τ=0.2,
+#   amplify_rewards=true)
 
 alphazero_player = Benchmark.Full(arena.mcts)
 

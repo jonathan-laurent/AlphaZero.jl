@@ -190,18 +190,7 @@ end
 
 GI.current_state(g::GameEnv) = (board=g.board, curplayer=g.curplayer)
 
-
-
-# function GI.board_symmetric(g::Game) :: Board # TODO GI.symmetries
-#   b = g.board
-#   stores = @SVector[b.stores[2], b.stores[1]]
-#   houses = vcat(b.houses[2,:]', b.houses[1,:]')
-#   Board(stores, houses)
-# end
-
 GI.white_playing(g::GameEnv) = g.curplayer == WHITE
-
-# game_terminated(g::GameEnv) = all(==(0), g.board.houses)
 
 #####
 ##### Reward shaping
