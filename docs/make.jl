@@ -13,7 +13,8 @@ makedocs(
     "Guided Tour" => [
       "tutorial/alphazero_intro.md",
       "tutorial/package_overview.md",
-      "tutorial/connect_four.md"
+      "tutorial/connect_four.md",
+      "tutorial/own_game.md"
     ],
     "Reference" => [
       "reference/params.md",
@@ -31,8 +32,7 @@ makedocs(
       "reference/scripts.md"
     ],
     "Contributing" => [
-      "contributing/guide.md",
-      "contributing/add_game.md"
+      "contributing/guide.md"
     ]
   ],
   repo="https://github.com/jonathan-laurent/AlphaZero.jl/blob/{commit}{path}#L{line}"

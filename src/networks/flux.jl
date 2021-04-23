@@ -12,7 +12,6 @@ using CUDA
 using Base: @kwdef
 
 import Flux
-import Functors
 
 CUDA.allowscalar(false)
 array_on_gpu(::Array) = false
@@ -110,28 +109,11 @@ function Network.train!(
 end
 
 regularized_params_(l) = []
-regularized_params_(l::Flux.Dense) = [l.W]
+regularized_params_(l::Flux.Dense) = [l.weight]
 regularized_params_(l::Flux.Conv) = [l.weight]
 
-# Reimplementation of what used to be Flux.prefor, does not visit leaves
-function foreach_flux_node(f::Function, x, seen = IdDict())
-  Functors.isleaf(x) && return
-  haskey(seen, x) && return
-  seen[x] = true
-  f(x)
-  for child in Flux.trainable(x)
-    foreach_flux_node(f, child, seen)
-  end
-end
-
 function Network.regularized_params(net::FluxNetwork)
-  ps = Flux.Params()
-  foreach_flux_node(net) do p
-    for r in regularized_params_(p)
-      any(x -> x === r, ps) || push!(ps, r)
-    end
-  end
-  return ps
+  return (w for l in Flux.modules(net) for w in regularized_params_(l))
 end
 
 function Network.gc(::FluxNetwork)

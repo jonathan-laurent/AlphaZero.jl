@@ -32,14 +32,6 @@ const INITIAL_BOARD =
 
 const INITIAL_STATE = (board=INITIAL_BOARD, curplayer=WHITE)
 
-# mutable struct GameEnv
-#   board :: Board
-#   curplayer :: Player
-#   function GameEnv(board::Board=INITIAL_BOARD, white_playing::Bool=true)
-#     new(board, white_playing ? WHITE : BLACK)
-#   end
-# end
-
 struct GameSpec <: GI.AbstractGameSpec end
 
 mutable struct GameEnv <: GI.AbstractGameEnv
@@ -47,8 +39,6 @@ mutable struct GameEnv <: GI.AbstractGameEnv
   curplayer :: Player
   finished :: Bool
   winner :: Player
-  # amask :: trues(2, NUM_HOUSES_PER_PLAYER)
-  # history :: Union{Nothing, Vector{Int}}
 end
 
 function GI.init(::GameSpec)
@@ -56,7 +46,6 @@ function GI.init(::GameSpec)
   curplayer = INITIAL_STATE.curplayer
   finished = false
   winner = 0
-  # amask :: Vector{Bool} # actions mask
   return GameEnv(board, curplayer, finished, winner)
 end
 
@@ -160,12 +149,10 @@ function GI.play!(g::GameEnv, a)
     pos = next_pos(pos, g.curplayer)
     g.board = write_pos(g.board, pos, read_pos(g.board, pos) + 1)
   end
-  
   # Check endgame
   if sum_houses(g.board, g.curplayer) == 0
     g.board = capture_leftovers(g.board, other(g.curplayer))
     g.finished = true
-  
   elseif isa(pos, HousePos)
     # Capture opposite house if last seed was put in empty house on your side # MUST CHECK ENDGAME AFTER
     if read_pos(g.board, pos) == 1 && g.curplayer == pos.player
@@ -218,21 +205,29 @@ function GI.white_reward(g::GameEnv)
 end
 
 #####
+##### Simple heuristic for minmax
+#####
+
+# This is an extremely naive heuristic and one can probably do better.
+function GI.heuristic_value(g::GameEnv)
+  nw, nb = g.board.stores
+  v = nw - nb
+  g.curplayer == BLACK && (v = -v)
+  return Float64(v)
+end
+
+#####
 ##### ML interface
 #####
 
-
-# GI.action_id(::Type{GameEnv}, a) = a
-
-# GI.action(::Type{GameEnv}, id) = id
-
 function flip_colors(board)
   stores = @SVector [INITIAL_BOARD.stores[2],INITIAL_BOARD.stores[1]]
-  houses = SMatrix{2, NUM_HOUSES_PER_PLAYER, UInt8, NUM_HOUSES}([INITIAL_BOARD.houses[2,:]'; INITIAL_BOARD.houses[1,:]'])
+  houses = SMatrix{2, NUM_HOUSES_PER_PLAYER, UInt8, NUM_HOUSES}(
+    [INITIAL_BOARD.houses[2,:]'; INITIAL_BOARD.houses[1,:]'])
   return Board(stores, houses)
 end
 
-function GI.vectorize_state(::GameSpec, state) # TODO: change to vectorize_state
+function GI.vectorize_state(::GameSpec, state)
   board = state.curplayer == WHITE ? state.board : flip_colors(state.board)
   function cell(pos, chan)
     if chan == :nstones
@@ -283,9 +278,9 @@ end
 #  +----+----+----+----+----+----+----+----+
 #          6    5    4    3    2    1
 
-function GI.render(g::GameEnv, with_position_names=true)
+function GI.render(g::GameEnv, with_position_names=true, botmargin=true)
   b = g.board
-  gray(s...) = print(crayon"blue", s..., crayon"reset")
+  gray(s...) = print(crayon"cyan", s..., crayon"reset")
   white(s...) = print(crayon"white", s..., crayon"reset")
   bold(s...) = print(crayon"yellow", s..., crayon"reset")
   blank_cell() = repeat(" ", 4)
@@ -328,6 +323,7 @@ function GI.render(g::GameEnv, with_position_names=true)
   print_half(reverse(b.houses[1,:]), g.curplayer == WHITE)
   hline(NUM_HOUSES_PER_PLAYER + 2)
   show_labels(reverse(1:NUM_HOUSES_PER_PLAYER))
+  botmargin && print("\n")
 end
 
 function GI.read_state(::Type{GameEnv})

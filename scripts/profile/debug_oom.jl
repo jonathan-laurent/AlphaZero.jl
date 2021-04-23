@@ -20,20 +20,4 @@ exp = Examples.experiments["connect-four"]
 
 exp = @set exp.netparams.num_filters = num_filters
 
-session = Session(exp)
-
-# Generate states
-
-n = 5000
-
-println("Generating $n some random traces")
-
-traces = [play_game(exp.gspec, RandomPlayer()) for i in 1:n]
-
-for trace in traces
-  AlphaZero.push_trace!(session.env.memory, trace, 1.0)
-end
-
-println("Starting a learning iteration")
-
-AlphaZero.learning_step!(session.env, session)
+Scripts.test_grad_updates(exp, num_games=5000)

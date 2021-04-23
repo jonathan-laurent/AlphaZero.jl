@@ -57,8 +57,6 @@ We found the [Julia language](https://julialang.org/) to be instrumental in achi
 To download AlphaZero.jl and start training a Connect Four agent, just run:
 
 ```sh
-export JULIA_CUDA_MEMORY_POOL split # optional (for better GPU performances)
-
 git clone https://github.com/jonathan-laurent/AlphaZero.jl.git
 cd AlphaZero.jl
 julia --project -e 'import Pkg; Pkg.instantiate()'
@@ -127,11 +125,19 @@ For more information on training a Connect Four agent using AlphaZero.jl, see ou
 * Jonathan Laurent: main developer
 * Pavel Dimens: logo design
 * Marek Kaluba: hyperparameters tuning for the grid-world example
+* Michał Łukomski: update Mancala implementation for compliance with the new game interface
 
 Contributions to AlphaZero.jl are most welcome. Many contribution ideas are available in our [contribution guide](https://jonathan-laurent.github.io/AlphaZero.jl/dev/contributing/guide/).
 Please do not hesitate to open a Github
 [issue](https://github.com/jonathan-laurent/AlphaZero.jl/issues) to share
 any idea, feedback or suggestion.
+
+### Supporting and Citing
+
+If you want to support this project and help it gain visibility, please consider starring
+the repository. Doing well on such metrics may also help us secure academic funding in the
+future. Also, if you use this software as part of your research, we would appreciate that
+you include the following [citation](./CITATION.bib) in your paper.
 
 ### Acknowledgements
 

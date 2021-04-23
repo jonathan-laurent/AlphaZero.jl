@@ -24,18 +24,11 @@ To download AlphaZero.jl and start a new training session, just run the
 following:
 
 ```sh
-export JULIA_CUDA_MEMORY_POOL split # optional (for better GPU performances)
-
 git clone --branch v0.4.0 https://github.com/jonathan-laurent/AlphaZero.jl.git
 cd AlphaZero.jl
 julia --project -e 'import Pkg; Pkg.instantiate()'
 julia --project -e 'using AlphaZero; Scripts.train("connect-four")'
 ```
-
-!!! note "Configuring CUDA.jl to use a splitting pool"
-
-    The first line is optional and it makes sure that CUDA.jl is precompiled to use a
-    splitting memory pool. Indeed, the splitting pool performs better than the default binned pool on AlphaZero's workload as it does not require to run the garbage collector as frequently.
 
 Instead of using [`Scripts.train`](@ref), one can do things more manually and run the following inside the Julia REPL:
 

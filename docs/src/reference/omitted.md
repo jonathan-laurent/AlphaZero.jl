@@ -19,9 +19,12 @@ Batchifier.BatchedOracle
 ## KnetLib and FluxLib
 
 ```@docs
-KnetLib
-KnetLib.KNetwork
-KnetLib.TwoHeadNetwork
+#KnetLib
+#KnetLib.KNetwork
+#KnetLib.TwoHeadNetwork
+FluxLib
+FluxLib.FluxNetwork
+FluxLib.TwoHeadNetwork
 ```
 
 ## Utilities

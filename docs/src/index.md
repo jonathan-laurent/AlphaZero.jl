@@ -48,6 +48,15 @@ This gain comes mostly from two sources:
 - **An asynchronous simulation mechanism** that enables batching requests to the neural
   network across several simulation threads, thereby maximizing GPU utilization.
 
+### Supporting and Citing
+
+If you want to support this project and help it gain visibility, please consider starring
+the repository. Doing well on such metrics may also help us secure academic funding in the
+future. Also, if you use this software as part of your research, we would appreciate that
+you include the following
+[citation](https://github.com/jonathan-laurent/AlphaZero.jl/blob/master/CITATION.bib) in
+your paper.
+
 ### Acknowledgements
 
 This material is based upon work supported by the United States Air Force and

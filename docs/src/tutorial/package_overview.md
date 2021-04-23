@@ -52,11 +52,8 @@ You can use AlphaZero.jl on the game of your choice by simply implementing the
 two-players, zero-sum games with finite action spaces and perfect information.
 Support for Markov Decision Processes will be added in a forthcoming release.
 
-
-When adding support for a new game, we recommend following some
-[conventions](@ref add_game) to ensure that it works properly with all helper
-scripts in the `scripts` directory.
-
+Please see [here](@ref own_game) for recommendations on how to use AlphaZero.jl on
+your own game.
 
 ### Network Interface
 

@@ -8,7 +8,7 @@ module Log
 export Logger
 
 using Crayons
-using Formatting
+using Formatting: fmt
 import ProgressMeter
 
 const INDENT_STEP = 2
