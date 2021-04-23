@@ -119,18 +119,6 @@ version = "3.27.0"
 deps = ["Artifacts", "Libdl"]
 uuid = "e66e0078-7015-5450-92f7-15fbd957f2ae"
 
-[[ConnectFourSolver]]
-deps = ["ConnectFourSolver_jll", "CxxWrap", "Pkg"]
-git-tree-sha1 = "a65acbbff1c9ec1903fed962c9cc46fb6c7e2d57"
-uuid = "c01be385-ab27-4b9c-92b7-2e6a77fbe7c3"
-version = "0.1.0"
-
-[[ConnectFourSolver_jll]]
-deps = ["Libdl", "Pkg", "libcxxwrap_julia_jll"]
-git-tree-sha1 = "07558ba0f261cef84c4b75180a58b8bb795bd2b6"
-uuid = "5ab91c8a-5c16-538d-97cb-84915cefd4b0"
-version = "0.1.0+0"
-
 [[ConstructionBase]]
 deps = ["LinearAlgebra"]
 git-tree-sha1 = "48920211c95a6da1914a06c44ec94be70e84ffff"
@@ -147,12 +135,6 @@ version = "0.5.7"
 git-tree-sha1 = "3f71217b538d7aaee0b69ab47d9b7724ca8afa0d"
 uuid = "a8cc5b0e-0ffa-5ad4-8c14-923d3ee1735f"
 version = "4.0.4"
-
-[[CxxWrap]]
-deps = ["Libdl", "MacroTools", "libcxxwrap_julia_jll"]
-git-tree-sha1 = "b400a0b5de176906388fc0c56dd93c5383049217"
-uuid = "1f15a43c-97ca-5a2a-ae31-89f07a497df4"
-version = "0.10.2"
 
 [[DataAPI]]
 git-tree-sha1 = "dfb3b7e89e395be1e25c2ad6d7690dc29cc53b1d"
@@ -1100,12 +1082,6 @@ deps = ["Artifacts", "Bzip2_jll", "FreeType2_jll", "FriBidi_jll", "JLLWrappers",
 git-tree-sha1 = "acc685bcf777b2202a904cdcb49ad34c2fa1880c"
 uuid = "0ac62f75-1d6f-5e53-bd7c-93b484bb37c0"
 version = "0.14.0+4"
-
-[[libcxxwrap_julia_jll]]
-deps = ["Libdl", "Pkg"]
-git-tree-sha1 = "b7594ea3040804e12eddebd977ec856ec0a17f19"
-uuid = "3eaa8342-bff7-56a5-9981-c04077f7cee7"
-version = "0.7.1+1"
 
 [[libfdk_aac_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
