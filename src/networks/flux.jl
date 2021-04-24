@@ -156,7 +156,7 @@ Network.hyperparams(nn::TwoHeadNetwork) = nn.hyper
 
 Network.game_spec(nn::TwoHeadNetwork) = nn.gspec
 
-Network.on_gpu(nn::TwoHeadNetwork) = array_on_gpu(nn.vhead[end].b)
+Network.on_gpu(nn::TwoHeadNetwork) = array_on_gpu(nn.vhead[end].bias)
 
 #####
 ##### Include networks library
