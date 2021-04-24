@@ -123,7 +123,7 @@ module AlphaZero
   # Only Flux works with CUDA,NNlib#master right now.
 
   if DEFAULT_DL_FRAMEWORK == "FLUX"
-    @info "Using the Flux implementation of AlphaZero.NetLib."
+    # @info "Using the Flux implementation of AlphaZero.NetLib."
     KNET_ADVICE =
     """
     For optimal performances, we recommend that you configure AlphaZero.jl
