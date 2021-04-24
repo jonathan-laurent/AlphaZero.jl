@@ -17,17 +17,6 @@ module AlphaZero
   import LinearAlgebra
   LinearAlgebra.BLAS.set_num_threads(1)
 
-  POOL_MSG =
-  """
-  For best performances, we recommend that you configure CUDA.jl to use a splitting pool.
-  To do so, you can set the JULIA_CUDA_MEMORY_POOL environment variable to "split".
-  """
-  if get(ENV, "JULIA_CUDA_MEMORY_POOL", "") != "split"
-    # Disabling this warning since the `JULIA_CUDA_MEMORY_POOL=cuda` option
-    # that is now chosen by default on CUDA 11.2 or higher is actually preferable.
-    # @info POOL_MSG
-  end
-
   # Internal helper functions
   include("util.jl")
   using .Util
@@ -147,7 +136,7 @@ module AlphaZero
       const NetLib = FluxLib
     end
   elseif DEFAULT_DL_FRAMEWORK == "KNET"
-    @info "Using the Knet implementation of AlphaZero.NetLib."
+    # @info "Using the Knet implementation of AlphaZero.NetLib."
     @eval begin
       include("networks/knet.jl")
       const NetLib = KnetLib
