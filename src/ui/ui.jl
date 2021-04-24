@@ -13,7 +13,7 @@ module UserInterface
   using ..AlphaZero
 
   import Plots
-  import JSON2, JSON3
+  import JSON3
   using Base: @kwdef
   using Statistics: mean
   using Formatting: format, fmt
