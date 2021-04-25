@@ -10,43 +10,9 @@ const Option{T} = Union{T, Nothing}
 infinity(::Type{R}) where R <: Real = one(R) / zero(R)
 
 """
-    concat_columns(cols) == hcat(cols...) # but faster
-"""
-function concat_columns(cols)
-  @assert !isempty(cols)
-  nsamples = length(cols)
-  excol = first(cols)
-  sdim = length(excol)
-  arr = similar(excol, (sdim, nsamples))
-  for (i, col) in enumerate(cols)
-    arr[:,i] = col
-  end
-  return arr
-end
-
-"""
-    superpose(xs) == cat(xs..., dims=ndims(first(xs))+1) # but faster
-"""
-function superpose(arrays)
-  n = length(arrays)
-  @assert n > 0
-  ex = first(arrays)
-  dest = similar(ex, size(ex)..., n)
-  i = 1
-  for src in arrays
-    for j in eachindex(src)
-      dest[i] = src[j]
-      i += 1
-    end
-  end
-  return dest
-end
-
-"""
     @printing_errors expr
 
 Evaluate expression `expr` while printing any uncaught exception on `stderr`.
-
 This is useful to avoid silent falure of concurrent tasks, as explained in
 [this issue](https://github.com/JuliaLang/julia/issues/10405).
 """

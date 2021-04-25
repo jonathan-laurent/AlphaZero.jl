@@ -3,7 +3,7 @@
 #####
 
 # A samples collection is represented on the learning side as a (W, X, A, P, V)
-# tuple. Each component is a `Float32` tensor whose last dimension corresponds
+# named-tuple. Each component is a `Float32` tensor whose last dimension corresponds
 # to the sample index. Writing `n` the number of samples and `a` the total
 # number of actions:
 # - W (size 1×n) contains the samples weights
@@ -32,7 +32,7 @@ function convert_sample(
   p = zeros(size(a))
   p[a] = e.π
   v = [e.z]
-  return (w, x, a, p, v)
+  return (; w, x, a, p, v)
 end
 
 function convert_samples(
@@ -41,11 +41,11 @@ function convert_samples(
     es::Vector{<:TrainingSample})
 
   ces = [convert_sample(gspec, wp, e) for e in es]
-  W = Util.superpose((e[1] for e in ces))
-  X = Util.superpose((e[2] for e in ces))
-  A = Util.superpose((e[3] for e in ces))
-  P = Util.superpose((e[4] for e in ces))
-  V = Util.superpose((e[5] for e in ces))
+  W = Flux.batch((e[1] for e in ces))
+  X = Flux.batch((e[2] for e in ces))
+  A = Flux.batch((e[3] for e in ces))
+  P = Flux.batch((e[4] for e in ces))
+  V = Flux.batch((e[5] for e in ces))
   f32(arr) = convert(AbstractArray{Float32}, arr)
   return f32.((W, X, A, P, V))
 end

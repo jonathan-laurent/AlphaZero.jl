@@ -1,6 +1,6 @@
 #####
 ##### AlphaZero.jl
-##### Jonathan Laurent, Carnegie Mellon University (2019-2020)
+##### Jonathan Laurent, Carnegie Mellon University (2019-2021)
 #####
 
 module AlphaZero
@@ -11,6 +11,10 @@ module AlphaZero
   using DataStructures: CircularBuffer
   using Distributions: Categorical, Dirichlet
   using Statistics: mean
+
+  # Even when using the Knet backend, we use utilities from Flux such as
+  # `Flux.batch` and `Flux.DataLoader`
+  import Flux
 
   # When running on a CPU, having multiple threads does not play
   # well with BLAS multithreading
