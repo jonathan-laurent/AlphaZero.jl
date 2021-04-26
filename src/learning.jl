@@ -113,7 +113,9 @@ end
 
 data_weights(tr::Trainer) = tr.data.W
 
-num_batches_total(tr::Trainer) = length(data_weights(tr)) ÷ tr.params.batch_size
+num_samples(tr::Trainer) = length(data_weights(tr))
+
+num_batches_total(tr::Trainer) = num_samples(tr) ÷ tr.params.batch_size
 
 function get_trained_network(tr::Trainer)
   return Network.copy(tr.network, on_gpu=false, test_mode=true)
@@ -135,7 +137,7 @@ end
 ##### Generating debugging reports
 #####
 
-function mean_learning_status(reports::Vector{Report.LearningStatus}, ws)
+function mean_learning_status(reports, ws)
   L     = wmean([r.loss.L     for r in reports], ws)
   Lp    = wmean([r.loss.Lp    for r in reports], ws)
   Lv    = wmean([r.loss.Lv    for r in reports], ws)
@@ -160,14 +162,13 @@ function learning_status(tr::Trainer, samples)
 end
 
 function learning_status(tr::Trainer)
-  batch_size = tr.params.loss_computation_batch_size
-  partial = length(data_weights(tr)) < batch_size
-  batches = Util.random_batches(tr.data, batch_size, partial=partial) do x
-    Network.convert_input(tr.network, x)
+  batchsize = min(tr.params.loss_computation_batch_size, num_samples(tr))
+  batches = Flux.Data.DataLoader(tr.data; batchsize, partial=true)
+  reports = map(batches) do batch
+    batch = Network.convert_input(tr.network, batch)
+    return learning_status(tr, batch)
   end
-  Network.gc(tr.network)
-  reports = [learning_status(tr, batch) for batch in batches]
-  ws = [sum(data_weights(tr)) for batch in batches]
+  ws = [sum(batch.W) for batch in batches]
   return mean_learning_status(reports, ws)
 end
 
