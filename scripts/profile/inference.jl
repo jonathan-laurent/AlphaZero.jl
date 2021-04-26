@@ -17,7 +17,7 @@ function profile_inference(
     on_gpu=true,
     nrep=100,
     batch_size=128,
-    num_filters=128)
+    num_filters=64)
   """
   Return inference time in μs.
   """
