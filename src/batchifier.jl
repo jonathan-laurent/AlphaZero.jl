@@ -46,7 +46,8 @@ The server stops automatically after all workers send `:none`.
 """
 function launch_server(f, num_workers)
   channel = Channel(num_workers)
-  Threads.@spawn Util.@printing_errors begin
+  # The server is spawned on the main thread for maximal responsiveness
+  Util.@tspawn_main Util.@printing_errors begin
     num_active = num_workers
     pending = []
     while num_active > 0

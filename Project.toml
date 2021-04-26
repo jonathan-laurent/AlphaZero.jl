@@ -24,6 +24,7 @@ Serialization = "9e88b42a-f829-5b0c-bbe9-9e923198166b"
 Setfield = "efcf1570-3423-57d1-acb7-fd33fddbac46"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
+ThreadPools = "b189fb0b-2eb5-4ed4-bc0c-d34c51242431"
 Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
 
 [compat]

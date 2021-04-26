@@ -6,7 +6,6 @@ import Random
 import ThreadPools
 using Distributions: Categorical
 
-
 """
     @printing_errors expr
 
@@ -135,8 +134,13 @@ end
 ##### Multithreading utilities
 #####
 
-function threads_pmap(f, xs)
-  return fetch.([Threads.@spawn @printing_errors f(x) for x in xs])
+function tmap_bg(f, xs)
+  nbg = Threads.nthreads() - 1
+  tasks = map(enumerate(xs)) do (i, x)
+    tid = nbg > 0 ? 2 + ((i - 1) % nbg) : 1
+    ThreadPools.@tspawnat tid @printing_errors f(x) 
+  end
+  return fetch.(tasks)
 end
 
 # TODO: the `mapreduce` function should ultimately be removed and replaced by a
@@ -152,6 +156,8 @@ The `make_worker` function must create a worker `w` with two fields:
   - a `process` function such that `w.process(x)` evaluates to `f(x)`
   - a `terminate` function to be called with no argument when the worker terminates.
 
+This function only spawns workers on background threads (with id greater or equal than 1).
+
 !!! note
 
     This function makes one call to `combine` per computed element
@@ -163,8 +169,10 @@ function mapreduce(make_worker, args, num_workers, combine, init)
   ret = init
   lock = ReentrantLock()
   tasks = []
-  for w in 1:num_workers
-    task = Threads.@spawn Util.@printing_errors begin
+  nbg = Threads.nthreads() - 1
+  for i in 1:num_workers
+    tid = nbg > 0 ? 2 + ((i - 1) % nbg) : 1
+    task = ThreadPools.@tspawnat tid Util.@printing_errors begin
       local k = 0
       worker = make_worker()
       while true
@@ -199,6 +207,10 @@ function mapreduce_sequential(make_worker, args, num_workers, combine, unit)
     return y
   end
   return reduce(combine, ys, init=unit)
+end
+
+macro tspawn_main(e)
+  return :(ThreadPools.@tspawnat 1 $(esc(e)))
 end
 
 end

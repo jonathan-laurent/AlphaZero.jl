@@ -250,7 +250,7 @@ function simulate_distributed(
 
   # Spawning a task to keep count of completed simulations
   chan = Distributed.RemoteChannel(()->Channel{Nothing}(1))
-  Threads.@spawn begin
+  Util.@tspawn_main begin
     for i in 1:p.num_games
       take!(chan)
       game_simulated()
