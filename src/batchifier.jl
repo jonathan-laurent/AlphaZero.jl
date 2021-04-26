@@ -56,11 +56,15 @@ function launch_server(f; num_workers, batch_size)
       req = take!(channel)
       if req == :done
         num_active -= 1
+        if num_active < batch_size
+          batch_size = num_active
+        end
       else
         push!(pending, req)
       end
       @assert length(pending) <= num_active
-      if length(pending) == num_active && num_active > 0
+      @assert batch_size <= num_active
+      if length(pending) >= batch_size && length(pending) > 0
         batch = [p.query for p in pending]
         results = f(batch)
         for i in eachindex(pending)
