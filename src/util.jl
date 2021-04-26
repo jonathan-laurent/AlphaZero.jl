@@ -168,7 +168,7 @@ used to transfer data onto the GPU.
     such as `Flux.DataLoader`.
 """
 function random_batches(
-  convert, data::Tuple, batchsize; partial=false)
+  convert, data, batchsize; partial=false)
   n = size(data[1])[end]
   perm = Random.randperm(n)
   batchs = map(data) do x
@@ -185,7 +185,7 @@ Generate an infinite stateful iterator of random batches by calling
 [`random_batches`](@ref) repeatedly. Every sample is guaranteed to be drawn
 exactly once per epoch.
 """
-function random_batches_stream(convert, data::Tuple, batchsize)
+function random_batches_stream(convert, data, batchsize)
   partial = size(data[1])[end] < batchsize
   return Iterators.Stateful(Iterators.flatten((
     random_batches(convert, data, batchsize, partial=partial)

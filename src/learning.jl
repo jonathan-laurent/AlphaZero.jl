@@ -41,13 +41,13 @@ function convert_samples(
     es::Vector{<:TrainingSample})
 
   ces = [convert_sample(gspec, wp, e) for e in es]
-  W = Flux.batch((e[1] for e in ces))
-  X = Flux.batch((e[2] for e in ces))
-  A = Flux.batch((e[3] for e in ces))
-  P = Flux.batch((e[4] for e in ces))
-  V = Flux.batch((e[5] for e in ces))
+  W = Flux.batch((e.w for e in ces))
+  X = Flux.batch((e.x for e in ces))
+  A = Flux.batch((e.a for e in ces))
+  P = Flux.batch((e.p for e in ces))
+  V = Flux.batch((e.v for e in ces))
   f32(arr) = convert(AbstractArray{Float32}, arr)
-  return f32.((W, X, A, P, V))
+  return map(f32, (; W, X, A, P, V))
 end
 
 #####
@@ -90,7 +90,7 @@ struct Trainer
   network :: AbstractNetwork
   samples :: Vector{<:TrainingSample}
   params :: LearningParams
-  data :: Tuple # (W, X, A, P, V) tuple obtained after converting `samples`
+  data :: NamedTuple # (W, X, A, P, V) tuple obtained after converting `samples`
   Wmean :: Float32
   Hp :: Float32
   batches_stream # infinite stateful iterator of training batches
@@ -110,7 +110,7 @@ struct Trainer
   end
 end
 
-data_weights(tr::Trainer) = tr.data[1] # Return the W tensor
+data_weights(tr::Trainer) = tr.data.W
 
 num_batches_total(tr::Trainer) = length(data_weights(tr)) ÷ tr.params.batch_size
 
