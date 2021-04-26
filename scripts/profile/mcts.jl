@@ -6,34 +6,53 @@ using AlphaZero
 using Base: @timed
 
 # using Revise; Revise.includet("scripts/profile/mcts.jl")
-# profile_inference(on_gpu=true, batch_size=128, num_filters=128)
+# profile_mcts(nrep=64, nworkers=64, batched=true)
 
-# Takeaway: the cost of simulation is almost zero compared to the cost of evaluating
-# the network.
+# Cost of simulation on one thread: 11μs
+# Cost of simulation on all threads: 3μs
+# To be compared to the cost of inference: 15μs to 30μs
+# Also, by comparing `profile_mcts` with `batched=true` and `batched=false`, we conclude
+# that the overhead of spawning tasks is not too big.
 
+"""
+Return the search time per inference request sent in μs/request.
+
+!!! note
+    For both the GPU and CPU to be maximally utilized, this number must be comparable to
+    the result of `profile_inference`.
+"""
 function profile_mcts(
   exp::Experiment = Examples.experiments["connect-four"];
-  nrep=100,
-  nthreads=128)
-  """
-  Return the search time per inference request sent in μs.
-  Try with many parallel tasks
-  """
+  batched=false,
+  nrep=30,
+  nworkers=1)
 
   oracle = MCTS.RandomOracle(exp.gspec)
+  if batched
+    spawn_oracle, done! = AlphaZero.batchify_oracles(oracle, false, nworkers)
+    oracles = [spawn_oracle() for _ in 1:nworkers]
+  else
+    oracles = [oracle for _ in 1:nworkers]
+    done!() = nothing
+  end
+
   players = [
     MctsPlayer(exp.gspec, oracle, exp.params.self_play.mcts)
-    for _ in 1:nthreads ]
+    for oracle in oracles ]
 
   think(players[1], GI.init(exp.gspec)) # compile everything
+  AlphaZero.reset_player!(players[1])
 
   info = @timed Threads.@threads for player in players
-    game = GI.init(exp.gspec)
     for i in 1:nrep
-      think(player, game)
+      think(player, GI.init(exp.gspec))
     end
+    done!()
   end
-  traversed = sum(p.mcts.total_nodes_traversed for p in players)
-  @show traversed
+  traversed = sum(p.mcts.total_simulations for p in players)
   return info.time * 1_000_000 / traversed
 end
+
+profile_mcts(nrep=64, nworkers=1)
+profile_mcts(nrep=64, nworkers=64)
+profile_mcts(nrep=64, nworkers=64, batched=true)

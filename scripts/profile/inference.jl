@@ -10,17 +10,19 @@ using Plots
 
 # using Revise; Revise.includet("scripts/profile/inference.jl")
 # profile_inference(on_gpu=true, batch_size=128, num_filters=128)
-# With default params: 27μs per sample
+# With 128 filters: 27μs per sample
+# With  64 filters: 17μs per sample
 
+"""
+Estimate inference time in μs/sample.
+"""
 function profile_inference(
     exp::Experiment = Examples.experiments["connect-four"];
     on_gpu=true,
     nrep=100,
     batch_size=128,
     num_filters=64)
-  """
-  Return inference time in μs.
-  """
+
   params = exp.netparams
   params = @set params.num_filters = num_filters
   net = exp.mknet(exp.gspec, params)
@@ -33,14 +35,15 @@ function profile_inference(
   return info.time / nrep / batch_size * 1_000_000
 end
 
+"""
+Plot the inference time speedup (in μs/sample) as a function of batch-size.
+"""
 function plot_inference_speedup(
   file::String,
   exp::Experiment = Examples.experiments["connect-four"];
   on_gpu=true,
   num_filters=64)
-  """
-  Plot inference time per sample (in μs) as a function of batch-size
-  """
+
   N = 8
   batch_sizes = [2^i for i in 0:N]
   ts = [
