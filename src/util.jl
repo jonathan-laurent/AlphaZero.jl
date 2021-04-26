@@ -110,7 +110,7 @@ function apply_temperature(π, τ)
 end
 
 """
-Same smoothing function that is used by Temsorboard to smooth time series.
+Same smoothing function that is used by Tensorboard to smooth time series.
 """
 function momentum_smoothing(x, μ)
   sx = similar(x)
