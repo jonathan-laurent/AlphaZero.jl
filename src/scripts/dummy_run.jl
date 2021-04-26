@@ -66,6 +66,7 @@ a real training session is started.
 function dummy_run(experiment::Experiment; dir=nothing, nostdout=false)
   experiment = dummy_run_experiment(experiment)
   isnothing(dir) && (dir = "sessions/dummy-$(experiment.name)")
+  rm(dir, force=true, recursive=true)
   session = Session(experiment; dir, nostdout)
   resume!(session)
   return

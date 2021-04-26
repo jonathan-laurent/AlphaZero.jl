@@ -17,7 +17,6 @@ end
 
 @testset "Dummy Runs" begin
   dir = "sessions/test-tictactoe"
-  rm(dir, force=true, recursive=true)
   @test dummy_run(experiments["tictactoe"], nostdout=false) == nothing
   if FULL
     @test dummy_run(experiments["connect-four"], nostdout=false) == nothing
