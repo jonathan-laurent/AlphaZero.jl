@@ -51,7 +51,7 @@ mutable struct Session{Env}
   save_intermediate :: Bool
   benchmark :: Vector{Benchmark.Evaluation}
   # Temporary state for logging
-  progress :: Option{Progress}
+  progress :: Union{Progress, Nothing}
   report :: SessionReport
 
   function Session(env, dir, logger, autosave, save_intermediate, benchmark)

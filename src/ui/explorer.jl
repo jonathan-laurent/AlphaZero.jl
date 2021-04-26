@@ -3,25 +3,24 @@
 #####
 
 using DataStructures: Stack
-using ..AlphaZero.Util: Option
 
 # All state statistics and are expressed with respect to the current player
 
 @kwdef mutable struct StateActionStats
-  P     :: Option{Float64} = nothing  # Probability given by `think`
-  Pmem  :: Option{Float64} = nothing  # Recorded π component in memory
-  Pmcts :: Option{Float64} = nothing  # Percentage of MCTS visits
-  Qmcts :: Option{Float64} = nothing
-  UCT   :: Option{Float64} = nothing
-  Pnet  :: Option{Float64} = nothing
-  Qnet  :: Option{Float64} = nothing
+  P     :: Union{Float64, Nothing} = nothing  # Probability given by `think`
+  Pmem  :: Union{Float64, Nothing} = nothing  # Recorded π component in memory
+  Pmcts :: Union{Float64, Nothing} = nothing  # Percentage of MCTS visits
+  Qmcts :: Union{Float64, Nothing} = nothing
+  UCT   :: Union{Float64, Nothing} = nothing
+  Pnet  :: Union{Float64, Nothing} = nothing
+  Qnet  :: Union{Float64, Nothing} = nothing
 end
 
 mutable struct StateStats{Action}
-  Nmcts :: Option{Int}
-  Nmem  :: Option{Int}
-  Vmem  :: Option{Float64}
-  Vnet  :: Option{Float64}
+  Nmcts :: Union{Int, Nothing}
+  Nmem  :: Union{Int, Nothing}
+  Vmem  :: Union{Float64, Nothing}
+  Vnet  :: Union{Float64, Nothing}
   actions :: Vector{Tuple{Action, StateActionStats}} # Sorted by P
   function StateStats(actions)
     actions_stats = [(a, StateActionStats()) for a in actions]
@@ -169,7 +168,7 @@ mutable struct Explorer
   game :: AbstractGameEnv
   history :: Stack{AbstractGameEnv}
   player :: AbstractPlayer
-  memory :: Option{MemoryBuffer}
+  memory :: Union{MemoryBuffer, Nothing}
   turn :: Int
   function Explorer(
       player::AbstractPlayer,

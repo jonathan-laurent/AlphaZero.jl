@@ -1,13 +1,11 @@
 module Util
 
-export Option, apply_temperature
+export apply_temperature
 
 import Random
+import ThreadPools
 using Distributions: Categorical
 
-const Option{T} = Union{T, Nothing}
-
-infinity(::Type{R}) where R <: Real = one(R) / zero(R)
 
 """
     @printing_errors expr
@@ -17,6 +15,7 @@ This is useful to avoid silent falure of concurrent tasks, as explained in
 [this issue](https://github.com/JuliaLang/julia/issues/10405).
 """
 macro printing_errors(expr)
+  # TODO: we should be able to replace this by `Base.erroronitor` in Julia 1.7
   return quote
     try
       $(esc(expr))
