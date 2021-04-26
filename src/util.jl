@@ -192,6 +192,16 @@ function random_batches_stream(convert, data, batchsize)
     for _ in Iterators.repeated(nothing))))
 end
 
+"""
+    cycle_iterator(iterator)
+
+Generate an infinite cycle from an iterator
+    
+"""
+function cycle_iterator(iterator)
+  return (iterator for _ in Iterators.repeated(nothing)) |> Iterators.flatten
+end
+
 #####
 ##### Multithreading utilities
 #####

@@ -104,9 +104,12 @@ struct Trainer
     W, X, A, P, V = data  
     Wmean = mean(W)
     Hp = entropy_wmean(P, W)
-    batches_stream = Util.random_batches_stream(data, params.batch_size) do x
-      Network.convert_input(network, x)
-    end
+    # Create a batches stream
+    batchsize = min(params.batch_size, length(W))
+    batches = Flux.Data.DataLoader(data; batchsize, partial=false, shuffle=true)
+    batches_stream = map(batches) do b
+      Network.convert_input(network, b)
+    end |> Util.cycle_iterator |> Iterators.Stateful
     return new(network, samples, params, data, Wmean, Hp, batches_stream)
   end
 end
