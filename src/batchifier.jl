@@ -20,7 +20,7 @@ using ..AlphaZero: MCTS, Util
 export BatchedOracle
 
 """
-    launch_server(f, num_workers)
+    launch_server(f; num_workers, batch_size)
 
 Launch an inference requests server.
 
@@ -30,8 +30,9 @@ Launch an inference requests server.
     It takes a batch of inputs and returns a batch of results
     of similar size.
   - `num_workers` is the number of workers that are expected to
-    query the server. It also corresponds to the batch size that is used to
-    evaluate `f`.
+    query the server.
+  - `batch_size` corresponds to the batch size that is used to evaluate `f`.
+    Note that one must have `batch_size <= num_workers`
 
 # How to use
 
@@ -44,7 +45,8 @@ A query can be either:
 
 The server stops automatically after all workers send `:none`.
 """
-function launch_server(f, num_workers)
+function launch_server(f; num_workers, batch_size)
+  @assert batch_size <= num_workers
   channel = Channel(num_workers)
   # The server is spawned on the main thread for maximal responsiveness
   Util.@tspawn_main Util.@printing_errors begin

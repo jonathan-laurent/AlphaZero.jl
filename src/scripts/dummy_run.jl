@@ -14,6 +14,7 @@ dummy_run_player(p::Benchmark.MctsRollouts) = @set p.params = dummy_run_mcts(p.p
 function dummy_run_sim(s::SimParams)
   s = @set s.num_games = 1
   s = @set s.num_workers = 1
+  s = @set s.batch_size = 1
   return s
 end
 

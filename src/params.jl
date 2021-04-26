@@ -68,6 +68,7 @@ and benchmarking.
 |:---------------------|:----------------------|:---------------|
 | `num_games`          | `Int`                 |  -             |
 | `num_workers`        | `Int`                 |  -             |
+| `batch_size `        | `Int`                 |  -             |
 | `use_gpu`            | `Bool`                | `false`        |
 | `fill_batches`       | `Bool`                | `true`         |
 | `flip_probability`   | `Float64`             | `0.`           |
@@ -76,6 +77,9 @@ and benchmarking.
 
 ## Explanations
 
+  + On each machine (process), `num_workers` simulation tasks are spawned. Inference
+    requests are processed by an inference server by batch of size `batch_size`. Note that
+    we must have `batch_size <= num_workers`.
   + If `fill_batches` is set to `true`, we make sure that batches sent to the
     neural network for inference have constant size.
   + Both players are reset (e.g. their MCTS trees are emptied)
@@ -88,6 +92,7 @@ and benchmarking.
 @kwdef struct SimParams
   num_games :: Int
   num_workers :: Int
+  batch_size :: Int
   use_gpu :: Bool = false
   fill_batches :: Bool = true
   reset_every :: Union{Nothing, Int} = 1
@@ -360,6 +365,11 @@ function check_params(gspec::AbstractGameSpec, p::Params)
   if !isnothing(p.arena)
     push!(mctss, p.arena.mcts)
     push!(sims, p.arena.sim)
+  end
+  if any(sim.batch_size > sim.num_workers for sim in sims)
+    push!(errors,
+      "The number of simulation workers must be " *
+      "greater or equal than the inference batch size.")
   end
   # Detecing non-provided symmetries
   if any(sim.flip_probability != 0 for sim in sims)

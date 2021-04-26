@@ -29,7 +29,12 @@ function profile_mcts(
 
   oracle = MCTS.RandomOracle(exp.gspec)
   if batched
-    spawn_oracle, done! = AlphaZero.batchify_oracles(oracle, false, nworkers)
+    spawn_oracle, done! =
+      AlphaZero.batchify_oracles(
+        oracle;
+        num_workers=nworkers,
+        batch_size=nworkers,
+        fill_batches=false)
     oracles = [spawn_oracle() for _ in 1:nworkers]
   else
     oracles = [oracle for _ in 1:nworkers]
@@ -53,6 +58,6 @@ function profile_mcts(
   return info.time * 1_000_000 / traversed
 end
 
-profile_mcts(nrep=64, nworkers=1)
-profile_mcts(nrep=64, nworkers=64)
-profile_mcts(nrep=64, nworkers=64, batched=true)
+# profile_mcts(nrep=64, nworkers=1)
+# profile_mcts(nrep=64, nworkers=64)
+# profile_mcts(nrep=64, nworkers=64, batched=true)

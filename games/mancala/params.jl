@@ -72,6 +72,7 @@ self_play = SelfPlayParams(
   sim=SimParams(
     num_games=5000,
     num_workers=128,
+    batch_size=128,
     use_gpu=true,
     reset_every=2,
     alternate_colors=false),
@@ -87,6 +88,7 @@ arena = ArenaParams(
   sim=SimParams(
     num_games=128,
     num_workers=128,
+    batch_size=128,
     use_gpu=true,
     reset_every=2,
     alternate_colors=true),
@@ -145,6 +147,7 @@ benchmark_sim = SimParams(
   arena.sim;
   num_games=256,
   num_workers=256,
+  batch_size=256,
   alternate_colors=false)
 
 benchmark = [
