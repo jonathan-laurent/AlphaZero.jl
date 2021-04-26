@@ -126,8 +126,7 @@ end
 """
     cycle_iterator(iterator)
 
-Generate an infinite cycle from an iterator
-    
+Generate an infinite cycle from an iterator.
 """
 function cycle_iterator(iterator)
   return (iterator for _ in Iterators.repeated(nothing)) |> Iterators.flatten
