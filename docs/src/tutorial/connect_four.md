@@ -24,7 +24,7 @@ To download AlphaZero.jl and start a new training session, just run the
 following:
 
 ```sh
-git clone --branch v0.4.0 https://github.com/jonathan-laurent/AlphaZero.jl.git
+git clone --branch v0.5.0 https://github.com/jonathan-laurent/AlphaZero.jl.git
 cd AlphaZero.jl
 julia --project -e 'import Pkg; Pkg.instantiate()'
 julia --project -e 'using AlphaZero; Scripts.train("connect-four")'
@@ -124,7 +124,7 @@ decisions.
 ### Training
 
 After the initial benchmarks are done, the first training iteration can start.
-Each training iteration took between one and two hours on our hardware. The
+Each training iteration took about an hour on our hardware. The
 first iterations are typically on the shorter end, as games of self-play
 terminate more quickly and the memory buffer has yet to reach its final size.
 
@@ -290,6 +290,7 @@ self_play = SelfPlayParams(
   sim=SimParams(
     num_games=5000,
     num_workers=128,
+    batch_size=64,
     use_gpu=true,
     reset_every=2,
     flip_probability=0.,
@@ -306,6 +307,7 @@ arena = ArenaParams(
   sim=SimParams(
     num_games=128,
     num_workers=128,
+    batch_size=128,
     use_gpu=true,
     reset_every=2,
     flip_probability=0.5,
@@ -365,6 +367,7 @@ benchmark_sim = SimParams(
   arena.sim;
   num_games=256,
   num_workers=256,
+  batch_size=256,
   alternate_colors=false)
 
 benchmark = [
