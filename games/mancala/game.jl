@@ -38,15 +38,13 @@ mutable struct GameEnv <: GI.AbstractGameEnv
   board :: Board
   curplayer :: Player
   finished :: Bool
-  winner :: Player
 end
 
 function GI.init(::GameSpec)
   board = INITIAL_STATE.board
   curplayer = INITIAL_STATE.curplayer
   finished = false
-  winner = 0
-  return GameEnv(board, curplayer, finished, winner)
+  return GameEnv(board, curplayer, finished)
 end
 
 GI.spec(::GameEnv) = GameSpec()
@@ -56,6 +54,9 @@ GI.two_players(::GameSpec) = true
 function GI.set_state!(g::GameEnv, state)
   g.board = state.board
   g.curplayer = state.curplayer
+  if sum_houses(g.board, g.curplayer) == 0 || sum_houses(g.board, other(g.curplayer)) == 0
+    g.finished = true
+  end
 end
 
 const ACTIONS = collect(1:NUM_HOUSES_PER_PLAYER)

@@ -12,6 +12,7 @@ const FULL = !CI
   test_game(games["grid-world"])
   test_game(games["tictactoe"])
   test_game(games["connect-four"])
+  test_game(games["mancala"])
   @test true
 end
 
@@ -20,5 +21,6 @@ end
   @test dummy_run(experiments["tictactoe"], nostdout=false) == nothing
   if FULL
     @test dummy_run(experiments["connect-four"], nostdout=false) == nothing
+    @test dummy_run(experiments["mancala"], nostdout=false) == nothing
   end
 end
