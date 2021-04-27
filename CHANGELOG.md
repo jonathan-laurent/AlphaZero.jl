@@ -37,3 +37,14 @@ Initial release, as announced on [Julia's discourse](@ref https://discourse.juli
 - Replaced the async MCTS implementation by a more straightforward synchronous
   implementation. Network inference requests are now batched across game simulations.
 - Added the Experiment and Scripts module to simplify common tasks.
+
+## Version 0.5
+
+- Improved the inference server so that it is now possible to keep MCTS workers
+  running while a batch of requests is being processed by the GPU. Concretely,
+  this translates into `SimParams` now having two separate `num_workers` and
+  `batch_size` parameters.
+- The inference server is now spawned on a separate thread to ensure minimal latency.
+
+Together, the two aforementioned improvements result in a 30% global speedup on the
+connect-four benchmark.
