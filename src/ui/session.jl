@@ -51,7 +51,7 @@ mutable struct Session{Env}
   save_intermediate :: Bool
   benchmark :: Vector{Benchmark.Evaluation}
   # Temporary state for logging
-  progress :: Option{Progress}
+  progress :: Union{Progress, Nothing}
   report :: SessionReport
 
   function Session(env, dir, logger, autosave, save_intermediate, benchmark)
@@ -94,10 +94,10 @@ function save_env(env::Env, dir)
   serialize(joinpath(dir, GSPEC_FILE), env.gspec)
   serialize(joinpath(dir, PARAMS_FILE), env.params)
   open(joinpath(dir, PARAMS_JSON_FILE), "w") do io
-    JSON2.pretty(io, JSON3.write(env.params))
+    JSON3.pretty(io, JSON3.write(env.params))
   end
   open(joinpath(dir, NET_PARAMS_FILE), "w") do io
-    JSON2.pretty(io, JSON3.write(Network.hyperparams(env.bestnn)))
+    JSON3.pretty(io, JSON3.write(Network.hyperparams(env.bestnn)))
   end
   serialize(joinpath(dir, BESTNN_FILE), env.bestnn)
   serialize(joinpath(dir, CURNN_FILE), env.curnn)
@@ -144,12 +144,12 @@ end
 
 function save_report_increment(session, bench, itrep, idir)
   open(joinpath(idir, BENCHMARK_FILE), "w") do io
-    JSON2.pretty(io, JSON3.write(bench))
+    JSON3.pretty(io, JSON3.write(bench))
   end
   if session.env.itc > 0
     @assert !isnothing(itrep)
     open(joinpath(idir, REPORT_FILE), "w") do io
-      JSON2.pretty(io, JSON3.write(itrep))
+      JSON3.pretty(io, JSON3.write(itrep))
     end
   end
 end
@@ -562,7 +562,7 @@ function run_new_benchmark(session_dir, name, benchmark; logger, itcmax=nothing)
     push!(reports, report)
     # Save the intermediate reports
     open(joinpath(outdir, BENCHMARK_FILE), "w") do io
-      JSON2.pretty(io, JSON3.write(reports))
+      JSON3.pretty(io, JSON3.write(reports))
     end
     plot_benchmark(env.params, reports, outdir)
     itc += 1

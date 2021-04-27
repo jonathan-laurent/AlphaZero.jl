@@ -11,19 +11,19 @@
 #####
 
 # """
-#    fill_and_evaluate(net, batch; batch_size, fill)
+#    fill_and_evaluate(net, batch; batch_size, fill_batches)
 
 # Evaluate a neural network on a batch of inputs.
 
-# If `fill=true`, the batch is padded with dummy inputs until it has size `batch_size`
-# before it is sent to the network.
+# If `fill_batches=true`, the batch is padded with dummy inputs until
+# it has size `batch_size` before it is sent to the network.
 
 # This function is typically called by inference servers.
 # """
-function fill_and_evaluate(net, batch; batch_size, fill)
+function fill_and_evaluate(net, batch; batch_size, fill_batches)
   n = length(batch)
   @assert n > 0
-  if !fill
+  if !fill_batches
     return Network.evaluate_batch(net, batch)
   else
     nmissing = batch_size - n
@@ -38,20 +38,25 @@ function fill_and_evaluate(net, batch; batch_size, fill)
 end
 
 # """
-#     launch_inference_server(net, nworkers; fill_batches)
+#     launch_inference_server(net; num_workers, fill_batches)
 
 # Start a server that processes inference requests for a single neural network.
 
 # Return a request channel (see [`Batchifier.launch_server`](@ref)).
 # """
-function launch_inference_server(net::AbstractNetwork, nworkers; fill_batches)
-  return Batchifier.launch_server(nworkers) do batch
-    fill_and_evaluate(net, batch; batch_size=nworkers, fill=fill_batches)
+function launch_inference_server(
+    net::AbstractNetwork;
+    num_workers,
+    batch_size,
+    fill_batches)
+
+  return Batchifier.launch_server(;num_workers, batch_size) do batch
+    fill_and_evaluate(net, batch; batch_size, fill_batches)
   end
 end
 
 # """
-#     launch_inference_server(net1, net2, nworkers; fill_batches)
+#     launch_inference_server(net1, net2, num_workers; fill_batches)
 # 
 # Start a server that processes inference requests for TWO networks.
 # This is needed when pitting two players together that rely on distinct networks for
@@ -64,24 +69,26 @@ end
 # """
 function launch_inference_server(
     net1::AbstractNetwork,
-    net2::AbstractNetwork,
-    nworkers;
+    net2::AbstractNetwork;
+    num_workers,
+    batch_size,
     fill_batches)
-  return Batchifier.launch_server(nworkers) do batch
+
+  return Batchifier.launch_server(;num_workers, batch_size) do batch
     n = length(batch)
     mask1 = findall(b -> b.netid == 1, batch)
     mask2 = findall(b -> b.netid == 2, batch)
     @assert length(mask1) + length(mask2) == n
-    state(x) = x.state
+    state(x) = x.state # TODO: this is ugly
     batch1 = state.(batch[mask1])
     batch2 = state.(batch[mask2])
     if isempty(mask2) # there are only queries from net1
-      return fill_and_evaluate(net1, batch1; batch_size=n, fill=fill_batches)
+      return fill_and_evaluate(net1, batch1; batch_size=n, fill_batches)
     elseif isempty(mask1) # there are only queries from net2
-      return fill_and_evaluate(net2, batch2; batch_size=n, fill=fill_batches)
+      return fill_and_evaluate(net2, batch2; batch_size=n, fill_batches)
     else # both networks sent queries
-      res1 = fill_and_evaluate(net1, batch1; batch_size=n, fill=fill_batches)
-      res2 = fill_and_evaluate(net2, batch2; batch_size=n, fill=fill_batches)
+      res1 = fill_and_evaluate(net1, batch1; batch_size=n, fill_batches)
+      res2 = fill_and_evaluate(net2, batch2; batch_size=n, fill_batches)
       @assert typeof(res1) == typeof(res2)
       res = similar(res1, n)
       res[mask1] = res1
@@ -92,7 +99,7 @@ function launch_inference_server(
 end
 
 # """
-#     batchify_oracles(oracles, fill_batches, num_workers)
+#     batchify_oracles(oracles; num_workers, batch_size, fill_batches)
 
 # Take some oracles, launch a server to call them by batches if needed and return a pair
 # of functions to be called by each concurrent worker:
@@ -114,36 +121,36 @@ send_done!(reqc) = () -> Batchifier.client_done!(reqc)
 zipthunk(f1, f2) = () -> (f1(), f2())
 
 # Two neural network oracles
-function batchify_oracles(os::Tuple{AbstractNetwork, AbstractNetwork}, fill, n)
-  reqc = launch_inference_server(os[1], os[2], n, fill_batches=fill)
+function batchify_oracles(os::Tuple{AbstractNetwork, AbstractNetwork}; kwargs...)
+  reqc = launch_inference_server(os[1], os[2]; kwargs...)
   make1() = Batchifier.BatchedOracle(reqc, st -> (state=st, netid=1))
   make2() = Batchifier.BatchedOracle(reqc, st -> (state=st, netid=2))
   return zipthunk(make1, make2), send_done!(reqc)
 end
 
-function batchify_oracles(os::Tuple{<:Any, AbstractNetwork}, fill, n)
-  reqc = launch_inference_server(os[2], n, fill_batches=fill)
+function batchify_oracles(os::Tuple{<:Any, AbstractNetwork}; kwargs...)
+  reqc = launch_inference_server(os[2]; kwargs...)
   make2() = Batchifier.BatchedOracle(reqc)
   return zipthunk(ret_oracle(os[1]), make2), send_done!(reqc)
 end
 
-function batchify_oracles(os::Tuple{AbstractNetwork, <:Any}, fill, n)
-  reqc = launch_inference_server(os[1], n, fill_batches=fill)
+function batchify_oracles(os::Tuple{AbstractNetwork, <:Any}; kwargs...)
+  reqc = launch_inference_server(os[1]; kwargs...)
   make1() = Batchifier.BatchedOracle(reqc)
   return zipthunk(make1, ret_oracle(os[2])), send_done!(reqc)
 end
 
-function batchify_oracles(os::Tuple{<:Any, <:Any}, fill, n)
+function batchify_oracles(os::Tuple{<:Any, <:Any}; kwargs...)
   return zipthunk(ret_oracle(os[1]), ret_oracle(os[2])), do_nothing!
 end
 
-function batchify_oracles(o::AbstractNetwork, fill, n)
-  reqc = launch_inference_server(o, n, fill_batches=fill)
+function batchify_oracles(o::AbstractNetwork; kwargs...)
+  reqc = launch_inference_server(o; kwargs...)
   make() = Batchifier.BatchedOracle(reqc)
   return make, send_done!(reqc)
 end
 
-function batchify_oracles(o::Any, fill, n)
+function batchify_oracles(o::Any; kwargs...)
   return ret_oracle(o), do_nothing!
 end
 
@@ -205,7 +212,7 @@ function simulate(
 
   oracles = simulator.make_oracles()
   spawn_oracles, done =
-    batchify_oracles(oracles, p.fill_batches, p.num_workers)
+    batchify_oracles(oracles; p.num_workers, p.batch_size, p.fill_batches)
   return Util.mapreduce(1:p.num_games, p.num_workers, vcat, []) do
     oracles = spawn_oracles()
     player = simulator.make_player(oracles)
@@ -250,7 +257,7 @@ function simulate_distributed(
 
   # Spawning a task to keep count of completed simulations
   chan = Distributed.RemoteChannel(()->Channel{Nothing}(1))
-  Threads.@spawn begin
+  Util.@tspawn_main begin
     for i in 1:p.num_games
       take!(chan)
       game_simulated()

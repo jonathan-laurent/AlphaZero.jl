@@ -1,56 +1,20 @@
 module Util
 
-export Option, apply_temperature
+export apply_temperature
 
 import Random
+import ThreadPools
 using Distributions: Categorical
-
-const Option{T} = Union{T, Nothing}
-
-infinity(::Type{R}) where R <: Real = one(R) / zero(R)
-
-"""
-    concat_columns(cols) == hcat(cols...) # but faster
-"""
-function concat_columns(cols)
-  @assert !isempty(cols)
-  nsamples = length(cols)
-  excol = first(cols)
-  sdim = length(excol)
-  arr = similar(excol, (sdim, nsamples))
-  for (i, col) in enumerate(cols)
-    arr[:,i] = col
-  end
-  return arr
-end
-
-"""
-    superpose(xs) == cat(xs..., dims=ndims(first(xs))+1) # but faster
-"""
-function superpose(arrays)
-  n = length(arrays)
-  @assert n > 0
-  ex = first(arrays)
-  dest = similar(ex, size(ex)..., n)
-  i = 1
-  for src in arrays
-    for j in eachindex(src)
-      dest[i] = src[j]
-      i += 1
-    end
-  end
-  return dest
-end
 
 """
     @printing_errors expr
 
 Evaluate expression `expr` while printing any uncaught exception on `stderr`.
-
 This is useful to avoid silent falure of concurrent tasks, as explained in
 [this issue](https://github.com/JuliaLang/julia/issues/10405).
 """
 macro printing_errors(expr)
+  # TODO: we should be able to replace this by `Base.erroronitor` in Julia 1.7
   return quote
     try
       $(esc(expr))
@@ -144,7 +108,7 @@ function apply_temperature(π, τ)
 end
 
 """
-Same smoothing function that is used by Temsorboard to smooth time series.
+Same smoothing function that is used by Tensorboard to smooth time series.
 """
 function momentum_smoothing(x, μ)
   sx = similar(x)
@@ -158,80 +122,25 @@ function momentum_smoothing(x, μ)
 end
 
 """
-    batches(X, batchsize; partial=false)
+    cycle_iterator(iterator)
 
-Take a data tensor `X` and split it into batches of fixed size along the
-last dimension of `X`.
-
-If `partial=true` and the number of samples in `X` is
-not a multiple of `batchsize`, then an additional smaller batch is added
-at the end (otherwise, it is discarded).
+Generate an infinite cycle from an iterator.
 """
-function batches(X, batchsize; partial=false)
-  n = size(X)[end]
-  b = batchsize
-  nbatches = n ÷ b
-  # The call to `copy` after selectdim is important because Flux does not
-  # deal well with views.
-  select(a, b) = copy(selectdim(X, ndims(X), a:b))
-  batches = [select(1+b*(i-1), b*i) for i in 1:nbatches]
-  if partial && n % b > 0
-    # If the number of samples is not a multiple of the batch size
-    push!(batches, select(b*nbatches+1, n))
-  end
-  return batches
-end
-
-function batches_tests()
-  @assert batches(collect(1:5), 2, partial=true) == [[1, 2], [3, 4], [5]]
-end
-
-"""
-    random_batches(convert, data::Tuple, batchsize; partial=false)
-
-Take a tuple of data tensors, shuffle its samples according to a random
-permutation and split them into a sequence of minibatches.
-
-The result is a lazy iterator that calls `convert` on the tensors of each
-new batch right before returning it. The `convert` function is typically
-used to transfer data onto the GPU.
-
-!!! note
-    In the future, it may be good to deprecate this function along with
-    [`random_batches_stream`](@ref) and use a standard solution instead,
-    such as `Flux.DataLoader`.
-"""
-function random_batches(
-  convert, data::Tuple, batchsize; partial=false)
-  n = size(data[1])[end]
-  perm = Random.randperm(n)
-  batchs = map(data) do x
-    batches(selectdim(x, ndims(x), perm), batchsize, partial=partial)
-  end
-  batchs = collect(zip(batchs...))
-  return (convert.(b) for b in batchs)
-end
-
-"""
-    random_batches_stream(convert, data::Tuple, batchsize)
-
-Generate an infinite stateful iterator of random batches by calling
-[`random_batches`](@ref) repeatedly. Every sample is guaranteed to be drawn
-exactly once per epoch.
-"""
-function random_batches_stream(convert, data::Tuple, batchsize)
-  partial = size(data[1])[end] < batchsize
-  return Iterators.Stateful(Iterators.flatten((
-    random_batches(convert, data, batchsize, partial=partial)
-    for _ in Iterators.repeated(nothing))))
+function cycle_iterator(iterator)
+  return (iterator for _ in Iterators.repeated(nothing)) |> Iterators.flatten
 end
 
 #####
 ##### Multithreading utilities
 #####
 
-function threads_pmap(f, xs)
-  return fetch.([Threads.@spawn @printing_errors f(x) for x in xs])
+function tmap_bg(f, xs)
+  nbg = Threads.nthreads() - 1
+  tasks = map(enumerate(xs)) do (i, x)
+    tid = nbg > 0 ? 2 + ((i - 1) % nbg) : 1
+    ThreadPools.@tspawnat tid @printing_errors f(x) 
+  end
+  return fetch.(tasks)
 end
 
 # TODO: the `mapreduce` function should ultimately be removed and replaced by a
@@ -247,6 +156,8 @@ The `make_worker` function must create a worker `w` with two fields:
   - a `process` function such that `w.process(x)` evaluates to `f(x)`
   - a `terminate` function to be called with no argument when the worker terminates.
 
+This function only spawns workers on background threads (with id greater or equal than 1).
+
 !!! note
 
     This function makes one call to `combine` per computed element
@@ -258,8 +169,10 @@ function mapreduce(make_worker, args, num_workers, combine, init)
   ret = init
   lock = ReentrantLock()
   tasks = []
-  for w in 1:num_workers
-    task = Threads.@spawn Util.@printing_errors begin
+  nbg = Threads.nthreads() - 1
+  for i in 1:num_workers
+    tid = nbg > 0 ? 2 + ((i - 1) % nbg) : 1
+    task = ThreadPools.@tspawnat tid Util.@printing_errors begin
       local k = 0
       worker = make_worker()
       while true
@@ -294,6 +207,10 @@ function mapreduce_sequential(make_worker, args, num_workers, combine, unit)
     return y
   end
   return reduce(combine, ys, init=unit)
+end
+
+macro tspawn_main(e)
+  return :(ThreadPools.@tspawnat 1 $(esc(e)))
 end
 
 end

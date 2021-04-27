@@ -10,4 +10,3 @@ res = Util.mapreduce(1:n, num_workers, +, 0) do
   return (process=process, terminate=terminate)
 end
 @test res == sum(i^2 for i in 1:n)
-@test true

@@ -2,6 +2,7 @@ using AlphaZero
 using AlphaZero.Examples: games, experiments
 using AlphaZero.Scripts: dummy_run, test_game
 
+using Base.Filesystem: rm
 using Test
 
 const CI = get(ENV, "CI", nothing) == "true"

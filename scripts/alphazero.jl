@@ -2,8 +2,11 @@
 ##### Simple CLI for AlphaZero.jl
 #####
 
-# We recommend using a splitting pool but this may require precompiling CUDA.jl again.
-# ENV["JULIA_CUDA_MEMORY_POOL"] = "split" # "binned" / "split"
+# We recommend using the cuda asynchronous memory pool, which should be used by default
+# by CUDA.jl if your CUDA toolkit version is 11.2 or higher. As a second choice, you may
+# also use the splitting pool (the binned pool is not recommended).
+
+# ENV["JULIA_CUDA_MEMORY_POOL"] = "cuda"  # "cuda" / "split" "binned"
 
 # Enables running the script on a distant machine without an X server
 ENV["GKSwstype"]="nul"

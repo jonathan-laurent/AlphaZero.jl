@@ -14,6 +14,7 @@ dummy_run_player(p::Benchmark.MctsRollouts) = @set p.params = dummy_run_mcts(p.p
 function dummy_run_sim(s::SimParams)
   s = @set s.num_games = 1
   s = @set s.num_workers = 1
+  s = @set s.batch_size = 1
   return s
 end
 
@@ -66,6 +67,7 @@ a real training session is started.
 function dummy_run(experiment::Experiment; dir=nothing, nostdout=false)
   experiment = dummy_run_experiment(experiment)
   isnothing(dir) && (dir = "sessions/dummy-$(experiment.name)")
+  rm(dir, force=true, recursive=true)
   session = Session(experiment; dir, nostdout)
   resume!(session)
   return

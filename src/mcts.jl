@@ -62,7 +62,7 @@ struct RandomOracle{GameSpec}
   gspec :: GameSpec
 end
 
-function (::RandomOracle)(state)
+function (r::RandomOracle)(state)
   g = GI.init(r.gspec, state)
   n = length(GI.available_actions(g))
   P = ones(n) ./ n

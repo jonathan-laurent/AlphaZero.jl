@@ -3,7 +3,7 @@
 #####
 
 # A samples collection is represented on the learning side as a (W, X, A, P, V)
-# tuple. Each component is a `Float32` tensor whose last dimension corresponds
+# named-tuple. Each component is a `Float32` tensor whose last dimension corresponds
 # to the sample index. Writing `n` the number of samples and `a` the total
 # number of actions:
 # - W (size 1×n) contains the samples weights
@@ -32,7 +32,7 @@ function convert_sample(
   p = zeros(size(a))
   p[a] = e.π
   v = [e.z]
-  return (w, x, a, p, v)
+  return (; w, x, a, p, v)
 end
 
 function convert_samples(
@@ -41,13 +41,13 @@ function convert_samples(
     es::Vector{<:TrainingSample})
 
   ces = [convert_sample(gspec, wp, e) for e in es]
-  W = Util.superpose((e[1] for e in ces))
-  X = Util.superpose((e[2] for e in ces))
-  A = Util.superpose((e[3] for e in ces))
-  P = Util.superpose((e[4] for e in ces))
-  V = Util.superpose((e[5] for e in ces))
+  W = Flux.batch((e.w for e in ces))
+  X = Flux.batch((e.x for e in ces))
+  A = Flux.batch((e.a for e in ces))
+  P = Flux.batch((e.p for e in ces))
+  V = Flux.batch((e.v for e in ces))
   f32(arr) = convert(AbstractArray{Float32}, arr)
-  return f32.((W, X, A, P, V))
+  return map(f32, (; W, X, A, P, V))
 end
 
 #####
@@ -64,7 +64,8 @@ entropy_wmean(π, w) = -sum(π .* log.(π .+ eps(eltype(π))) .* w) / sum(w)
 
 wmean(x, w) = sum(x .* w) / sum(w)
 
-function losses(nn, params, Wmean, Hp, (W, X, A, P, V))
+function losses(nn, regws, params, Wmean, Hp, (W, X, A, P, V))
+  # `regws` must be equal to `Network.regularized_params(nn)`
   creg = params.l2_regularization
   cinv = params.nonvalidity_penalty
   P̂, V̂, p_invalid = Network.forward_normalized(nn, X, A)
@@ -74,7 +75,7 @@ function losses(nn, params, Wmean, Hp, (W, X, A, P, V))
   Lv = mse_wmean(V̂, V, W)
   Lreg = iszero(creg) ?
     zero(Lv) :
-    creg * sum(sum(w .* w) for w in Network.regularized_params(nn))
+    creg * sum(sum(w .* w) for w in regws)
   Linv = iszero(cinv) ?
     zero(Lv) :
     cinv * wmean(p_invalid, W)
@@ -90,7 +91,7 @@ struct Trainer
   network :: AbstractNetwork
   samples :: Vector{<:TrainingSample}
   params :: LearningParams
-  data :: Tuple # (W, X, A, P, V) tuple obtained after converting `samples`
+  data :: NamedTuple # (W, X, A, P, V) tuple obtained after converting `samples`
   Wmean :: Float32
   Hp :: Float32
   batches_stream # infinite stateful iterator of training batches
@@ -103,23 +104,29 @@ struct Trainer
     W, X, A, P, V = data  
     Wmean = mean(W)
     Hp = entropy_wmean(P, W)
-    batches_stream = Util.random_batches_stream(data, params.batch_size) do x
-      Network.convert_input(network, x)
-    end
+    # Create a batches stream
+    batchsize = min(params.batch_size, length(W))
+    batches = Flux.Data.DataLoader(data; batchsize, partial=false, shuffle=true)
+    batches_stream = map(batches) do b
+      Network.convert_input(network, b)
+    end |> Util.cycle_iterator |> Iterators.Stateful
     return new(network, samples, params, data, Wmean, Hp, batches_stream)
   end
 end
 
-data_weights(tr::Trainer) = tr.data[1] # Return the W tensor
+data_weights(tr::Trainer) = tr.data.W
 
-num_batches_total(tr::Trainer) = length(data_weights(tr)) ÷ tr.params.batch_size
+num_samples(tr::Trainer) = length(data_weights(tr))
+
+num_batches_total(tr::Trainer) = num_samples(tr) ÷ tr.params.batch_size
 
 function get_trained_network(tr::Trainer)
   return Network.copy(tr.network, on_gpu=false, test_mode=true)
 end
 
 function batch_updates!(tr::Trainer, n)
-  L(batch...) = losses(tr.network, tr.params, tr.Wmean, tr.Hp, batch)[1]
+  regws = Network.regularized_params(tr.network)
+  L(batch...) = losses(tr.network, regws, tr.params, tr.Wmean, tr.Hp, batch)[1]
   data = Iterators.take(tr.batches_stream, n)
   ls = Vector{Float32}()
   Network.train!(tr.network, tr.params.optimiser, L, data, n) do i, l
@@ -133,7 +140,7 @@ end
 ##### Generating debugging reports
 #####
 
-function mean_learning_status(reports::Vector{Report.LearningStatus}, ws)
+function mean_learning_status(reports, ws)
   L     = wmean([r.loss.L     for r in reports], ws)
   Lp    = wmean([r.loss.Lp    for r in reports], ws)
   Lv    = wmean([r.loss.Lv    for r in reports], ws)
@@ -148,7 +155,8 @@ function learning_status(tr::Trainer, samples)
   # As done now, this is slighly inefficient as we solve the
   # same neural network inference problem twice
   W, X, A, P, V = samples
-  Ls = losses(tr.network, tr.params, tr.Wmean, tr.Hp, samples)
+  regws = Network.regularized_params(tr.network)
+  Ls = losses(tr.network, regws, tr.params, tr.Wmean, tr.Hp, samples)
   Ls = Network.convert_output_tuple(tr.network, Ls)
   Pnet, _ = Network.forward_normalized(tr.network, X, A)
   Hpnet = entropy_wmean(Pnet, W)
@@ -157,14 +165,13 @@ function learning_status(tr::Trainer, samples)
 end
 
 function learning_status(tr::Trainer)
-  batch_size = tr.params.loss_computation_batch_size
-  partial = length(data_weights(tr)) < batch_size
-  batches = Util.random_batches(tr.data, batch_size, partial=partial) do x
-    Network.convert_input(tr.network, x)
+  batchsize = min(tr.params.loss_computation_batch_size, num_samples(tr))
+  batches = Flux.Data.DataLoader(tr.data; batchsize, partial=true)
+  reports = map(batches) do batch
+    batch = Network.convert_input(tr.network, batch)
+    return learning_status(tr, batch)
   end
-  Network.gc(tr.network)
-  reports = [learning_status(tr, batch) for batch in batches]
-  ws = [sum(data_weights(tr)) for batch in batches]
+  ws = [sum(batch.W) for batch in batches]
   return mean_learning_status(reports, ws)
 end
 

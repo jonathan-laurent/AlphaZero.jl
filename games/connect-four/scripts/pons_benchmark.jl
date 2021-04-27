@@ -116,9 +116,10 @@ function test_player_on(make_player, oracle, benchmark, progress)
   batches = Iterators.partition(entries, batch_size) |> collect
   nworkers = length(batches)
   # Spawn nworkers workers (nworkers <= NUM_WORKERS)
-  spawn_oracle, done = AlphaZero.batchify_oracles(oracle, false, nworkers)
+  spawn_oracle, done = AlphaZero.batchify_oracles(
+    oracle; num_workers=nworkers, batch_size=nworkers, fill_batches=false)
   solver = Solver.Player()
-  results = AlphaZero.Util.threads_pmap(batches) do batch
+  results = AlphaZero.Util.tmap_bg(batches) do batch
     player = make_player(spawn_oracle())
     res = map(batch) do e
       err = optimal_on(solver, player, e) ? 0. : 1.

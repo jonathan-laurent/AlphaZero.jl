@@ -9,6 +9,7 @@ self_play = SelfPlayParams(
   sim=SimParams(
     num_games=1000,
     num_workers=4,
+    batch_size=4,
     use_gpu=false,
     reset_every=16,
     flip_probability=0.,
@@ -24,6 +25,7 @@ arena = ArenaParams(
   sim=SimParams(
     num_games=100,
     num_workers=10,
+    batch_size=10,
     use_gpu=false,
     reset_every=1,
     flip_probability=0.,
@@ -58,7 +60,8 @@ params = Params(
 benchmark_sim = SimParams(
   arena.sim;
   num_games=500,
-  num_workers=10)
+  num_workers=10,
+  batch_size=10)
 
 benchmark = [
   Benchmark.Single(
