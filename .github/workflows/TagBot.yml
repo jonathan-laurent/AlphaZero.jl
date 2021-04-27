@@ -14,17 +14,14 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           ssh: ${{ secrets.DOCUMENTER_KEY }}
+          changelog: |
+            ## {{ package }} {{ version }}
+            {% if previous_release %}
+            [Diff since {{ previous_release }}]({{ compare_url }})
+            {% endif %}
+            {% if custom %}
+            {{ custom }}
+            {% endif %}
 
-with:
-  token: ${{ secrets.GITHUB_TOKEN }}
-  changelog: |
-    ## {{ package }} {{ version }}
-    {% if previous_release %}
-    [Diff since {{ previous_release }}]({{ compare_url }})
-    {% endif %}
-    {% if custom %}
-    {{ custom }}
-    {% endif %}
-
-    See CHANGELOG.md for more details.
-    {% endif %}
+            See CHANGELOG.md for more details.
+            {% endif %}
