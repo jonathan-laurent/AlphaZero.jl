@@ -24,4 +24,3 @@ jobs:
             {% endif %}
 
             See CHANGELOG.md for more details.
-            {% endif %}
