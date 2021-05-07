@@ -38,15 +38,13 @@ mutable struct GameEnv <: GI.AbstractGameEnv
   board :: Board
   curplayer :: Player
   finished :: Bool
-  winner :: Player
 end
 
 function GI.init(::GameSpec)
   board = INITIAL_STATE.board
   curplayer = INITIAL_STATE.curplayer
   finished = false
-  winner = 0
-  return GameEnv(board, curplayer, finished, winner)
+  return GameEnv(board, curplayer, finished)
 end
 
 GI.spec(::GameEnv) = GameSpec()
@@ -56,6 +54,9 @@ GI.two_players(::GameSpec) = true
 function GI.set_state!(g::GameEnv, state)
   g.board = state.board
   g.curplayer = state.curplayer
+  if sum_houses(g.board, g.curplayer) == 0 || sum_houses(g.board, other(g.curplayer)) == 0
+    g.finished = true
+  end
 end
 
 const ACTIONS = collect(1:NUM_HOUSES_PER_PLAYER)
@@ -149,12 +150,10 @@ function GI.play!(g::GameEnv, a)
     pos = next_pos(pos, g.curplayer)
     g.board = write_pos(g.board, pos, read_pos(g.board, pos) + 1)
   end
-
   # Check endgame
   if sum_houses(g.board, g.curplayer) == 0
     g.board = capture_leftovers(g.board, other(g.curplayer))
     g.finished = true
-
   elseif isa(pos, HousePos)
     # Capture opposite house if last seed was put in empty house on your side # MUST CHECK ENDGAME AFTER
     if read_pos(g.board, pos) == 1 && g.curplayer == pos.player
