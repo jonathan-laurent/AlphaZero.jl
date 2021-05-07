@@ -2,7 +2,7 @@
 
 ## Version 0.1
 
-Initial release, as announced on [Julia's discourse](@ref https://discourse.julialang.org/t/announcing-alphazero-jl/36877).
+Initial release, as announced on [Julia's discourse](https://discourse.julialang.org/t/announcing-alphazero-jl/36877).
 
 ## Version 0.2
 
