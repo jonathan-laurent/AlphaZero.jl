@@ -121,7 +121,7 @@ is drawn once per call to [`MCTS.explore!`](@ref) from a Dirichlet distribution
 of parameter ``α``.
 """
 mutable struct Env{State, Oracle}
-  # Store (nonterminal) state statistics assuming player one is to play
+  # Store (nonterminal) state statistics assuming the white player is to play
   tree :: Dict{State, StateInfo}
   # External oracle to evaluate positions
   oracle :: Oracle
@@ -186,7 +186,6 @@ function uct_scores(info::StateInfo, cpuct, ϵ, η)
   end
 end
 
-# Also decreases the visit count
 function update_state_info!(env, state, action_id, q)
   stats = env.tree[state].stats
   astats = stats[action_id]
@@ -195,7 +194,7 @@ end
 
 # Run a single MCTS simulation, updating the statistics of all traversed states.
 # Return the estimated Q-value for the current player.
-# Modifies the state of the game.
+# Modifies the state of the game environment.
 function run_simulation!(env::Env, game; η, root=true)
   if GI.game_terminated(game)
     return 0.
