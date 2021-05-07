@@ -1,3 +1,7 @@
 # Mancala
 
-Default support for the game of Mancala, in progress.
+Using AlphaZero.jl on the game of
+[Mancala](https://endlessgames.com/wp-content/uploads/Mancala_Instructions.pdfs).
+
+**Example status:** the example should run but the hyperparameters have yet to be tuned.
+Currently, the network alone has a ~30% win rate against a vanilla MCTS agent.

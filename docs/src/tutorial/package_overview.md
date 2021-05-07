@@ -74,6 +74,8 @@ profiling, benchmarking and model exploration.
   resume training.
 - An [interactive command interpreter](@ref explorer) can be used to explore the
   behavior of AlphaZero agents.
+- Common tasks can be executed in a single line thanks to the [Scripts](@ref scripts)
+  module.
 - Reports are generated automatically after each training iteration to help
   diagnosing problems and tuning hyperparameters. An extensive documentation of
   collected metrics can be found in [Training Reports](@ref reports) and

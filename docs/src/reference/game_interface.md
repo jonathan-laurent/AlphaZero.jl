@@ -90,7 +90,7 @@ available_actions
 apply_random_symmetry!
 ```
 
-## Wrapper for CommonRLInterface.jl
+## [Wrapper for CommonRLInterface.jl](@id common_rl_intf)
 
 ```@meta
 CurrentModule = AlphaZero

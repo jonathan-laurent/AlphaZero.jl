@@ -2,7 +2,6 @@
 ##### Utilities to batch oracles
 #####
 
-
 """
 Utilities for batchifying oracle evaluation.
 
@@ -87,7 +86,7 @@ It should be called ``n`` times in total, where ``n`` is the number of workers t
 indicated to [`launch_server`](@ref).
 
 !!! note
-    
+
     This function does not take a `BatchedOracle` as an argument as there can be several
     oracles per worker (e.g. a worker can simulate games between two players that each
     rely on a neural network).

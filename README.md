@@ -114,6 +114,7 @@ For more information on training a Connect Four agent using AlphaZero.jl, see ou
 - [An Introduction to AlphaZero](https://jonathan-laurent.github.io/AlphaZero.jl/dev/tutorial/alphazero_intro/)
 - [Package Overview](https://jonathan-laurent.github.io/AlphaZero.jl/dev/tutorial/package_overview/)
 - [Connect-Four Tutorial](https://jonathan-laurent.github.io/AlphaZero.jl/dev/tutorial/connect_four/)
+- [Solving Your Own Games](https://jonathan-laurent.github.io/AlphaZero.jl/dev/tutorial/own_game/)
 - [Hyperparameters Documentation](https://jonathan-laurent.github.io/AlphaZero.jl/dev/reference/params/)
 
 ### Contributors

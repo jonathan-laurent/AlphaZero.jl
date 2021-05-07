@@ -124,8 +124,6 @@ module AlphaZero
   # based on the value of the ALPHAZERO_DEFAULT_DL_FRAMEWORK environment variable.
   const DEFAULT_DL_FRAMEWORK = get(ENV, "ALPHAZERO_DEFAULT_DL_FRAMEWORK", "FLUX")
 
-  # Only Flux works with CUDA,NNlib#master right now.
-
   if DEFAULT_DL_FRAMEWORK == "FLUX"
     # @info "Using the Flux implementation of AlphaZero.NetLib."
     KNET_ADVICE =
@@ -133,7 +131,6 @@ module AlphaZero
     For optimal performances, we recommend that you configure AlphaZero.jl
     to use Knet as a backend by setting ALPHAZERO_DEFAULT_DL_FRAMEWORK to KNET.
     """
-    # Knet does not work with the latest CUDA.jl so we disable this advice for now.
     # @info KNET_ADVICE
     @eval begin
       include("networks/flux.jl")
@@ -141,6 +138,7 @@ module AlphaZero
     end
   elseif DEFAULT_DL_FRAMEWORK == "KNET"
     # @info "Using the Knet implementation of AlphaZero.NetLib."
+    error("Knet does not yet work with CUDA v3 so we are using the Flux backend instead.")
     @eval begin
       include("networks/knet.jl")
       const NetLib = KnetLib

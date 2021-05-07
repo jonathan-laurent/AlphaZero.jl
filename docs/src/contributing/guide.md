@@ -60,8 +60,8 @@ the resulting insights.
 
 #### [Improve the user interface](@id improve_ui)
 
-An effort has been made in designing AlphaZero.jl to separate the
-user interface code from the core logic (see [`AlphaZero.Handlers`](@ref)).
-We would be interested in seeing alternative user interfaces being developed.
-In particular, using something like TensorBoard for logging and/or profiling
-might be nice.
+An effort has been made in designing AlphaZero.jl to separate the user interface code from
+the core logic (see [`AlphaZero.Handlers`](@ref)). We would be interested in seeing
+alternative user interfaces being developed. In particular, using something like
+[TensorBoardLogger](https://github.com/PhilipVinc/TensorBoardLogger.jl) or
+[Dash](https://github.com/plotly/Dash.jl) for logging and/or profiling might be nice.
