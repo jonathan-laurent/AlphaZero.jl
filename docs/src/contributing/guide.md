@@ -3,16 +3,15 @@
 Contributions to AlphaZero.jl are most welcome. Here are some contribution
 ideas:
 
-  - [Add support for a new game](@ref)
+  - [Solve new games](@ref)
   - [Help with hyperparameter tuning](@ref)
   - [Improve the user interface](@ref improve_ui)
   - Write tutorials or other learning resources based on this package
 
-We also believe that AlphaZero.jl can be made significantly faster
+We also believe that AlphaZero.jl can be made even faster
 without adding too much complexity to the codebase.
 Here are suggestions to make this happen:
-  - Accelerate network inference using Int8 quantization
-  - Add support for multiple GPUs
+  - Accelerate network inference by adding support for FP16 or Int8 quantization
   - Enable data generation, network updates and checkpoint evaluations
     to be run in parallel
 
@@ -27,6 +26,11 @@ ML projects. Here are a few examples:
   - Use supervised learning to initialize the network based on a set of games
     played by humans
   - Implement the alternate training target proposed [here](https://medium.com/oracledevs/lessons-from-alphazero-part-4-improving-the-training-target-6efba2e71628)
+  - Implement some of the improvements introduced in the [KataGo](https://arxiv.org/pdf/1902.10565.pdf) paper
+
+
+You may also want to have a look at our JSOC (Julia Summer of
+Code) [project page](https://julialang.org/jsoc/gsoc/flux/#alphazerojl).
 
 Please do not hesitate to open a Github
 [issue](https://github.com/jonathan-laurent/AlphaZero.jl/issues) to share
@@ -34,7 +38,7 @@ any idea, feedback or suggestion.
 
 ---
 
-#### Add support for a new game
+#### Solve new games
 
 The simplest way to contribute to AlphaZero.jl is to demonstrate it on
 new games. Interesting candidates include:
