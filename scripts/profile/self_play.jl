@@ -8,6 +8,11 @@
 using AlphaZero
 using Setfield
 
+using Profile
+using ProfileSVG
+# using ProfileView
+# import StatProfilerHTML
+
 import CUDA
 
 function profile_self_play(
@@ -29,6 +34,27 @@ function profile_self_play(
   return
 end
 
-profile_self_play() # Compilation
-profile_self_play()
-profile_self_play() # Double-checking
+function full_profile()
+  profile_self_play() # Compilation
+  profile_self_play()
+  profile_self_play() # Double-checking
+end
+
+function flame_graph()
+  profile_self_play() # Compilation
+  Profile.init(n=10^8, delay=0.01)
+  Profile.clear()
+  @profile profile_self_play()
+  ProfileSVG.save("self-play-profile.svg")
+  # StatProfilerHTML.statprofilehtml()
+  # ProfileView.view(C=true)
+end
+
+full_profile()
+
+# Num cores experiments
+# 1: 203s / 13% GC
+# 2: 156s / 16% GC
+# 3: 131s / 19% GC
+# 4: 128s / 20% GC 
+# 6: 125s / 20% GC
