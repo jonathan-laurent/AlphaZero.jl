@@ -22,7 +22,7 @@ An MCTS player picks an action as follows. Given a game state, it launches
 Rewards are discounted using the `gamma` factor.
 
 Then, an action is picked according to the distribution ``π`` where
-``π_i ∝ n_i^τ`` with ``n_i`` the number of times that the ``i^{\\text{th}}``
+``π_i ∝ n_i^{1/τ}`` with ``n_i`` the number of times that the ``i^{\\text{th}}``
 action was visited and ``τ`` the `temperature` parameter.
 
 It is typical to use a high value of the temperature parameter ``τ``
