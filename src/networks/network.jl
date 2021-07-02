@@ -94,7 +94,8 @@ as an input by a given network.
 """
 function convert_input end
 
-function convert_input_tuple(nn::AbstractNetwork, input::Tuple)
+function convert_input_tuple(
+    nn::AbstractNetwork, input::Union{Tuple, NamedTuple})
   return map(input) do arr
     convert_input(nn, arr)
   end
@@ -108,7 +109,8 @@ to a standard CPU array (or number) type.
 """
 function convert_output end
 
-function convert_output_tuple(nn::AbstractNetwork, output::Tuple)
+function convert_output_tuple(
+    nn::AbstractNetwork, output::Union{Tuple, NamedTuple})
   return map(output) do arr
     convert_output(nn, arr)
   end
