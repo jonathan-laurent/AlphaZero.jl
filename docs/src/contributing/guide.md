@@ -44,7 +44,8 @@ any idea, feedback or suggestion.
 
 The simplest way to contribute to AlphaZero.jl is to demonstrate it on
 new games. Interesting candidates include:
-Othello, [Gobblet](https://en.wikipedia.org/wiki/Gobblet), Go 9x9, Chess...A nice first-time contribution may also be to provide an example of using AlphaZero.jl in conjunction with [OpenSpiel.jl](https://openspiel.readthedocs.io/en/latest/julia.html).
+Othello, [Gobblet](https://en.wikipedia.org/wiki/Gobblet), Go 9x9, Chess...
+A nice first-time contribution may also be to provide an example of using AlphaZero.jl in conjunction with [OpenSpiel.jl](https://openspiel.readthedocs.io/en/latest/julia.html).
 
 ---
 
