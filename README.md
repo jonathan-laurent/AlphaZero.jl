@@ -129,6 +129,13 @@ Please do not hesitate to open a Github
 [issue](https://github.com/jonathan-laurent/AlphaZero.jl/issues) to share
 any idea, feedback or suggestion.
 
+### Related Julia Projects
+
+- [AlphaGPU.jl](https://github.com/fabricerosay/AlphaGPU): an AlphaZero implementation inspired from the _"Scaling Scaling Laws with Board Games"_ [paper](https://github.com/andyljones/boardlaw), where almost everything happens on GPU (including the core MCTS logic). This implementation trades off some genericity and flexibility in exchange for unbeatable performances when used with small neural networks and environments that support batch-simulation on GPU.
+- [ReinforcementLearning.jl](https://github.com/JuliaReinforcementLearning/ReinforcementLearning.jl): a reinforcement learning framework that leverages Julia's multiple dispatch to offer highly composable environments, algorithms and components. Future releases of AlphaZero.jl may build on this framework, as it gains better support for multithreaded and distributed RL.
+- [POMDPs.jl](https://github.com/JuliaPOMDP/POMDPs.jl): a fast, elegant and well-designed framework for working with partially observable Markov decisions processes.
+
+
 ### Supporting and Citing
 
 If you want to support this project and help it gain visibility, please consider starring
