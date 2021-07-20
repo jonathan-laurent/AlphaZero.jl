@@ -58,3 +58,9 @@ full_profile()
 # 3: 131s / 19% GC
 # 4: 128s / 20% GC 
 # 6: 125s / 20% GC
+
+# Knet vs Flux
+# 1. Flux, 64 filters:  92 samples/s  (20% in GC)
+# 2. Flux, 128 filters: 52 samples/s
+# 3. Knet, 64 filters:  82 samples/s  (35% in GC)
+# 4. Knet, 128 filters: 42 samples/s

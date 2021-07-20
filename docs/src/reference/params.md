@@ -29,7 +29,7 @@ SamplesWeighingPolicy
 ArenaParams
 ```
 
-## Memory Analysisautodocsautodocs
+## Memory Analysis
 
 ```@docs
 MemAnalysisParams
