@@ -21,6 +21,7 @@ can be built on top of this implementation and that would make for nice
 ML projects. Here are a few examples:
 
   - Implement and compare different [First-Play Urgency](https://lczero.org/play/flags/) strategies
+  - Implement tools to automate and help with hyperparameter tuning
   - Add a resignation mechanism to speed-up self-play
   - Give more weight to recent samples during learning
   - Use rollouts in addition to the network's value head to evaluate positions

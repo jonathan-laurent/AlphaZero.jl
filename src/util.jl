@@ -138,7 +138,7 @@ function tmap_bg(f, xs)
   nbg = Threads.nthreads() - 1
   tasks = map(enumerate(xs)) do (i, x)
     tid = nbg > 0 ? 2 + ((i - 1) % nbg) : 1
-    ThreadPools.@tspawnat tid @printing_errors f(x) 
+    ThreadPools.@tspawnat tid @printing_errors f(x)
   end
   return fetch.(tasks)
 end
