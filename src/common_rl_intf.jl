@@ -66,6 +66,8 @@ The following optional methods must be implemented for `rlenv`:
   - `state`
   - `setstate!`
   - `valid_action_mask`
+  - `player`
+  - `players`
 
 # Keyword arguments
 
