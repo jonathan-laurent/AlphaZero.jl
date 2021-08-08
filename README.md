@@ -111,6 +111,7 @@ For more information on training a Connect Four agent using AlphaZero.jl, see ou
 
 ### Resources
 
+- [JuliaCon 2021 Talk](https://www.youtube.com/watch?v=nbLmR0aDumo)
 - [Documentation Home](https://jonathan-laurent.github.io/AlphaZero.jl/dev/)
 - [An Introduction to AlphaZero](https://jonathan-laurent.github.io/AlphaZero.jl/dev/tutorial/alphazero_intro/)
 - [Package Overview](https://jonathan-laurent.github.io/AlphaZero.jl/dev/tutorial/package_overview/)
