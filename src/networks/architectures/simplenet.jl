@@ -64,3 +64,13 @@ function SimpleNet(gspec::AbstractGameSpec, hyper::SimpleNetHP)
 end
 
 Network.HyperParams(::Type{SimpleNet}) = SimpleNetHP
+
+function Base.copy(nn::SimpleNet)
+  return SimpleNet(
+    nn.gspec,
+    nn.hyper,
+    deepcopy(nn.common),
+    deepcopy(nn.vhead),
+    deepcopy(nn.phead)
+  )
+end

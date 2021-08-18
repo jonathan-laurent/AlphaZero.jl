@@ -11,6 +11,8 @@ module AlphaZero
   using DataStructures: CircularBuffer
   using Distributions: Categorical, Dirichlet
   using Statistics: mean
+  using Requires
+
 
   # Even when using the Knet backend, we use utilities from Flux such as
   # `Flux.batch` and `Flux.DataLoader`
@@ -125,13 +127,20 @@ module AlphaZero
   const DEFAULT_DL_FRAMEWORK = get(ENV, "ALPHAZERO_DEFAULT_DL_FRAMEWORK", "FLUX")
 
   if DEFAULT_DL_FRAMEWORK == "FLUX"
-    @info "Using the Flux implementation of AlphaZero.NetLib."
+    # @info "Using the Flux implementation of AlphaZero.NetLib."
+    KNET_ADVICE =
+    """
+    For optimal performances, we recommend that you configure AlphaZero.jl
+    to use Knet as a backend by setting ALPHAZERO_DEFAULT_DL_FRAMEWORK to KNET.
+    """
+    # @info KNET_ADVICE
     @eval begin
       include("networks/flux.jl")
       const NetLib = FluxLib
     end
   elseif DEFAULT_DL_FRAMEWORK == "KNET"
-    @info "Using the Knet implementation of AlphaZero.NetLib."
+    # @info "Using the Knet implementation of AlphaZero.NetLib."
+    error("Knet does not yet work with CUDA v3 so we are using the Flux backend instead.")
     @eval begin
       include("networks/knet.jl")
       const NetLib = KnetLib
@@ -171,5 +180,15 @@ module AlphaZero
   # Scripts
   include("scripts/scripts.jl")
   export Scripts
+
+  function __init__()
+    # OpenSpiel.jl Wrapper
+    @require OpenSpiel="ceb70bd2-fe3f-44f0-b81f-41608acaf2f2" begin
+      include("openspiel.jl")
+      export OpenSpielWrapper
+      include("openspiel_example.jl")
+      @info "AlphaZero.jl's OpenSpielWrapper loaded"
+    end
+  end
 
 end
