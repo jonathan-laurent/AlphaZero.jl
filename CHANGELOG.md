@@ -48,3 +48,8 @@ Initial release, as announced on [Julia's discourse](https://discourse.julialang
 
 Together, the two aforementioned improvements result in a 30% global speedup on the
 connect-four benchmark.
+
+## Version 0.5.2
+
+- Add a wrapper to use AlphaZero.jl with OpenSpiel.jl.
+- Add an OpenSpiel tic-tac-toe example.
