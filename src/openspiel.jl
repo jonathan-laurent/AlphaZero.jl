@@ -6,6 +6,7 @@ using OpenSpiel
 
 struct Spec{G} <: GI.AbstractGameSpec
   spiel_game :: G # loaded with OpenSpiel.load_game
+  suppress_warnings :: Bool
   heuristic_value :: Function
   vectorize_state :: Function
   symmetries :: Function
@@ -20,9 +21,11 @@ mutable struct Env{G, S, P} <: GI.AbstractGameEnv
   curplayer :: P
 end
 
+
 #####
 ##### Default functions and constructors
 #####
+
 
 default_heurisic_value(env) = 0.0
 # not handling terminal states, not flip board for two-player games
@@ -33,9 +36,14 @@ default_parse_action(spec, str::String) = GI.parse_action(spec, str)
 default_read_state(spec) = GI.read_state(spec)
 
 """
-  Spec(spiel_game::CxxWrap.StdLib.SharedPtrAllocated{OpenSpiel.Game}; kwargs...) <: AbstractGameSpec
+    Spec(spiel_game; kwargs...) <: AbstractGameSpec
+
+
+Wrap an OpenSpiel game object (`CxxWrap.StdLib.SharedPtrAllocated{OpenSpiel.Game}`)
+into an AlphaZero game spec.
 
 # Keyword arguments
+
 The following optional functions from `GameInterface` are not present in
 OpenSpiel.jl and can be provided as keyword arguments:
 
@@ -46,10 +54,12 @@ OpenSpiel.jl and can be provided as keyword arguments:
   - `parse_action`
   - `read_state`
 
+You can silence warnings by setting `suppress_warnings=true`.
 """
 
 function Spec(
   spiel_game;
+  suppress_warnings = false,
   heuristic_value = default_heurisic_value,
   vectorize_state = default_vectorize_state,
   symmetries = default_symmetries,
@@ -60,9 +70,13 @@ function Spec(
   nplayers = num_players(spiel_game)
   @assert nplayers == 1 || nplayers == 2 "
   AlphaZero.jl only supports games with one or two players."
-  heuristic_value == default_heurisic_value && (@warn "defalult_heuristic_value always return 0.0")
+  if heuristic_value == default_heurisic_value && !suppress_warnings
+    @warn "The `default_heuristic_value` function was not provided and so " *
+      "algorithms such as MinMax may not work with this environment."
+  end
   return Spec(
     spiel_game,
+    suppress_warnings,
     heuristic_value,
     vectorize_state,
     symmetries,
@@ -76,6 +90,8 @@ end
 #####
 ##### GameInterface API
 #####
+
+
 function GI.init(spec::Spec)
   state = new_initial_state(spec.spiel_game)
   curplayer = current_player(state)
@@ -115,7 +131,8 @@ function GI.actions_mask(env::Env)
   try
     return convert(Array{Bool}, legal_actions_mask(env.state))
   catch e
-    @error "Probably game don't implement legal_actions_mask function"
+    @error "AlphaZero.jl only works with OpenSpiel environments that implement " * 
+      "the `legal_actions_mask` function."
     rethrow(e)
   end
 end
@@ -141,7 +158,10 @@ GI.symmetries(spec, state) = spec.symmetries(spec.spiel_game, state)
 
 # Interactive utilities
 
-GI.render(env::Env) = show(env.state)
+function GI.render(env::Env)
+  show(env.state)
+  print("\n\n") # GameInterface expects the rendering to end with an empty line 
+end
 
 # action_string, parse action require Env instead of Spec for OpenSpiel functions
 GI.action_string(env::Env, action) = action_to_string(env.state, action)

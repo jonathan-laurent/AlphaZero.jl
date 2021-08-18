@@ -37,7 +37,7 @@ end
 function parse_action(spec, str)
   length(str) == 1 || (return nothing)
   x = Int(uppercase(str[1])) - Int('A')
-  (0 <= x < NUM_POSITIONS) ? x : nothing
+  (0 <= x < 9) ? x : nothing
 end
 
 
@@ -45,5 +45,6 @@ GameSpec() = AlphaZero.OpenSpielWrapper.Spec(
   spiel_game;
   vectorize_state,
   action_string,
-  parse_action
+  parse_action,
+  suppress_warnings=true
 )

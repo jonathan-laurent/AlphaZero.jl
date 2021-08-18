@@ -180,7 +180,7 @@ module AlphaZero
       include("openspiel.jl")
       export OpenSpielWrapper
       include("openspiel_example.jl")
-      @info "AlphaZero.jl's OpenSpielWrapper loaded"
+      @info "AlphaZero.jl's OpenSpielWrapper loaded."
     end
   end
 
