@@ -1,7 +1,7 @@
 name = "AlphaZero"
 uuid = "8ed9eb0b-7496-408d-8c8b-2119aeea02cd"
 authors = ["Jonathan Laurent <jonathan.laurent@cs.cmu.edu>"]
-version = "0.5.1"
+version = "0.5.2"
 
 [deps]
 ArgParse = "c7e460c6-2fb9-53a9-8c5b-16f535851c63"
