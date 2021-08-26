@@ -57,6 +57,7 @@ We found the [Julia language](https://julialang.org/) to be instrumental in achi
 To download AlphaZero.jl and start training a Connect Four agent, just run:
 
 ```sh
+export GKSwstype=100  # To avoid an occasional GR bug
 git clone https://github.com/jonathan-laurent/AlphaZero.jl.git
 cd AlphaZero.jl
 julia --project -e 'import Pkg; Pkg.instantiate()'
@@ -110,6 +111,7 @@ For more information on training a Connect Four agent using AlphaZero.jl, see ou
 
 ### Resources
 
+- [JuliaCon 2021 Talk](https://www.youtube.com/watch?v=nbLmR0aDumo)
 - [Documentation Home](https://jonathan-laurent.github.io/AlphaZero.jl/dev/)
 - [An Introduction to AlphaZero](https://jonathan-laurent.github.io/AlphaZero.jl/dev/tutorial/alphazero_intro/)
 - [Package Overview](https://jonathan-laurent.github.io/AlphaZero.jl/dev/tutorial/package_overview/)
@@ -129,12 +131,21 @@ Please do not hesitate to open a Github
 [issue](https://github.com/jonathan-laurent/AlphaZero.jl/issues) to share
 any idea, feedback or suggestion.
 
+
 ### Supporting and Citing
 
 If you want to support this project and help it gain visibility, please consider starring
 the repository. Doing well on such metrics may also help us secure academic funding in the
 future. Also, if you use this software as part of your research, we would appreciate that
 you include the following [citation](./CITATION.bib) in your paper.
+
+
+### Related Julia Projects
+
+- [AlphaGPU.jl](https://github.com/fabricerosay/AlphaGPU): an AlphaZero implementation inspired from the _"Scaling Scaling Laws with Board Games"_ [paper](https://github.com/andyljones/boardlaw), where almost everything happens on GPU (including the core MCTS logic). This implementation trades off some genericity and flexibility in exchange for unbeatable performances when used with small neural networks and environments that support batch-simulation on GPU.
+- [ReinforcementLearning.jl](https://github.com/JuliaReinforcementLearning/ReinforcementLearning.jl): a reinforcement learning framework that leverages Julia's multiple dispatch to offer highly composable environments, algorithms and components. Future releases of AlphaZero.jl may build on this framework, as it gains better support for multithreaded and distributed RL.
+- [POMDPs.jl](https://github.com/JuliaPOMDP/POMDPs.jl): a fast, elegant and well-designed framework for working with partially observable Markov decisions processes.
+
 
 ### Acknowledgements
 

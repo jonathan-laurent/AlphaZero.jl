@@ -92,3 +92,13 @@ function ResNet(gspec::AbstractGameSpec, hyper::ResNetHP)
 end
 
 Network.HyperParams(::Type{<:ResNet}) = ResNetHP
+
+function Base.copy(nn::ResNet)
+  return ResNet(
+    nn.gspec,
+    nn.hyper,
+    deepcopy(nn.common),
+    deepcopy(nn.vhead),
+    deepcopy(nn.phead)
+  )
+end

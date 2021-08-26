@@ -145,7 +145,7 @@ function Network.forward(nn::TwoHeadNetwork, state)
   return (p, v)
 end
 
-# Flux.@functor does not work do to Network being parametric
+# Flux.@functor does not work with abstract types
 function Flux.functor(nn::Net) where Net <: TwoHeadNetwork
   children = (nn.common, nn.vhead, nn.phead)
   constructor = cs -> Net(nn.gspec, nn.hyper, cs...)

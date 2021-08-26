@@ -19,11 +19,15 @@ module Examples
     "tictactoe" => Tictactoe.GameSpec(),
     "connect-four" => ConnectFour.GameSpec(),
     "mancala" => Mancala.GameSpec())
+    # "ospiel_ttt" => OSpielTictactoe.GameSpec()
+  # ospiel_ttt is added from openspiel_example.jl when OpenSpiel.jl is imported
+
 
   const experiments = Dict(
     "grid-world" => GridWorld.Training.experiment,
     "tictactoe" => Tictactoe.Training.experiment,
     "connect-four" => ConnectFour.Training.experiment,
     "mancala" => Mancala.Training.experiment)
+    # "ospiel_ttt" => OSpielTictactoe.Training.experiment
 
 end

@@ -36,6 +36,9 @@ For more details, we recommend the following resources.
 
 - A short and effective introduction to AlphaZero is Surag Nair's
    [excellent tutorial](https://web.stanford.edu/~surag/posts/alphazero.html).
+- Our JuliaCon 2021 [talk](https://www.youtube.com/watch?v=nbLmR0aDumo)
+   features a ten-minute introduction to AlphaZero and discusses some research challenges
+   of using it to solve problems beyond board games.
 - A good resource to learn about Monte Carlo Tree Search (MCTS) is this
    [Int8 tutorial](https://int8.io/monte-carlo-tree-search-beginners-guide/).
 - Then, DeepMind's original

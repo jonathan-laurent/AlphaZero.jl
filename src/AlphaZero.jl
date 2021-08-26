@@ -11,6 +11,8 @@ module AlphaZero
   using DataStructures: CircularBuffer
   using Distributions: Categorical, Dirichlet
   using Statistics: mean
+  using Requires
+
 
   # Even when using the Knet backend, we use utilities from Flux such as
   # `Flux.batch` and `Flux.DataLoader`
@@ -171,5 +173,16 @@ module AlphaZero
   # Scripts
   include("scripts/scripts.jl")
   export Scripts
+
+  function __init__()
+    # OpenSpiel.jl Wrapper
+    @require OpenSpiel="ceb70bd2-fe3f-44f0-b81f-41608acaf2f2" begin
+      include("openspiel.jl")
+      export OpenSpielWrapper
+      include("openspiel_example.jl")
+      @info "AlphaZero.jl's OpenSpielWrapper loaded."
+    end
+  end
+
 
 end

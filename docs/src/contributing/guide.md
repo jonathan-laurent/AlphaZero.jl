@@ -12,6 +12,7 @@ We also believe that AlphaZero.jl can be made even faster
 without adding too much complexity to the codebase.
 Here are suggestions to make this happen:
   - Accelerate network inference by adding support for FP16 or Int8 quantization
+  - Accelerate network inference with [Torch.jl](https://github.com/FluxML/Torch.jl)
   - Enable data generation, network updates and checkpoint evaluations
     to be run in parallel
 
@@ -19,6 +20,8 @@ Finally, there are many small improvements and variations that
 can be built on top of this implementation and that would make for nice
 ML projects. Here are a few examples:
 
+  - Implement and compare different [First-Play Urgency](https://lczero.org/play/flags/) strategies
+  - Implement tools to automate and help with hyperparameter tuning
   - Add a resignation mechanism to speed-up self-play
   - Give more weight to recent samples during learning
   - Use rollouts in addition to the network's value head to evaluate positions
@@ -43,6 +46,7 @@ any idea, feedback or suggestion.
 The simplest way to contribute to AlphaZero.jl is to demonstrate it on
 new games. Interesting candidates include:
 Othello, [Gobblet](https://en.wikipedia.org/wiki/Gobblet), Go 9x9, Chess...
+A nice first-time contribution may also be to provide an example of using AlphaZero.jl in conjunction with [OpenSpiel.jl](https://openspiel.readthedocs.io/en/latest/julia.html).
 
 ---
 
