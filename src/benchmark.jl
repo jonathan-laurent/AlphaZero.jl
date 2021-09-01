@@ -130,15 +130,19 @@ end
 Pure MCTS baseline that uses rollouts to evaluate new positions.
 
 Argument `params` has type [`MctsParams`](@ref).
+Additionally, a depth can be provided to define the maximum number of rollout steps before calling heuristic_value.
+If depth == 0, there will be no rollout at all and heuristic_value is called immediately.
 """
 struct MctsRollouts <: Player
   params :: MctsParams
+  depth :: Union{Int, Float64} # Inf isa Float64
+  MctsRollouts(params::MctsParams, depth=Inf) = new(params, max(zero(depth), depth))
 end
 
-name(p::MctsRollouts) = "MCTS ($(p.params.num_iters_per_turn) rollouts)"
+name(p::MctsRollouts) = "MCTS ($(p.params.num_iters_per_turn) rollouts, depth $(p.depth))"
 
 function instantiate(p::MctsRollouts, gspec::AbstractGameSpec, nn)
-  return MctsPlayer(gspec, MCTS.RolloutOracle(gspec), p.params)
+  return MctsPlayer(gspec, MCTS.RolloutOracle(gspec, p.depth), p.params)
 end
 
 """
