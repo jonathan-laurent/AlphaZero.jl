@@ -39,13 +39,14 @@ struct RolloutOracle{GameSpec} <: Function
 end
 
 function rollout!(game, γ=1.)
-  r = 0.
-  while !GI.game_terminated(game)
-    action = rand(GI.available_actions(game))
-    GI.play!(game, action)
-    r = γ * r + GI.white_reward(game)
+  action = rand(GI.available_actions(game))
+  GI.play!(game, action)
+  wr = GI.white_reward(game)
+  if GI.game_terminated(game)
+    return wr
+  else
+    return wr + γ * rollout!(game, γ)
   end
-  return r
 end
 
 function (r::RolloutOracle)(state)
