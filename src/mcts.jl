@@ -35,17 +35,24 @@ Therefore, it can be used to implement the "vanilla" MCTS algorithm.
 struct RolloutOracle{GameSpec} <: Function
   gspec :: GameSpec
   gamma :: Float64
-  RolloutOracle(gspec, γ=1.) = new{typeof(gspec)}(gspec, γ)
+  depth :: Union{Int, Float64}
+  RolloutOracle(gspec, γ=1., depth=Inf) = new{typeof(gspec)}(gspec, γ, depth)
 end
 
-function rollout!(game, γ=1.)
+function rollout!(game, γ=1., depth=Inf)
   action = rand(GI.available_actions(game))
   GI.play!(game, action)
   wr = GI.white_reward(game)
+  wvalue = 0.
   if GI.game_terminated(game)
-    return wr
+    wvalue = 0.
+  elseif depth == 0
+    v = GI.heuristic_value(game)
+    wvalue = GI.white_playing(game) ? v : -v
   else
-    return wr + γ * rollout!(game, γ)
+    wvalue = rollout!(game, γ, depth-1)
+  end
+  return wr + γ * wvalue
 end
 
 function (r::RolloutOracle)(state)
@@ -53,7 +60,7 @@ function (r::RolloutOracle)(state)
   wp = GI.white_playing(g)
   n = length(GI.available_actions(g))
   P = ones(n) ./ n
-  wr = rollout!(g, r.gamma)
+  wr = rollout!(g, r.gamma, r.depth)
   V = wp ? wr : -wr
   return P, V
 end
