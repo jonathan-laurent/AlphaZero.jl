@@ -102,7 +102,7 @@ function plot_iteration(
   # Saving everything
   for (name, plot) in plots
     pdir = joinpath(dir, name)
-    isdir(pdir) || mkdir(pdir)
+    isdir(pdir) || mkpath(pdir)
     Plots.savefig(plot, joinpath(pdir, "$itc"))
   end
 end
