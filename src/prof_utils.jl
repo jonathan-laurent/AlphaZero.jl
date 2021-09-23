@@ -47,7 +47,7 @@ function chrome_tracing_logger(file::String; always_flush=false)
   println(stream, "[")
   formatter = FormatLogger(stream; always_flush) do stream, log
     args = values(log.kwargs)
-    dict = (; args.name, args.cat, args.ph, args.ts, args.pid)
+    dict = (; args.name, args.cat, args.ph, args.ts, args.pid, args.tid)
     JSON3.write(stream, dict)
     println(stream, ",")
   end

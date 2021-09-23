@@ -5,6 +5,10 @@
 # using Revise; Revise.includet("scripts/profile/self_play.jl")
 # profile_self_play()
 
+# Note: when using the chrome_tracing logger, it looks like debug statements
+# from GPUCompiler are shown that are normally hidden. This may be a bug
+# in Logging or GPUCompiler and we should investigate it at some point.
+
 using AlphaZero
 using Setfield
 
