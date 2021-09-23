@@ -241,7 +241,7 @@ end
 #####
 
 default_session_dir(e::Experiment) = default_session_dir(e.name)
-default_session_dir(exp_name::String) = "$(DEFAULT_SESSIONS_DIR)/$exp_name"
+default_session_dir(exp_name::String) = joinpath(DEFAULT_SESSIONS_DIR, exp_name)
 
 function session_logger(dir, nostdout, autosave)
   if autosave

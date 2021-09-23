@@ -124,7 +124,8 @@ For more information on training a Connect Four agent using AlphaZero.jl, see ou
 * Jonathan Laurent: main developer
 * Pavel Dimens: logo design
 * Marek Kaluba: hyperparameters tuning for the grid-world example
-* Michał Łukomski: update Mancala implementation for compliance with the new game interface
+* Michał Łukomski: Mancala example, OpenSpiel wrapper
+* Johannes Fischer: documentation improvements
 
 Contributions to AlphaZero.jl are most welcome. Many contribution ideas are available in our [contribution guide](https://jonathan-laurent.github.io/AlphaZero.jl/dev/contributing/guide/).
 Please do not hesitate to open a Github
