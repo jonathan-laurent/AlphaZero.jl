@@ -9,7 +9,8 @@ using AlphaZero
 using Setfield
 
 using Profile
-using ProfileSVG
+using LoggingExtras
+# using ProfileSVG
 # using ProfileView
 # import StatProfilerHTML
 
@@ -21,7 +22,7 @@ function profile_self_play(
   num_workers=256,
   batch_size=128,
   num_filters=64)
-  
+
   exp = @set exp.netparams.num_filters = num_filters
   exp = @set exp.params.self_play.sim.num_workers = num_workers
   exp = @set exp.params.self_play.sim.batch_size = batch_size
@@ -40,6 +41,13 @@ function full_profile()
   profile_self_play() # Double-checking
 end
 
+function chrome_tracing()
+  global_logger(TeeLogger(
+    ConsoleLogger(),
+    AlphaZero.ProfUtils.chrome_tracing_logger("tracing.json")))
+  profile_self_play()
+end
+
 function flame_graph()
   profile_self_play() # Compilation
   Profile.init(n=10^8, delay=0.01)
@@ -50,13 +58,14 @@ function flame_graph()
   # ProfileView.view(C=true)
 end
 
-full_profile()
+# full_profile()
+chrome_tracing()
 
 # Num cores experiments
 # 1: 203s / 13% GC
 # 2: 156s / 16% GC
 # 3: 131s / 19% GC
-# 4: 128s / 20% GC 
+# 4: 128s / 20% GC
 # 6: 125s / 20% GC
 
 # Knet vs Flux

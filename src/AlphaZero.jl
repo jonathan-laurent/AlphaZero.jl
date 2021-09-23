@@ -28,6 +28,8 @@ module AlphaZero
   using .Util
   export Util
   export apply_temperature
+  include("prof_utils.jl")
+  using .ProfUtils
 
   # A generic interface for single-player or zero-sum two-players games.
   include("game.jl")

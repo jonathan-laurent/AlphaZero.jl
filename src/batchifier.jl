@@ -14,7 +14,7 @@ The typical workflow should be the following:
 """
 module Batchifier
 
-using ..AlphaZero: MCTS, Util
+using ..AlphaZero: MCTS, Util, ProfUtils
 
 export BatchedOracle
 
@@ -65,7 +65,11 @@ function launch_server(f; num_workers, batch_size)
       @assert batch_size <= num_active
       if length(pending) >= batch_size && length(pending) > 0
         batch = [p.query for p in pending]
-        results = f(batch)
+        results = ProfUtils.log_event(;
+            name="Infer (batch size: $(length(batch)))",
+            cat="GPU", pid=0, tid=0) do
+          f(batch)
+        end
         for i in eachindex(pending)
           put!(pending[i].answer_channel, results[i])
         end
@@ -115,6 +119,8 @@ end
 
 function (oracle::BatchedOracle)(state)
   query = oracle.preprocess(state)
+  ProfUtils.instant_event(
+    name="Query", cat="Query", pid=0, tid=Threads.threadid())
   put!(oracle.reqchan, (query=query, answer_channel=oracle.anschan))
   answer = take!(oracle.anschan)
   return answer
