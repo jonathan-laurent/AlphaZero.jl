@@ -3,6 +3,7 @@ module Util
 export apply_temperature
 
 import Random
+import Distributions
 import ThreadPools
 using Distributions: Categorical
 
