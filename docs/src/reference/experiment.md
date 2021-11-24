@@ -1,4 +1,4 @@
-# [Game Interface](@id experiment)
+# [Experiment](@id experiment)
 
 ```@meta
 CurrentModule = AlphaZero.Experiments
