@@ -326,4 +326,6 @@ function copy(network::AbstractNetwork; on_gpu, test_mode)
   return network
 end
 
+include("graph_network.jl")
+
 end

@@ -52,6 +52,9 @@ module AlphaZero
   export OptimiserSpec
   export CyclicNesterov, Adam
 
+  export GraphNetwork
+  export GraphNeuralNetworkLib
+
   # Utilities to batch oracle calls
   include("batchifier.jl")
   using .Batchifier
