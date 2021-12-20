@@ -7,42 +7,51 @@ import AlphaZero.GI
 
 struct GameSpec <: GI.AbstractGameSpec
     verticies::Vector{Int}
-    fadjlist::Vector{Vector}
+    fadjlist::Matrix{T} where {T}
 end
 
 mutable struct GameEnv <: GI.AbstractGameEnv
     verticies::Vector{Int}
-    fadjList::Vector{Vector}
+    fadjlist::Matrix{T} where {T}
     maskedActions::Vector{Bool}
     visitedVerticies::Vector{Int}
     finished::Bool
 end
 
-GI.spec() = GameSpec()
+GI.spec(game::GameEnv) = GameSpec(game.verticies, game.fadjlist)
 
 function GI.init(spec::GameSpec)
     return GameEnv(spec.verticies, spec.fadjlist, trues(length(spec.verticies)), Vector{Int}(), false)
 end
 
-function GI.set_state!(g::GameEnv, currentVertex)
-    g.maskedActions[currentVertex] = false
-    push!(g.visitedVerticies, currentVertex)
-    any(g.maskedActions) || (g.finished = true)
+function GI.set_state!(game::GameEnv, state)
+    game.maskedActions = state.availableActions
+    game.visitedVerticies = state.path
+    any(game.maskedActions) || (game.finished = true)
     return
 end
 
-two_players(::GameSpec) = false
-GI.actions(a::GameSpec) = collect(Base.OneTo(size(a.eccentricities)[1]))
-GI.clone(g::GameEnv) = GameEnv(g.verticies, g.fadjList, deepcopy(g.maskedActions), deepcopy(g.visitedVerticies), g.finished)
-GI.play!(g::GameEnv, vertex::Int) = GI.set_state!(g, vertex)
-GI.current_state(g::GameEnv) = (path = g.visitedVerticies,)
+GI.two_players(::GameSpec) = false
+GI.actions(a::GameSpec) = collect(range(1, length = length(a.verticies)))
+GI.clone(g::GameEnv) = GameEnv(g.verticies, g.fadjlist, deepcopy(g.maskedActions), deepcopy(g.visitedVerticies), g.finished)
+GI.current_state(g::GameEnv) = (path = g.visitedVerticies, availableActions = g.maskedActions)
 GI.white_playing(::GameEnv) = true
 GI.game_terminated(g::GameEnv) = g.finished
 GI.available_actions(g::GameEnv) = g.verticies[g.maskedActions]
+GI.actions_mask(game::GameEnv) = game.maskedActions
+
+function GI.play!(g::GameEnv, vertex::Int)
+    maskedActions = deepcopy(g.maskedActions)
+    visitedVerticies = deepcopy(g.visitedVerticies)
+    maskedActions[vertex] = false
+    state = (path = push!(visitedVerticies, vertex), availableActions = maskedActions)
+    GI.set_state!(g, state)
+end
 
 function GI.white_reward(g::GameEnv)
+    isempty(g.visitedVerticies[1:end-1]) && (return 0.0)
     return -1 * sum(eachindex(g.visitedVerticies[1:end-1])) do vert
-        g.fadjList[g.visitedVerticies[vert+1], g.visitedVerticies[vert]]
+        g.fadjlist[g.visitedVerticies[vert+1], g.visitedVerticies[vert]]
     end
 end
 
@@ -59,28 +68,18 @@ function GI.render(g::GameEnv)
     graphplot(graph; curves = false)
 end
 
-function modelCreator(din, d, dout)
-    return GNNChain(GCNConv(din => d),
-        BatchNorm(d),
-        x -> relu.(x),
-        GCNConv(d => d, relu),
-        Dropout(0.5),
-        Dense(d, dout)
-    )
-end
-
-# function vectorize_state(a::AbstractGameSpec, state)
-#     return state
-# end
-
-function graph_state(spec::GameSpec, state)
-    adjacencyList = spec.fadjlist[state.visitedVerticies, state.visitedVerticies]
-    initialGraph = SimpleDiGraph(adjacencyList)
-
-    verts = state.visitedVerticies
-    nextVerts = circshift(state.visitedVerticies, -1)
-    foreach(zip(verts, nextVerts)) do (v1, v2)
-        add_edge!(initialGraph, v1, v2) || @warn "$v1 and $v2 cannot be connected"
+function GI.graph_state(spec::GameSpec, state)
+    if length(state.path) > 1
+        modifiedAdacencyList = deepcopy(spec.fadjlist)
+        foreach(enumerate(state.path[2:end])) do (idx, node)
+            prevNode = state.path[idx]
+            modifiedAdacencyList[prevNode, :] .= Inf
+            modifiedAdacencyList[:, node] .= Inf
+            modifiedAdacencyList[node, prevNode] = Inf
+            modifiedAdacencyList[prevNode, node] = spec.fadjlist[prevNode, node]
+        end
+        return SimpleDiGraph(modifiedAdacencyList)
+    else
+        return SimpleDiGraph(spec.fadjlist)
     end
-    return initialGraph
 end
