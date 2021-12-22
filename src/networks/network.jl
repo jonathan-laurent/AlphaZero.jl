@@ -3,7 +3,7 @@ A generic, framework agnostic interface for neural networks.
 """
 module Network
 
-export AbstractNetwork, OptimiserSpec, CyclicNesterov, Adam
+export AbstractNetwork, OptimiserSpec, CyclicNesterov, Adam, GraphNetwork
 
 using ..AlphaZero
 

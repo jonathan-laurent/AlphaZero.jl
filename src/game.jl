@@ -10,6 +10,7 @@ module GameInterface
 export AbstractGameSpec, AbstractGameEnv
 
 using ..AlphaZero: Util
+import Graphs
 
 #####
 ##### Game environments and game specifications
@@ -80,6 +81,13 @@ function actions end
 Return a vectorized representation of a given state.
 """
 function vectorize_state end
+
+"""
+    graph_state(::AbstractGameSpec, state) :: SimpleDiGraph{Float32}
+
+Return a SimpleDiGraph representation of a given state.
+"""
+function graph_state end
 
 #####
 ##### Operations on envs
@@ -252,9 +260,13 @@ end
 
 Return a tuple that indicates the shape of a vectorized state representation.
 """
-function state_dim(game_spec::AbstractGameSpec)
+function state_dim(game_spec::AbstractGameSpec; graph::Bool = false)
   state = current_state(init(game_spec))
-  return size(vectorize_state(game_spec, state))
+  if graph
+    return size(graph_state(game_spec, state))
+  else
+    return size(vectorize_state(game_spec, state))
+  end
 end
 
 """

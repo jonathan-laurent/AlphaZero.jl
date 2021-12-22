@@ -22,6 +22,8 @@ using Flux: relu, softmax, flatten
 using Flux: Chain, Dense, Conv, BatchNorm, SkipConnection
 import Zygote
 
+# include("graph_network.jl")
+
 #####
 ##### Flux Networks
 #####
@@ -39,7 +41,7 @@ network interface with the following exceptions:
 [`Network.HyperParams`](@ref), [`Network.hyperparams`](@ref),
 [`Network.forward`](@ref) and [`Network.on_gpu`](@ref).
 """
-abstract type FluxGNN<: GraphNetwork end
+abstract type FluxGNN <: GraphNetwork end
 
 function Base.copy(nn::Net) where Net <: FluxGNN
   #new = Net(Network.hyperparams(nn))
@@ -112,11 +114,11 @@ regularized_params_(l) = []
 regularized_params_(l::Flux.Dense) = [l.weight]
 regularized_params_(l::Flux.Conv) = [l.weight]
 
-function Network.regularized_params(net::FluxNetwork)
+function Network.regularized_params(net::GraphNetwork)
   return (w for l in Flux.modules(net) for w in regularized_params_(l))
 end
 
-function Network.gc(::FluxNetwork)
+function Network.gc(::GraphNetwork)
   GC.gc(true)
   # CUDA.reclaim()
 end
@@ -126,7 +128,7 @@ end
 
 # Flux.@functor does not work with abstract types
 function Flux.functor(nn::Net) where Net <: FluxGNN
-  children = (nn.model)
+  children = (nn.model, )
   constructor = cs -> Net(nn.gspec, nn.hyper, cs...)
   return (children, constructor)
 end
