@@ -27,7 +27,7 @@ function convert_sample(
     @assert wp == LINEAR_WEIGHT
     w = Float32[n]
   end
-  x = GI.vectorize_state(gspec, e.s)
+  x = GI.input_state(gspec, e.s)
   a = GI.actions_mask(GI.init(gspec, e.s))
   p = zeros(size(a))
   p[a] = e.π
@@ -46,7 +46,7 @@ function convert_samples(
   A = Flux.batch((e.a for e in ces))
   P = Flux.batch((e.p for e in ces))
   V = Flux.batch((e.v for e in ces))
-  f32(arr) = convert(AbstractArray{Float32}, arr)
+  f32(arr) = eltype(arr) isa Number ? convert(AbstractArray{Float32}, arr) : arr
   return map(f32, (; W, X, A, P, V))
 end
 

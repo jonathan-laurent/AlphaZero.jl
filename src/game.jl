@@ -10,7 +10,6 @@ module GameInterface
 export AbstractGameSpec, AbstractGameEnv
 
 using ..AlphaZero: Util
-import Graphs
 
 #####
 ##### Game environments and game specifications
@@ -33,6 +32,7 @@ The specification holds all _static_ information about a game, which does not
 depend on the current state.
 """
 abstract type AbstractGameSpec end
+
 
 """
     AbstractGameEnv
@@ -83,11 +83,21 @@ Return a vectorized representation of a given state.
 function vectorize_state end
 
 """
-    graph_state(::AbstractGameSpec, state) :: SimpleDiGraph{Float32}
+    graph_state(::AbstractGameSpec, state)
 
-Return a SimpleDiGraph representation of a given state.
+Return a graph representation of a given state.
 """
 function graph_state end
+
+"""
+input state asks if the state is a graph game and calls the correct one.
+
+    returns the input to a learner
+"""
+input_state(spec::AbstractGameSpec, state) = isgraph(spec) ? graph_state(spec, state) : vectorize_state(spec, state)
+
+isgraph(::AbstractGameSpec) = false
+
 
 #####
 ##### Operations on envs
@@ -260,13 +270,9 @@ end
 
 Return a tuple that indicates the shape of a vectorized state representation.
 """
-function state_dim(game_spec::AbstractGameSpec; graph::Bool = false)
+function state_dim(game_spec::AbstractGameSpec)
   state = current_state(init(game_spec))
-  if graph
-    return size(graph_state(game_spec, state))
-  else
-    return size(vectorize_state(game_spec, state))
-  end
+  return size(vectorize_state(game_spec, state))
 end
 
 """

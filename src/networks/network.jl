@@ -286,7 +286,7 @@ may want to use a `BatchedOracle` along with an inference server that uses
 function evaluate(nn::AbstractNetwork, state)
   gspec = game_spec(nn)
   actions_mask = GI.actions_mask(GI.init(gspec, state))
-  x = GI.vectorize_state(gspec, state)
+  x = GI.input_state(gspec, state)
   a = Float32.(actions_mask)
   xnet, anet = to_singletons.(convert_input_tuple(nn, (x, a)))
   net_output = forward_normalized(nn, xnet, anet)
@@ -306,7 +306,7 @@ MCTS oracle interface.
 """
 function evaluate_batch(nn::AbstractNetwork, batch)
   gspec = game_spec(nn)
-  X = Flux.batch((GI.vectorize_state(gspec, b) for b in batch))
+  X = Flux.batch((GI.input_state(gspec, b) for b in batch))
   A = Flux.batch((GI.actions_mask(GI.init(gspec, b)) for b in batch))
   Xnet, Anet = convert_input_tuple(nn, (X, Float32.(A)))
   P, V, _ = convert_output_tuple(nn, forward_normalized(nn, Xnet, Anet))
@@ -326,6 +326,5 @@ function copy(network::AbstractNetwork; on_gpu, test_mode)
   return network
 end
 
-include("graph_network.jl")
 
 end

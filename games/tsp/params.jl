@@ -1,6 +1,6 @@
-Network = GraphNeuralNetworkLib.SimpleGNN
+Network = NetLib.SimpleGNN
 
-netparams = GraphNeuralNetworkLib.SimpleGraphNetHP(
+netparams = NetLib.SimpleGraphNetHP(
     innerSize=64
   )
 
@@ -73,4 +73,4 @@ benchmark = [
 experiment = Experiment(
   "tsp", GameSpec(), params, Network, netparams, benchmark)
 
-Scripts.dummy_run(experiment)
+# Scripts.dummy_run(experiment)

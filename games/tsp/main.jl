@@ -6,5 +6,5 @@ module Tsp
     import ..GameSpec
     include("params.jl")
   end
-  include("solver.jl")
+#   include("solver.jl")
 end

@@ -34,14 +34,15 @@ end
 
 function SimpleGNN(gspec::AbstractGameSpec, hyper::SimpleGraphNetHP)
     innerSize = hyper.innerSize
-    nodeFeature = GI.state_dim(gspec; graph = true)
-    actionCount = length(GI.num_actions(gspec))
+    nodeFeature = GI.state_dim(gspec)
+    actionCount = GI.num_actions(gspec)+1
     model = GNNChain(GCNConv(nodeFeature[1] => innerSize),
         BatchNorm(innerSize),     # Apply batch normalization on node features (nodes dimension is batch dimension)
         x -> relu.(x),     
         GCNConv(innerSize => innerSize, relu),
-        GlobalPool(mean),  # aggregate node-wise features into graph-wise features
-        Dense(innerSize, actionCount))
+        GlobalPool(mean),
+        Dense(innerSize, actionCount),
+        softmax)
     SimpleGNN(gspec, hyper, model)
 end
 
@@ -54,10 +55,16 @@ function Base.copy(nn::SimpleGNN)
     deepcopy(nn.model)
   )
 end
+result(graph, model) = model(graph, g.ndata.x)
 
 function Network.forward(nn::SimpleGNN, state)
-  c = nn.model(state, state.ndata.x)
-  v = c[1] # Value of state
-  p = c[2:end] # Ranking of actions
-  return (p, v)
+    applyModel(graph) = nn.model(graph, graph.ndata.x)
+    result = applyModel.(state)
+    # Matrix{Float32}(undef, GI.num_actions(nn.gspec)+1, length(state))
+    # for (ind, graph) in enumerate(state)
+    #     result[:, ind] .= nn.model(graph, graph.ndata.x)
+    # end
+    v = [result[ind][indDepth] for indDepth in 1:1, ind in 1:length(state)]
+    p = [result[ind][indDepth] for indDepth in 2:size(result[1], 1), ind in 1:length(state) ]
+    return (p, v)
 end

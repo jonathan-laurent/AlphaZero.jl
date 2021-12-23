@@ -165,4 +165,26 @@ Network.on_gpu(nn::TwoHeadNetwork) = array_on_gpu(nn.vhead[end].bias)
 include("architectures/simplenet.jl")
 include("architectures/resnet.jl")
 
+abstract type FluxGNN <: FluxNetwork end
+
+
+# Flux.@functor does not work with abstract types
+function Flux.functor(nn::Net) where Net <: FluxGNN
+  children = (nn.model, )
+  constructor = cs -> Net(nn.gspec, nn.hyper, cs...)
+  return (children, constructor)
+end
+
+Network.hyperparams(nn::FluxGNN) = nn.hyper
+
+Network.game_spec(nn::FluxGNN) = nn.gspec
+
+Network.on_gpu(nn::FluxGNN) = array_on_gpu(nn.model[end-1].bias)
+
+#####
+##### Include networks library
+#####
+
+include("architectures/demographnet.jl")
+
 end

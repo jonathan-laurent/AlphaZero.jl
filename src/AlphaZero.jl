@@ -152,9 +152,6 @@ module AlphaZero
   export SimpleNet, SimpleNetHP, ResNet, ResNetHP
 
 
-  include("networks/graphneuralnetwork.jl")
-  using .GraphNeuralNetworkLib
-  export GraphNeuralNetworkLib
   export SimpleGNN, SimpleGraphNetHP
   
   # A structure that contains the information necessary to replicate a training session
