@@ -149,7 +149,7 @@ mutable struct Env{State, Oracle}
       gamma=1., cpuct=1., noise_ϵ=0., noise_α=1., prior_temperature=1., adaptive_normalization=false)
     S = GI.state_type(gspec)
     tree = Dict{S, StateInfo}()
-    norm = NormStats(adaptive_normalization, 1.)
+    norm = NormStats(adaptive_normalization, 1e-8)
     total_simulations = 0
     total_nodes_traversed = 0
     new{S, typeof(oracle)}(
@@ -288,7 +288,7 @@ end
 Empty the MCTS tree.
 """
 function reset!(env)
-  env.norm.factor = 1.
+  env.norm.factor = 1e-8
   empty!(env.tree)
   #GC.gc(true)
 end

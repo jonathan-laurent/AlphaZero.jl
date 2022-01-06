@@ -269,7 +269,7 @@ end
 function self_play_measurements(trace, _, player)
   mem = MCTS.approximate_memory_footprint(player.mcts)
   edepth = MCTS.average_exploration_depth(player.mcts)
-  norm_factor = player.mcts.norm.factor
+  norm_factor = player.mcts.norm.use_normalization ? player.mcts.norm.factor : 1.0
   return (trace=trace, mem=mem, edepth=edepth, norm_factor=norm_factor)
 end
 
