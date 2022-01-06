@@ -71,11 +71,11 @@ Collect samples out of a game trace and add them to the memory buffer.
 
 Here, `gamma` is the reward discount factor.
 """
-function push_trace!(mem::MemoryBuffer, trace, gamma)
+function push_trace!(mem::MemoryBuffer, trace, gamma, norm_factor)
   n = length(trace)
   wr = 0.
   for i in reverse(1:n)
-    wr = gamma * wr + trace.rewards[i]
+    wr = gamma * wr + trace.rewards[i]/norm_factor
     s = trace.states[i]
     π = trace.policies[i]
     wp = GI.white_playing(GI.init(mem.gspec, s))
