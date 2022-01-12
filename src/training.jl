@@ -269,8 +269,7 @@ end
 function self_play_measurements(trace, _, player)
   mem = MCTS.approximate_memory_footprint(player.mcts)
   edepth = MCTS.average_exploration_depth(player.mcts)
-  norm_factor = player.mcts.norm.use_normalization ? player.mcts.norm.factor : 1.0
-  return (trace=trace, mem=mem, edepth=edepth, norm_factor=norm_factor)
+  return (trace=trace, mem=mem, edepth=edepth)
 end
 
 function self_play_step!(env::Env, handler)
@@ -288,7 +287,7 @@ function self_play_step!(env::Env, handler)
   # Add the collected samples in memory
   new_batch!(env.memory)
   for x in results
-    push_trace!(env.memory, x.trace, params.mcts.gamma, x.norm_factor)
+    push_trace!(env.memory, x.trace, params.mcts.gamma)
   end
   speed = cur_batch_size(env.memory) / elapsed
   edepth = mean([x.edepth for x in results])

@@ -174,7 +174,7 @@ function MctsPlayer(
     noise_ϵ=params.dirichlet_noise_ϵ,
     noise_α=params.dirichlet_noise_α,
     prior_temperature=params.prior_temperature,
-    adaptive_normalization = params.adaptive_normalization)
+    adaptive_cpuct=params.adaptive_cpuct)
   return MctsPlayer(mcts,
     niters=params.num_iters_per_turn,
     τ=params.temperature,
@@ -189,7 +189,7 @@ function RandomMctsPlayer(game_spec::AbstractGameSpec, params::MctsParams)
     gamma=params.gamma,
     noise_ϵ=params.dirichlet_noise_ϵ,
     noise_α=params.dirichlet_noise_α,
-    adaptive_normalization = params.adaptive_normalization)
+    adaptive_cpuct=params.adaptive_cpuct)
   return MctsPlayer(mcts,
     niters=params.num_iters_per_turn,
     τ=params.temperature)

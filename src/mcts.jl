@@ -134,11 +134,11 @@ mutable struct Env{State, Oracle}
   # Parameters
   gamma :: Float64 # Discount factor
   cpuct :: Float64
+  adaptive_cpuct :: Bool
+  scaled_cpuct :: Float64
   noise_ϵ :: Float64
   noise_α :: Float64
   prior_temperature :: Float64
-  # Adaptive normalization
-  norm :: NormStats
   # Performance statistics
   total_simulations :: Int64
   total_nodes_traversed :: Int64
@@ -146,14 +146,13 @@ mutable struct Env{State, Oracle}
   gspec :: GI.AbstractGameSpec
 
   function Env(gspec, oracle;
-      gamma=1., cpuct=1., noise_ϵ=0., noise_α=1., prior_temperature=1., adaptive_normalization=false)
+      gamma=1., cpuct=1., noise_ϵ=0., noise_α=1., prior_temperature=1., adaptive_cpuct=false)
     S = GI.state_type(gspec)
     tree = Dict{S, StateInfo}()
-    norm = NormStats(adaptive_normalization, 1e-8)
     total_simulations = 0
     total_nodes_traversed = 0
     new{S, typeof(oracle)}(
-      tree, oracle, gamma, cpuct, noise_ϵ, noise_α, prior_temperature, norm,
+      tree, oracle, gamma, cpuct, adaptive_cpuct, cpuct, noise_ϵ, noise_α, prior_temperature,
       total_simulations, total_nodes_traversed, gspec)
   end
 end
@@ -185,15 +184,11 @@ end
 ##### Main algorithm
 #####
 
-function uct_scores(info::StateInfo, cpuct, ϵ, η, norm)
+function uct_scores(info::StateInfo, cpuct, ϵ, η)
   @assert iszero(ϵ) || length(η) == length(info.stats)
   sqrtNtot = sqrt(Ntot(info))
   return map(enumerate(info.stats)) do (i, a)
     Q = a.W / max(a.N, 1)
-    if(norm.use_normalization)
-      norm.factor = max(norm.factor, abs(Q))
-      Q /= norm.factor
-    end  
     P = iszero(ϵ) ? a.P : (1-ϵ) * a.P + ϵ * η[i]
     Q + cpuct * P * sqrtNtot / (a.N + 1)
   end
@@ -209,6 +204,10 @@ end
 # Return the estimated Q-value for the current player.
 # Modifies the state of the game environment.
 function run_simulation!(env::Env, game; η, root=true)
+  if env.adaptive_cpuct && isempty(env.tree)
+    (_, V) = env.oracle(GI.current_state(game))
+    env.scaled_cpuct = env.cpuct * abs(V)
+  end
   if GI.game_terminated(game)
     return 0.
   else
@@ -219,7 +218,7 @@ function run_simulation!(env::Env, game; η, root=true)
       return info.Vest
     else
       ϵ = root ? env.noise_ϵ : 0.
-      scores = uct_scores(info, env.cpuct, ϵ, η, env.norm)
+      scores = uct_scores(info, env.scaled_cpuct, ϵ, η)
       action_id = argmax(scores)
       action = actions[action_id]
       wp = GI.white_playing(game)
@@ -288,7 +287,6 @@ end
 Empty the MCTS tree.
 """
 function reset!(env)
-  env.norm.factor = 1e-8
   empty!(env.tree)
   #GC.gc(true)
 end
