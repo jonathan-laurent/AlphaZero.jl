@@ -38,7 +38,7 @@ end
 function convert_samples(
     gspec::AbstractGameSpec,
     wp::SamplesWeighingPolicy,
-    es::Vector{<:TrainingSample})
+    es::AbstractVector{<:TrainingSample})
 
   ces = [convert_sample(gspec, wp, e) for e in es]
   W = Flux.batch((e.w for e in ces))
@@ -89,7 +89,7 @@ end
 
 struct Trainer
   network :: AbstractNetwork
-  samples :: Vector{<:TrainingSample}
+  samples :: AbstractVector{<:TrainingSample}
   params :: LearningParams
   data :: NamedTuple # (W, X, A, P, V) tuple obtained after converting `samples`
   Wmean :: Float32
