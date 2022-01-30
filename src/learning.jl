@@ -41,11 +41,11 @@ function convert_samples(
     es::AbstractVector{<:TrainingSample})
 
   ces = [convert_sample(gspec, wp, e) for e in es]
-  W = Flux.batch((e.w for e in ces))
-  X = Flux.batch((e.x for e in ces))
-  A = Flux.batch((e.a for e in ces))
-  P = Flux.batch((e.p for e in ces))
-  V = Flux.batch((e.v for e in ces))
+  W = Flux.batch([e.w for e in ces])
+  X = Flux.batch([e.x for e in ces])
+  A = Flux.batch([e.a for e in ces])
+  P = Flux.batch([e.p for e in ces])
+  V = Flux.batch([e.v for e in ces])
   f32(arr) = convert(AbstractArray{Float32}, arr)
   return map(f32, (; W, X, A, P, V))
 end
