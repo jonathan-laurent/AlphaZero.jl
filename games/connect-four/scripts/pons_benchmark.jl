@@ -211,7 +211,6 @@ if !isdir(Solver.DEFAULT_SOLVER_DIR)
   exit()
 end
 
-using JSON2
 using JSON3
 
 JSON3.StructType(::Type{Results}) = JSON3.Struct()
@@ -224,7 +223,7 @@ if isfile(SAVE_FILE)
 else
   data = generate_data(SESSION_DIR)
   open(SAVE_FILE, "w") do io
-    JSON2.pretty(io, JSON3.write(data))
+    JSON3.pretty(io, JSON3.write(data))
   end
 end
 
