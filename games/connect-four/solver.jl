@@ -88,7 +88,7 @@ function qvalue(player, game, action)
   return qnext
 end
 
-function think(p::Player, g)
+function AlphaZero.think(p::Player, g)
   as = GI.available_actions(g)
   qs = [qvalue(p, g, a) for a in as]
   maxq = maximum(qs)
