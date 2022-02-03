@@ -87,7 +87,7 @@ end
 ##### Trainer Utility
 #####
 
-struct Trainer{T} where T <: AbstractNetwork
+struct Trainer{T <: AbstractNetwork}
   network :: T
   samples :: AbstractVector{<:TrainingSample}
   params :: LearningParams
