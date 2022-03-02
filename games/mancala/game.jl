@@ -2,6 +2,7 @@ import AlphaZero.GI
 
 using Crayons
 using StaticArrays
+using Random: AbstractRNG
 
 const NUM_HOUSES_PER_PLAYER = 6
 
@@ -40,7 +41,7 @@ mutable struct GameEnv <: GI.AbstractGameEnv
   finished :: Bool
 end
 
-function GI.init(::GameSpec)
+function GI.init(::GameSpec, ::AbstractRNG)
   board = INITIAL_STATE.board
   curplayer = INITIAL_STATE.curplayer
   finished = false
