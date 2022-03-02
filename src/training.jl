@@ -223,7 +223,6 @@ function learning_step!(env::Env, handler)
     Handlers.updates_started(handler, status)
     dlosses, dttrain = @timed batch_updates!(trainer, nbatches)
     status, dtloss = @timed learning_status(trainer)
-    @show dtloss
     Handlers.updates_finished(handler, status)
     tloss += dtloss
     ttrain += dttrain
