@@ -14,10 +14,10 @@ const RL = CommonRLInterface
 const EPISODE_LENGTH_BOUND = 200
 const SIZE = SA[10, 10]
 const REWARDS =     Dict(
-		    SA[9,3] =>  10.0,
-		    SA[8,8] =>   3.0,
-		    SA[4,3] => -10.0,
-		    SA[4,6] =>  -5.0)
+		    SA[9,3] =>   1.0,
+		    SA[8,8] =>   0.3,
+		    SA[4,3] =>  -1.0,
+		    SA[4,6] =>  -0.5)
 
 mutable struct World <: AbstractEnv
   position ::SVector{2, Int}
