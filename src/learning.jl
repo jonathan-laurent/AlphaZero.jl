@@ -154,6 +154,7 @@ end
 function learning_status(tr::Trainer, samples)
   # As done now, this is slighly inefficient as we solve the
   # same neural network inference problem twice
+  samples = Network.convert_input_tuple(tr.network, samples)
   W, X, A, P, V = samples
   regws = Network.regularized_params(tr.network)
   Ls = losses(tr.network, regws, tr.params, tr.Wmean, tr.Hp, samples)
@@ -167,11 +168,12 @@ end
 function learning_status(tr::Trainer)
   batchsize = min(tr.params.loss_computation_batch_size, num_samples(tr))
   batches = Flux.Data.DataLoader(tr.data; batchsize, partial=true)
-  reports = map(batches) do batch
-    batch = Network.convert_input_tuple(tr.network, batch)
-    return learning_status(tr, batch)
+  reports = []
+  ws = []
+  for batch in batches
+    push!(reports, learning_status(tr, batch))
+    push!(ws, sum(batch.W))
   end
-  ws = [sum(batch.W) for batch in batches]
   return mean_learning_status(reports, ws)
 end
 
