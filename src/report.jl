@@ -227,7 +227,7 @@ end
 
 Report generated after each training iteration.
 - Fields `self_play`, `memory`, `learning` have types [`Report.SelfPlay`](@ref),
-    [`Report.SelfPlay`](@ref) and [`Report.Learning`](@ref) respectively
+    [`Report.Memory`](@ref) and [`Report.Learning`](@ref) respectively
 - Fields `perfs_self_play`, `perfs_memory_analysis` and `perfs_learning` are
     performance reports for the different phases of the iteration,
     with type [`Report.Perfs`](@ref)
