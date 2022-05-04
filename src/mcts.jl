@@ -92,6 +92,8 @@ Ntot(b::StateInfo) = sum(s.N for s in b.stats)
 ##### MCTS Environment
 #####
 
+@enum FpuStrategy reduction absolute
+
 """
     MCTS.Env(game_spec::AbstractGameSpec, oracle; <keyword args>)
 
@@ -105,6 +107,10 @@ Create and initialize an MCTS environment with a given `oracle`.
      (see below)
   - `prior_temperature=1.`: temperature to apply to the oracle's output
      to get the prior probability vector used by MCTS.
+  - `fpu_strategy=reduction`: “First Play Urgency” strategy
+  - `fpu_value=0.44`: "First Play Urgency” value used to adjust
+     unvisited nodes evaluation based on `fpu_strategy`. It is
+     set to 0.44 by default, according to Leela-Chess value.
 
 ## Dirichlet Noise
 
@@ -132,6 +138,8 @@ mutable struct Env{State, Oracle}
   noise_ϵ :: Float64
   noise_α :: Float64
   prior_temperature :: Float64
+  fpu_strategy :: FpuStrategy
+  fpu_value :: Float64
   # Performance statistics
   total_simulations :: Int64
   total_nodes_traversed :: Int64
@@ -139,14 +147,15 @@ mutable struct Env{State, Oracle}
   gspec :: GI.AbstractGameSpec
 
   function Env(gspec, oracle;
-      gamma=1., cpuct=1., noise_ϵ=0., noise_α=1., prior_temperature=1.)
+      gamma=1., cpuct=1., noise_ϵ=0., noise_α=1., prior_temperature=1.,
+      fpu_strategy=reduction, fpu_value=0.44) # Magic value inspired from Leela-Chess
     S = GI.state_type(gspec)
     tree = Dict{S, StateInfo}()
     total_simulations = 0
     total_nodes_traversed = 0
     new{S, typeof(oracle)}(
       tree, oracle, gamma, cpuct, noise_ϵ, noise_α, prior_temperature,
-      total_simulations, total_nodes_traversed, gspec)
+      fpu_strategy, fpu_value, total_simulations, total_nodes_traversed, gspec)
   end
 end
 
@@ -177,13 +186,18 @@ end
 ##### Main algorithm
 #####
 
-function uct_scores(info::StateInfo, cpuct, ϵ, η)
+function uct_scores(info::StateInfo, env, ϵ, η, parent_stats)
   @assert iszero(ϵ) || length(η) == length(info.stats)
   sqrtNtot = sqrt(Ntot(info))
+  fpu_Q = env.fpu_value
+  if (!isnothing(parent_stats) && env.fpu_strategy == reduction)
+    parent_Q = parent_stats.W / parent_stats.N
+    fpu_Q = parent_Q - env.fpu_value
+  end
   return map(enumerate(info.stats)) do (i, a)
-    Q = a.W / max(a.N, 1)
+    Q = (a.N != 0) ? a.W / max(a.N, 1) : fpu_Q
     P = iszero(ϵ) ? a.P : (1-ϵ) * a.P + ϵ * η[i]
-    Q + cpuct * P * sqrtNtot / (a.N + 1)
+    Q + env.cpuct * P * sqrtNtot / (a.N + 1)
   end
 end
 
@@ -196,7 +210,7 @@ end
 # Run a single MCTS simulation, updating the statistics of all traversed states.
 # Return the estimated Q-value for the current player.
 # Modifies the state of the game environment.
-function run_simulation!(env::Env, game; η, root=true)
+function run_simulation!(env::Env, game; η, root=true, parent_stats=nothing)
   if GI.game_terminated(game)
     return 0.
   else
@@ -207,15 +221,16 @@ function run_simulation!(env::Env, game; η, root=true)
       return info.Vest
     else
       ϵ = root ? env.noise_ϵ : 0.
-      scores = uct_scores(info, env.cpuct, ϵ, η)
+      scores = uct_scores(info, env, ϵ, η, parent_stats)
       action_id = argmax(scores)
       action = actions[action_id]
+      next_parent_stats = info.stats[action_id]
       wp = GI.white_playing(game)
       GI.play!(game, action)
       wr = GI.white_reward(game)
       r = wp ? wr : -wr
       pswitch = wp != GI.white_playing(game)
-      qnext = run_simulation!(env, game, η=η, root=false)
+      qnext = run_simulation!(env, game, η=η, root=false, parent_stats=next_parent_stats)
       qnext = pswitch ? -qnext : qnext
       q = r + env.gamma * qnext
       update_state_info!(env, state, action_id, q)
