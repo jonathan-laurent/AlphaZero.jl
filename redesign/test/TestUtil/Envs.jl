@@ -1,9 +1,9 @@
-@reexport module Envs
+module Envs
 
 using RLZero
+using ReinforcementLearningEnvironments
 using Random: MersenneTwister
 using Statistics: mean
-using ReinforcementLearningEnvironments
 
 export random_walk_value, tictactoe_draw, tictactoe_winning
 

@@ -1,4 +1,4 @@
-@reexport module Shortcuts
+module Shortcuts
 
 using RLZero
 
