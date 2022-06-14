@@ -1,4 +1,5 @@
 [deps]
+JET = "c3a54625-cd67-489e-a8e7-0a5a0ff4e31b"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 Reexport = "189a3867-3050-52da-a836-e630ba90ab69"
 ReinforcementLearningBase = "e575027e-6cd6-5018-9292-cdc6200d2b44"

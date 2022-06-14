@@ -1,4 +1,4 @@
-module Envs
+module TestEnvs
 
 using RLZero
 using ReinforcementLearningEnvironments

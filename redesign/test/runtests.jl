@@ -1,12 +1,4 @@
-using Test
-using RLZero
-using ReinforcementLearningBase
-using ReinforcementLearningEnvironments
+include("RLZeroTests/RLZeroTests.jl")
+using .RLZeroTests
 
-using Random: MersenneTwister
-using Statistics: mean
-
-include("TestUtil/TestUtil.jl")
-using .TestUtil
-
-include("runtests/mcts.jl")
+run_mcts_tests()
