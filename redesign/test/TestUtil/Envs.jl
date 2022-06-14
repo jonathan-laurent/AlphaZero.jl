@@ -8,10 +8,9 @@ using Statistics: mean
 export random_walk_value, tictactoe_draw, tictactoe_winning
 
 function random_walk_value(; N, start_pos, rep=1000)
-    env = RandomWalk1D(; N=5)
+    env = RandomWalk1D(; start_pos, N)
     rng = MersenneTwister(0)
     oracle = RolloutOracle(rng)
-    env = RandomWalk1D(; start_pos, N)
     return mean(oracle(env)[2] for _ in 1:rep)
 end
 
