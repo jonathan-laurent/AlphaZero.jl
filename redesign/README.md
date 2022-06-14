@@ -75,6 +75,8 @@ To run the VSCode debugger within the REPL, just write:
 
 Also, if the "Jump to Definition" VSCode feature does not work, you may one to relaunch the "Choose Julia Env" command. This can be done by clicking on the status bar.
 
+By executing code directly in the editor window, the whole stack trace gets highlighted in red in the editor whenever an exception is raised.
+
 ## Dev Plan
 
 - We start implementing a minimal version of AlphaZero as it is easier:
