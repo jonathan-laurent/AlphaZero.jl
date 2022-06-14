@@ -43,6 +43,10 @@
 - We use the `Reexport` package so as to ease working with module hierarchies.
 - We should make sure that the codebase can be explored using the "Jump to definition" feature of VS-Code.
 
+## Testing
+
+We make an unusual architecture decision by including all tests in the main `RLZero` package. This enables organizing the tests neatly using submodules while still benefitting from good Revise/editor support. Indeed, Revise can only track code in a package or in a single standalone script (via includet). An alternative would be to have a separate testing package but the current tooling does not make this easy.
+
 ## Workflow
 
 We use `JuliaFormatter` to format the code on save. To do so, use the following VSCode configuration:

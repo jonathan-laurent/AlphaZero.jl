@@ -1,4 +1,4 @@
-module RLZeroTests
+module Tests
 
 using Reexport
 

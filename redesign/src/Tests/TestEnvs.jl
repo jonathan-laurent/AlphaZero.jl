@@ -1,18 +1,10 @@
 module TestEnvs
 
-using RLZero
 using ReinforcementLearningEnvironments
 using Random: MersenneTwister
 using Statistics: mean
 
-export random_walk_value, tictactoe_draw, tictactoe_winning
-
-function random_walk_value(; N, start_pos, rep=1000)
-    env = RandomWalk1D(; start_pos, N)
-    rng = MersenneTwister(0)
-    oracle = RolloutOracle(rng)
-    return mean(oracle(env)[2] for _ in 1:rep)
-end
+export tictactoe_draw, tictactoe_winning
 
 function tictactoe_position(actions)
     env = TicTacToeEnv()

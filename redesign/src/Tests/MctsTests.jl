@@ -9,9 +9,18 @@ using ReinforcementLearningEnvironments
 using Random: MersenneTwister
 using Statistics: mean
 
+using ...MCTS
+
 using ..TestEnvs
 
 export run_mcts_tests
+
+function random_walk_value(; N, start_pos, rep=1000)
+    env = RandomWalk1D(; start_pos, N)
+    rng = MersenneTwister(0)
+    oracle = RolloutOracle(rng)
+    return mean(oracle(env)[2] for _ in 1:rep)
+end
 
 function uniform_mcts_policy(; n=100)
     return Policy(;

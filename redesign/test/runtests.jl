@@ -1,4 +1,3 @@
-include("RLZeroTests/RLZeroTests.jl")
-using .RLZeroTests
+using RLZero
 
 run_mcts_tests()
