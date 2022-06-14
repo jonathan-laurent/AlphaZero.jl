@@ -214,8 +214,8 @@ Oracle that performs a single random rollout to estimate state value.
 Given a state, the oracle selects random actions until a leaf node is reached.
 The resulting cumulative reward is treated as a stochastic value estimate.
 """
-struct RolloutOracle
-    rng::AbstractRNG
+struct RolloutOracle{RNG<:AbstractRNG}
+    rng::RNG
 end
 
 function (oracle::RolloutOracle)(env::AbstractEnv)
