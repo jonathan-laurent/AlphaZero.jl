@@ -2,15 +2,12 @@ module MctsTests
 
 using Test
 using JET
-using RLZero
 using ReinforcementLearningBase
 using ReinforcementLearningEnvironments
-
 using Random: MersenneTwister
 using Statistics: mean
 
 using ...MCTS
-
 using ..TestEnvs
 
 export run_mcts_tests
@@ -57,14 +54,13 @@ function run_mcts_tests()
     @testset "mcts policy" begin
         policy = uniform_mcts_policy()
         env = tictactoe_winning()
-        rng = MersenneTwister(0)
         tree = explore(policy, env)
         best = argmax(completed_qvalues(tree))
         @test legal_action_space(env)[best] == 3
     end
     @testset "mcts inferred" begin
-        @test_opt target_modules = (RLZero.MCTS,) profile_rollout()
-        #@test_opt target_modules = (RLZero.MCTS,) profile_explore()
+        @test_opt target_modules = (MCTS,) profile_rollout()
+        #@test_opt target_modules = (MCTS,) profile_explore()
     end
 end
 

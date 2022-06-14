@@ -40,6 +40,7 @@
 
 - This codebase enforces the [Blue Style](https://github.com/invenia/BlueStyle).
 - Each source file defines a submodule. The files hierarchy perfectly reflects the underlying module hierarchy.
+- The imports in each submodule are split in two parts: the external package imports first and then the internal submodule imports.
 - We use the `Reexport` package so as to ease working with module hierarchies.
 - We should make sure that the codebase can be explored using the "Jump to definition" feature of VS-Code.
 
@@ -71,6 +72,8 @@ To run the VSCode debugger within the REPL, just write:
 ```julia
 @run function_to_debug()
 ```
+
+Also, if the "Jump to Definition" VSCode feature does not work, you may one to relaunch the "Choose Julia Env" command. This can be done by clicking on the status bar.
 
 ## Dev Plan
 
