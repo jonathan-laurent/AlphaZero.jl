@@ -32,16 +32,18 @@ end
 function profile_rollout()
     oracle = RolloutOracle(MersenneTwister(0))
     env = TicTacToeEnv()
-    for i in 1:100
+    for _ in 1:100
         oracle(env)
     end
+    return nothing
 end
 
 function profile_explore()
     policy = uniform_mcts_policy()
     env = tictactoe_winning()
-    rng = MersenneTwister(0)
-    return explore(policy, env)
+    for _ in 1:100
+        explore(policy, env)
+    end
 end
 
 function run_mcts_tests()
