@@ -48,6 +48,14 @@
 
 We make an unusual architecture decision by including all tests in the main `RLZero` package. This enables organizing the tests neatly using submodules while still benefitting from good Revise/editor support. Indeed, Revise can only track code in a package or in a single standalone script (via includet). An alternative would be to have a separate testing package but the current tooling does not make this easy.
 
+## Setup
+
+We are working with the master version of ReinforcementLearning.jl so you should update your Manifest accordingly:
+
+```
+] add ReinforcementLearningBase#master ReinforcementLearningEnvironments#master
+```
+
 ## Workflow
 
 We use `JuliaFormatter` to format the code on save. To do so, use the following VSCode configuration:
