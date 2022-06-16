@@ -11,17 +11,17 @@ struct StaticBitArray{Size,NumChunks}
     chunks::SVector{NumChunks,UInt64}
 end
 
-function StaticBitArray(size::Number, num_chunks::Number)
-    @assert 0 <= size <= 64 * num_chunks
-    chunks = zeros(SVector{num_chunks,UInt64})
-    return StaticBitArray{size,num_chunks}(chunks)
+function StaticBitArray{Size,NumChunks}() where {Size,NumChunks}
+    @assert 0 <= Size <= 64 * NumChunks
+    chunks = zeros(SVector{NumChunks,UInt64})
+    return StaticBitArray{Size,NumChunks}(chunks)
 end
 
-function StaticBitArray(size::Number)
-    @assert 0 <= size
-    num_chunks, rem = divrem(size, 64)
-    rem > 0 && (num_chunks += 1)
-    return StaticBitArray(size, num_chunks)
+function StaticBitArray{Size}() where {Size}
+    @assert 0 <= Size
+    NumChunks, rem = divrem(Size, 64)
+    rem > 0 && (NumChunks += 1)
+    return StaticBitArray{Size,NumChunks}()
 end
 
 function decompose_idx(idx, ::Val{N}) where {N}
@@ -36,7 +36,7 @@ function decompose_idx(idx, ::Val{N}) where {N}
     return chunk_id, chunk_offset
 end
 
-function Base.setindex(arr::StaticBitArray{S,N}, ::Val{b}, idx) where {S,N,b}
+function Base.setindex(arr::StaticBitArray{S,N}, b::Bool, idx) where {S,N}
     chunkid, offset = decompose_idx(idx, Val(N))
     chunk = arr.chunks[chunkid]
     if b
@@ -46,8 +46,6 @@ function Base.setindex(arr::StaticBitArray{S,N}, ::Val{b}, idx) where {S,N,b}
     end
     return StaticBitArray{S,N}(setindex(arr.chunks, chunk, chunkid))
 end
-
-Base.setindex(arr::StaticBitArray, b::Bool, idx) = setindex(arr, Val(b), idx)
 
 function Base.getindex(arr::StaticBitArray{S,N}, idx) where {S,N}
     chunk_id, offset = decompose_idx(idx, Val(N))
@@ -60,7 +58,7 @@ function run_tests()
         for size in [4, 64, 65, 1000]
             for i in 1:100
                 indices = randsubseq(rng, 1:size, 0.3)
-                arr = StaticBitArray(size)
+                arr = StaticBitArray{size}()
                 for i in indices
                     arr = setindex(arr, true, i)
                 end

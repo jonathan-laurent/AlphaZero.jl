@@ -5,6 +5,9 @@ using Reexport
 include("Util/Util.jl")
 @reexport using .Util
 
+include("BatchedEnvs.jl")
+@reexport using .BatchedEnvs
+
 include("MCTS.jl")
 @reexport using .MCTS
 
