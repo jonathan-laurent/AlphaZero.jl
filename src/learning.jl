@@ -25,7 +25,7 @@ function convert_sample(
     w = Float32[log2(e.n) + 1]
   else
     @assert wp == LINEAR_WEIGHT
-    w = Float32[n]
+    w = Float32[e.n]
   end
   x = GI.vectorize_state(gspec, e.s)
   a = GI.actions_mask(GI.init(gspec, e.s))
