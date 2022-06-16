@@ -12,9 +12,7 @@ function test_equivalent(BatchedEnv, BaselineEnv)
     rng = MersenneTwister(0)
     for i in 1:100
         env = BatchedEnv()
-        rewards = 0.0
         env_baseline = BaselineEnv()
-        rewards_baseline = 0.0
         while !BatchedEnvs.terminated(env)
             valid_actions = filter(1:BatchedEnvs.num_actions(env)) do i
                 BatchedEnvs.valid_action(env, i)
@@ -23,8 +21,11 @@ function test_equivalent(BatchedEnv, BaselineEnv)
             @test sort(valid_actions) == sort(valid_actions_baseline)
             @test !isempty(valid_actions)
             action = rand(rng, valid_actions)
-            env, _ = BatchedEnvs.act(env, action)
+            env, info = BatchedEnvs.act(env, action)
             env_baseline(action)
+            reward_baseline = RLBase.reward(env_baseline)
+            info.switched && (reward_baseline *= -1)
+            @test info.reward == reward_baseline
         end
         @test RLBase.is_terminated(env_baseline)
     end
