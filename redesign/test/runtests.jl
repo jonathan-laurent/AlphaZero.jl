@@ -1,3 +1,3 @@
 using RLZero.Tests
 
-run_mcts_tests()
+run_all_tests()

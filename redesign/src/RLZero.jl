@@ -2,6 +2,9 @@ module RLZero
 
 using Reexport
 
+include("Util/Util.jl")
+@reexport using .Util
+
 include("MCTS.jl")
 @reexport using .MCTS
 
