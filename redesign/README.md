@@ -89,3 +89,12 @@ By executing code directly in the editor window, the whole stack trace gets high
 
 - We start implementing a minimal version of AlphaZero as it is easier:
   - Reset MCTS tree everytime for now.
+
+## Useful Links
+
+- [MuZero Pseudocode](https://arxiv.org/src/1911.08265v2/anc/pseudocode.py)
+- [Michal Lukomski's GSOC Project](https://github.com/michelangelo21/MuZero)
+- [Werner Duvaud's implementation](https://github.com/werner-duvaud/muzero-general)
+- [Duvaud's Tictactoe Params](https://github.com/werner-duvaud/muzero-general/blob/master/games/tictactoe.py)
+
+Note that in the MuZero pseudocode, they seem to be updating the network every 1000 batch updates (batches have size 2048). There is 1e6 updates in total so 1000 iterations. Buffer with 1e6 samples (Renewed twice during iteration?). This is surprisingly small...
