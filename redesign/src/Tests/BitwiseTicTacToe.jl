@@ -26,7 +26,7 @@ BatchedEnvs.num_actions(::BitwiseTicTacToeEnv) = 9
 posidx(n, player) = n + 9 * player
 posidx(x, y, player) = posidx(x + 3 * (y - 1), player)
 
-function Base.show(io::IO, env::BitwiseTicTacToeEnv)
+function Base.show(io::IO, ::MIME"text/plain", env::BitwiseTicTacToeEnv)
     for i in 1:3
         for j in 1:3
             if env.board[posidx(i, j, CROSS)]

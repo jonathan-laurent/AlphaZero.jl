@@ -1,46 +1,43 @@
 """
 An batched MCTS implementation that can run on GPU.
-
-Tree: (batch_size * num_simulations) nodes
-
-Ability: use broadcasting for within the kernel.
-
-How do we deal with warps that execute in lockstep?
-We must avoid unnecessary branching.
-Env simulation is going to desynchronize warps but only momentarily.
 """
 module BatchedMCTS
 
 using StaticArrays
 using Distributions: sample, Gumbel
 using Random: AbstractRNG
-using Flux: softmax
 using Base: @kwdef
+using Setfield
+using Base.Iterators: map as imap
 
 using ..BatchedEnvs
+using ..Util.Devices
 
-struct Node{State,NumActions}
-    state::State
-    parent::Int16
-    prev_action::Int16
-    expanded::Bool
-    prior::SVector{NumActions,Float32}
-end
-
-function root_node(state, na)
-    return Node(state, Int16(0), Int16(0), false, @SVector zeros(Float32, na))
-end
-
-"""
-For the moment, the oracle is uniform
-"""
-@kwdef struct Policy{Oracle,ArrayType}
+@kwdef struct Policy{Oracle,Device}
     oracle::Oracle
-    mkarray::ArrayType
+    device::Device
     num_simulations::Int = 64
     num_considered_actions::Int = 8
-    value_scale::Float64 = 0.1
+    value_scale::Float32 = 0.1f0
     max_visit_init::Int = 50
+end
+
+@kwdef struct Node{NumActions,State}
+    # Static info created at initialization
+    state::State
+    parent::Int16 = Int16(0)
+    prev_action::Int16 = Int16(0)
+    prev_reward::Float32 = 0.0f0
+    prev_switched::Bool = false
+    terminal::Bool = false
+    valid_actions::SVector{NumActions,Bool} = @SVector zeros(Bool, NumActions)
+    # Oracle info
+    prior::SVector{NumActions,Float32} = @SVector zeros(Float32, NumActions)
+    value_prior::Float32 = 0.0f0
+    # Dynamic info
+    children::SVector{NumActions,Int16} = @SVector zeros(Int16, NumActions)
+    total_rewards::Float32 = 0.0f0
+    num_visits::Int16 = 1
 end
 
 function create_tree(policy, envs)
@@ -48,22 +45,167 @@ function create_tree(policy, envs)
     na = num_actions(env)
     ne = length(envs)
     ns = policy.num_simulations
-    tree = policy.mkarray{Node{typeof(env),na}}(undef, (ns, ne))
-    curnode = policy.mkarray{Int16}(undef, ne)
-    tree[1, :] = policy.mkarray([root_node(e, na) for e in envs])
-    fill!(curnode, 1)
-    return tree, curnode
+    Arr = DeviceArray(policy.device)
+    StateNode = Node{na,typeof(env)}
+    # We index tree nodes with (batchnum, simnum)
+    # This is unusual but this has better cache locality in this case
+    tree = Arr{StateNode}(undef, (ne, ns))
+    tree[:, 1] = Arr([StateNode(; state=e) for e in envs])
+    return tree
 end
 
-function tree_dims(tree::AbstractVector{Node{S,N}}) where {S,N}
-    ns, ne = size(tree)
-    return (; na=N, ns, ne)
+const Tree{N,S} = AbstractArray{Node{N,S}}
+
+function tree_dims(tree::Tree{N,S}) where {N,S}
+    na = N
+    ne, ns = size(tree)
+    return (; na, ne, ns)
 end
 
-function evaluate_states(policy, tree, pos)
-    (; na, ns, ne) = tree_dims(tree)
-    policy.mkarray(collect(1:ne))
+function evaluate_states(policy, tree, frontier)
+    (; na, ne) = tree_dims(tree)
+    prior = (@SVector ones(Float32, na)) / na
+    Devices.foreach(1:ne, policy.device) do batchnum
+        nid = frontier[batchnum]
+        node = tree[batchnum, nid]
+        if !node.terminal
+            @set! node.prior = prior
+            @set! node.value_prior = 0.0f0
+            tree[batchnum, nid] = node
+        end
+    end
     return nothing
+end
+
+function softmax(xs, eps=1e-15)
+    xs = xs .- maximum(xs)
+    ys = exp.(xs) .+ eltype(xs)(eps)
+    return ys ./ sum(ys)
+end
+
+# Version of argmax that nevers raises an exception
+function safe_argmax(f, xs; init)
+    best_idx = 0
+    best_val = init
+    for (i, x) in enumerate(xs)
+        y = f(x)
+        if y > best_val
+            best_idx = i
+            best_val = y
+        end
+    end
+    return best_idx
+end
+
+value(node) = node.total_rewards / node.num_visits
+
+qvalue(child) = value(child) * (-1)^child.prev_switched
+
+function root_value_estimate(tree, node, bid)
+    total_qvalues = 0.0f0
+    total_prior = 0.0f0
+    total_visits = 0
+    for (i, cnid) in enumerate(node.children)
+        if cnid > 0  # if the child was visited
+            child = tree[bid, cnid]
+            total_qvalues += node.prior[i] * qvalue(child)
+            total_prior += node.prior[i]
+            total_visits += child.num_visits
+        end
+    end
+    children_value = total_qvalues
+    total_prior > 0 && (children_value /= total_prior)
+    return (node.value_prior + total_visits * children_value) / (1 + total_visits)
+end
+
+function completed_qvalues(tree, node, bid)
+    root_value = root_value_estimate(tree, node, bid)
+    na = length(node.children)
+    ret = imap(1:na) do i
+        cnid = node.children[i]
+        return cnid > 0 ? value(tree[bid, cnid]) : root_value
+    end
+    return SVector{na}(ret)
+end
+
+function num_child_visits(tree, node, bid, i)
+    cnid = node.children[i]
+    return cnid > 0 ? tree[bid, cnid].num_visits : Int16(0)
+end
+
+function qcoeff(mcts, tree, node, bid)
+    na = length(node.children)
+    # init is necessary for GPUCompiler right now...
+    max_child_visit = maximum(1:na; init=Int16(0)) do i
+        num_child_visits(tree, node, bid, i)
+    end
+    return mcts.value_scale * (mcts.max_visit_init + max_child_visit)
+end
+
+function target_policy(mcts, tree, node, bid)
+    qs = completed_qvalues(tree, node, bid)
+    return softmax(log.(node.prior) + qcoeff(mcts, tree, node, bid) * qs)
+end
+
+function select_nonroot_action(mcts, tree, node, bid)
+    policy = target_policy(mcts, tree, node, bid)
+    na = length(node.children)
+    total_visits = sum(i -> num_child_visits(tree, node, bid, i), 1:na; init=0)
+    return safe_argmax(1:na; init=-Inf32) do i
+        ratio = Float32(num_child_visits(tree, node, bid, i)) / (total_visits + 1)
+        return policy[i] - ratio
+    end
+end
+
+# TODO: initialize init node better...
+
+function select(mcts, tree, simnum, bid)
+    (; na) = tree_dims(tree)
+    cur = Int16(1)  # start at the root
+    while true
+        node = tree[bid, cur]
+        if node.terminal
+            return cur
+        end
+        i = select_nonroot_action(mcts, tree, node, bid)
+        cnid = node.children[i]
+        if cnid > 0
+            # The child is already in the tree so we proceed.
+            cur = cnid
+        else
+            # The child is not in the tree so we add it and return.
+            newstate, info = act(node.state, i)
+            terminal = terminated(newstate)
+            if terminal
+                valid_actions = SVector{na,Bool}(false for _ in 1:na)
+            else
+                valid_actions = SVector{na,Bool}(false for _ in 1:na)
+            end
+            child = Node{na,typeof(node.state)}(;
+                state=newstate,
+                parent=cur,
+                prev_action=i,
+                prev_reward=info.reward,
+                prev_switched=info.switched,
+                terminal,
+                valid_actions,
+            )
+            tree[bid, simnum] = child
+            return Int16(simnum)
+        end
+    end
+end
+
+# Start from the root and add a new frontier (whose index is returned)
+# After the node is added, one expect the oracle to be called on all
+# frontier nodes where terminal=false.
+function select(policy, tree, simnum)
+    (; ne) = tree_dims(tree)
+    batch_ids = DeviceArray(policy.device)(1:ne)
+    frontier = map(batch_ids) do bid
+        return select(policy, tree, simnum, bid)
+    end
+    return frontier
 end
 
 end

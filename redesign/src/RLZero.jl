@@ -12,8 +12,9 @@ include("MCTS.jl")
 @reexport using .MCTS
 
 include("BatchedMCTS.jl")
+@reexport using .BatchedMCTS: BatchedMCTS
 
 include("Tests/Tests.jl")
-using .Tests
+@reexport using .Tests: Tests
 
 end
