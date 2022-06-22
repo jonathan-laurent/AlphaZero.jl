@@ -8,7 +8,7 @@ using Random: MersenneTwister
 using Statistics: mean
 
 using ...MCTS
-using ..TestEnvs
+using ..Common.TestEnvs
 
 export run_mcts_tests
 

@@ -2,7 +2,7 @@ module BitwiseTicTacToeTests
 
 using Test
 using ..BatchedEnvsTests
-using ..BitwiseTicTacToe
+using ..Common.BitwiseTicTacToe
 using ReinforcementLearningEnvironments
 
 export run_bitwise_tictactoe_tests

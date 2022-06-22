@@ -1,15 +1,15 @@
-module BatchedMctsTests
+module BatchedMctsAosTests
 
-using ...BatchedMctsAoS
+using ...BatchedMctsAos
 using ...Util.Devices
-using ..BitwiseTicTacToe
+using ..Common.BitwiseTicTacToe
 
 using CUDA
 using Test
 
 export run_batched_mcts_tests
 
-const MCTS = BatchedMctsAoS
+const MCTS = BatchedMctsAos
 
 function run_batched_mcts_tests_on(device; num_simulations=2, num_envs=2)
     env = BitwiseTicTacToeEnv()

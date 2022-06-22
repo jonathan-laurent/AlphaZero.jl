@@ -1,8 +1,8 @@
 """
 An batched MCTS implementation that can run on GPU where trees
-are represented in Array of Structs (AoS) format.
+are represented in Array of Structs format.
 """
-module BatchedMctsAoS
+module BatchedMctsAos
 
 using StaticArrays
 using Distributions: sample, Gumbel

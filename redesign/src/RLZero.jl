@@ -11,8 +11,8 @@ using .BatchedEnvs
 include("MCTS.jl")
 @reexport using .MCTS
 
-include("BatchedMctsAoS.jl")
-@reexport using .BatchedMctsAoS: BatchedMctsAoS
+include("BatchedMctsAos.jl")
+@reexport using .BatchedMctsAos: BatchedMctsAos
 
 include("Tests/Tests.jl")
 @reexport using .Tests: Tests

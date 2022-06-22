@@ -5,11 +5,11 @@ using Test
 
 export run_all_tests
 
+include("Common/Common.jl")
+@reexport using .Common
+
 include("BatchedEnvsTests.jl")
 @reexport using .BatchedEnvsTests
-
-include("BitwiseTicTacToe.jl")
-@reexport using .BitwiseTicTacToe
 
 include("BitwiseTicTacToeTests.jl")
 @reexport using .BitwiseTicTacToeTests
@@ -17,14 +17,11 @@ include("BitwiseTicTacToeTests.jl")
 include("UtilTests.jl")
 @reexport using .UtilTests
 
-include("TestEnvs.jl")
-@reexport using .TestEnvs
-
 include("MctsTests.jl")
 @reexport using .MctsTests
 
-include("BatchedMctsTests.jl")
-@reexport using .BatchedMctsTests
+include("BatchedMctsAosTests.jl")
+@reexport using .BatchedMctsAosTests
 
 function run_all_tests()
     @testset "RLZero tests" begin

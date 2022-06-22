@@ -1,7 +1,7 @@
 module BitwiseTicTacToe
 
-using ...BatchedEnvs
-using ...Util.StaticBitArrays
+using ....BatchedEnvs
+using ....Util.StaticBitArrays
 
 export BitwiseTicTacToeEnv
 
