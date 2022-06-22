@@ -69,7 +69,7 @@ end
 function root_value_estimate(node::Tree)
     total_visits = sum(node.num_visits)
     root_value = node.oracle_value
-    visited = visited_children_indices(node)
+    visited = collect(visited_children_indices(node))
     if !isempty(visited)
         children_value = sum(node.prior[i] * qvalue(node, i) for i in visited)
         children_value /= sum(node.prior[i] for i in visited)
