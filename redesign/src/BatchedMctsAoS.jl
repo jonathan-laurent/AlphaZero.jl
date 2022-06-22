@@ -1,5 +1,6 @@
 """
-An batched MCTS implementation that can run on GPU.
+An batched MCTS implementation that can run on GPU where trees
+are represented in Array of Structs (AoS) format.
 """
 module BatchedMctsAoS
 
@@ -12,6 +13,7 @@ using Base.Iterators: map as imap
 
 using ..BatchedEnvs
 using ..Util.Devices
+using ..Util.Devices.KernelFuns: sum, argmax, maximum, softmax
 
 @kwdef struct Policy{Oracle,Device}
     oracle::Oracle
@@ -71,7 +73,7 @@ function tree_dims(tree::Tree{N,S}) where {N,S}
     return (; na, ne, ns)
 end
 
-function evaluate_states(mcts, tree, frontier)
+function eval_states!(mcts, tree, frontier)
     (; na, ne) = tree_dims(tree)
     prior = (@SVector ones(Float32, na)) / na
     Devices.foreach(1:ne, mcts.device) do batchnum
@@ -84,26 +86,6 @@ function evaluate_states(mcts, tree, frontier)
         end
     end
     return nothing
-end
-
-function softmax(xs, eps=1e-15)
-    xs = xs .- maximum(xs)
-    ys = exp.(xs) .+ eltype(xs)(eps)
-    return ys ./ sum(ys)
-end
-
-# Version of argmax that nevers raises an exception
-function safe_argmax(f, xs; init)
-    best_idx = 0
-    best_val = init
-    for (i, x) in enumerate(xs)
-        y = f(x)
-        if y > best_val
-            best_idx = i
-            best_val = y
-        end
-    end
-    return best_idx
 end
 
 value(node) = node.total_rewards / node.num_visits
@@ -160,13 +142,13 @@ function select_nonroot_action(mcts, tree, node, bid)
     policy = target_policy(mcts, tree, node, bid)
     na = length(node.children)
     total_visits = sum(i -> num_child_visits(tree, node, bid, i), 1:na; init=0)
-    return safe_argmax(1:na; init=-Inf32) do i
+    return argmax(1:na; init=(0, -Inf32)) do i
         ratio = Float32(num_child_visits(tree, node, bid, i)) / (total_visits + 1)
         return policy[i] - ratio
     end
 end
 
-function select(mcts, tree, simnum, bid)
+function select!(mcts, tree, simnum, bid)
     (; na) = tree_dims(tree)
     cur = Int16(1)  # start at the root
     while true
@@ -198,17 +180,17 @@ end
 # Start from the root and add a new frontier (whose index is returned)
 # After the node is added, one expect the oracle to be called on all
 # frontier nodes where terminal=false.
-function select(mcts, tree, simnum)
+function select!(mcts, tree, simnum)
     (; ne) = tree_dims(tree)
     batch_ids = DeviceArray(mcts.device)(1:ne)
     frontier = map(batch_ids) do bid
-        return select(mcts, tree, simnum, bid)
+        return select!(mcts, tree, simnum, bid)
     end
     return frontier
 end
 
 # Value: if terminal node: terminal value / otherwise: network value
-function backpropagate(mcts, tree, frontier)
+function backpropagate!(mcts, tree, frontier)
     (; ne) = tree_dims(tree)
     batch_ids = DeviceArray(mcts.device)(1:ne)
     map(batch_ids) do bid
@@ -227,6 +209,19 @@ function backpropagate(mcts, tree, frontier)
         end
     end
     return nothing
+end
+
+function explore(mcts, envs)
+    tree = create_tree(mcts, envs)
+    (; ne, ns) = tree_dims(tree)
+    frontier = DeviceArray(mcts.device)(ones(Int16, ne))
+    eval_states!(mcts, tree, frontier)
+    for i in 2:ns
+        frontier = select!(mcts, tree, i)
+        eval_states!(mcts, tree, frontier)
+        backpropagate!(mcts, tree, frontier)
+    end
+    return tree
 end
 
 end

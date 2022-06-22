@@ -23,11 +23,15 @@ include("TestEnvs.jl")
 include("MctsTests.jl")
 @reexport using .MctsTests
 
+include("BatchedMctsTests.jl")
+@reexport using .BatchedMctsTests
+
 function run_all_tests()
     @testset "RLZero tests" begin
         run_util_tests()
         run_bitwise_tictactoe_tests()
         run_mcts_tests()
+        run_batched_mcts_tests()
     end
     return nothing
 end
