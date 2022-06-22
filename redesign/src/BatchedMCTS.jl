@@ -37,20 +37,29 @@ end
     # Dynamic info
     children::SVector{NumActions,Int16} = @SVector zeros(Int16, NumActions)
     total_rewards::Float32 = 0.0f0
-    num_visits::Int16 = 1
+    num_visits::Int16 = Int16(1)
 end
 
-function create_tree(policy, envs)
+function Node{na}(state; args...) where {na}
+    terminal = terminated(state)
+    if terminal
+        valid_actions = SVector{na,Bool}(false for _ in 1:na)
+    else
+        valid_actions = SVector{na,Bool}(false for _ in 1:na)
+    end
+    return Node{na,typeof(state)}(; state, terminal, valid_actions, args...)
+end
+
+function create_tree(mcts, envs)
     env = envs[1]
     na = num_actions(env)
     ne = length(envs)
-    ns = policy.num_simulations
-    Arr = DeviceArray(policy.device)
-    StateNode = Node{na,typeof(env)}
+    ns = mcts.num_simulations
+    Arr = DeviceArray(mcts.device)
     # We index tree nodes with (batchnum, simnum)
     # This is unusual but this has better cache locality in this case
-    tree = Arr{StateNode}(undef, (ne, ns))
-    tree[:, 1] = Arr([StateNode(; state=e) for e in envs])
+    tree = Arr{Node{na,typeof(env)}}(undef, (ne, ns))
+    tree[:, 1] = Arr([Node{na}(e) for e in envs])
     return tree
 end
 
@@ -62,10 +71,10 @@ function tree_dims(tree::Tree{N,S}) where {N,S}
     return (; na, ne, ns)
 end
 
-function evaluate_states(policy, tree, frontier)
+function evaluate_states(mcts, tree, frontier)
     (; na, ne) = tree_dims(tree)
     prior = (@SVector ones(Float32, na)) / na
-    Devices.foreach(1:ne, policy.device) do batchnum
+    Devices.foreach(1:ne, mcts.device) do batchnum
         nid = frontier[batchnum]
         node = tree[batchnum, nid]
         if !node.terminal
@@ -157,8 +166,6 @@ function select_nonroot_action(mcts, tree, node, bid)
     end
 end
 
-# TODO: initialize init node better...
-
 function select(mcts, tree, simnum, bid)
     (; na) = tree_dims(tree)
     cur = Int16(1)  # start at the root
@@ -175,20 +182,12 @@ function select(mcts, tree, simnum, bid)
         else
             # The child is not in the tree so we add it and return.
             newstate, info = act(node.state, i)
-            terminal = terminated(newstate)
-            if terminal
-                valid_actions = SVector{na,Bool}(false for _ in 1:na)
-            else
-                valid_actions = SVector{na,Bool}(false for _ in 1:na)
-            end
-            child = Node{na,typeof(node.state)}(;
-                state=newstate,
+            child = Node{na}(
+                newstate;
                 parent=cur,
                 prev_action=i,
                 prev_reward=info.reward,
                 prev_switched=info.switched,
-                terminal,
-                valid_actions,
             )
             tree[bid, simnum] = child
             return Int16(simnum)
@@ -199,13 +198,35 @@ end
 # Start from the root and add a new frontier (whose index is returned)
 # After the node is added, one expect the oracle to be called on all
 # frontier nodes where terminal=false.
-function select(policy, tree, simnum)
+function select(mcts, tree, simnum)
     (; ne) = tree_dims(tree)
-    batch_ids = DeviceArray(policy.device)(1:ne)
+    batch_ids = DeviceArray(mcts.device)(1:ne)
     frontier = map(batch_ids) do bid
-        return select(policy, tree, simnum, bid)
+        return select(mcts, tree, simnum, bid)
     end
     return frontier
+end
+
+# Value: if terminal node: terminal value / otherwise: network value
+function backpropagate(mcts, tree, frontier)
+    (; ne) = tree_dims(tree)
+    batch_ids = DeviceArray(mcts.device)(1:ne)
+    map(batch_ids) do bid
+        node = tree[bid, frontier[bid]]
+        val = node.value_prior
+        while true
+            @set! node.num_visits += Int16(1)
+            @set! node.total_rewards += val
+            if node.parent > 0
+                (node.prev_switched) && (val = -val)
+                val += node.prev_reward
+                node = tree[bid, node.parent]
+            else
+                return nothing
+            end
+        end
+    end
+    return nothing
 end
 
 end
