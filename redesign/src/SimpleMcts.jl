@@ -7,7 +7,7 @@ A straightforward non-batched implementation of Gumbel MCTS.
 - All values are from the current player perspective.
 - All computations are done using `Float64` but `Float32` is accepted from oracles.
 """
-module MCTS
+module SimpleMcts
 
 using ReinforcementLearningBase
 using Distributions: sample, Gumbel

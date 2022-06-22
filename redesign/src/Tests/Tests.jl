@@ -17,8 +17,8 @@ include("BitwiseTicTacToeTests.jl")
 include("UtilTests.jl")
 @reexport using .UtilTests
 
-include("MctsTests.jl")
-@reexport using .MctsTests
+include("SimpleMctsTests.jl")
+@reexport using .SimpleMctsTests
 
 include("BatchedMctsAosTests.jl")
 @reexport using .BatchedMctsAosTests

@@ -61,8 +61,8 @@ function run_mcts_tests()
         @test legal_action_space(env)[best] == 3
     end
     @testset "mcts inferred" begin
-        @test_opt target_modules = (MCTS,) profile_rollout()
-        # @test_opt target_modules = (MCTS,) profile_explore()
+        @test_opt target_modules = (SimpleMcts,) profile_rollout()
+        @test_opt target_modules = (SimpleMcts,) profile_explore()
     end
 end
 
