@@ -98,24 +98,4 @@ By executing code directly in the editor window, the whole stack trace gets high
 - [Werner Duvaud's implementation](https://github.com/werner-duvaud/muzero-general)
 - [Duvaud's Tictactoe Params](https://github.com/werner-duvaud/muzero-general/blob/master/games/tictactoe.py)
 
-Note that in the MuZero pseudocode, they seem to be updating the network every 1000 batch updates (batches have size 2048). There is 1e6 updates in total so 1000 iterations. Buffer with 1e6 samples (Renewed twice during iteration?). This is surprisingly small...
-
-# WHat's better style
-
-```julia
-valid_actions = SVector{na,Bool}(
-    terminal ?
-        (valid_action(newstate, i) for _ in 1:na) :
-        (false for _ in 1:na)
-)
-```
-
-or
-
-```julia
-if terminal
-    valid_actions = SVector{na,Bool}(false for _ in 1:na)
-else
-    valid_actions = SVector{na,Bool}(false for _ in 1:na)
-end
-```
+Note that in the MuZero pseudocode, they seem to be updating the network every 1000 batch updates (batches have size 2048). There are 1e6 updates in total so this makes 1000 iterations. The buffer is surprisingly small with 1e6 samples.
