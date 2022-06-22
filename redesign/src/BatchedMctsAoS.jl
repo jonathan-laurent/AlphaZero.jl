@@ -1,7 +1,7 @@
 """
 An batched MCTS implementation that can run on GPU.
 """
-module BatchedMCTS
+module BatchedMctsAoS
 
 using StaticArrays
 using Distributions: sample, Gumbel
