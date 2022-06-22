@@ -39,7 +39,9 @@
 ## Coding Style
 
 - This codebase enforces the [Blue Style](https://github.com/invenia/BlueStyle).
-- Each source file defines a submodule. The files hierarchy perfectly reflects the underlying module hierarchy.
+- Each source file defines a submodule with the same name. The files hierarchy perfectly reflects the underlying module hierarchy.
+- All leaf module names must be unique. In particular, this makes it easier to open files in editors such as VSCode without running into ambiguities.
+- The tests for a leaf module with name `Module` is in `Tests/ModuleTests`. Note that the `Tests` directory has a flat structure. It also contains a `Common` submodule with definitions that are common to several test modules.
 - The imports in each submodule are split in two parts: the external package imports first and then the internal submodule imports.
 - We use the `Reexport` package so as to ease working with module hierarchies.
 - We should make sure that the codebase can be explored using the "Jump to definition" feature of VS-Code.
