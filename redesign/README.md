@@ -45,6 +45,8 @@
 - The imports in each submodule are split in two parts: the external package imports first and then the internal submodule imports.
 - We use the `Reexport` package so as to ease working with module hierarchies.
 - We should make sure that the codebase can be explored using the "Jump to definition" feature of VS-Code.
+- **Unresolved:** It is still in debate whether type annotations should be used liberally or
+  inly for the purpose of dispatch.
 
 ## Testing
 

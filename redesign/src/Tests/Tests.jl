@@ -20,6 +20,9 @@ include("UtilTests.jl")
 include("SimpleMctsTests.jl")
 @reexport using .SimpleMctsTests
 
+include("BatchedMctsTests.jl")
+@reexport using .BatchedMctsTests
+
 include("BatchedMctsAosTests.jl")
 @reexport using .BatchedMctsAosTests
 
