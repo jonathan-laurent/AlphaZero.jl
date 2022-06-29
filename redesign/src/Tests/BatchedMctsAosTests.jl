@@ -23,8 +23,8 @@ function run_batched_mcts_tests_on(device; num_simulations=2, num_envs=2)
     return tree
 end
 
-function mcts_rollout(device)
-    return Policy{RolloutOracle(MersenneTwister(0)),device}
+function mcts_rollout_randomwalk1d(device)
+    return Policy{RolloutOracle(MersenneTwister(0)),device}(; num_considered_actions=2)
 end
 
 function random_walk_envs(; n_envs=2)
@@ -32,7 +32,7 @@ function random_walk_envs(; n_envs=2)
 end
 
 function profile_explore()
-    policy = mcts_rollout(CPU())
+    policy = mcts_rollout_randomwalk1d(CPU())
     envs = random_walk_envs()
     return explore(policy, envs)
 end
