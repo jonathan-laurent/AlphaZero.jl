@@ -35,7 +35,6 @@ function profile_rollout()
     for _ in 1:100
         oracle(env)
     end
-    return nothing
 end
 
 function profile_explore()
@@ -48,10 +47,24 @@ end
 
 function run_mcts_tests()
     @testset "mcts oracle" begin
-        @test isapprox(
-            [random_walk_value(; N=5, start_pos=i) for i in 2:4], [-0.5, 0, 0.5], atol=0.1
-        )
-        @test uniform_oracle(RandomWalk1D(; N=5))[2] == 0
+        @testset "RolloutOracle" begin
+            @test isapprox(
+                [random_walk_value(; N=5, start_pos=i) for i in 2:4],
+                [-0.5, 0, 0.5],
+                atol=0.1,
+            )
+
+            nb_actions = 2
+            rollout_oracle = RolloutOracle(MersenneTwister(0))
+            @test rollout_oracle(RandomWalk1D(; N=5))[1] == ones(nb_actions) ./ nb_actions
+        end
+
+        @testset "uniform_oracle" begin
+            @test uniform_oracle(RandomWalk1D(; N=5))[2] == 0
+
+            nb_actions = 2
+            @test uniform_oracle(RandomWalk1D(; N=5))[1] == ones(nb_actions) ./ nb_actions
+        end
     end
     @testset "mcts policy" begin
         policy = uniform_mcts_policy()
