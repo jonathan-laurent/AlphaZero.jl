@@ -15,6 +15,8 @@ using ..BatchedEnvs
 using ..Util.Devices
 using ..Util.Devices.KernelFuns: sum, argmax, maximum, softmax
 
+export Policy, explore, completed_qvalues
+
 """
 An MCTS Policy that leverages an external oracle and
 supporting a specific device.
