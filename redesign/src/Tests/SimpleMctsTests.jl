@@ -69,19 +69,26 @@ function run_mcts_tests()
     @testset "mcts policy" begin
         policy = uniform_mcts_policy_tic_tac_toe()
         env = tictactoe_winning()
-        tree = explore(policy, env)
-        qvalue_list = completed_qvalues(tree)
-        best = argmax(qvalue_list)
+        tree_explore = explore(policy, env)
+        tree_gumbel_explore = gumbel_explore(policy, env, MersenneTwister(0))
 
-        best_move = 3
-        num_legal_actions = length(legal_action_space(env))
-        oracle_prior = ones(Float32, num_legal_actions) ./ num_legal_actions
-        oracle_value = 0.0
+        function test_exploration(env, tree)
+            qvalue_list = completed_qvalues(tree)
+            best = argmax(qvalue_list)
 
-        @test tree.prior == oracle_prior
-        @test tree.oracle_value == oracle_value
-        @test length(qvalue_list) == length(tree.children) == num_legal_actions
-        @test legal_action_space(env)[best] == best_move
+            best_move = 3
+            num_legal_actions = length(legal_action_space(env))
+            oracle_prior = ones(Float32, num_legal_actions) ./ num_legal_actions
+            oracle_value = 0.0
+
+            @test tree.prior == oracle_prior
+            @test tree.oracle_value == oracle_value
+            @test length(qvalue_list) == length(tree.children) == num_legal_actions
+            @test legal_action_space(env)[best] == best_move
+        end
+
+        test_exploration(env, tree_explore)
+        test_exploration(env, tree_gumbel_explore)
     end
     @testset "mcts inferred" begin
         @test_opt target_modules = (SimpleMcts,) profile_rollout()
