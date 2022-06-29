@@ -19,7 +19,7 @@ end
 
 function bitwise_tictactoe_position(actions)
     env = BitwiseTicTacToeEnv()
-    return BatchedEnvs.act(env, actions)
+    return act(env, actions)[1]
 end
 
 """

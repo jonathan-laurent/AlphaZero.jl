@@ -24,15 +24,17 @@ function run_batched_mcts_tests_on(device; num_simulations=2, num_envs=2)
 end
 
 function rollout_mcts_randomwalk1d(device)
-    return Policy{RolloutOracle(MersenneTwister(0)),device}(; num_considered_actions=2)
+    return Policy(;
+        oracle=RolloutOracle(MersenneTwister(0)), device=device, num_considered_actions=2
+    )
 end
 
-function uniform_mcts_policy_tic_tac_toe(device)
+function uniform_mcts_tic_tac_toe(device)
     return Policy(; oracle=uniform_oracle, device=device, num_considered_actions=9)
 end
 
 function tic_tac_toe_winning_envs(; n_envs=2)
-    return [bitwise_tictactoe_winning()[1] for _ in 1:n_envs]
+    return [bitwise_tictactoe_winning() for _ in 1:n_envs]
 end
 
 function random_walk_envs(; n_envs=2)
@@ -69,7 +71,7 @@ function run_batched_mcts_tests()
         device = CPU()
         n_envs = 2
 
-        policy = uniform_mcts_policy_tic_tac_toe(device)
+        policy = uniform_mcts_tic_tac_toe(device)
         envs = tic_tac_toe_winning_envs(; n_envs=n_envs)
         tree = explore(policy, envs)
 
