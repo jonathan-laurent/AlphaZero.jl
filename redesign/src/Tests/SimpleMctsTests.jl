@@ -74,9 +74,13 @@ function run_mcts_tests()
         best = argmax(qvalue_list)
 
         best_move = 3
-        @test length(qvalue_list) ==
-            length(tree.children) ==
-            length(legal_action_space(env))
+        num_legal_actions = length(legal_action_space(env))
+        oracle_prior = ones(num_legal_actions) ./ num_legal_actions
+        oracle_value = 0.0
+
+        @test tree.prior == oracle_prior
+        @test tree.oracle_value == oracle_value
+        @test length(qvalue_list) == length(tree.children) == num_legal_actions
         @test legal_action_space(env)[best] == best_move
     end
     @testset "mcts inferred" begin
