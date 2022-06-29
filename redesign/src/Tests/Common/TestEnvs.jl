@@ -4,7 +4,10 @@ using ReinforcementLearningEnvironments
 using Random: MersenneTwister
 using Statistics: mean
 
-export tictactoe_draw, tictactoe_winning
+using ....BatchedEnvs
+using ..BitwiseTicTacToe
+
+export tictactoe_draw, tictactoe_winning, bitwise_tictactoe_draw, bitwise_tictactoe_winning
 
 function tictactoe_position(actions)
     env = TicTacToeEnv()
@@ -12,6 +15,11 @@ function tictactoe_position(actions)
         env(a)
     end
     return env
+end
+
+function bitwise_tictactoe_position(actions)
+    env = BitwiseTicTacToeEnv()
+    return BatchedEnvs.act(env, actions)
 end
 
 """
@@ -24,6 +32,7 @@ Return the following simple tictactoe position (O to play).
 This position should result in a draw.
 """
 tictactoe_draw() = tictactoe_position([5, 1, 3, 7, 4])
+bitwise_tictactoe_draw() = bitwise_tictactoe_position([5, 1, 3, 7, 4])
 
 """
 Return the following simple tictactoe position (X to play).
@@ -35,5 +44,6 @@ Return the following simple tictactoe position (X to play).
 This position should result in a win for X.
 """
 tictactoe_winning() = tictactoe_position([5, 6, 1, 9])
+bitwise_tictactoe_winning() = bitwise_tictactoe_position([5, 6, 1, 9])
 
 end

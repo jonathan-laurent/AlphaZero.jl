@@ -54,6 +54,13 @@ function BatchedEnvs.act(env::BitwiseTicTacToeEnv, pos)
     return newenv, (; reward, switched=true)
 end
 
+function BatchedEnvs.act(env::BitwiseTicTacToeEnv, pos_list::AbstractArray)
+    for pos in pos_list
+        env, vec = BatchedEnvs.act(env, pos)
+    end
+    return env, vec # TODO: returning `vec` is surely not the best thing to do
+end
+
 function BatchedEnvs.valid_action(env::BitwiseTicTacToeEnv, pos)
     return !env.board[posidx(pos, CROSS)] && !env.board[posidx(pos, NOUGHT)]
 end
