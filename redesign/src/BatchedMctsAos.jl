@@ -15,6 +15,10 @@ using ..BatchedEnvs
 using ..Util.Devices
 using ..Util.Devices.KernelFuns: sum, argmax, maximum, softmax
 
+"""
+An MCTS Policy that leverages an external oracle and
+supporting a specific device.
+"""
 @kwdef struct Policy{Oracle,Device}
     oracle::Oracle
     device::Device
@@ -35,11 +39,11 @@ end
     valid_actions::SVector{NumActions,Bool} = @SVector zeros(Bool, NumActions)
     # Oracle info
     prior::SVector{NumActions,Float32} = @SVector zeros(Float32, NumActions)
-    value_prior::Float32 = 0.0f0
+    oracle_value::Float32 = 0.0f0
     # Dynamic info
     children::SVector{NumActions,Int16} = @SVector zeros(Int16, NumActions)
-    total_rewards::Float32 = 0.0f0
     num_visits::Int16 = Int16(1)
+    total_rewards::Float32 = 0.0f0
 end
 
 function Node{na}(state; args...) where {na}
@@ -81,7 +85,7 @@ function eval_states!(mcts, tree, frontier)
         node = tree[batchnum, nid]
         if !node.terminal
             @set! node.prior = prior
-            @set! node.value_prior = 0.0f0
+            @set! node.oracle_value = 0.0f0
             tree[batchnum, nid] = node
         end
     end
@@ -106,7 +110,7 @@ function root_value_estimate(tree, node, bid)
     end
     children_value = total_qvalues
     total_prior > 0 && (children_value /= total_prior)
-    return (node.value_prior + total_visits * children_value) / (1 + total_visits)
+    return (node.oracle_value + total_visits * children_value) / (1 + total_visits)
 end
 
 function completed_qvalues(tree, node, bid)
@@ -195,7 +199,7 @@ function backpropagate!(mcts, tree, frontier)
     batch_ids = DeviceArray(mcts.device)(1:ne)
     map(batch_ids) do bid
         node = tree[bid, frontier[bid]]
-        val = node.value_prior
+        val = node.oracle_value
         while true
             @set! node.num_visits += Int16(1)
             @set! node.total_rewards += val

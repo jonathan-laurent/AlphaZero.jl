@@ -19,6 +19,17 @@ export Policy, gumbel_explore, explore, completed_qvalues
 export RolloutOracle, uniform_oracle
 
 """
+An MCTS Policy that leverages an external oracle.
+"""
+@kwdef struct Policy{Oracle}
+    oracle::Oracle
+    num_simulations::Int = 64
+    num_considered_actions::Int = 8
+    value_scale::Float64 = 0.1f0
+    max_visit_init::Int = 50
+end
+
+"""
 An MCTS tree.
 
 MCTS trees are represented by graph of structures in memory.
@@ -26,22 +37,13 @@ We store Q-values for each nodes instead of of storing values
 so as to make it easier to handle terminal states.
 """
 mutable struct Tree
-    oracle_value::Float32
-    children::Vector{Union{Nothing,Tree}}
+    # Oracle info
     prior::Vector{Float32}
+    oracle_value::Float32
+    # Dynamic info
+    children::Vector{Union{Nothing,Tree}}
     num_visits::Vector{Int32}
     total_rewards::Vector{Float64}
-end
-
-"""
-An MCTS Policy that leverages an external oracle.
-"""
-@kwdef struct Policy{Oracle}
-    oracle::Oracle
-    num_simulations::Int
-    num_considered_actions::Int
-    value_scale::Float64
-    max_visit_init::Int
 end
 
 num_children(node::Tree) = length(node.children)
@@ -87,13 +89,13 @@ function completed_qvalues(node::Tree)
 end
 
 function create_node(env::AbstractEnv, oracle)
-    prior, value = oracle(env)
+    prior, oracle_value = oracle(env)
     num_actions = length(legal_action_space(env))
     @assert num_actions > 0
     children = convert(Vector{Union{Nothing,Tree}}, fill(nothing, num_actions))
     num_visits = fill(Int32(0), num_actions)
     total_rewards = fill(Float64(0), num_actions)
-    return Tree(value, children, prior, num_visits, total_rewards)
+    return Tree(prior, oracle_value, children, num_visits, total_rewards)
 end
 
 """
