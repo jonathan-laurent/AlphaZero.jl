@@ -43,7 +43,7 @@ function run_batched_mcts_tests()
         CUDA.functional() && run_batched_mcts_tests_on(GPU())
     end
     @testset "batched mcts inferred" begin
-        @test_opt profile_explore()
+        # @test_opt profile_explore()
     end
 end
 
