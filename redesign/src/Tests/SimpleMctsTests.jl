@@ -69,8 +69,6 @@ function run_mcts_tests()
     @testset "mcts policy" begin
         policy = uniform_mcts_policy_tic_tac_toe()
         env = tictactoe_winning()
-        tree_explore = explore(policy, env)
-        tree_gumbel_explore = gumbel_explore(policy, env, MersenneTwister(0))
 
         function test_exploration(env, tree)
             qvalue_list = completed_qvalues(tree)
@@ -87,8 +85,14 @@ function run_mcts_tests()
             @test legal_action_space(env)[best] == best_move
         end
 
-        test_exploration(env, tree_explore)
-        test_exploration(env, tree_gumbel_explore)
+        @testset "explore" begin
+            tree = explore(policy, env)
+            test_exploration(env, tree)
+        end
+        @testset "gumbel_explore" begin
+            tree = gumbel_explore(policy, env, MersenneTwister(0))
+            test_exploration(env, tree)
+        end
     end
     @testset "mcts inferred" begin
         @test_opt target_modules = (SimpleMcts,) profile_rollout()
