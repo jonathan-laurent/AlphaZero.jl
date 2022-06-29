@@ -67,9 +67,6 @@ function run_mcts_tests()
         end
     end
     @testset "mcts policy" begin
-        policy = uniform_mcts_policy_tic_tac_toe()
-        env = tictactoe_winning()
-
         function test_exploration(env, tree)
             qvalue_list = completed_qvalues(tree)
             best = argmax(qvalue_list)
@@ -84,6 +81,9 @@ function run_mcts_tests()
             @test length(qvalue_list) == length(tree.children) == num_legal_actions
             @test legal_action_space(env)[best] == best_move
         end
+
+        policy = uniform_mcts_policy_tic_tac_toe()
+        env = tictactoe_winning()
 
         @testset "explore" begin
             tree = explore(policy, env)
