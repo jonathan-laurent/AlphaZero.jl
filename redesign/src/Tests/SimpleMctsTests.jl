@@ -75,7 +75,7 @@ function run_mcts_tests()
 
         best_move = 3
         num_legal_actions = length(legal_action_space(env))
-        oracle_prior = ones(num_legal_actions) ./ num_legal_actions
+        oracle_prior = ones(Float32, num_legal_actions) ./ num_legal_actions
         oracle_value = 0.0
 
         @test tree.prior == oracle_prior
