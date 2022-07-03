@@ -79,9 +79,6 @@ function run_batched_mcts_tests()
             test_exploration(tree, envs[i], tree[i, 1], i)
         end
     end
-    @testset "batched mcts inferred" begin
-        # @test_opt profile_explore()
-    end
 end
 
 end
