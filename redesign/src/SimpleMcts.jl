@@ -32,8 +32,8 @@ end
 """
 An MCTS tree.
 
-MCTS trees are represented by graph of structures in memory.
-We store Q-values for each nodes instead of of storing values
+MCTS trees are represented by graphs of structures in memory.
+We store Q-values for each nodes instead of storing values
 so as to make it easier to handle terminal states.
 """
 mutable struct Tree

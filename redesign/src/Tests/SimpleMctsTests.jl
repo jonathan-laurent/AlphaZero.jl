@@ -92,6 +92,7 @@ function run_mcts_tests()
         @testset "gumbel_explore" begin
             tree = gumbel_explore(policy, env, MersenneTwister(0))
             test_exploration(env, tree)
+            @test all(tree.num_visits .!= 0)
         end
     end
     @testset "mcts inferred" begin
