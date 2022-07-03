@@ -53,7 +53,7 @@ function Node{na}(state; args...) where {na}
     if terminal
         valid_actions = SVector{na,Bool}(false for _ in 1:na)
     else
-        valid_actions = SVector{na,Bool}(false for _ in 1:na)
+        valid_actions = SVector{na,Bool}(valid_action(state, i) for i in 1:na)
     end
     return Node{na,typeof(state)}(; state, terminal, valid_actions, args...)
 end
