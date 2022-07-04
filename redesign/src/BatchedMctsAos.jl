@@ -44,7 +44,7 @@ end
     oracle_value::Float32 = 0.0f0
     # Dynamic info
     children::SVector{NumActions,Int16} = @SVector zeros(Int16, NumActions)
-    num_visits::Int16 = Int16(1)
+    num_visits::Int16 = Int16(0)
     total_rewards::Float32 = 0.0f0
 end
 
@@ -178,6 +178,8 @@ function select!(mcts, tree, simnum, bid)
                 prev_switched=info.switched,
             )
             tree[bid, simnum] = child
+            @set! node.children[i] = simnum
+            tree[bid, cur] = node
             return Int16(simnum)
         end
     end
@@ -200,15 +202,18 @@ function backpropagate!(mcts, tree, frontier)
     (; ne) = tree_dims(tree)
     batch_ids = DeviceArray(mcts.device)(1:ne)
     map(batch_ids) do bid
-        node = tree[bid, frontier[bid]]
+        sid = frontier[bid]
+        node = tree[bid, sid]
         val = node.oracle_value
         while true
             @set! node.num_visits += Int16(1)
             @set! node.total_rewards += val
+            tree[bid, sid] = node
             if node.parent > 0
                 (node.prev_switched) && (val = -val)
                 val += node.prev_reward
-                node = tree[bid, node.parent]
+                sid = node.parent
+                node = tree[bid, sid]
             else
                 return nothing
             end
