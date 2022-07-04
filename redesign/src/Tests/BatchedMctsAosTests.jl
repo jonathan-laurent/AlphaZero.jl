@@ -3,6 +3,7 @@ module BatchedMctsAosTests
 using ...BatchedMctsAos
 using ...SimpleMcts: RolloutOracle, uniform_oracle
 using ...Util.Devices
+using ...BatchedEnvs
 using ..Common.Common
 
 using Random: MersenneTwister
@@ -57,15 +58,14 @@ function run_batched_mcts_tests()
             qvalue_list = completed_qvalues(tree, node, i)
             best = argmax(qvalue_list)
 
-            best_move = 3
-            num_legal_actions = 5
-            oracle_prior = ones(Float32, num_legal_actions) ./ num_legal_actions
+            best_move = 2
+            oracle_prior = ones(Float32, num_actions(env)) ./ num_actions(env)
             oracle_value = Float32(0)
 
-            # @test node.prior == oracle_prior
+            @test node.prior == oracle_prior
             @test node.oracle_value == oracle_value
-            # @test length(qvalue_list) == length(tree.children) == num_legal_actions
-            # @test legal_action_space(env)[best] == best_move
+            @test length(qvalue_list) == length(node.children) == num_actions(env)
+            # @test best == best_move
         end
 
         device = CPU()
