@@ -1,7 +1,6 @@
 module BatchedMctsAosTests
 
 using ...BatchedMctsAos
-using ...SimpleMcts: RolloutOracle, uniform_oracle
 using ...Util.Devices
 using ...BatchedEnvs
 using ..Common.Common
@@ -18,7 +17,7 @@ const MCTS = BatchedMctsAos
 
 function run_batched_mcts_tests_on(device; num_simulations=2, num_envs=2)
     env = BitwiseTicTacToeEnv()
-    mcts = MCTS.Policy(; device=device, oracle=nothing, num_simulations)
+    mcts = MCTS.Policy(; device=device, oracle=uniform_oracle, num_simulations)
     tree = MCTS.explore(mcts, [env for _ in 1:num_envs])
     @test true
     return tree
@@ -52,6 +51,23 @@ function run_batched_mcts_tests()
     @testset "batched mcts compilation" begin
         run_batched_mcts_tests_on(CPU())
         CUDA.functional() && run_batched_mcts_tests_on(GPU())
+    end
+    @testset "batched mcts oracle" begin
+        @testset "rollout oracle" begin
+            env = bitwise_tictactoe_winning()
+            prior, value = RolloutOracle(MersenneTwister(0))(env)
+
+            @test value in [1, -1]
+            @test prior == ones(Float32, num_actions(env)) ./ num_actions(env)
+        end
+
+        @testset "uniform_oracle" begin
+            env = bitwise_tictactoe_winning()
+            prior, value = uniform_oracle(env)
+
+            @test value == 0
+            @test prior == ones(Float32, num_actions(env)) ./ num_actions(env)
+        end
     end
     @testset "batched mcts policy" begin
         function test_exploration(tree, env, node, i)

@@ -61,12 +61,16 @@ function BatchedEnvs.act(env::BitwiseTicTacToeEnv, pos_list::AbstractArray)
     return env, vec # TODO: returning `vec` is surely not the best thing to do
 end
 
-function BatchedEnvs.valid_action(env::BitwiseTicTacToeEnv, pos)
+function BatchedEnvs.valid_actions(env::BitwiseTicTacToeEnv)
+    return [BatchedEnvs.valid_actions(env, pos) for pos in 1:9]
+end
+
+function BatchedEnvs.valid_actions(env::BitwiseTicTacToeEnv, pos)
     return !env.board[posidx(pos, CROSS)] && !env.board[posidx(pos, NOUGHT)]
 end
 
 function full_board(env::BitwiseTicTacToeEnv)
-    return !any(BatchedEnvs.valid_action(env, pos) for pos in 1:9)
+    return !any(BatchedEnvs.valid_actions(env, pos) for pos in 1:9)
 end
 
 function is_win(env::BitwiseTicTacToeEnv, player)

@@ -15,7 +15,7 @@ function test_equivalent(BatchedEnv, BaselineEnv)
         env_baseline = BaselineEnv()
         while !BatchedEnvs.terminated(env)
             valid_actions = filter(1:BatchedEnvs.num_actions(env)) do i
-                BatchedEnvs.valid_action(env, i)
+                BatchedEnvs.valid_actions(env, i)
             end
             valid_actions_baseline = collect(RLBase.legal_action_space(env_baseline))
             @test sort(valid_actions) == sort(valid_actions_baseline)
@@ -55,7 +55,7 @@ function test_batch_simulate(Env, device; N=32_000, L=9)
     for i in 1:L
         envs = broadcast(envs, rd[:, i]) do e, r
             if !BatchedEnvs.terminated(e)
-                a = find_kth_modulo(i -> BatchedEnvs.valid_action(e, i), 1:9, r)
+                a = find_kth_modulo(i -> BatchedEnvs.valid_actions(e, i), 1:9, r)
                 return BatchedEnvs.act(e, a)[1]
             end
             return e

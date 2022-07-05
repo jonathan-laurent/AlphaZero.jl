@@ -16,6 +16,7 @@ using ..Util.Devices
 using ..Util.Devices.KernelFuns: sum, argmax, maximum, softmax
 
 export Policy, explore, completed_qvalues
+export uniform_oracle, RolloutOracle
 
 """
 An MCTS Policy that leverages an external oracle and
@@ -38,7 +39,7 @@ end
     prev_reward::Float32 = 0.0f0
     prev_switched::Bool = false
     terminal::Bool = false
-    valid_actions::SVector{NumActions,Bool} = @SVector zeros(Bool, NumActions)
+    valid_actions_list::SVector{NumActions,Bool} = @SVector zeros(Bool, NumActions)
     # Oracle info
     prior::SVector{NumActions,Float32} = @SVector zeros(Float32, NumActions)
     oracle_value::Float32 = 0.0f0
@@ -51,11 +52,11 @@ end
 function Node{na}(state; args...) where {na}
     terminal = terminated(state)
     if terminal
-        valid_actions = SVector{na,Bool}(false for _ in 1:na)
+        valid_actions_list = SVector{na,Bool}(false for _ in 1:na)
     else
-        valid_actions = SVector{na,Bool}(valid_action(state, i) for i in 1:na)
+        valid_actions_list = SVector{na,Bool}(valid_actions(state, i) for i in 1:na)
     end
-    return Node{na,typeof(state)}(; state, terminal, valid_actions, args...)
+    return Node{na,typeof(state)}(; state, terminal, valid_actions_list, args...)
 end
 
 function create_tree(mcts, envs)
@@ -81,13 +82,13 @@ end
 
 function eval_states!(mcts, tree, frontier)
     (; na, ne) = tree_dims(tree)
-    prior = (@SVector ones(Float32, na)) / na
     Devices.foreach(1:ne, mcts.device) do batchnum
         nid = frontier[batchnum]
         node = tree[batchnum, nid]
         if !node.terminal
+            prior, oracle_value = mcts.oracle(node.state)
             @set! node.prior = prior
-            @set! node.oracle_value = 0.0f0
+            @set! node.oracle_value = oracle_value
             tree[batchnum, nid] = node
         end
     end
@@ -233,6 +234,46 @@ function explore(mcts, envs)
         backpropagate!(mcts, tree, frontier)
     end
     return tree
+end
+
+#####
+## Some standard oracles
+#####
+
+"""
+Oracle that always returns a value of 0 and a uniform policy.
+"""
+function uniform_oracle(env)
+    n = num_actions(env)
+    P = (@SVector ones(Float32, n)) ./ n
+    V = Float32(0.0)
+    return P, V
+end
+
+"""
+Oracle that performs a single random rollout to estimate state value.
+
+Given a state, the oracle selects random actions until a leaf node is reached.
+The resulting cumulative reward is treated as a stochastic value estimate.
+"""
+struct RolloutOracle{RNG<:AbstractRNG}
+    rng::RNG
+end
+
+function (oracle::RolloutOracle)(env)
+    rewards = Float32(0.0)
+    original_player = env.curplayer
+    cur_env = env
+    while !terminated(cur_env)
+        player = cur_env.curplayer
+        legal_actions = findall(valid_actions(cur_env))
+        a = rand(oracle.rng, legal_actions)
+        cur_env, (reward, _) = act(cur_env, a)
+        rewards += player == original_player ? reward : -reward
+    end
+    n = num_actions(env)
+    P = (@SVector ones(Float32, n)) ./ n
+    return P, rewards
 end
 
 end
