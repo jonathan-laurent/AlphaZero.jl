@@ -29,8 +29,10 @@ function rollout_mcts_randomwalk1d(device)
     )
 end
 
-function uniform_mcts_tic_tac_toe(device)
-    return Policy(; oracle=uniform_oracle, device=device, num_considered_actions=9)
+function uniform_mcts_tic_tac_toe(device, num_simulations=64)
+    return Policy(;
+        oracle=uniform_oracle, device=device, num_considered_actions=9, num_simulations
+    )
 end
 
 function tic_tac_toe_winning_envs(; n_envs=2)
