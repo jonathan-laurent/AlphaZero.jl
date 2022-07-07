@@ -76,11 +76,11 @@ function run_batched_mcts_tests()
             qvalue_list = completed_qvalues(tree, node, i)
             best = argmax(qvalue_list)
 
-            best_move = 2
-            oracle_prior = ones(Float32, num_actions(env)) ./ num_actions(env)
+            best_move = 3
+            oracle_prior = [0, 0.2, 0.2, 0.2, 0, 0, 0.2, 0.2, 0]
             oracle_value = Float32(0)
 
-            @test node.prior == oracle_prior
+            @test isapprox(node.prior, oracle_prior, atol=1.0e-7)
             @test node.oracle_value == oracle_value
             @test length(qvalue_list) == length(node.children) == num_actions(env)
             # @test best == best_move

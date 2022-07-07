@@ -80,6 +80,13 @@ function tree_dims(tree::Tree{N,S}) where {N,S}
     return (; na, ne, ns)
 end
 
+function validate_prior(node, prior)
+    for unvalid_id in findall(!, node.valid_actions_list)
+        @set! prior[unvalid_id] = 0
+    end
+    return prior ./ sum(prior; init=0)
+end
+
 function eval_states!(mcts, tree, frontier)
     (; na, ne) = tree_dims(tree)
     Devices.foreach(1:ne, mcts.device) do batchnum
@@ -87,7 +94,7 @@ function eval_states!(mcts, tree, frontier)
         node = tree[batchnum, nid]
         if !node.terminal
             prior, oracle_value = mcts.oracle(node.state)
-            @set! node.prior = prior
+            @set! node.prior = validate_prior(node, prior)
             @set! node.oracle_value = oracle_value
             tree[batchnum, nid] = node
         end
