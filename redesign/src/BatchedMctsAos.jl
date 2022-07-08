@@ -128,7 +128,7 @@ function completed_qvalues(tree, node, bid)
     na = length(node.children)
     ret = imap(1:na) do i
         cnid = node.children[i]
-        return cnid > 0 ? value(tree[bid, cnid]) : root_value
+        return cnid > 0 ? qvalue(tree[bid, cnid]) : root_value
     end
     return SVector{na}(ret)
 end

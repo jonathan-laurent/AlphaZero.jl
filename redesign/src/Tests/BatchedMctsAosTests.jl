@@ -83,7 +83,7 @@ function run_batched_mcts_tests()
             @test isapprox(node.prior, oracle_prior, atol=1.0e-7)
             @test node.oracle_value == oracle_value
             @test length(qvalue_list) == length(node.children) == num_actions(env)
-            # @test best == best_move
+            @test best == best_move
         end
 
         device = CPU()
