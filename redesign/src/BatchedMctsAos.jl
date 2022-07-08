@@ -39,7 +39,7 @@ end
     prev_reward::Float32 = 0.0f0
     prev_switched::Bool = false
     terminal::Bool = false
-    valid_actions_list::SVector{NumActions,Bool} = @SVector zeros(Bool, NumActions)
+    valid_actions::SVector{NumActions,Bool} = @SVector zeros(Bool, NumActions)
     # Oracle info
     prior::SVector{NumActions,Float32} = @SVector zeros(Float32, NumActions)
     oracle_value::Float32 = 0.0f0
@@ -52,11 +52,11 @@ end
 function Node{na}(state; args...) where {na}
     terminal = terminated(state)
     if terminal
-        valid_actions_list = SVector{na,Bool}(false for _ in 1:na)
+        valid_actions = SVector{na,Bool}(false for _ in 1:na)
     else
-        valid_actions_list = SVector{na,Bool}(valid_actions(state, i) for i in 1:na)
+        valid_actions = SVector{na,Bool}(valid_action(state, i) for i in 1:na)
     end
-    return Node{na,typeof(state)}(; state, terminal, valid_actions_list, args...)
+    return Node{na,typeof(state)}(; state, terminal, valid_actions, args...)
 end
 
 function create_tree(mcts, envs)
@@ -81,7 +81,7 @@ function tree_dims(tree::Tree{N,S}) where {N,S}
 end
 
 function validate_prior(node, prior)
-    for unvalid_id in findall(!, node.valid_actions_list)
+    for unvalid_id in findall(!, node.valid_actions)
         @set! prior[unvalid_id] = 0
     end
     return prior ./ sum(prior; init=0)
