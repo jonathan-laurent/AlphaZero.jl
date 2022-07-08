@@ -256,31 +256,3 @@ function uniform_oracle(env)
     V = Float32(0.0)
     return P, V
 end
-
-"""
-Oracle that performs a single random rollout to estimate state value.
-
-Given a state, the oracle selects random actions until a leaf node is reached.
-The resulting cumulative reward is treated as a stochastic value estimate.
-"""
-struct RolloutOracle{RNG<:AbstractRNG}
-    rng::RNG
-end
-
-function (oracle::RolloutOracle)(env)
-    rewards = Float32(0.0)
-    original_player = env.curplayer
-    cur_env = env
-    while !terminated(cur_env)
-        player = cur_env.curplayer
-        legal_actions = findall(valid_actions(cur_env))
-        a = rand(oracle.rng, legal_actions)
-        cur_env, (reward, _) = act(cur_env, a)
-        rewards += player == original_player ? reward : -reward
-    end
-    n = num_actions(env)
-    P = (@SVector ones(Float32, n)) ./ n
-    return P, rewards
-end
-
-end
