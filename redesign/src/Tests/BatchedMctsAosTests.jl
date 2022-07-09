@@ -55,14 +55,6 @@ function run_batched_mcts_tests()
         CUDA.functional() && run_batched_mcts_tests_on(GPU())
     end
     @testset "batched mcts oracle" begin
-        @testset "rollout oracle" begin
-            env = bitwise_tictactoe_winning()
-            prior, value = RolloutOracle(MersenneTwister(0))(env)
-
-            @test value in [1, -1]
-            @test prior == ones(Float32, num_actions(env)) ./ num_actions(env)
-        end
-
         @testset "uniform_oracle" begin
             env = bitwise_tictactoe_winning()
             prior, value = uniform_oracle(env)
