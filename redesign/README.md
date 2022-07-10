@@ -45,8 +45,8 @@
 - The imports in each submodule are split in two parts: the external package imports first and then the internal submodule imports.
 - We use the `Reexport` package so as to ease working with module hierarchies.
 - We should make sure that the codebase can be explored using the "Jump to definition" feature of VS-Code.
-- **Unresolved:** It is still in debate whether type annotations should be used liberally or
-  inly for the purpose of dispatch.
+- As specified by BlueStyle, multiline comments and docstrings should be wrapped at 92 lines. This is not enforced by the formatter but one can use a VSCode extension such as `Rewrap` to do this automatically (i.e. usinig the Alt-Q shortcut).
+- **Unresolved:** It is still in debate whether type annotations should be used liberally or only for the purpose of dispatch. (Let's do the latter for now.)
 
 ## Testing
 
