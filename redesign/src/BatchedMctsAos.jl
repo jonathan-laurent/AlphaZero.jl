@@ -127,6 +127,10 @@ function completed_qvalues(tree, node, bid)
     root_value = root_value_estimate(tree, node, bid)
     na = length(node.children)
     ret = imap(1:na) do i
+        if (!node.valid_actions[i]) 
+            return -Inf32
+        end
+
         cnid = node.children[i]
         return cnid > 0 ? qvalue(tree[bid, cnid]) : root_value
     end
