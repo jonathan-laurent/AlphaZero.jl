@@ -23,30 +23,14 @@ function run_batched_mcts_tests_on(device; num_simulations=2, num_envs=2)
     return tree
 end
 
-function rollout_mcts_randomwalk1d(device)
-    return Policy(;
-        oracle=RolloutOracle(MersenneTwister(0)), device=device, num_considered_actions=2
-    )
-end
-
 function uniform_mcts_tic_tac_toe(device, num_simulations=64)
-    return Policy(;
-        oracle=uniform_oracle, device=device, num_considered_actions=9, num_simulations
+    return MCTS.Policy(;
+        oracle=MCTS.uniform_oracle, device=device, num_considered_actions=9, num_simulations
     )
 end
 
 function tic_tac_toe_winning_envs(; n_envs=2)
     return [bitwise_tictactoe_winning() for _ in 1:n_envs]
-end
-
-function random_walk_envs(; n_envs=2)
-    return [RandomWalk1D() for _ in 1:n_envs]
-end
-
-function profile_explore()
-    policy = rollout_mcts_randomwalk1d(CPU())
-    envs = random_walk_envs()
-    return explore(policy, envs)
 end
 
 function run_batched_mcts_tests()
@@ -65,7 +49,7 @@ function run_batched_mcts_tests()
     end
     @testset "batched mcts policy" begin
         function test_exploration(tree, env, node, i)
-            qvalue_list = completed_qvalues(tree, node, i)
+            qvalue_list = MCTS.completed_qvalues(tree, node, i)
             best = argmax(qvalue_list)
 
             best_move = 3
