@@ -181,7 +181,7 @@ function select!(mcts, tree, simnum, bid)
             cur = cnid
         else
             # The child is not in the tree so we add it and return.
-            newstate, info = act(node.state, i)
+            newstate, info = act_legal(node, i)
             child = Node{na}(
                 newstate;
                 parent=cur,
@@ -261,4 +261,7 @@ function uniform_oracle(env)
     return P, V
 end
 
+endfunction act_legal(node, aid)
+    @assert node.valid_actions[aid]
+    return act(node.state, aid)
 end
