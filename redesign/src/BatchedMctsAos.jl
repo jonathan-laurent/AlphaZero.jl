@@ -219,12 +219,12 @@ function backpropagate!(mcts, tree, frontier)
         node = tree[bid, sid]
         val = node.oracle_value
         while true
+            val += node.prev_reward
+            (node.prev_switched) && (val = -val)
             @set! node.num_visits += Int16(1)
             @set! node.total_rewards += val
             tree[bid, sid] = node
             if node.parent > 0
-                (node.prev_switched) && (val = -val)
-                val += node.prev_reward
                 sid = node.parent
                 node = tree[bid, sid]
             else
