@@ -61,16 +61,33 @@ function run_batched_mcts_tests()
             @test length(qvalue_list) == length(node.children) == num_actions(env)
             @test best == best_move
         end
+        function test_exploration(tree, envs::AbstractArray)
+            (n_envs,) = size(envs)
+            for i in 1:n_envs
+                test_exploration(tree, envs[i], tree[i, 1], i)
+            end
+        end
 
         device = CPU()
         n_envs = 2
 
         policy = uniform_mcts_tic_tac_toe(device)
         envs = tic_tac_toe_winning_envs(; n_envs=n_envs)
-        tree = explore(policy, envs)
 
-        for i in 1:n_envs
-            test_exploration(tree, envs[i], tree[i, 1], i)
+        @testset "explore" begin
+            tree = MCTS.explore(policy, envs)
+            test_exploration(tree, envs)
+        end
+        @testset "gumbel explore" begin
+            tree = MCTS.gumbel_explore(policy, envs, MersenneTwister(0))
+            test_exploration(tree, envs)
+            # All (valid) actions have been visited at least once
+            # @test all(all(root.children[root.valid_actions] .!= 0) for root in tree[:, 1])
+            # Only valid actions are explored
+            @test all(
+                !any(@. root.valid_actions == false && root.children > 0) for
+                root in tree[:, 1]
+            )
         end
     end
 end

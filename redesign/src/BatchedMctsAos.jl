@@ -15,7 +15,7 @@ using ..BatchedEnvs
 using ..Util.Devices
 using ..Util.Devices.KernelFuns: sum, argmax, maximum, softmax
 
-export Policy, explore, completed_qvalues
+export Policy, explore, gumbel_explore, completed_qvalues
 export uniform_oracle, RolloutOracle
 
 """
@@ -91,6 +91,7 @@ function eval_states!(mcts, tree, frontier)
     (; na, ne) = tree_dims(tree)
     Devices.foreach(1:ne, mcts.device) do batchnum
         nid = frontier[batchnum]
+        (nid == 0) && return nothing
         node = tree[batchnum, nid]
         if !node.terminal
             prior, oracle_value = mcts.oracle(node.state)
@@ -127,7 +128,7 @@ function completed_qvalues(tree, node, bid)
     root_value = root_value_estimate(tree, node, bid)
     na = length(node.children)
     ret = imap(1:na) do i
-        if (!node.valid_actions[i]) 
+        if (!node.valid_actions[i])
             return -Inf32
         end
 
@@ -166,9 +167,14 @@ function select_nonroot_action(mcts, tree, node, bid)
     end
 end
 
-function select!(mcts, tree, simnum, bid)
+function act_legal(node, aid)
+    @assert node.valid_actions[aid]
+    return act(node.state, aid)
+end
+
+# `cur` is set to one so that selection starts at root node
+function select!(mcts, tree, simnum, bid; cur=Int16(1))
     (; na) = tree_dims(tree)
-    cur = Int16(1)  # start at the root
     while true
         node = tree[bid, cur]
         if node.terminal
@@ -215,15 +221,16 @@ function backpropagate!(mcts, tree, frontier)
     batch_ids = DeviceArray(mcts.device)(1:ne)
     map(batch_ids) do bid
         sid = frontier[bid]
+        (sid == 0) && return nothing
         node = tree[bid, sid]
         val = node.oracle_value
         while true
+            val += node.prev_reward
+            (node.prev_switched) && (val = -val)
             @set! node.num_visits += Int16(1)
             @set! node.total_rewards += val
             tree[bid, sid] = node
             if node.parent > 0
-                (node.prev_switched) && (val = -val)
-                val += node.prev_reward
                 sid = node.parent
                 node = tree[bid, sid]
             else
@@ -247,6 +254,105 @@ function explore(mcts, envs)
     return tree
 end
 
+function gumbel_select!(mcts, tree, batch_actions, simnum)
+    (; na, ne) = tree_dims(tree)
+    batch_ids = DeviceArray(mcts.device)(1:ne)
+    frontier = map(batch_ids) do bid
+        action = batch_actions[bid]
+        (!tree[bid, 1].valid_actions[action]) && return 0
+        batch_root = tree[bid, 1]
+        cnid = batch_root.children[action]
+        if (cnid == 0)
+            # The child is not in the tree so we add it and return.
+            newstate, info = act_legal(batch_root, action)
+            child = Node{na}(
+                newstate;
+                parent=1,
+                prev_action=action,
+                prev_reward=info.reward,
+                prev_switched=info.switched,
+            )
+            tree[bid, simnum] = child
+            @set! batch_root.children[action] = simnum
+            tree[bid, 1] = batch_root
+            return Int16(simnum)
+        end
+        return select!(mcts, tree, simnum, bid; cur=cnid)
+    end
+    return frontier
+end
+
+function gumbel_explore(mcts, envs, rng::AbstractRNG)
+    tree = create_tree(mcts, envs)
+    (na, ne, ns) = tree_dims(tree)
+    frontier = DeviceArray(mcts.device)(ones(Int16, ne))
+    eval_states!(mcts, tree, frontier)
+
+    gscores = rand(rng, Gumbel(), (ne, na))
+    root_prior_matrix = vcat([tree[bid, 1].prior' for bid in 1:ne]...) # Refacto ?
+    base_scores = gscores + log.(root_prior_matrix)
+
+    num_considered = min(mcts.num_considered_actions, na)
+    @assert all(num_considered .> 0)
+    considered = zeros(Int16, (ne, num_considered)) # TODO: refacto
+    for bid in 1:ne
+        considered[bid, :] = partialsortperm(
+            base_scores[bid, :], 1:num_considered; rev=true
+        )
+    end
+
+    # Sequential halving
+    num_prev_sims = 1 # number of performed simulations
+    num_halving_steps::Int = ceil(log2(num_considered))
+    sims_per_step = mcts.num_simulations / num_halving_steps
+    while true
+        num_visits::Int = max(1, floor(sims_per_step / num_considered))
+        for _ in 1:num_visits
+            # If we do not have enough simulations left to
+            # visit every considered actions, we must visit
+            # the most promising ones with higher priority
+            if num_prev_sims + num_considered > ns
+                # For the q-values to exist, we need
+                # num_simulations > num_conidered_actions
+                for bid in 1:ne
+                    aid = considered[bid, :]
+                    cid_list = tree[bid, 1].children[aid]
+                    qs = [cid != 0 ? qvalue(tree[bid, cid]) : 0 for cid in cid_list]
+                    sigma = qs * qcoeff(mcts, tree, tree[bid, 1], bid)
+                    scores = base_scores[bid, considered[bid, :]] + sigma
+                    considered[bid, :] = considered[bid, sortperm(scores; rev=true)]
+                end
+            end
+            # We visit all considered actions once
+            for i in 1:num_considered
+                num_prev_sims += 1
+                frontier = gumbel_select!(
+                    mcts, tree, considered[:, num_considered], num_prev_sims
+                )
+                eval_states!(mcts, tree, frontier)
+                backpropagate!(mcts, tree, frontier)
+                if num_prev_sims >= ns
+                    return tree
+                end
+            end
+        end
+        # Halving step
+        num_considered = max(2, num_considered ÷ 2)
+        new_considered = zeros(Int16, (ne, num_considered))
+        for bid in 1:ne
+            aid = considered[bid, :]
+            cid_list = tree[bid, 1].children[aid]
+            qs = [cid != 0 ? qvalue(tree[bid, cid]) : 0 for cid in cid_list]
+            sigma = qs * qcoeff(mcts, tree, tree[bid, 1], bid)
+            scores = base_scores[bid, considered[bid, :]] + sigma
+            new_considered[bid, :] = considered[
+                bid, partialsortperm(scores, 1:num_considered; rev=true)
+            ]
+        end
+        considered = new_considered
+    end
+end
+
 #####
 ## Some standard oracles
 #####
@@ -261,7 +367,4 @@ function uniform_oracle(env)
     return P, V
 end
 
-endfunction act_legal(node, aid)
-    @assert node.valid_actions[aid]
-    return act(node.state, aid)
 end
