@@ -150,7 +150,7 @@ Run MCTS search on the current state and return an MCTS tree.
 """
 function explore(mcts::Policy, env::AbstractEnv)
     node = create_node(env, mcts.oracle)
-    for _ in 1:(mcts.num_simulations)
+    for _ in 2:(mcts.num_simulations)
         run_simulation(mcts, node, copy(env))
     end
     return node
