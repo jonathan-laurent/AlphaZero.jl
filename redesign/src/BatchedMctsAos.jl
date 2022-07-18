@@ -282,6 +282,8 @@ function gumbel_select!(mcts, tree, batch_actions, simnum)
     return frontier
 end
 
+vec_of_vec_to_mat(vec) = reduce(vcat, transpose(vec))
+
 function gumbel_explore(mcts, envs, rng::AbstractRNG)
     tree = create_tree(mcts, envs)
     (na, ne, ns) = tree_dims(tree)
@@ -289,7 +291,7 @@ function gumbel_explore(mcts, envs, rng::AbstractRNG)
     eval_states!(mcts, tree, frontier)
 
     gscores = rand(rng, Gumbel(), (ne, na))
-    root_prior_matrix = vcat([tree[bid, 1].prior' for bid in 1:ne]...) # Refacto ?
+    root_prior_matrix = vec_of_vec_to_mat([tree[bid, 1].prior for bid in 1:ne])
     base_scores = gscores + log.(root_prior_matrix)
 
     num_considered = min(mcts.num_considered_actions, na)
@@ -336,18 +338,16 @@ function gumbel_explore(mcts, envs, rng::AbstractRNG)
         end
         # Halving step
         num_considered = max(2, num_considered ÷ 2)
-        new_considered = zeros(Int16, (ne, num_considered))
-        for bid in 1:ne
-            aid = considered[bid, :]
-            cid_list = tree[bid, 1].children[aid]
-            qs = [cid != 0 ? qvalue(tree[bid, cid]) : 0 for cid in cid_list]
-            sigma = qs * qcoeff(mcts, tree, tree[bid, 1], bid)
-            scores = base_scores[bid, considered[bid, :]] + sigma
-            new_considered[bid, :] = considered[
-                bid, partialsortperm(scores, 1:num_considered; rev=true)
-            ]
-        end
-        considered = new_considered
+        considered = vec_of_vec_to_mat(
+            map(1:ne) do bid
+                aid = considered[bid, :]
+                cid_list = tree[bid, 1].children[aid]
+                qs = [cid != 0 ? qvalue(tree[bid, cid]) : 0 for cid in cid_list]
+                sigma = qs * qcoeff(mcts, tree, tree[bid, 1], bid)
+                scores = base_scores[bid, considered[bid, :]] + sigma
+                return considered[bid, partialsortperm(scores, 1:num_considered; rev=true)]
+            end,
+        )
     end
 end
 
