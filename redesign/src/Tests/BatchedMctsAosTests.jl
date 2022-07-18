@@ -23,6 +23,14 @@ function run_batched_mcts_tests_on(device; num_simulations=2, num_envs=2)
     return tree
 end
 
+function run_batched_gumbel_mcts_tests_on(device; num_simulations=2, num_envs=2)
+    env = BitwiseTicTacToeEnv()
+    mcts = MCTS.Policy(; device=device, oracle=uniform_oracle, num_simulations)
+    tree = MCTS.gumbel_explore(mcts, [env for _ in 1:num_envs], MersenneTwister(0))
+    @test true
+    return tree
+end
+
 function uniform_mcts_tic_tac_toe(device, num_simulations=64)
     return MCTS.Policy(;
         oracle=MCTS.uniform_oracle, device=device, num_considered_actions=9, num_simulations
@@ -36,7 +44,9 @@ end
 function run_batched_mcts_tests()
     @testset "batched mcts compilation" begin
         run_batched_mcts_tests_on(CPU())
+        run_batched_gumbel_mcts_tests_on(CPU())
         CUDA.functional() && run_batched_mcts_tests_on(GPU())
+        CUDA.functional() && run_batched_gumbel_mcts_tests_on(GPU())
     end
     @testset "batched mcts oracle" begin
         @testset "uniform_oracle" begin
