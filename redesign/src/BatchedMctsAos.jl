@@ -326,9 +326,7 @@ function gumbel_explore(mcts, envs, rng::AbstractRNG)
             # We visit all considered actions once
             for i in 1:num_considered
                 num_prev_sims += 1
-                frontier = gumbel_select!(
-                    mcts, tree, considered[:, num_considered], num_prev_sims
-                )
+                frontier = gumbel_select!(mcts, tree, considered[:, i], num_prev_sims)
                 eval_states!(mcts, tree, frontier)
                 backpropagate!(mcts, tree, frontier)
                 if num_prev_sims >= ns
