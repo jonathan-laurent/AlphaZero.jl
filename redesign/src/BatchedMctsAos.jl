@@ -310,12 +310,11 @@ function gumbel_explore(mcts, envs, rng::AbstractRNG)
 
     num_considered = min(mcts.num_considered_actions, na)
     @assert all(num_considered .> 0)
-    considered = zeros(Int16, (ne, num_considered)) # TODO: refacto
-    for bid in 1:ne
-        considered[bid, :] = partialsortperm(
-            base_scores[bid, :], 1:num_considered; rev=true
-        )
-    end
+    considered = vec_of_vec_to_mat(
+        map(1:ne) do bid
+            partialsortperm(base_scores[bid, :], 1:num_considered; rev=true)
+        end,
+    )
 
     # Sequential halving
     num_prev_sims = 1 # number of performed simulations
