@@ -284,6 +284,20 @@ end
 
 vec_of_vec_to_mat(vec) = reduce(vcat, transpose(vec))
 
+function compute_and_sort_on_scores(mcts, tree, base_scores, considered, sortperm_)
+    (; ne) = tree_dims(tree)
+    return vec_of_vec_to_mat(
+        map(1:ne) do bid
+            aid = considered[bid, :]
+            cid_list = tree[bid, 1].children[aid]
+            qs = [cid != 0 ? qvalue(tree[bid, cid]) : 0 for cid in cid_list]
+            sigma = qs * qcoeff(mcts, tree, tree[bid, 1], bid)
+            scores = base_scores[bid, considered[bid, :]] + sigma
+            return considered[bid, sortperm_(scores)]
+        end,
+    )
+end
+
 function gumbel_explore(mcts, envs, rng::AbstractRNG)
     tree = create_tree(mcts, envs)
     (na, ne, ns) = tree_dims(tree)
@@ -316,14 +330,13 @@ function gumbel_explore(mcts, envs, rng::AbstractRNG)
             if num_prev_sims + num_considered > ns
                 # For the q-values to exist, we need
                 # num_simulations > num_conidered_actions
-                for bid in 1:ne
-                    aid = considered[bid, :]
-                    cid_list = tree[bid, 1].children[aid]
-                    qs = [cid != 0 ? qvalue(tree[bid, cid]) : 0 for cid in cid_list]
-                    sigma = qs * qcoeff(mcts, tree, tree[bid, 1], bid)
-                    scores = base_scores[bid, considered[bid, :]] + sigma
-                    considered[bid, :] = considered[bid, sortperm(scores; rev=true)]
-                end
+                considered = compute_and_sort_on_scores(
+                    mcts,
+                    tree,
+                    base_scores,
+                    considered,
+                    (scores) -> sortperm(scores; rev=true),
+                )
             end
             # We visit all considered actions once
             for i in 1:num_considered
@@ -338,15 +351,12 @@ function gumbel_explore(mcts, envs, rng::AbstractRNG)
         end
         # Halving step
         num_considered = max(2, num_considered ÷ 2)
-        considered = vec_of_vec_to_mat(
-            map(1:ne) do bid
-                aid = considered[bid, :]
-                cid_list = tree[bid, 1].children[aid]
-                qs = [cid != 0 ? qvalue(tree[bid, cid]) : 0 for cid in cid_list]
-                sigma = qs * qcoeff(mcts, tree, tree[bid, 1], bid)
-                scores = base_scores[bid, considered[bid, :]] + sigma
-                return considered[bid, partialsortperm(scores, 1:num_considered; rev=true)]
-            end,
+        considered = compute_and_sort_on_scores(
+            mcts,
+            tree,
+            base_scores,
+            considered,
+            (scores) -> partialsortperm(scores, 1:num_considered; rev=true),
         )
     end
 end
