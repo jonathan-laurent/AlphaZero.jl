@@ -57,8 +57,13 @@ module BatchedMcts
 
 using Adapt: @adapt_structure
 using Base: @kwdef
+using Base.Iterators: map as imap
+
 using ..Util.Devices
 using ..Util.Devices.KernelFuns: sum, argmax, maximum, softmax
+
+export EnvOracle, check_oracle
+export Policy, Tree, explore
 
 # # Environment oracles
 
@@ -78,9 +83,9 @@ the same type than those passed to the `explore` and `gumbel_explore` functions.
 - `internal_states`: internal representations of the environment states as used by MCTS and
     manipulated by `transition_fn`. `internal_states` must be a single or multi-dimensional
     array whose last dimension is a batch dimension (see examples below).
-- `policy_priors`: the policy prior for each states as an `AbstractArray{Float32,2}` with
+- `policy_prior`: the policy prior for each states as an `AbstractArray{Float32,2}` with
     dimensions `num_actions` and `batch_id`.
-- `value_priors`: the value prior for each state as an `AbstractVector{Float32}`.
+- `value_prior`: the value prior for each state as an `AbstractVector{Float32}`.
 
 # The `transition_fn` function
 
@@ -99,7 +104,7 @@ example) along with a vector of action ids. Action ids consist in integers betwe
   indicating which actions are valid to take (this is disregarded in MuZero).
 - `player_switched`: vector of booleans indicating whether or not the current player
     switched during the transition (always `true` in many board games).
-- `policy_priors`, `value_priors`: same as for `init_fn`.
+- `policy_prior`, `value_prior`: same as for `init_fn`.
 
 
 # Examples of internal state encodings
@@ -131,7 +136,7 @@ The function returns `nothing` if no problems are detected. Otherwise, helpful e
 messages are raised.
 """
 function check_oracle(oracle::EnvOracle, env)
-    # TODO
+    # TODO: use `assert`
     return nothing
 end
 
@@ -203,6 +208,8 @@ All these fields are used to store the results of calling the environment oracle
   temporal locality since each thread is looking at a different batch. On the other hand, a
   `(B, N)` layout may provide better spatial locality when copying the results of the
   environment oracle and possibly when navigating trees.
+
+# TODO: add a comment on CuArray vs Arrayfor the parameter of Tree
 """
 struct Tree{
     StateNodeArray,
@@ -232,17 +239,179 @@ end
 ## https://cuda.juliagpu.org/stable/tutorials/custom_structs/
 @adapt_structure Tree
 
-batch_size(tree) = size(tree)[1]
+function validate_prior(prior, valid_actions)
+    prior = map(zip(policy_prior, valid_actions)) do (prior, is_valid)
+        (is_valid) ? prior : Float32(0)
+    end
+    return prior ./ sum(prior; dims=1)
+end
+
+function create_tree(mcts, envs)
+    (; internal_states, policy_prior, value_prior) = mcts.oracle.init_fn(envs)
+    A, N, B = size(policy_prior)[1], mcts.num_simulations, length(envs)
+
+    return Tree(;
+        parent=zeros(Int16, mcts.device, (N, B)),
+        num_visits=zeros(Int16, mcts.device, (N, B)),
+        total_values=zeros(Float32, mcts.device, (N, B)),
+        children=zeros(Int16, mcts.device, (A, N, B)),
+        state=internal_states,
+        terminal=zeros(Bool, mcts.device, (N, B)),
+        valid_actions=zeros(Bool, mcts.device, (A, N, B)),
+        prev_action=zeros(Int16, mcts.device, (N, B)),
+        prev_reward=zeros(Float32, mcts.device, (N, B)),
+        prev_switched=zeros(Bool, mcts.device, (N, B)),
+        policy_prior, # TODO: `validate_prior` but need `valid_actions`, should it be returned by `init_fn`
+        value_prior,
+    )
+end
+
+function size(tree::Tree)
+    A, N, B = size(tree.children)
+    return (; A, N, B)
+end
+
+batch_size(tree) = size(tree).B
 
 # # MCTS implementation
 
-function select!(mcts, tree, simnum)
+value(tree, cid, bid) = tree.total_values[cid, bid] / tree.num_visits[cid, bid]
+
+qvalue(tree, cid, bid) = value(tree, cid, bid) * (-1)^tree.prev_switched[cid, bid]
+
+function get_visited_children(tree, cid, bid)
+    direct_children = tree.children[:, cid, bid]
+    direct_children = direct_children[direct_children .!= 0]
+    return direct_children
+end
+
+function root_value_estimate(tree, cid, bid) # TODO
+    total_qvalues = 0.0f0
+    total_prior = 0.0f0
+    total_visits = 0
+    for (aid, cnid) in enumerate(get_visited_children(tree, cid, bid))
+        total_qvalues += tree.prior[aid, cid, bid] * qvalue(tree, cnid, bid)
+        total_prior += tree.prior[aid, cid, bid]
+        total_visits += tree.num_visits[cnid, bid]
+    end
+    children_value = total_qvalues
+    total_prior > 0 && (children_value /= total_prior)
+    return (tree.value_prior[cid, bid] + total_visits * children_value) / (1 + total_visits)
+end
+
+function completed_qvalues(tree, cid, bid)
+    root_value = root_value_estimate(tree, cid, bid)
+    (; na) = size(tree)
+    return imap(1:na) do aid
+        if (!tree.valid_actions[aid, cid, bid])
+            return -Inf32
+        end
+
+        cnid = node.children[aid, cid, bid]
+        return cnid > 0 ? qvalue(tree, cnid, bid) : root_value
+    end
+end
+
+function qcoeff(mcts, tree, cid, bid)
+    # XXX: init is necessary for GPUCompiler right now...
+    max_child_visit = maximum(get_visited_children(tree, cid, bid); init=Int16(0))
+    return mcts.value_scale * (mcts.max_visit_init + max_child_visit)
+end
+
+function target_policy(mcts, tree, cid, bid)
+    qs = completed_qvalues(tree, cid, bid)
+    return softmax(log.(tree.policy_prior[:, cid, bid]) + qcoeff(mcts, tree, cid, bid) * qs)
+end
+
+function select_nonroot_action(mcts, tree, cid, bid)
+    policy = target_policy(mcts, tree, cid, bid)
+    (; na) = size(tree)
+    num_child_visits = tree.num_visits[get_visited_children(tree, cid, bid), bid]
+    total_visits = sum(num_child_visits)
+    return argmax(policy - Float32.(num_child_visits) / (total_visits + 1))
+end
+
+function select(mcts, tree, bid)
+    return (; A) = size(tree)
+    cur = Int16(1)
+    while true
+        if tree.terminal[cur, bid]
+            return cur
+        end
+        aid = select_nonroot_action(mcts, tree, cur, bid)
+        cnid = tree.children[aid, cur, bid]
+        if cnid > 0
+            cur = cnid
+        else
+            return cur # returns parent
+        end
+    end
+    return nothing
+end
+
+function select_and_eval!(mcts, tree, simnum)
     B = batch_size(tree)
     batch_indices = DeviceArray(mcts.device)(1:B)
-    frontier = map(batch_indices) do bid
-        @assert false, "Not implemented"
+    pfrontier = map(batch_indices) do bid
+        select(mcts, tree, bid)
     end
+
+    # Compute transition at `pfrontier`
+    non_terminal_mask = !tree.terminal[pfrontier, :]
+    parent_ids = pfrontier[non_terminal_mask]
+    action_ids = [select_nonroot_action(mcts, tree, pid, bid) for pid in parent_ids]
+    parent_states = [tree.state[:, pid, bid] for pid in parent_ids]
+    info = mcts.oracle.transition_fn(parent_states, action_ids)
+
+    # Create nodes and save `info`
+    tree.parent[simnum, non_terminal_mask] = parent_ids
+    tree.children[action_ids, parent_ids, non_terminal_mask] = simnum
+    tree.state[:, simnum, non_terminal_mask] = info.internal_states
+    tree.terminal[simnum, non_terminal_mask] = info.terminal
+    tree.valid_actions[:, simnum, non_terminal_mask] = info.valid_actions
+    tree.prev_action[simnum, non_terminal_mask] = action_ids
+    tree.prev_reward[simnum, non_terminal_mask] = info.rewards
+    tree.prev_switched[simnum, non_terminal_mask] = info.player_switched
+    tree.policy_prior[:, simnum, non_terminal_mask] = info.policy_prior
+    tree.value_prior[simnum, non_terminal_mask] = info.value_prior
+
+    # Update frontier
+    frontier = pfrontier
+    frontier[non_terminal_mask] = simnum
+
     return frontier
+end
+
+function backpropagate!(mcts, tree, frontier)
+    (; ne) = tree_dims(tree)
+    batch_ids = DeviceArray(mcts.device)(1:ne)
+    map(batch_ids) do bid
+        sid = frontier[bid]
+        val = tree.value_prior[sid, bid]
+        while true
+            tree.num_visits[sid, bid] += Int16(1)
+            tree.total_values[sid, bid] += val
+            if tree.parent[sid, bid] > 0
+                (tree.prev_switched[sid, bid]) && (val = -val)
+                val += tree.prev_reward[sid, bid]
+                sid = tree.parent[sid, bid]
+            else
+                return nothing
+            end
+        end
+    end
+    return nothing
+end
+
+function explore(mcts, envs)
+    tree = create_tree(mcts, envs)
+    (; B, S) = size(tree)
+    frontier = DeviceArray(mcts.device)(ones(Int16, B))
+    for i in 2:S
+        frontier = select_and_eval!(mcts, tree, i)
+        backpropagate!(mcts, tree, frontier)
+    end
+    return tree
 end
 
 end

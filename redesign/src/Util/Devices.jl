@@ -1,6 +1,7 @@
 module Devices
 
 using CUDA
+import Base.zeros
 
 export Device, GPU, CPU, DeviceArray
 
@@ -10,6 +11,14 @@ struct CPU <: Device end
 
 DeviceArray(::GPU) = CuArray
 DeviceArray(::CPU) = Array
+
+"""
+A device agnostic zeros array.
+"""
+Base.zeros(T, ::CPU, dims...) = Base.zeros(T, dims...)
+Base.zeros(T, ::GPU, dims...) = CUDA.zeros(T, dims...)
+
+Base.zeros(device::Device, dims...) = zeros(Float64, device, dims)
 
 """
 A device agnostic parallel loop construct.
