@@ -402,7 +402,8 @@ function validate_prior(policy_prior, valid_actions)
     prior_sum = mapslices(prior; dims=1) do prior_slice
         sum(prior_slice; init=0)
     end
-    return @. prior / max(1, prior_sum)
+    @assert !all(prior_sum .== 0) "No available actions"
+    return @. prior / prior_sum
 end
 
 function create_tree(mcts, envs)
