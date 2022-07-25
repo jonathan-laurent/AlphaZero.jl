@@ -571,11 +571,11 @@ function backpropagate!(mcts, tree, frontier)
         sid = frontier[bid]
         val = tree.value_prior[sid, bid]
         while true
+            val += tree.prev_reward[sid, bid]
+            (tree.prev_switched[sid, bid]) && (val = -val)
             tree.num_visits[sid, bid] += Int16(1)
             tree.total_values[sid, bid] += val
             if tree.parent[sid, bid] > 0
-                (tree.prev_switched[sid, bid]) && (val = -val)
-                val += tree.prev_reward[sid, bid]
                 sid = tree.parent[sid, bid]
             else
                 return nothing
