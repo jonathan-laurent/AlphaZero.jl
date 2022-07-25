@@ -31,6 +31,7 @@ function run_all_tests()
         run_util_tests()
         run_bitwise_tictactoe_tests()
         run_mcts_tests()
+        run_batched_mcts_aos_tests()
         run_batched_mcts_tests()
     end
     return nothing

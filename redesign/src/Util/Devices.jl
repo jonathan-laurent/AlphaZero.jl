@@ -68,6 +68,11 @@ module KernelFuns
         return best_x
     end
 
+    function argmax(ys; init)
+        xs = 1:length(ys)
+        return argmax(x -> ys[x], xs; init)
+    end
+
     function maximum(xs; init)
         best = init
         for x in xs
@@ -97,7 +102,5 @@ module KernelFuns
         ys = exp.(xs) .+ eltype(xs)(eps)
         return ys ./ sum(ys; init=z)
     end
-
 end
-
 end

@@ -11,11 +11,11 @@ using Test
 using JET
 using ReinforcementLearningEnvironments
 
-export run_batched_mcts_tests
+export run_batched_mcts_aos_tests
 
 const MCTS = BatchedMctsAos
 
-function run_batched_mcts_tests_on(device; num_simulations=2, num_envs=2)
+function run_batched_mcts_aos_tests_on(device; num_simulations=2, num_envs=2)
     env = BitwiseTicTacToeEnv()
     mcts = MCTS.Policy(; device=device, oracle=uniform_oracle, num_simulations)
     tree = MCTS.explore(mcts, [env for _ in 1:num_envs])
@@ -49,10 +49,10 @@ function profile_explore()
     return explore(policy, envs)
 end
 
-function run_batched_mcts_tests()
+function run_batched_mcts_aos_tests()
     @testset "batched mcts compilation" begin
-        run_batched_mcts_tests_on(CPU())
-        CUDA.functional() && run_batched_mcts_tests_on(GPU())
+        run_batched_mcts_aos_tests_on(CPU())
+        CUDA.functional() && run_batched_mcts_aos_tests_on(GPU())
     end
     @testset "batched mcts oracle" begin
         @testset "uniform_oracle" begin
