@@ -81,8 +81,9 @@ function tree_dims(tree::Tree{N,S}) where {N,S}
 end
 
 function validate_prior(node, prior)
-    for unvalid_id in findall(!, node.valid_actions)
-        @set! prior[unvalid_id] = 0
+    for (action_id, is_valid_action) in enumerate(node.valid_actions)
+        (is_valid_action) && continue
+        @set! prior[action_id] = Float32(0)
     end
     return prior ./ sum(prior; init=0)
 end
@@ -127,7 +128,7 @@ function completed_qvalues(tree, node, bid)
     root_value = root_value_estimate(tree, node, bid)
     na = length(node.children)
     ret = imap(1:na) do i
-        if (!node.valid_actions[i]) 
+        if (!node.valid_actions[i])
             return -Inf32
         end
 
@@ -218,12 +219,12 @@ function backpropagate!(mcts, tree, frontier)
         node = tree[bid, sid]
         val = node.oracle_value
         while true
+            val += node.prev_reward
+            (node.prev_switched) && (val = -val)
             @set! node.num_visits += Int16(1)
             @set! node.total_rewards += val
             tree[bid, sid] = node
             if node.parent > 0
-                (node.prev_switched) && (val = -val)
-                val += node.prev_reward
                 sid = node.parent
                 node = tree[bid, sid]
             else
