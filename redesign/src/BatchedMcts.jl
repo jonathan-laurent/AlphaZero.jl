@@ -84,8 +84,6 @@ the same type than those passed to the `explore` and `gumbel_explore` functions.
 - `internal_states`: internal representations of the environment states as used by MCTS and
     manipulated by `transition_fn`. `internal_states` must be a single or multi-dimensional
     array whose last dimension is a batch dimension (see examples below).
-- `terminal`: vector of booleans indicating whether or not the reached states are terminal
-    (this is always `false` in MuZero).
 - `valid_actions`: a vector of booleans with dimensions `num_actions` and `batch_id`
   indicating which actions are valid to take (this is disregarded in MuZero).
 - `policy_prior`: the policy prior for each states as an `AbstractArray{Float32,2}` with
@@ -154,16 +152,12 @@ function check_oracle(oracle::EnvOracle, envs, aids)
     init_res = oracle.init_fn(envs)
     # Named-tuple check
     @assert check_keys(
-        keys(init_res),
-        (:internal_states, :terminal, :valid_actions, :policy_prior, :value_prior),
+        keys(init_res), (:internal_states, :valid_actions, :policy_prior, :value_prior)
     ) "The `EnvOracle`'s `init_fn` function should returned a named-tuple with the " *
-        "following fields: internal_states, terminal, valid_actions, policy_prior, " *
+        "following fields: internal_states, valid_actions, policy_prior, " *
         "value_prior."
 
     # Type and dimensions check
-    @assert (length(init_res.terminal) == B && typeof(init_res.terminal[1]) == Bool) "The " *
-        "`init_fn`'s function should return a `terminal` vector with dimensions " *
-        "`batch_id` and of type `Bool`."
     size_valid_actions = size(init_res.valid_actions)
     @assert (
         length(size_valid_actions) == 2 &&
@@ -266,7 +260,6 @@ function UniformTicTacToeEnvOracle()
 
         return (;
             internal_states=envs,
-            terminal=is_terminated.(envs),
             valid_actions,
             policy_prior=get_policy_prior(A, B),
             value_prior=get_value_prior(B),
@@ -420,8 +413,6 @@ function create_tree(mcts, envs)
     num_visits[1, :] .= 1
     internal_states = DeviceArray(mcts.device){AbstractEnv}(undef, (N, B))
     internal_states[1, :] = info.internal_states
-    terminal = zeros(Bool, mcts.device, (N, B))
-    terminal[1, :] = info.terminal
     valid_actions = zeros(Bool, mcts.device, (A, N, B))
     valid_actions[:, 1, :] = info.valid_actions
     policy_prior = zeros(Float32, mcts.device, (A, N, B))
@@ -435,7 +426,7 @@ function create_tree(mcts, envs)
         total_values=zeros(Float32, mcts.device, (N, B)),
         children=zeros(Int16, mcts.device, (A, N, B)),
         state=internal_states,
-        terminal,
+        terminal=zeros(Bool, mcts.device, (N, B)),
         valid_actions,
         prev_action=zeros(Int16, mcts.device, (N, B)),
         prev_reward=zeros(Float32, mcts.device, (N, B)),
