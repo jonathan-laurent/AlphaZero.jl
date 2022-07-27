@@ -57,6 +57,8 @@ module BatchedMcts
 
 using Adapt: @adapt_structure
 using Base: @kwdef, size
+using Distributions: Gumbel
+using Random: AbstractRNG
 
 using ..BatchedEnvs
 using ..Util.Devices
@@ -327,6 +329,8 @@ end
 const NO_PARENT = Int16(0)
 ## Value stored in tree.children for unvisited children
 const UNVISITED = Int16(0)
+## Value used in various tree's attributes to access root information
+const ROOT = Int16(1)
 
 """
 A batch of MCTS trees, represented as a structure of arrays.
@@ -418,15 +422,17 @@ function create_tree(mcts, envs)
     A, N, B = size(info.policy_prior)[1], mcts.num_simulations, length(envs)
 
     num_visits = zeros(Int16, mcts.device, (N, B))
-    num_visits[1, :] .= 1
-    internal_states = DeviceArray(mcts.device){typeof(info.internal_states[1])}(undef, (N, B))
-    internal_states[1, :] = info.internal_states
+    num_visits[ROOT, :] .= 1
+    internal_states = DeviceArray(mcts.device){typeof(info.internal_states[1])}(
+        undef, (N, B)
+    )
+    internal_states[ROOT, :] = info.internal_states
     valid_actions = zeros(Bool, mcts.device, (A, N, B))
-    valid_actions[:, 1, :] = info.valid_actions
+    valid_actions[:, ROOT, :] = info.valid_actions
     policy_prior = zeros(Float32, mcts.device, (A, N, B))
-    policy_prior[:, 1, :] = validate_prior(info.policy_prior, info.valid_actions)
+    policy_prior[:, ROOT, :] = validate_prior(info.policy_prior, info.valid_actions)
     value_prior = zeros(Float32, mcts.device, (N, B))
-    value_prior[1, :] = info.value_prior
+    value_prior[ROOT, :] = info.value_prior
 
     return Tree(;
         parent=zeros(Int16, mcts.device, (N, B)),
@@ -502,7 +508,8 @@ end
 function select_nonroot_action(mcts, tree, cid, bid)
     policy = target_policy(mcts, tree, cid, bid)
     num_child_visits = [
-        (cnid != 0) ? tree.num_visits[cnid, bid] : Int16(0) for cnid in tree.children[:, cid, bid]
+        (cnid != 0) ? tree.num_visits[cnid, bid] : Int16(0) for
+        cnid in tree.children[:, cid, bid]
     ]
     total_visits = sum(num_child_visits; init=Int16(0))
     return argmax(
@@ -510,8 +517,8 @@ function select_nonroot_action(mcts, tree, cid, bid)
     )
 end
 
-function select(mcts, tree, bid)
-    cur = Int16(1)
+function select(mcts, tree, bid; start=Int16(1))
+    cur = start
     while true
         if tree.terminal[cur, bid]
             return cur
@@ -527,12 +534,8 @@ function select(mcts, tree, bid)
     return nothing
 end
 
-function select_and_eval!(mcts, tree, simnum)
+function eval!(mcts, tree, simnum, pfrontier)
     B = batch_size(tree)
-    batch_indices = DeviceArray(mcts.device)(1:B)
-    pfrontier = map(batch_indices) do bid
-        select(mcts, tree, bid)::Int16
-    end
 
     # Compute transition at `pfrontier`
     non_terminal_mask = [!tree.terminal[cid, bid] for (cid, bid) in zip(pfrontier, 1:B)]
@@ -569,6 +572,16 @@ function select_and_eval!(mcts, tree, simnum)
     return frontier
 end
 
+function select_and_eval!(mcts, tree, simnum)
+    B = batch_size(tree)
+    batch_indices = DeviceArray(mcts.device)(1:B)
+    pfrontier = map(batch_indices) do bid
+        select(mcts, tree, bid)
+    end
+
+    return eval!(mcts, tree, simnum, pfrontier)
+end
+
 function backpropagate!(mcts, tree, frontier)
     B = batch_size(tree)
     batch_ids = DeviceArray(mcts.device)(1:B)
@@ -593,8 +606,50 @@ end
 function explore(mcts, envs)
     tree = create_tree(mcts, envs)
     (; B, N) = size(tree)
-    for i in 2:N
-        frontier = select_and_eval!(mcts, tree, i)
+    frontier = DeviceArray(mcts.device)(ones(Int16, B))
+    for simun in 2:N
+        frontier = select_and_eval!(mcts, tree, simun)
+        backpropagate!(mcts, tree, frontier)
+    end
+    return tree
+end
+
+function get_table_of_considered_visits(mcts) end # TODO
+
+function gumbel_select_root(mcts, tree, gumbel)
+    B = batch_size(tree)
+
+    table_of_considered_visits = get_table_of_considered_visits(mcts)
+    num_valid_actions = sum(tree.valid_actions[:, ROOT, :]; dims=1)
+    num_considered = min.(mcts.num_conidered_actions, num_valid_actions)
+
+    num_visits = tree.num_visits[get_visited_children.(tree, ROOT, 1:B), :]
+    simulation_index = sum(num_visits; dims=1)
+
+    considered_visits = table_of_considered_visits[num_considered, simulation_index]
+    penality = [(num_visits[:, bid] == considered_visits) ? 0 : -Inf32 for bid in 1:B]
+
+    qs = completed_qvalues.(tree, ROOT, 1:B)
+    norm_qs = qs * qcoeff.(mcts, tree, ROOT, 1:B)
+    scores = map(1:B) do bid
+        gumbel + log.(tree.policy_prior[:, ROOT, bid]) + norm_qs[bid] + penality
+    end
+    return argmax.(scores)
+end
+
+function gumbel_select_and_eval!(mcts, tree, simnum, gumbel)
+    root_selection = gumbel_select_root(mcts, tree, gumbel)
+    return select_and_eval!(mcts, tree, simnum, pfrontier)
+end
+
+function gumbel_explore(mcts, envs, rng::AbstractRNG)
+    tree = create_tree(mcts, envs)
+    (; B, N) = size(tree)
+    gumbel = rand(rng, Gumbel(); dims=num_considered)
+
+    frontier = DeviceArray(mcts.device)(ones(Int16, B))
+    for simnum in 2:N
+        frontier = gumbel_select_and_eval!(mcts, tree, simnum, gumbel)
         backpropagate!(mcts, tree, frontier)
     end
     return tree

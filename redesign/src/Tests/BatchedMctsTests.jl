@@ -8,6 +8,7 @@ import ...SimpleMcts as Sim
 import ..SimpleMctsTests as SimTest
 
 using CUDA
+using Random: MersenneTwister
 using Test
 
 export run_batched_mcts_tests
@@ -42,7 +43,7 @@ function run_batched_mcts_tests()
             check_oracle(UniformTicTacToeEnvOracle(), envs, aids)
             @test true
         end
-        @testset "Exploration" begin
+        @testset "Policy" begin
             function test_exploration(tree, env, bid)
                 root = 1
                 qvalue_list = MCTS.completed_qvalues(tree, root, bid)
@@ -59,17 +60,34 @@ function run_batched_mcts_tests()
                     num_actions(env)
                 @test best == best_move
             end
+            function test_exploration(tree, envs::AbstractArray)
+                n_envs = length(envs)
+                for bid in 1:n_envs
+                    test_exploration(tree, envs[bid], bid)
+                end
+            end
 
             device = CPU()
             n_envs = 2
 
             envs = tic_tac_toe_winning_envs()
             mcts = uniform_mcts_tictactoe(device)
-            tree = MCTS.explore(mcts, envs)
 
-            for bid in 1:n_envs
-                test_exploration(tree, envs[bid], bid)
+            @testset "Explore" begin
+                tree = MCTS.explore(mcts, envs)
+                test_exploration(tree, envs)
             end
+            # @testset "Gumbel explore" begin
+            #     tree = MCTS.gumbel_explore(mcts, tree, MersenneTwister(0))
+            #     test_exploration(tree, envs)
+            #     # All (valid) actions have been visited at least once
+            #     @test all(all(root.children[root.valid_actions] .!= 0) for root in tree[:, 1])
+            #     # Only valid actions are explored
+            #     @test all(
+            #         !any(@. root.valid_actions == false && root.children > 0) for
+            #         root in tree[:, 1]
+            #     )
+            # end
         end
         @testset "Equivalence with SimpleMcts" begin
             sim_policy = SimTest.uniform_mcts_policy_tic_tac_toe(; num_simulations=64)
