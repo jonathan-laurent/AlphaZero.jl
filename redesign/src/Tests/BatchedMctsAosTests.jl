@@ -32,7 +32,7 @@ function rollout_mcts_randomwalk1d(device)
     )
 end
 
-function uniform_mcts_tic_tac_toe(device, num_simulations=64)
+function uniform_mcts_tic_tac_toe(device; num_simulations=64)
     return Policy(;
         oracle=uniform_oracle, device=device, num_considered_actions=9, num_simulations
     )
@@ -94,7 +94,7 @@ function run_batched_mcts_aos_tests()
             end
         end
         @testset "equivalence with SimpleMcts" begin
-            sim_policy = SimTest.uniform_mcts_policy_tic_tac_toe(; n=64)
+            sim_policy = SimTest.uniform_mcts_policy_tic_tac_toe(; num_simulations=64)
             sim_env = tictactoe_winning()
             sim_tree = Sim.explore(sim_policy, sim_env)
 

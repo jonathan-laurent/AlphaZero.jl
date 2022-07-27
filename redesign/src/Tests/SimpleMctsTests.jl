@@ -19,9 +19,9 @@ function random_walk_value(; N, start_pos, rep=1000)
     return mean(oracle(env)[2] for _ in 1:rep)
 end
 
-function uniform_mcts_policy_tic_tac_toe(; n=100)
+function uniform_mcts_policy_tic_tac_toe(; num_simulations=100)
     return Policy(;
-        num_simulations=n,
+        num_simulations=num_simulations,
         num_considered_actions=9,
         value_scale=0.1,
         max_visit_init=50,

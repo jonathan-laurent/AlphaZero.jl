@@ -57,16 +57,19 @@ module BatchedMcts
 
 using Adapt: @adapt_structure
 using Base: @kwdef, size
-using ReinforcementLearningBase
 
+using ..BatchedEnvs
 using ..Util.Devices
 using ..Util.Devices: ones
 using ..Util.Devices.KernelFuns: sum, argmax, maximum, softmax
 
+include("./Tests/Common/BitwiseTicTacToe.jl")
+using .BitwiseTicTacToe
+
 export EnvOracle, check_oracle, UniformTicTacToeEnvOracle
 export Policy, Tree, explore
 
-# # Environment oracles
+# #Environment oracles
 
 """
     EnvOracle(; init_fn, transition_fn)
@@ -238,8 +241,10 @@ end
 
 Define an `EnvOracle` object with a uniform policy for the game of Tic-Tac-Toe.
 
-This environment is a wrapper around the Tic-Tac-Toe environment of RL.jl.
-For more details, checkout their documentation:
+This oracle environment is a wrapper around the BitwiseTicTacToeEnv.
+Checkout `./Tests/Common/BitwiseTicTacToe.jl`
+
+It was inspired by the RL.jl library. For more details, checkout their documentation:
 https://juliareinforcementlearning.org/docs/rlenvs/#ReinforcementLearningEnvironments.TicTacToeEnv
 """
 function UniformTicTacToeEnvOracle()
@@ -247,15 +252,15 @@ function UniformTicTacToeEnvOracle()
     get_value_prior(B) = zeros(Float32, B)
 
     function init_fn(envs)
-        A = length(action_space(envs[1]))
+        A = num_actions(envs[1])
         B = length(envs)
 
         @assert B > 0
-        @assert all(e -> length(action_space(e)) == A, envs)
+        @assert all(e -> num_actions(e) == A, envs)
 
         valid_actions = zeros(Bool, (A, B))
         for (bid, env) in enumerate(envs)
-            valid_actions[:, bid] = legal_action_space_mask(env)
+            valid_actions[:, bid] = [valid_action(env, i) for i in 1:A]
         end
 
         return (;
@@ -267,28 +272,30 @@ function UniformTicTacToeEnvOracle()
     end
 
     function transition_fn(envs, aids)
-        A = length(action_space(envs[1]))
+        A = num_actions(envs[1])
         B = length(envs)
 
-        prev_players = map(current_player, envs)
-        internal_states = map(zip(envs, aids)) do (env, aid)
-            next_env = copy(env)
-            @assert aid in legal_action_space(env) "Tried to play an illegal move"
-            next_env(aid)
-            next_env
+        player_switched = zeros(Bool, B)
+        rewards = zeros(Float32, B)
+        internal_states = map(zip(1:B, aids)) do (bid, aid)
+            @assert valid_action(envs[bid], aid) "Tried to play an illegal move"
+            newenv, info = act(envs[bid], aid)
+            rewards[bid] = info.reward
+            player_switched[bid] = info.switched
+            newenv
         end
 
         valid_actions = zeros(Bool, (A, B))
         for (bid, env) in enumerate(internal_states)
-            valid_actions[:, bid] = legal_action_space_mask(env)
+            valid_actions[:, bid] = [valid_action(env, i) for i in 1:A]
         end
 
         return (;
             internal_states,
-            rewards=Float32.(reward.(internal_states, prev_players)),
-            terminal=is_terminated.(internal_states),
+            rewards,
+            terminal=terminated.(internal_states),
             valid_actions,
-            player_switched=prev_players .!= map(current_player, internal_states),
+            player_switched,
             policy_prior=get_policy_prior(A, B),
             value_prior=get_value_prior(B),
         )
@@ -400,9 +407,9 @@ function validate_prior(policy_prior, valid_actions)
         (is_valid) ? prior : Float32(0)
     end
     prior_sum = mapslices(prior; dims=1) do prior_slice
-        sum(prior_slice; init=0)
-    end
-    @assert !all(prior_sum .== 0) "No available actions"
+        sum(prior_slice; init=Float32(0))
+    end::Matrix{Float32}
+    @assert !all(prior_sum .== Float32(0)) "No available actions"
     return @. prior / prior_sum
 end
 
@@ -412,7 +419,7 @@ function create_tree(mcts, envs)
 
     num_visits = zeros(Int16, mcts.device, (N, B))
     num_visits[1, :] .= 1
-    internal_states = DeviceArray(mcts.device){AbstractEnv}(undef, (N, B))
+    internal_states = DeviceArray(mcts.device){typeof(info.internal_states[1])}(undef, (N, B))
     internal_states[1, :] = info.internal_states
     valid_actions = zeros(Bool, mcts.device, (A, N, B))
     valid_actions[:, 1, :] = info.valid_actions
@@ -451,9 +458,7 @@ value(tree, cid, bid) = tree.total_values[cid, bid] / tree.num_visits[cid, bid]
 qvalue(tree, cid, bid) = value(tree, cid, bid) * (-1)^tree.prev_switched[cid, bid]
 
 function get_visited_children(tree, cid, bid)
-    direct_children = tree.children[:, cid, bid]
-    direct_children = direct_children[direct_children .!= 0]
-    return direct_children
+    return [child for child in tree.children[:, cid, bid] if child != Int16(0)]
 end
 
 function root_value_estimate(tree, cid, bid) # TODO
@@ -497,9 +502,9 @@ end
 function select_nonroot_action(mcts, tree, cid, bid)
     policy = target_policy(mcts, tree, cid, bid)
     num_child_visits = [
-        (cnid != 0) ? tree.num_visits[cnid, bid] : 0 for cnid in tree.children[:, cid, bid]
+        (cnid != 0) ? tree.num_visits[cnid, bid] : Int16(0) for cnid in tree.children[:, cid, bid]
     ]
-    total_visits = sum(num_child_visits; init=0)
+    total_visits = sum(num_child_visits; init=Int16(0))
     return argmax(
         policy - Float32.(num_child_visits) / (total_visits + 1); init=(0, -Inf32)
     )
@@ -526,16 +531,16 @@ function select_and_eval!(mcts, tree, simnum)
     B = batch_size(tree)
     batch_indices = DeviceArray(mcts.device)(1:B)
     pfrontier = map(batch_indices) do bid
-        select(mcts, tree, bid)
+        select(mcts, tree, bid)::Int16
     end
 
     # Compute transition at `pfrontier`
-    non_terminal_mask = .![tree.terminal[cid, bid] for (cid, bid) in zip(pfrontier, 1:B)]
+    non_terminal_mask = [!tree.terminal[cid, bid] for (cid, bid) in zip(pfrontier, 1:B)]
     # No new node to expand (a.k.a only terminal node on the frontier)
     (!any(non_terminal_mask)) && return pfrontier
 
     parent_ids = pfrontier[non_terminal_mask]
-    non_terminal_bids = OneTo(B)[non_terminal_mask]
+    non_terminal_bids = Base.OneTo(B)[non_terminal_mask]
     action_ids = [
         select_nonroot_action(mcts, tree, cid, bid) for
         (cid, bid) in zip(parent_ids, non_terminal_bids)
@@ -588,7 +593,6 @@ end
 function explore(mcts, envs)
     tree = create_tree(mcts, envs)
     (; B, N) = size(tree)
-    frontier = DeviceArray(mcts.device)(ones(Int16, B))
     for i in 2:N
         frontier = select_and_eval!(mcts, tree, i)
         backpropagate!(mcts, tree, frontier)

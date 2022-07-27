@@ -9,15 +9,13 @@ import ..SimpleMctsTests as SimTest
 
 using CUDA
 using Test
-using ReinforcementLearningEnvironments
-using ReinforcementLearningBase
 
 export run_batched_mcts_tests
 
 const MCTS = BatchedMcts
 
 function tic_tac_toe_winning_envs(; n_envs=2)
-    return [tictactoe_winning() for _ in 1:n_envs]
+    return [bitwise_tictactoe_winning() for _ in 1:n_envs]
 end
 
 function uniform_mcts_tictactoe(device; num_simulations=64)
@@ -40,7 +38,7 @@ function run_batched_mcts_tests()
         end
         @testset "UniformTicTacToeEnvOracle" begin
             envs = tic_tac_toe_winning_envs()
-            aids = [legal_action_space(env)[1] for env in envs]
+            aids = [2 for env in envs]
             check_oracle(UniformTicTacToeEnvOracle(), envs, aids)
             @test true
         end
@@ -58,7 +56,7 @@ function run_batched_mcts_tests()
                 @test tree.value_prior[root, bid] == value_prior
                 @test length(qvalue_list) ==
                     length(tree.children[:, root, bid]) ==
-                    length(action_space(env))
+                    num_actions(env)
                 @test best == best_move
             end
 
@@ -74,7 +72,7 @@ function run_batched_mcts_tests()
             end
         end
         @testset "Equivalence with SimpleMcts" begin
-            sim_policy = SimTest.uniform_mcts_policy_tic_tac_toe(; n=64)
+            sim_policy = SimTest.uniform_mcts_policy_tic_tac_toe(; num_simulations=64)
             sim_env = tictactoe_winning()
             sim_tree = Sim.explore(sim_policy, sim_env)
 
