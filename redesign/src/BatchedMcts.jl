@@ -331,6 +331,8 @@ const NO_PARENT = Int16(0)
 const UNVISITED = Int16(0)
 ## Value used in various tree's attributes to access root information
 const ROOT = Int16(1)
+## Valud used when no action is selected
+const NO_ACTION = Int16(0)
 
 """
 A batch of MCTS trees, represented as a structure of arrays.
@@ -521,14 +523,16 @@ function select(mcts, tree, bid; start=Int16(1))
     cur = start
     while true
         if tree.terminal[cur, bid]
-            return cur
+            # returns current terminal, but no action played
+            return cur, NO_ACTION
         end
         aid = select_nonroot_action(mcts, tree, cur, bid)
         cnid = tree.children[aid, cur, bid]
         if cnid > 0
             cur = cnid
         else
-            return cur # returns parent
+            # returns parent and action played
+            return cur, aid
         end
     end
     return nothing
@@ -536,18 +540,18 @@ end
 
 function eval!(mcts, tree, simnum, pfrontier)
     B = batch_size(tree)
+    # How the pfrontier's tuples are formed
+    action = last
+    parent = first
 
-    # Compute transition at `pfrontier`
-    non_terminal_mask = [!tree.terminal[cid, bid] for (cid, bid) in zip(pfrontier, 1:B)]
+    # Get terminal nodes at `pfrontier`
+    non_terminal_mask = @. action(pfrontier) != NO_ACTION
     # No new node to expand (a.k.a only terminal node on the frontier)
-    (!any(non_terminal_mask)) && return pfrontier
+    (!any(non_terminal_mask)) && return parent.(pfrontier)
 
-    parent_ids = pfrontier[non_terminal_mask]
+    parent_ids = parent.(pfrontier[non_terminal_mask])
+    action_ids = action.(pfrontier[non_terminal_mask])
     non_terminal_bids = Base.OneTo(B)[non_terminal_mask]
-    action_ids = [
-        select_nonroot_action(mcts, tree, cid, bid) for
-        (cid, bid) in zip(parent_ids, non_terminal_bids)
-    ]
     parent_states = [
         tree.state[pid, bid] for (pid, bid) in zip(parent_ids, non_terminal_bids)
     ]
@@ -566,7 +570,7 @@ function eval!(mcts, tree, simnum, pfrontier)
     tree.value_prior[simnum, non_terminal_mask] = info.value_prior
 
     # Update frontier
-    frontier = pfrontier
+    frontier = parent.(pfrontier)
     frontier[non_terminal_mask] .= simnum
 
     return frontier
