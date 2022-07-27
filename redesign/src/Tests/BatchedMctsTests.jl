@@ -77,17 +77,19 @@ function run_batched_mcts_tests()
                 tree = MCTS.explore(mcts, envs)
                 test_exploration(tree, envs)
             end
-            # @testset "Gumbel explore" begin
-            #     tree = MCTS.gumbel_explore(mcts, tree, MersenneTwister(0))
-            #     test_exploration(tree, envs)
-            #     # All (valid) actions have been visited at least once
-            #     @test all(all(root.children[root.valid_actions] .!= 0) for root in tree[:, 1])
-            #     # Only valid actions are explored
-            #     @test all(
-            #         !any(@. root.valid_actions == false && root.children > 0) for
-            #         root in tree[:, 1]
-            #     )
-            # end
+            @testset "Gumbel explore" begin
+                tree = MCTS.gumbel_explore(mcts, envs, MersenneTwister(0))
+                test_exploration(tree, envs)
+                # All (valid) actions have been visited at least once
+                @test all(
+                    all(root.children[root.valid_actions] .!= 0) for root in tree[:, 1]
+                )
+                # Only valid actions are explored
+                @test all(
+                    !any(@. root.valid_actions == false && root.children > 0) for
+                    root in tree[:, 1]
+                )
+            end
         end
         @testset "Equivalence with SimpleMcts" begin
             sim_policy = SimTest.uniform_mcts_policy_tic_tac_toe(; num_simulations=64)
