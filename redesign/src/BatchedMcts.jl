@@ -149,10 +149,8 @@ A list of environments `envs` must be specified, along with a list of actions `a
 The function returns `nothing` if no problems are detected. Otherwise, helpful error
 messages are raised.
 """
-function check_oracle(oracle::EnvOracle, envs, aids)
+function check_oracle(oracle::EnvOracle, envs)
     B = length(envs)
-
-    @assert B == length(aids) "`envs` and `aids` must be of the same size."
 
     init_res = oracle.init_fn(envs)
     # Named-tuple check
@@ -181,6 +179,9 @@ function check_oracle(oracle::EnvOracle, envs, aids)
         length(init_res.value_prior) == B && eltype(init_res.value_prior) == Float32
     ) "The `init_fn`'s function should return a `value_policy` vector of length " *
         "`batch_id`, and of type `Float32`."
+
+    aids = [findfirst(init_res.valid_actions[:, bid]) for bid in 1:B]
+    envs = [env for (bid, env) in enumerate(envs) if any(init_res.valid_actions[:, bid])]
 
     transition_res = oracle.transition_fn(envs, aids)
     # Named-tuple check
