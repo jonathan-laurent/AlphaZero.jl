@@ -575,7 +575,11 @@ function eval!(mcts, tree, simnum, parent_frontier)
 
     # Create nodes and save `info`
     tree.parent[simnum, non_terminal_mask] = parent_ids
-    tree.children[action_ids, parent_ids, non_terminal_mask] .= simnum
+    for (bid, (aid, cid, is_terminal)) in
+        enumerate(zip(action_ids, parent_ids, non_terminal_mask))
+        (!is_terminal) && continue
+        tree.children[aid, cid, bid] = simnum
+    end
     tree.state[simnum, non_terminal_mask] = info.internal_states
     tree.terminal[simnum, non_terminal_mask] = info.terminal
     tree.valid_actions[:, simnum, non_terminal_mask] = info.valid_actions
@@ -637,7 +641,7 @@ function get_sequence_of_considered_visits(max_num_considered_actions, num_simul
     (max_num_considered_actions <= 1) && return 0:(num_simulations - 1)
 
     num_halving_steps = Int(ceil(log2(max_num_considered_actions)))
-    sequence = []
+    sequence = Int16[]
     visits = zeros(Int16, max_num_considered_actions)
 
     num_considered = max_num_considered_actions
@@ -660,7 +664,7 @@ function get_table_of_considered_visits(mcts)
     ]
 end
 
-function gumbel_select_root(mcts, tree, gumbel, simnum)
+function gumbel_select_root(mcts, tree, gumbel, child_total_visits)
     (; A, B) = size(tree)
 
     table_of_considered_visits = get_table_of_considered_visits(mcts)
@@ -669,7 +673,7 @@ function gumbel_select_root(mcts, tree, gumbel, simnum)
 
     num_visits = [get_num_child_visits(tree, ROOT, bid) for bid in 1:B]
     considered_visits = [
-        table_of_considered_visits[num_considered[bid]][simnum] for bid in 1:B
+        table_of_considered_visits[num_considered[bid]][child_total_visits] for bid in 1:B
     ]
     penality = map(1:B) do bid
         [(num_visits[bid][aid] == considered_visits[bid]) ? 0 : -Inf32 for aid in 1:A]
@@ -687,7 +691,7 @@ end
 
 function gumbel_select_and_eval!(mcts, tree, simnum, gumbel)
     root_selection = DeviceArray(mcts.device)(
-        gumbel_select_root(mcts, tree, gumbel, simnum)
+        gumbel_select_root(mcts, tree, gumbel, simnum - ROOT)
     )
     @assert all(root_selection .!= 0)
     parent_frontier = map(enumerate(root_selection)) do (bid, aid)

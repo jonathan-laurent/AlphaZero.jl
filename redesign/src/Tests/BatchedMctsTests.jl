@@ -81,14 +81,9 @@ function run_batched_mcts_tests()
                 tree = MCTS.gumbel_explore(mcts, envs, MersenneTwister(0))
                 test_exploration(tree, envs)
                 # All (valid) actions have been visited at least once
-                @test all(
-                    all(root.children[root.valid_actions] .!= 0) for root in tree[:, 1]
-                )
+                @test all(@. tree.valid_actions[:, 1, :] || tree.children[:, 1, :] == 0)
                 # Only valid actions are explored
-                @test all(
-                    !any(@. root.valid_actions == false && root.children > 0) for
-                    root in tree[:, 1]
-                )
+                @test all(@. !tree.valid_actions[:, 1, :] || tree.children[:, 1, :] != 0)
             end
         end
         @testset "Equivalence with SimpleMcts" begin
