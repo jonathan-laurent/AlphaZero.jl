@@ -174,6 +174,13 @@ function check_oracle(oracle::EnvOracle, envs)
         size_policy_prior[2] == B &&
         eltype(init_res.policy_prior) == Float32
     ) "The `init_fn`'s function should return a `policy_prior` vector with dimensions " *
+    A = size_valid_actions[1]
+    @assert (size_valid_actions == (A, B) && eltype(init_res.valid_actions) == Bool) "The " *
+        "`init_fn`'s function should return a `valid_actions` vector with dimensions " *
+        "`num_actions` and `batch_id`, and of type `Bool`."
+    size_policy_prior = size(init_res.policy_prior)
+    @assert (size_policy_prior == (A, B) && etype(init_res.policy_prior) == Float32) "The " *
+        "`init_fn`'s function should return a `policy_prior` vector with dimensions " *
         "`num_actions` and `batch_id`, and of type `Float32`."
     @assert (
         length(init_res.value_prior) == B && eltype(init_res.value_prior) == Float32
@@ -211,9 +218,7 @@ function check_oracle(oracle::EnvOracle, envs)
         "`batch_id` and of type `Bool`."
     size_valid_actions = size(transition_res.valid_actions)
     @assert (
-        length(size_valid_actions) == 2 &&
-        size_valid_actions[2] == B &&
-        eltype(transition_res.valid_actions) == Bool
+        size_valid_actions == (A, B) && eltype(transition_res.valid_actions) == Bool
     ) "The `transition_fn`'s function should return a `valid_actions` vector with " *
         "dimensions `num_actions` and `batch_id`, and of type `Bool`."
     @assert (
@@ -223,9 +228,7 @@ function check_oracle(oracle::EnvOracle, envs)
         "`batch_id`, and of type `Bool`."
     size_policy_prior = size(transition_res.policy_prior)
     @assert (
-        length(size_policy_prior) == 2 &&
-        size_policy_prior[2] == B &&
-        eltype(transition_res.policy_prior) == Float32
+        size_policy_prior == (A, B) && eltype(transition_res.policy_prior) == Float32
     ) "The `transition_fn`'s function should return a `policy_prior` vector with " *
         "dimensions `num_actions` and `batch_id`, and of type `Float32`."
     @assert (
