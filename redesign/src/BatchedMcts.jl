@@ -167,18 +167,18 @@ function check_oracle(oracle::EnvOracle, envs, aids)
     @assert (
         length(size_valid_actions) == 2 &&
         size_valid_actions[2] == B &&
-        typeof(init_res.valid_actions[1]) == Bool
+        eltype(init_res.valid_actions) == Bool
     ) "The `init_fn`'s function should return a `valid_actions` vector with dimensions " *
         "`num_actions` and `batch_id`, and of type `Bool`."
     size_policy_prior = size(init_res.policy_prior)
     @assert (
         length(size_policy_prior) == 2 &&
         size_policy_prior[2] == B &&
-        typeof(init_res.policy_prior[1]) == Float32
+        eltype(init_res.policy_prior) == Float32
     ) "The `init_fn`'s function should return a `policy_prior` vector with dimensions " *
         "`num_actions` and `batch_id`, and of type `Float32`."
     @assert (
-        length(init_res.value_prior) == B && typeof(init_res.value_prior[1]) == Float32
+        length(init_res.value_prior) == B && eltype(init_res.value_prior) == Float32
     ) "The `init_fn`'s function should return a `value_policy` vector of length " *
         "`batch_id`, and of type `Float32`."
 
@@ -201,35 +201,35 @@ function check_oracle(oracle::EnvOracle, envs, aids)
 
     # Type and dimensions check
     @assert (
-        length(transition_res.rewards) == B && typeof(transition_res.rewards[1]) == Float32
+        length(transition_res.rewards) == B && eltype(transition_res.rewards) == Float32
     ) "The `transition_fn`'s function should return a `rewards` vector of length " *
         "`batch_id` and of type `Float32`."
     @assert (
-        length(transition_res.terminal) == B && typeof(transition_res.terminal[1]) == Bool
+        length(transition_res.terminal) == B && eltype(transition_res.terminal) == Bool
     ) "The `transition_fn`'s function should return a `terminal` vector of length " *
         "`batch_id` and of type `Bool`."
     size_valid_actions = size(transition_res.valid_actions)
     @assert (
         length(size_valid_actions) == 2 &&
         size_valid_actions[2] == B &&
-        typeof(transition_res.valid_actions[1]) == Bool
+        eltype(transition_res.valid_actions) == Bool
     ) "The `transition_fn`'s function should return a `valid_actions` vector with " *
         "dimensions `num_actions` and `batch_id`, and of type `Bool`."
     @assert (
         length(transition_res.player_switched) == B &&
-        typeof(transition_res.player_switched[1]) == Bool
+        eltype(transition_res.player_switched) == Bool
     ) "The `transition_fn`'s function should return a `player_switched` vector of length " *
         "`batch_id`, and of type `Bool`."
     size_policy_prior = size(transition_res.policy_prior)
     @assert (
         length(size_policy_prior) == 2 &&
         size_policy_prior[2] == B &&
-        typeof(transition_res.policy_prior[1]) == Float32
+        eltype(transition_res.policy_prior) == Float32
     ) "The `transition_fn`'s function should return a `policy_prior` vector with " *
         "dimensions `num_actions` and `batch_id`, and of type `Float32`."
     @assert (
         length(transition_res.value_prior) == B &&
-        typeof(transition_res.value_prior[1]) == Float32
+        eltype(transition_res.value_prior) == Float32
     ) "The `transition_fn`'s function should return a `value_policy` vector of length " *
         "`batch_id`, and of type `Float32`."
 
@@ -425,9 +425,7 @@ function create_tree(mcts, envs)
 
     num_visits = zeros(Int16, mcts.device, (N, B))
     num_visits[ROOT, :] .= 1
-    internal_states = DeviceArray(mcts.device){typeof(info.internal_states[1])}(
-        undef, (N, B)
-    )
+    internal_states = DeviceArray(mcts.device){eltype(info.internal_states)}(undef, (N, B))
     internal_states[ROOT, :] = info.internal_states
     valid_actions = zeros(Bool, mcts.device, (A, N, B))
     valid_actions[:, ROOT, :] = info.valid_actions
@@ -548,7 +546,7 @@ function select(mcts, tree, bid; start=ROOT)
             cur = cnid
         else
             # returns parent and action played
-            return cur, aid
+            return cur, Int16(aid)
         end
     end
     return nothing
@@ -600,7 +598,7 @@ function select_and_eval!(mcts, tree, simnum)
     B = batch_size(tree)
     batch_indices = DeviceArray(mcts.device)(1:B)
     parent_frontier = map(batch_indices) do bid
-        select(mcts, tree, bid)
+        select(mcts, tree, bid)::Tuple{Int16, Int16}
     end
 
     return eval!(mcts, tree, simnum, parent_frontier)
