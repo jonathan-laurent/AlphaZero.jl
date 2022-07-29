@@ -162,12 +162,12 @@ function check_oracle(oracle::EnvOracle, envs)
 
     # Type and dimensions check
     size_valid_actions = size(init_res.valid_actions)
-    A = size_valid_actions[1]
+    A, _ = size_valid_actions
     @assert (size_valid_actions == (A, B) && eltype(init_res.valid_actions) == Bool) "The " *
         "`init_fn`'s function should return a `valid_actions` vector with dimensions " *
         "`num_actions` and `batch_id`, and of type `Bool`."
     size_policy_prior = size(init_res.policy_prior)
-    @assert (size_policy_prior == (A, B) && etype(init_res.policy_prior) == Float32) "The " *
+    @assert (size_policy_prior == (A, B) && eltype(init_res.policy_prior) == Float32) "The " *
         "`init_fn`'s function should return a `policy_prior` vector with dimensions " *
         "`num_actions` and `batch_id`, and of type `Float32`."
     @assert (length(init_res.value_prior) == B && eltype(init_res.value_prior) == Float32) "The " *
@@ -204,7 +204,8 @@ function check_oracle(oracle::EnvOracle, envs)
     ) "The `transition_fn`'s function should return a `terminal` vector of length " *
         "`batch_id` and of type `Bool`."
     size_valid_actions = size(transition_res.valid_actions)
-    @assert (size_valid_actions == (A, B) && eltype(transition_res.valid_actions) == Bool) "The `transition_fn`'s function should return a `valid_actions` vector with " *
+    @assert (size_valid_actions == (A, B) && eltype(transition_res.valid_actions) == Bool) "The `" *
+        "transition_fn`'s function should return a `valid_actions` vector with " *
         "dimensions `num_actions` and `batch_id`, and of type `Bool`."
     @assert (
         length(transition_res.player_switched) == B &&
@@ -212,7 +213,8 @@ function check_oracle(oracle::EnvOracle, envs)
     ) "The `transition_fn`'s function should return a `player_switched` vector of length " *
         "`batch_id`, and of type `Bool`."
     size_policy_prior = size(transition_res.policy_prior)
-    @assert (size_policy_prior == (A, B) && eltype(transition_res.policy_prior) == Float32) "The `transition_fn`'s function should return a `policy_prior` vector with " *
+    @assert (size_policy_prior == (A, B) && eltype(transition_res.policy_prior) == Float32) "The " *
+        "`transition_fn`'s function should return a `policy_prior` vector with " *
         "dimensions `num_actions` and `batch_id`, and of type `Float32`."
     @assert (
         length(transition_res.value_prior) == B &&
