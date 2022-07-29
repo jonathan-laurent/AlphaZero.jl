@@ -669,11 +669,9 @@ function gumbel_select_root(mcts, tree, gumbel, child_total_visits)
 
     qs = completed_qvalues(tree, ROOT, 1:B)
     norm_qs = qs .* qcoeff(mcts, tree, ROOT, 1:B)
-    # XXX: MCTX does: norm_qs - max(norm_qs) (?)
     scores = map(1:B) do bid
         gumbel[:, bid] + log.(tree.policy_prior[:, ROOT, bid]) + norm_qs[bid] + penality[bid]
     end
-    # XXX: MCTX does: max with sum (except `penality`) to prevent manipulation of -Inf32 (?)
     return argmax.(scores; init=(NO_ACTION, -Inf32))
 end
 
