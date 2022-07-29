@@ -162,18 +162,6 @@ function check_oracle(oracle::EnvOracle, envs)
 
     # Type and dimensions check
     size_valid_actions = size(init_res.valid_actions)
-    @assert (
-        length(size_valid_actions) == 2 &&
-        size_valid_actions[2] == B &&
-        eltype(init_res.valid_actions) == Bool
-    ) "The `init_fn`'s function should return a `valid_actions` vector with dimensions " *
-        "`num_actions` and `batch_id`, and of type `Bool`."
-    size_policy_prior = size(init_res.policy_prior)
-    @assert (
-        length(size_policy_prior) == 2 &&
-        size_policy_prior[2] == B &&
-        eltype(init_res.policy_prior) == Float32
-    ) "The `init_fn`'s function should return a `policy_prior` vector with dimensions " *
     A = size_valid_actions[1]
     @assert (size_valid_actions == (A, B) && eltype(init_res.valid_actions) == Bool) "The " *
         "`init_fn`'s function should return a `valid_actions` vector with dimensions " *
@@ -182,9 +170,8 @@ function check_oracle(oracle::EnvOracle, envs)
     @assert (size_policy_prior == (A, B) && etype(init_res.policy_prior) == Float32) "The " *
         "`init_fn`'s function should return a `policy_prior` vector with dimensions " *
         "`num_actions` and `batch_id`, and of type `Float32`."
-    @assert (
-        length(init_res.value_prior) == B && eltype(init_res.value_prior) == Float32
-    ) "The `init_fn`'s function should return a `value_policy` vector of length " *
+    @assert (length(init_res.value_prior) == B && eltype(init_res.value_prior) == Float32) "The " *
+        "`init_fn`'s function should return a `value_policy` vector of length " *
         "`batch_id`, and of type `Float32`."
 
     aids = [findfirst(init_res.valid_actions[:, bid]) for bid in 1:B]
@@ -217,9 +204,7 @@ function check_oracle(oracle::EnvOracle, envs)
     ) "The `transition_fn`'s function should return a `terminal` vector of length " *
         "`batch_id` and of type `Bool`."
     size_valid_actions = size(transition_res.valid_actions)
-    @assert (
-        size_valid_actions == (A, B) && eltype(transition_res.valid_actions) == Bool
-    ) "The `transition_fn`'s function should return a `valid_actions` vector with " *
+    @assert (size_valid_actions == (A, B) && eltype(transition_res.valid_actions) == Bool) "The `transition_fn`'s function should return a `valid_actions` vector with " *
         "dimensions `num_actions` and `batch_id`, and of type `Bool`."
     @assert (
         length(transition_res.player_switched) == B &&
@@ -227,9 +212,7 @@ function check_oracle(oracle::EnvOracle, envs)
     ) "The `transition_fn`'s function should return a `player_switched` vector of length " *
         "`batch_id`, and of type `Bool`."
     size_policy_prior = size(transition_res.policy_prior)
-    @assert (
-        size_policy_prior == (A, B) && eltype(transition_res.policy_prior) == Float32
-    ) "The `transition_fn`'s function should return a `policy_prior` vector with " *
+    @assert (size_policy_prior == (A, B) && eltype(transition_res.policy_prior) == Float32) "The `transition_fn`'s function should return a `policy_prior` vector with " *
         "dimensions `num_actions` and `batch_id`, and of type `Float32`."
     @assert (
         length(transition_res.value_prior) == B &&
@@ -603,7 +586,7 @@ function select_and_eval!(mcts, tree, simnum)
     B = batch_size(tree)
     batch_indices = DeviceArray(mcts.device)(1:B)
     parent_frontier = map(batch_indices) do bid
-        select(mcts, tree, bid)::Tuple{Int16, Int16}
+        select(mcts, tree, bid)::Tuple{Int16,Int16}
     end
 
     return eval!(mcts, tree, simnum, parent_frontier)
