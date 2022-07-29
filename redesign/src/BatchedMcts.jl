@@ -468,7 +468,7 @@ value(tree, cid, bid) = tree.total_values[cid, bid] / tree.num_visits[cid, bid]
 qvalue(tree, cid, bid) = value(tree, cid, bid) * (-1)^tree.prev_switched[cid, bid]
 
 function get_visited_children(tree, cid, bid)
-    return [child for child in tree.children[:, cid, bid] if child != Int16(0)]
+    return [child for child in tree.children[:, cid, bid] if child != UNVISITED]
 end
 
 function root_value_estimate(tree, cid, bid) # TODO
@@ -494,7 +494,7 @@ function completed_qvalues(tree, cid, bid)
         end
 
         cnid = tree.children[aid, cid, bid]
-        return cnid > 0 ? qvalue(tree, cnid, bid) : root_value
+        return cnid != UNVISITED ? qvalue(tree, cnid, bid) : root_value
     end
 end
 
@@ -506,7 +506,7 @@ end
 
 function qcoeff(mcts, tree, cid, bid)
     # XXX: init is necessary for GPUCompiler right now...
-    max_child_visit = maximum(get_visited_children(tree, cid, bid); init=Int16(0))
+    max_child_visit = maximum(get_visited_children(tree, cid, bid); init=UNVISITED)
     return mcts.value_scale * (mcts.max_visit_init + max_child_visit)
 end
 
@@ -523,7 +523,7 @@ end
 
 function get_num_child_visits(tree, cid, bid)
     return [
-        (cnid != 0) ? tree.num_visits[cnid, bid] : Int16(0) for
+        (cnid != UNVISITED) ? tree.num_visits[cnid, bid] : UNVISITED for
         cnid in tree.children[:, cid, bid]
     ]
 end
@@ -531,9 +531,9 @@ end
 function select_nonroot_action(mcts, tree, cid, bid)
     policy = target_policy(mcts, tree, cid, bid)
     num_child_visits = get_num_child_visits(tree, cid, bid)
-    total_visits = sum(num_child_visits; init=Int16(0))
+    total_visits = sum(num_child_visits; init=UNVISITED)
     return argmax(
-        policy - Float32.(num_child_visits) / (total_visits + 1); init=(0, -Inf32)
+        policy - Float32.(num_child_visits) / (total_visits + 1); init=(NO_ACTION, -Inf32)
     )
 end
 
@@ -545,8 +545,9 @@ function select(mcts, tree, bid; start=ROOT)
             return cur, NO_ACTION
         end
         aid = select_nonroot_action(mcts, tree, cur, bid)
+        @assert aid != NO_ACTION
         cnid = tree.children[aid, cur, bid]
-        if cnid > 0
+        if cnid != UNVISITED
             cur = cnid
         else
             # returns parent and action played
@@ -619,7 +620,7 @@ function backpropagate!(mcts, tree, frontier)
             (tree.prev_switched[sid, bid]) && (val = -val)
             tree.num_visits[sid, bid] += Int16(1)
             tree.total_values[sid, bid] += val
-            if tree.parent[sid, bid] > 0
+            if tree.parent[sid, bid] != NO_PARENT
                 sid = tree.parent[sid, bid]
             else
                 return nothing
@@ -670,7 +671,7 @@ function gumbel_select_root(mcts, tree, gumbel, child_total_visits)
     (; A, B) = size(tree)
 
     table_of_considered_visits = get_table_of_considered_visits(mcts)
-    num_valid_actions = sum.(eachcol(tree.valid_actions[:, ROOT, :]); init=0)
+    num_valid_actions = sum.(eachcol(tree.valid_actions[:, ROOT, :]); init=NO_ACTION)
     num_considered = min.(mcts.num_considered_actions, num_valid_actions)
 
     num_visits = [get_num_child_visits(tree, ROOT, bid) for bid in 1:B]
@@ -688,17 +689,17 @@ function gumbel_select_root(mcts, tree, gumbel, child_total_visits)
         gumbel[:, bid] + log.(tree.policy_prior[:, ROOT, bid]) + norm_qs[bid] + penality[bid]
     end
     # XXX: MCTX does: max with sum (except `penality`) to prevent manipulation of -Inf32 (?)
-    return argmax.(scores; init=(0, -Inf32))
+    return argmax.(scores; init=(NO_ACTION, -Inf32))
 end
 
 function gumbel_select_and_eval!(mcts, tree, simnum, gumbel)
     root_selection = DeviceArray(mcts.device)(
         gumbel_select_root(mcts, tree, gumbel, simnum - ROOT)
     )
-    @assert all(root_selection .!= 0)
+    @assert all(root_selection .!= NO_ACTION)
     parent_frontier = map(enumerate(root_selection)) do (bid, aid)
         cnid = tree.children[aid, ROOT, bid]
-        (cnid > 0) ? select(mcts, tree, bid; start=cnid) : (ROOT, aid)
+        (cnid != UNVISITED) ? select(mcts, tree, bid; start=cnid) : (ROOT, aid)
     end
 
     return eval!(mcts, tree, simnum, parent_frontier)
