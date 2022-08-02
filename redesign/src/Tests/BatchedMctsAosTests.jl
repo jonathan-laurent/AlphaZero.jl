@@ -46,7 +46,6 @@ function run_batched_mcts_tests()
         run_batched_mcts_tests_on(CPU())
         run_batched_gumbel_mcts_tests_on(CPU())
         CUDA.functional() && run_batched_mcts_tests_on(GPU())
-        CUDA.functional() && run_batched_gumbel_mcts_tests_on(GPU())
     end
     @testset "batched mcts oracle" begin
         @testset "uniform_oracle" begin
