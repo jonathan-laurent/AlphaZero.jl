@@ -40,8 +40,7 @@ function run_batched_mcts_tests()
         end
         @testset "UniformTicTacToeEnvOracle" begin
             envs = tic_tac_toe_winning_envs()
-            aids = [2 for env in envs]
-            check_oracle(UniformTicTacToeEnvOracle(), envs, aids)
+            check_oracle(UniformTicTacToeEnvOracle(), envs)
             @test true
         end
         @testset "Policy" begin

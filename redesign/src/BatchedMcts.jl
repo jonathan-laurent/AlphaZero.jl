@@ -61,6 +61,7 @@ using Distributions: Gumbel
 using Random: AbstractRNG
 import Base.Iterators.map as imap
 using StaticArrays
+using CUDA: @allowscalar
 
 using ..BatchedEnvs
 using ..Util.Devices
@@ -151,10 +152,8 @@ A list of environments `envs` must be specified, along with a list of actions `a
 The function returns `nothing` if no problems are detected. Otherwise, helpful error
 messages are raised.
 """
-function check_oracle(oracle::EnvOracle, envs, aids)
+function check_oracle(oracle::EnvOracle, envs)
     B = length(envs)
-
-    @assert B == length(aids) "`envs` and `aids` must be of the same size."
 
     init_res = oracle.init_fn(envs)
     # Named-tuple check
@@ -166,23 +165,20 @@ function check_oracle(oracle::EnvOracle, envs, aids)
 
     # Type and dimensions check
     size_valid_actions = size(init_res.valid_actions)
-    @assert (
-        length(size_valid_actions) == 2 &&
-        size_valid_actions[2] == B &&
-        eltype(init_res.valid_actions) == Bool
-    ) "The `init_fn`'s function should return a `valid_actions` vector with dimensions " *
+    A, _ = size_valid_actions
+    @assert (size_valid_actions == (A, B) && eltype(init_res.valid_actions) == Bool) "The " *
+        "`init_fn`'s function should return a `valid_actions` vector with dimensions " *
         "`num_actions` and `batch_id`, and of type `Bool`."
     size_policy_prior = size(init_res.policy_prior)
-    @assert (
-        length(size_policy_prior) == 2 &&
-        size_policy_prior[2] == B &&
-        eltype(init_res.policy_prior) == Float32
-    ) "The `init_fn`'s function should return a `policy_prior` vector with dimensions " *
+    @assert (size_policy_prior == (A, B) && eltype(init_res.policy_prior) == Float32) "The " *
+        "`init_fn`'s function should return a `policy_prior` vector with dimensions " *
         "`num_actions` and `batch_id`, and of type `Float32`."
-    @assert (
-        length(init_res.value_prior) == B && eltype(init_res.value_prior) == Float32
-    ) "The `init_fn`'s function should return a `value_policy` vector of length " *
+    @assert (length(init_res.value_prior) == B && eltype(init_res.value_prior) == Float32) "The " *
+        "`init_fn`'s function should return a `value_policy` vector of length " *
         "`batch_id`, and of type `Float32`."
+
+    aids = [findfirst(init_res.valid_actions[:, bid]) for bid in 1:B]
+    envs = [env for (bid, env) in enumerate(envs) if any(init_res.valid_actions[:, bid])]
 
     transition_res = oracle.transition_fn(envs, aids)
     # Named-tuple check
@@ -211,11 +207,8 @@ function check_oracle(oracle::EnvOracle, envs, aids)
     ) "The `transition_fn`'s function should return a `terminal` vector of length " *
         "`batch_id` and of type `Bool`."
     size_valid_actions = size(transition_res.valid_actions)
-    @assert (
-        length(size_valid_actions) == 2 &&
-        size_valid_actions[2] == B &&
-        eltype(transition_res.valid_actions) == Bool
-    ) "The `transition_fn`'s function should return a `valid_actions` vector with " *
+    @assert (size_valid_actions == (A, B) && eltype(transition_res.valid_actions) == Bool) "The `" *
+        "transition_fn`'s function should return a `valid_actions` vector with " *
         "dimensions `num_actions` and `batch_id`, and of type `Bool`."
     @assert (
         length(transition_res.player_switched) == B &&
@@ -223,11 +216,8 @@ function check_oracle(oracle::EnvOracle, envs, aids)
     ) "The `transition_fn`'s function should return a `player_switched` vector of length " *
         "`batch_id`, and of type `Bool`."
     size_policy_prior = size(transition_res.policy_prior)
-    @assert (
-        length(size_policy_prior) == 2 &&
-        size_policy_prior[2] == B &&
-        eltype(transition_res.policy_prior) == Float32
-    ) "The `transition_fn`'s function should return a `policy_prior` vector with " *
+    @assert (size_policy_prior == (A, B) && eltype(transition_res.policy_prior) == Float32) "The " *
+        "`transition_fn`'s function should return a `policy_prior` vector with " *
         "dimensions `num_actions` and `batch_id`, and of type `Float32`."
     @assert (
         length(transition_res.value_prior) == B &&
@@ -466,12 +456,12 @@ value(tree, cid, bid) = tree.total_values[cid, bid] / tree.num_visits[cid, bid]
 qvalue(tree, cid, bid) = value(tree, cid, bid) * (-1)^tree.prev_switched[cid, bid]
 
 function root_value_estimate(tree, cid, bid, ::Tuple{Val{A}, Any, Any}) where A
-    total_qvalues = 0.0f0
-    total_prior = 0.0f0
-    total_visits = 0
+    total_qvalues = Float32(0)
+    total_prior = Float32(0)
+    total_visits = UNVISITED
     for aid in 1:A
         cnid = tree.children[aid, cid, bid]
-        (cnid == Int16(0)) && continue
+        (cnid == UNVISITED) && continue
 
         total_qvalues += tree.policy_prior[aid, cid, bid] * qvalue(tree, cnid, bid)
         total_prior += tree.policy_prior[aid, cid, bid]
@@ -488,7 +478,7 @@ function completed_qvalues(tree, cid, bid, tree_size::Tuple{Val{A}, Any, Any}) w
         (!tree.valid_actions[aid, cid, bid]) && return -Inf32
 
         cnid = tree.children[aid, cid, bid]
-        return cnid > 0 ? qvalue(tree, cnid, bid) : root_value
+        return cnid != UNVISITED ? qvalue(tree, cnid, bid) : root_value
     end
     return SVector{A}(ret)
 end
@@ -496,14 +486,14 @@ end
 function get_num_child_visits(tree, cid, bid, ::Tuple{Val{A}, Any, Any}) where A
     ret = imap(1:A) do aid
         cnid = tree.children[aid, cid, bid]
-        (cnid != 0) ? tree.num_visits[cnid, bid] : Int16(0)
+        (cnid != UNVISITED) ? tree.num_visits[cnid, bid] : UNVISITED
     end
     return SVector{A}(ret)
 end
 
 function qcoeff(mcts, tree, cid, bid, tree_size)
     # XXX: init is necessary for GPUCompiler right now...
-    max_child_visit = maximum(get_num_child_visits(tree, cid, bid, tree_size); init=Int16(0))
+    max_child_visit = maximum(get_num_child_visits(tree, cid, bid, tree_size); init=UNVISITED)
     return mcts.value_scale * (mcts.max_visit_init + max_child_visit)
 end
 
@@ -516,9 +506,9 @@ end
 function select_nonroot_action(mcts, tree, cid, bid, tree_size)
     policy = target_policy(mcts, tree, cid, bid, tree_size)
     num_child_visits = get_num_child_visits(tree, cid, bid, tree_size)
-    total_visits = sum(num_child_visits; init=Int16(0))
+    total_visits = sum(num_child_visits; init=UNVISITED)
     return Int16(argmax(
-        policy - Float32.(num_child_visits) / (total_visits + 1); init=(0, -Inf32)
+        policy - Float32.(num_child_visits) / (total_visits + 1); init=(NO_ACTION, -Inf32)
     ))
 end
 
@@ -530,8 +520,10 @@ function select(mcts, tree, bid, tree_size; start=ROOT)
             return cur, NO_ACTION
         end
         aid = select_nonroot_action(mcts, tree, cur, bid, tree_size)
+        @assert aid != NO_ACTION
+
         cnid = tree.children[aid, cur, bid]
-        if cnid > 0
+        if cnid != UNVISITED
             cur = cnid
         else
             # returns parent and action played
@@ -548,25 +540,36 @@ function eval!(mcts, tree, simnum, parent_frontier)
     parent = first
 
     # Get terminal nodes at `parent_frontier`
-    non_terminal_mask = @. action(parent_frontier) != NO_ACTION
+    CPU_parent_frontier = copy_to_CPU(parent_frontier, mcts.device)
+    non_terminal_mask = @. action(CPU_parent_frontier) != NO_ACTION
     # No new node to expand (a.k.a only terminal node on the frontier)
     (!any(non_terminal_mask)) && return parent.(parent_frontier)
 
-    parent_ids = parent.(parent_frontier[non_terminal_mask])
-    action_ids = action.(parent_frontier[non_terminal_mask])
+    parent_ids = parent.(CPU_parent_frontier[non_terminal_mask])
+    action_ids = action.(CPU_parent_frontier[non_terminal_mask])
     non_terminal_bids = Base.OneTo(B)[non_terminal_mask]
     parent_states = [
-        tree.state[pid, bid] for (pid, bid) in zip(parent_ids, non_terminal_bids)
+        @allowscalar tree.state[pid, bid] for (pid, bid) in zip(parent_ids, non_terminal_bids)
     ]
     info = mcts.oracle.transition_fn(parent_states, action_ids)
 
     # Create nodes and save `info`
     tree.parent[simnum, non_terminal_mask] = parent_ids
-    for (bid, (aid, cid, is_terminal)) in
-        enumerate(zip(action_ids, parent_ids, non_terminal_mask))
-        (!is_terminal) && continue
-        tree.children[aid, cid, bid] = simnum
+    for i in 1:length(non_terminal_bids)
+        aid = action_ids[i]
+        cid = parent_ids[i]
+        bid = non_terminal_bids[i]
+        @allowscalar tree.children[aid, cid, bid] = simnum
     end
+    # ids = DeviceArray(mcts.device)(1:length(non_terminal_bids))
+    # function set_children(i)
+    #     aid = action_ids[i]
+    #     cid = parent_ids[i]
+    #     bid = non_terminal_bids[i]
+    #     tree.children[aid, cid, bid] = simnum
+    # end
+    # set_children.(ids)
+
     tree.state[simnum, non_terminal_mask] = info.internal_states
     tree.terminal[simnum, non_terminal_mask] = info.terminal
     tree.valid_actions[:, simnum, non_terminal_mask] = info.valid_actions
@@ -606,7 +609,7 @@ function backpropagate!(mcts, tree, frontier)
             (tree.prev_switched[sid, bid]) && (val = -val)
             tree.num_visits[sid, bid] += Int16(1)
             tree.total_values[sid, bid] += val
-            if tree.parent[sid, bid] > 0
+            if tree.parent[sid, bid] != NO_PARENT
                 sid = tree.parent[sid, bid]
             else
                 return nothing
@@ -654,7 +657,7 @@ function get_table_of_considered_visits(mcts, ::Tuple{Val{A}, Any, Any}) where A
 end
 
 function gumbel_select_root(mcts, tree, bid, gumbel, table_of_considered_visits, child_total_visits, tree_size::Tuple{Val{A}, Any, Val{B}}) where {A, B}
-    num_valid_actions = sum(aid -> tree.valid_actions[aid, ROOT, bid], 1:A; init=0)
+    num_valid_actions = sum(aid -> tree.valid_actions[aid, ROOT, bid], 1:A; init=NO_ACTION)
     num_considered = min(mcts.num_considered_actions, num_valid_actions)
 
     num_visits = get_num_child_visits(tree, ROOT, bid, tree_size)
@@ -666,22 +669,20 @@ function gumbel_select_root(mcts, tree, bid, gumbel, table_of_considered_visits,
 
     qs = completed_qvalues(tree, ROOT, bid, tree_size)
     norm_qs = qs .* qcoeff(mcts, tree, ROOT, bid, tree_size)
-    # XXX: MCTX does: norm_qs - max(norm_qs) (?)
     policy = SVector{A}(imap(aid -> tree.policy_prior[aid, ROOT, bid], 1:A))
     batch_gumbel = SVector{A}(imap(aid -> gumbel[aid, bid], 1:A))
     scores = batch_gumbel + log.(policy) + norm_qs + penality
-    # XXX: MCTX does: max with sum (except `penality`) to prevent manipulation of -Inf32 (?)
-    return Int16(argmax(scores; init=(0, -Inf32)))
+    return Int16(argmax(scores; init=(NO_ACTION, -Inf32)))
 end
 
 function gumbel_select_and_eval!(mcts, tree, simnum, gumbel, table_of_considered_visits, tree_size::Tuple{Any, Any, Val{B}}) where B
     batch_indices = DeviceArray(mcts.device)(1:B)
     parent_frontier = map(batch_indices) do bid
         aid = gumbel_select_root(mcts, tree, bid, gumbel, table_of_considered_visits, simnum - ROOT, tree_size)
-        @assert aid != 0
+        @assert aid != NO_ACTION
 
         cnid = tree.children[aid, ROOT, bid]
-        (cnid > 0) ? select(mcts, tree, bid, tree_size; start=cnid) : (ROOT, aid)
+        (cnid != UNVISITED) ? select(mcts, tree, bid, tree_size; start=cnid) : (ROOT, aid)
     end
 
     return eval!(mcts, tree, simnum, parent_frontier)
