@@ -81,8 +81,9 @@ function tree_dims(tree::Tree{N,S}) where {N,S}
 end
 
 function validate_prior(node, prior)
-    for unvalid_id in findall(!, node.valid_actions)
-        @set! prior[unvalid_id] = 0
+    for (action_id, is_valid_action) in enumerate(node.valid_actions)
+        (is_valid_action) && continue
+        @set! prior[action_id] = Float32(0)
     end
     return prior ./ sum(prior; init=0)
 end

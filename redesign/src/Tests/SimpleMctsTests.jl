@@ -35,6 +35,7 @@ function profile_rollout()
     for _ in 1:100
         oracle(env)
     end
+    return nothing
 end
 
 function profile_explore()
@@ -43,6 +44,7 @@ function profile_explore()
     for _ in 1:100
         explore(policy, env)
     end
+    return nothing
 end
 
 function run_mcts_tests()
@@ -99,6 +101,7 @@ function run_mcts_tests()
         @test_opt target_modules = (SimpleMcts,) profile_rollout()
         @test_opt target_modules = (SimpleMcts,) profile_explore()
     end
+    return nothing
 end
 
 end
