@@ -27,6 +27,7 @@ function run_batched_mcts_tests_on(device::Device)
     envs = tic_tac_toe_winning_envs()
     mcts = uniform_mcts_tictactoe(device)
     tree = MCTS.explore(mcts, envs)
+    # tree = MCTS.gumbel_explore(mcts, envs, MersenneTwister(0))
     @test true
     return tree
 end
@@ -46,7 +47,10 @@ function run_batched_mcts_tests()
         @testset "Policy" begin
             function test_exploration(tree, env, bid)
                 root = 1
-                qvalue_list = MCTS.completed_qvalues(tree, root, bid)
+                (; A, N, B) = MCTS.size(tree)
+                tree_size = (Val(A), Val(N), Val(B))
+
+                qvalue_list = MCTS.completed_qvalues(tree, root, bid, tree_size)
                 best = argmax(qvalue_list)
 
                 best_move = 3
@@ -95,8 +99,11 @@ function run_batched_mcts_tests()
             bat_env = tic_tac_toe_winning_envs(; n_envs=1)
             bat_tree = MCTS.explore(bat_policy, bat_env)
 
+            (; A, N, B) = MCTS.size(bat_tree)
+            tree_size = (Val(A), Val(N), Val(B))
+
             sim_qvalues = Sim.completed_qvalues(sim_tree)
-            bat_qvalues_inf = MCTS.completed_qvalues(bat_tree, 1, 1)
+            bat_qvalues_inf = MCTS.completed_qvalues(bat_tree, 1, 1, tree_size)
             bat_qvalues = [q for q in bat_qvalues_inf if q != -Inf32]
 
             @test isapprox(sim_qvalues, bat_qvalues, atol=1e-6)
