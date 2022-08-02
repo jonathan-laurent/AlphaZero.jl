@@ -27,7 +27,7 @@ function run_batched_mcts_tests_on(device::Device)
     envs = tic_tac_toe_winning_envs()
     mcts = uniform_mcts_tictactoe(device)
     tree = MCTS.explore(mcts, envs)
-    # tree = MCTS.gumbel_explore(mcts, envs, MersenneTwister(0))
+    tree = MCTS.gumbel_explore(mcts, envs, MersenneTwister(0))
     @test true
     return tree
 end

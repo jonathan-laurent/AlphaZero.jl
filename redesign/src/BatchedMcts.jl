@@ -674,12 +674,7 @@ function gumbel_select_root(mcts, tree, bid, gumbel, table_of_considered_visits,
     return Int16(argmax(scores; init=(0, -Inf32)))
 end
 
-function gumbel_select_and_eval!(mcts, tree, simnum, gumbel)
-    (; A, N, B) = size(tree)
-    tree_size = (Val(A), Val(N), Val(B))
-
-    table_of_considered_visits = get_table_of_considered_visits(mcts, tree_size)
-
+function gumbel_select_and_eval!(mcts, tree, simnum, gumbel, table_of_considered_visits, tree_size::Tuple{Any, Any, Val{B}}) where B
     batch_indices = DeviceArray(mcts.device)(1:B)
     parent_frontier = map(batch_indices) do bid
         aid = gumbel_select_root(mcts, tree, bid, gumbel, table_of_considered_visits, simnum - ROOT, tree_size)
@@ -695,9 +690,13 @@ end
 function gumbel_explore(mcts, envs, rng::AbstractRNG)
     tree = create_tree(mcts, envs)
     (; A, B, N) = size(tree)
-    gumbel = rand(rng, Gumbel(), (A, B))
+    tree_size = (Val(A), Val(N), Val(B))
+
+    gumbel = SMatrix{A, B}(rand(rng, Gumbel(), (A, B)))
+    table_of_considered_visits = get_table_of_considered_visits(mcts, tree_size)
+
     for simnum in 2:N
-        frontier = gumbel_select_and_eval!(mcts, tree, simnum, gumbel)
+        frontier = gumbel_select_and_eval!(mcts, tree, simnum, gumbel, table_of_considered_visits, tree_size)
         backpropagate!(mcts, tree, frontier)
     end
     return tree
