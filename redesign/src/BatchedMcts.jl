@@ -356,7 +356,8 @@ All these fields are used to store the results of calling the environment oracle
 # Remarks
 
 - The `Tree` structure is parametric in its field array types since those could be
-  instantiated on CPU or GPU.
+  instantiated on CPU or GPU (e.g. Array{Bool, 3} or CuArray{Bool, 1, CUDA.Mem.DeviceBuffer}
+  for `BoolActionArray`). See `create_tree` for more details on how a `Tree` is created.
 - It is yet to be determined whether a batch of MCTS trees is more cache-friendly when
   represented as a structure of arrays (as is the case here) or as an array of structures
   (as in the `BatchedMctsAos` implementation).
@@ -366,9 +367,6 @@ All these fields are used to store the results of calling the environment oracle
   temporal locality since each thread is looking at a different batch. On the other hand, a
   `(B, N)` layout may provide better spatial locality when copying the results of the
   environment oracle and possibly when navigating trees.
-
-# TODO: add a comment on CuArray vs Arrayfor the parameter of Tree
-See `create_tree` for more details on how a `Tree` is created.
 """
 @kwdef struct Tree{
     StateNodeArray,
@@ -404,8 +402,8 @@ function validate_prior(policy_prior, valid_actions)
     end
     prior_sum = mapslices(prior; dims=1) do prior_slice
         sum(prior_slice; init=Float32(0))
-    end::Matrix{Float32}
-    @assert !all(prior_sum .== Float32(0)) "No available actions"
+    end
+    @assert any(prior_sum .!= Float32(0)) "No available actions"
     return @. prior / prior_sum
 end
 
