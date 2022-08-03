@@ -557,7 +557,7 @@ function eval!(mcts, tree, simnum, parent_frontier)
 
     # Create nodes and save `info`
     tree.parent[simnum, non_terminal_mask] = parent_ids
-    for i in 1:length(non_terminal_bids)
+    for i in eachindex(non_terminal_bids)
         aid = action_ids[i]
         cid = parent_ids[i]
         bid = non_terminal_bids[i]
