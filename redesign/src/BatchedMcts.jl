@@ -74,7 +74,7 @@ using .BitwiseTicTacToe
 export EnvOracle, check_oracle, UniformTicTacToeEnvOracle
 export Policy, Tree, explore
 
-# #Environment oracles
+# # Environment oracles
 
 """
     EnvOracle(; init_fn, transition_fn)
@@ -147,7 +147,7 @@ end
 This function performs some sanity checks to see if an environment oracle is correctly
 specified on a given environment instance.
 
-A list of environments `envs` must be specified, along with a list of actions `aids`.
+A list of environments `envs` must be specified.
 
 The function returns `nothing` if no problems are detected. Otherwise, helpful error
 messages are raised.
@@ -177,7 +177,7 @@ function check_oracle(oracle::EnvOracle, envs)
         "`init_fn`'s function should return a `value_policy` vector of length " *
         "`batch_id`, and of type `Float32`."
 
-    aids = [findfirst(init_res.valid_actions[:, bid]) for bid in 1:B]
+    aids = [findfirst(init_res.valid_actions[:, bid]) for bid in 1:B if any(init_res.valid_actions[:, bid])]
     envs = [env for (bid, env) in enumerate(envs) if any(init_res.valid_actions[:, bid])]
 
     transition_res = oracle.transition_fn(envs, aids)
@@ -236,7 +236,7 @@ end
 Define an `EnvOracle` object with a uniform policy for the game of Tic-Tac-Toe.
 
 This oracle environment is a wrapper around the BitwiseTicTacToeEnv.
-Checkout `./Tests/Common/BitwiseTicTacToe.jl`
+Checkout `./Tests/Common/BitwiseTicTacToe.jl`.
 
 It was inspired by the RL.jl library. For more details, checkout their documentation:
 https://juliareinforcementlearning.org/docs/rlenvs/#ReinforcementLearningEnvironments.TicTacToeEnv
