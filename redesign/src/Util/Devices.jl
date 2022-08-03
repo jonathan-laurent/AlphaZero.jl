@@ -3,7 +3,7 @@ module Devices
 using CUDA
 import Base.zeros
 
-export Device, GPU, CPU, DeviceArray, copy_to_CPU
+export Device, GPU, CPU, DeviceArray
 
 abstract type Device end
 struct GPU <: Device end
@@ -11,9 +11,6 @@ struct CPU <: Device end
 
 DeviceArray(::GPU) = CuArray
 DeviceArray(::CPU) = Array
-
-copy_to_CPU(x, ::CPU) = x
-copy_to_CPU(x, ::GPU) = Array(x)
 
 """
 A device agnostic zeros array.

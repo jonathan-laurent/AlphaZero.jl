@@ -540,35 +540,33 @@ function eval!(mcts, tree, simnum, parent_frontier)
     parent = first
 
     # Get terminal nodes at `parent_frontier`
-    CPU_parent_frontier = copy_to_CPU(parent_frontier, mcts.device)
-    non_terminal_mask = @. action(CPU_parent_frontier) != NO_ACTION
+    non_terminal_mask = @. action(parent_frontier) != NO_ACTION
     # No new node to expand (a.k.a only terminal node on the frontier)
     (!any(non_terminal_mask)) && return parent.(parent_frontier)
 
-    parent_ids = parent.(CPU_parent_frontier[non_terminal_mask])
-    action_ids = action.(CPU_parent_frontier[non_terminal_mask])
-    non_terminal_bids = Base.OneTo(B)[non_terminal_mask]
-    parent_states = [
-        @allowscalar tree.state[pid, bid] for (pid, bid) in zip(parent_ids, non_terminal_bids)
-    ]
+    parent_ids = parent.(parent_frontier[non_terminal_mask])
+    action_ids = action.(parent_frontier[non_terminal_mask])
+    non_terminal_bids = DeviceArray(mcts.device)(Base.OneTo(B))[non_terminal_mask]
+
+    ids = DeviceArray(mcts.device)(eachindex(non_terminal_bids))
+    function get_parent_states(i)
+        pid = parent_ids[i]
+        bid = non_terminal_bids[i]
+        tree.state[pid, bid]
+    end
+
+    parent_states = get_parent_states.(ids)
     info = mcts.oracle.transition_fn(parent_states, action_ids)
 
     # Create nodes and save `info`
     tree.parent[simnum, non_terminal_mask] = parent_ids
-    for i in 1:length(non_terminal_bids)
+    function set_children(i)
         aid = action_ids[i]
         cid = parent_ids[i]
         bid = non_terminal_bids[i]
-        @allowscalar tree.children[aid, cid, bid] = simnum
+        tree.children[aid, cid, bid] = simnum
     end
-    # ids = DeviceArray(mcts.device)(1:length(non_terminal_bids))
-    # function set_children(i)
-    #     aid = action_ids[i]
-    #     cid = parent_ids[i]
-    #     bid = non_terminal_bids[i]
-    #     tree.children[aid, cid, bid] = simnum
-    # end
-    # set_children.(ids)
+    set_children.(ids)
 
     tree.state[simnum, non_terminal_mask] = info.internal_states
     tree.terminal[simnum, non_terminal_mask] = info.terminal
