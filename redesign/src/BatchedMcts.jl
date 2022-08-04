@@ -131,6 +131,11 @@ example) along with a vector of action ids. Action ids consist in integers betwe
 - When using MuZero, the `internal_states` field typically has type `AbstractArray{Float32,
   2}` where the first dimension corresponds to the size of latent states and the second
   dimension is the batch dimension.
+
+#TODO: Add a note on the accepted types of `transition_fn` and `init_fn`.
+    `init_fn` accepts the same type as the `envs` passed to `explore`.
+    `transition_fn` accepts `Array` and `CuArray`, depending if you run the MCTS on CPU or GPU respectively.
+        To ease the use of both `Array` and `CuArray`, give a look at `Util.Devices`.
 """
 @kwdef struct EnvOracle{I<:Function,T<:Function}
     init_fn::I
@@ -244,13 +249,19 @@ https://juliareinforcementlearning.org/docs/rlenvs/#ReinforcementLearningEnviron
 function UniformTicTacToeEnvOracle()
     get_policy_prior(A, B) = ones(Float32, (A, B)) / A
     get_value_prior(B) = zeros(Float32, B)
+
     function get_valid_actions(A, B, envs)
+        CPU_envs = copy_to_CPU(envs)
         valid_actions = zeros(Bool, (A, B))
-        for (bid, env) in enumerate(envs)
-            valid_actions[:, bid] = [valid_action(env, i) for i in 1:A]
+        for (bid, env) in enumerate(CPU_envs)
+            valid_actions[:, bid] = map(i -> valid_action(env, i), 1:A)
         end
         return valid_actions
     end
+
+    get_state = info -> first(info)
+    get_reward = info -> last(info).reward
+    get_switched = info -> last(info).switched
 
     function init_fn(envs)
         A = num_actions(envs[1])
@@ -268,18 +279,15 @@ function UniformTicTacToeEnvOracle()
     end
 
     function transition_fn(envs, aids)
-        A = num_actions(envs[1])
+        A = @allowscalar num_actions(envs[1])
         B = length(envs)
+        
+        @assert all(valid_action.(envs, aids)) "Tried to play an illegal move"
 
-        player_switched = zeros(Bool, B)
-        rewards = zeros(Float32, B)
-        internal_states = map(zip(1:B, aids)) do (bid, aid)
-            @assert valid_action(envs[bid], aid) "Tried to play an illegal move"
-            newenv, info = act(envs[bid], aid)
-            rewards[bid] = info.reward
-            player_switched[bid] = info.switched
-            newenv
-        end
+        act_info = act.(envs, aids)
+        player_switched = get_switched.(act_info)
+        rewards = Float32.(get_reward.(act_info))
+        internal_states = get_state.(act_info)
 
         return (;
             internal_states,
