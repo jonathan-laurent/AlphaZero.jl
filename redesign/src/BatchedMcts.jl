@@ -723,8 +723,10 @@ function gumbel_explore(mcts, envs, rng::AbstractRNG)
     (; A, B, N) = size(tree)
     tree_size = (Val(A), Val(N), Val(B))
 
-    gumbel = SMatrix{A,B}(rand(rng, Gumbel(), (A, B)))
-    table_of_considered_visits = get_table_of_considered_visits(mcts, tree_size)
+    gumbel = DeviceArray(mcts.device)(rand(rng, Gumbel(), (A, B)))
+    table_of_considered_visits = DeviceArray(mcts.device)(
+        get_table_of_considered_visits(mcts, tree_size)
+    )
 
     for simnum in 2:N
         frontier = gumbel_select_and_eval!(
