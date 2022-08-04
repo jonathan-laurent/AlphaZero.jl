@@ -131,6 +131,11 @@ example) along with a vector of action ids. Action ids consist in integers betwe
 - When using MuZero, the `internal_states` field typically has type `AbstractArray{Float32,
   2}` where the first dimension corresponds to the size of latent states and the second
   dimension is the batch dimension.
+
+#TODO: Add a note on the accepted types of `transition_fn` and `init_fn`.
+    `init_fn` accepts the same type as the `envs` passed to `explore`.
+    `transition_fn` accepts `Array` and `CuArray`, depending if you run the MCTS on CPU or GPU respectively.
+        To ease the use of both `Array` and `CuArray`, give a look at `Util.Devices`.
 """
 @kwdef struct EnvOracle{I<:Function,T<:Function}
     init_fn::I
@@ -245,6 +250,19 @@ function UniformTicTacToeEnvOracle()
     get_policy_prior(A, B) = ones(Float32, (A, B)) / A
     get_value_prior(B) = zeros(Float32, B)
 
+    function get_valid_actions(A, B, envs)
+        CPU_envs = copy_to_CPU(envs)
+        valid_actions = zeros(Bool, (A, B))
+        for (bid, env) in enumerate(CPU_envs)
+            valid_actions[:, bid] = map(i -> valid_action(env, i), 1:A)
+        end
+        return valid_actions
+    end
+
+    get_state = info -> first(info)
+    get_reward = info -> last(info).reward
+    get_switched = info -> last(info).switched
+
     function init_fn(envs)
         A = num_actions(envs[1])
         B = length(envs)
@@ -252,43 +270,30 @@ function UniformTicTacToeEnvOracle()
         @assert B > 0
         @assert all(e -> num_actions(e) == A, envs)
 
-        valid_actions = zeros(Bool, (A, B))
-        for (bid, env) in enumerate(envs)
-            valid_actions[:, bid] = [valid_action(env, i) for i in 1:A]
-        end
-
         return (;
             internal_states=envs,
-            valid_actions,
+            valid_actions=get_valid_actions(A, B, envs),
             policy_prior=get_policy_prior(A, B),
             value_prior=get_value_prior(B),
         )
     end
 
     function transition_fn(envs, aids)
-        A = num_actions(envs[1])
+        A = @allowscalar num_actions(envs[1])
         B = length(envs)
+        
+        @assert all(valid_action.(envs, aids)) "Tried to play an illegal move"
 
-        player_switched = zeros(Bool, B)
-        rewards = zeros(Float32, B)
-        internal_states = map(zip(1:B, aids)) do (bid, aid)
-            @assert valid_action(envs[bid], aid) "Tried to play an illegal move"
-            newenv, info = act(envs[bid], aid)
-            rewards[bid] = info.reward
-            player_switched[bid] = info.switched
-            newenv
-        end
-
-        valid_actions = zeros(Bool, (A, B))
-        for (bid, env) in enumerate(internal_states)
-            valid_actions[:, bid] = [valid_action(env, i) for i in 1:A]
-        end
+        act_info = act.(envs, aids)
+        player_switched = get_switched.(act_info)
+        rewards = Float32.(get_reward.(act_info))
+        internal_states = get_state.(act_info)
 
         return (;
             internal_states,
             rewards,
             terminal=terminated.(internal_states),
-            valid_actions,
+            valid_actions=get_valid_actions(A, B, internal_states),
             player_switched,
             policy_prior=get_policy_prior(A, B),
             value_prior=get_value_prior(B),
@@ -359,7 +364,8 @@ All these fields are used to store the results of calling the environment oracle
 # Remarks
 
 - The `Tree` structure is parametric in its field array types since those could be
-  instantiated on CPU or GPU.
+  instantiated on CPU or GPU (e.g. Array{Bool, 3} or CuArray{Bool, 1, CUDA.Mem.DeviceBuffer}
+  for `BoolActionArray`). See `create_tree` for more details on how a `Tree` is created.
 - It is yet to be determined whether a batch of MCTS trees is more cache-friendly when
   represented as a structure of arrays (as is the case here) or as an array of structures
   (as in the `BatchedMctsAos` implementation).
@@ -369,8 +375,6 @@ All these fields are used to store the results of calling the environment oracle
   temporal locality since each thread is looking at a different batch. On the other hand, a
   `(B, N)` layout may provide better spatial locality when copying the results of the
   environment oracle and possibly when navigating trees.
-
-# TODO: add a comment on CuArray vs Arrayfor the parameter of Tree
 """
 @kwdef struct Tree{
     StateNodeArray,
@@ -406,8 +410,8 @@ function validate_prior(policy_prior, valid_actions)
     end
     prior_sum = mapslices(prior; dims=1) do prior_slice
         sum(prior_slice; init=Float32(0))
-    end::Matrix{Float32}
-    @assert !all(prior_sum .== Float32(0)) "No available actions"
+    end
+    @assert any(prior_sum .!= Float32(0)) "No available actions"
     return @. prior / prior_sum
 end
 
@@ -455,7 +459,7 @@ value(tree, cid, bid) = tree.total_values[cid, bid] / tree.num_visits[cid, bid]
 
 qvalue(tree, cid, bid) = value(tree, cid, bid) * (-1)^tree.prev_switched[cid, bid]
 
-function root_value_estimate(tree, cid, bid, ::Tuple{Val{A}, Any, Any}) where A
+function root_value_estimate(tree, cid, bid, ::Tuple{Val{A},Any,Any}) where {A}
     total_qvalues = Float32(0)
     total_prior = Float32(0)
     total_visits = UNVISITED
@@ -472,7 +476,7 @@ function root_value_estimate(tree, cid, bid, ::Tuple{Val{A}, Any, Any}) where A
     return (tree.value_prior[cid, bid] + total_visits * children_value) / (1 + total_visits)
 end
 
-function completed_qvalues(tree, cid, bid, tree_size::Tuple{Val{A}, Any, Any}) where A
+function completed_qvalues(tree, cid, bid, tree_size::Tuple{Val{A},Any,Any}) where {A}
     root_value = root_value_estimate(tree, cid, bid, tree_size)
     ret = imap(1:A) do aid
         (!tree.valid_actions[aid, cid, bid]) && return -Inf32
@@ -483,7 +487,7 @@ function completed_qvalues(tree, cid, bid, tree_size::Tuple{Val{A}, Any, Any}) w
     return SVector{A}(ret)
 end
 
-function get_num_child_visits(tree, cid, bid, ::Tuple{Val{A}, Any, Any}) where A
+function get_num_child_visits(tree, cid, bid, ::Tuple{Val{A},Any,Any}) where {A}
     ret = imap(1:A) do aid
         cnid = tree.children[aid, cid, bid]
         (cnid != UNVISITED) ? tree.num_visits[cnid, bid] : UNVISITED
@@ -493,11 +497,13 @@ end
 
 function qcoeff(mcts, tree, cid, bid, tree_size)
     # XXX: init is necessary for GPUCompiler right now...
-    max_child_visit = maximum(get_num_child_visits(tree, cid, bid, tree_size); init=UNVISITED)
+    max_child_visit = maximum(
+        get_num_child_visits(tree, cid, bid, tree_size); init=UNVISITED
+    )
     return mcts.value_scale * (mcts.max_visit_init + max_child_visit)
 end
 
-function target_policy(mcts, tree, cid, bid, tree_size::Tuple{Val{A}, Any, Any}) where A
+function target_policy(mcts, tree, cid, bid, tree_size::Tuple{Val{A},Any,Any}) where {A}
     qs = completed_qvalues(tree, cid, bid, tree_size)
     policy = SVector{A}(imap(aid -> tree.policy_prior[aid, cid, bid], 1:A))
     return softmax(log.(policy) + qcoeff(mcts, tree, cid, bid, tree_size) * qs)
@@ -507,9 +513,12 @@ function select_nonroot_action(mcts, tree, cid, bid, tree_size)
     policy = target_policy(mcts, tree, cid, bid, tree_size)
     num_child_visits = get_num_child_visits(tree, cid, bid, tree_size)
     total_visits = sum(num_child_visits; init=UNVISITED)
-    return Int16(argmax(
-        policy - Float32.(num_child_visits) / (total_visits + 1); init=(NO_ACTION, -Inf32)
-    ))
+    return Int16(
+        argmax(
+            policy - Float32.(num_child_visits) / (total_visits + 1);
+            init=(NO_ACTION, -Inf32),
+        ),
+    )
 end
 
 function select(mcts, tree, bid, tree_size; start=ROOT)
@@ -540,35 +549,33 @@ function eval!(mcts, tree, simnum, parent_frontier)
     parent = first
 
     # Get terminal nodes at `parent_frontier`
-    CPU_parent_frontier = copy_to_CPU(parent_frontier, mcts.device)
-    non_terminal_mask = @. action(CPU_parent_frontier) != NO_ACTION
+    non_terminal_mask = @. action(parent_frontier) != NO_ACTION
     # No new node to expand (a.k.a only terminal node on the frontier)
     (!any(non_terminal_mask)) && return parent.(parent_frontier)
 
-    parent_ids = parent.(CPU_parent_frontier[non_terminal_mask])
-    action_ids = action.(CPU_parent_frontier[non_terminal_mask])
-    non_terminal_bids = Base.OneTo(B)[non_terminal_mask]
-    parent_states = [
-        @allowscalar tree.state[pid, bid] for (pid, bid) in zip(parent_ids, non_terminal_bids)
-    ]
+    parent_ids = parent.(parent_frontier[non_terminal_mask])
+    action_ids = action.(parent_frontier[non_terminal_mask])
+    non_terminal_bids = DeviceArray(mcts.device)(Base.OneTo(B))[non_terminal_mask]
+
+    ids = DeviceArray(mcts.device)(eachindex(non_terminal_bids))
+    function get_parent_states(i)
+        pid = parent_ids[i]
+        bid = non_terminal_bids[i]
+        tree.state[pid, bid]
+    end
+
+    parent_states = get_parent_states.(ids)
     info = mcts.oracle.transition_fn(parent_states, action_ids)
 
     # Create nodes and save `info`
     tree.parent[simnum, non_terminal_mask] = parent_ids
-    for i in 1:length(non_terminal_bids)
+    function set_children(i)
         aid = action_ids[i]
         cid = parent_ids[i]
         bid = non_terminal_bids[i]
-        @allowscalar tree.children[aid, cid, bid] = simnum
+        tree.children[aid, cid, bid] = simnum
     end
-    # ids = DeviceArray(mcts.device)(1:length(non_terminal_bids))
-    # function set_children(i)
-    #     aid = action_ids[i]
-    #     cid = parent_ids[i]
-    #     bid = non_terminal_bids[i]
-    #     tree.children[aid, cid, bid] = simnum
-    # end
-    # set_children.(ids)
+    set_children.(ids)
 
     tree.state[simnum, non_terminal_mask] = info.internal_states
     tree.terminal[simnum, non_terminal_mask] = info.terminal
@@ -630,7 +637,8 @@ function explore(mcts, envs)
 end
 
 function get_sequence_of_considered_visits(max_num_considered_actions, num_simulations)
-    (max_num_considered_actions <= 1) && return SVector{num_simulations, Int16}(0:(num_simulations - 1))
+    (max_num_considered_actions <= 1) &&
+        return SVector{num_simulations,Int16}(0:(num_simulations - 1))
 
     num_halving_steps = Int(ceil(log2(max_num_considered_actions)))
     sequence = Int16[]
@@ -649,14 +657,22 @@ function get_sequence_of_considered_visits(max_num_considered_actions, num_simul
     return SVector{num_simulations}(sequence[1:num_simulations])
 end
 
-function get_table_of_considered_visits(mcts, ::Tuple{Val{A}, Any, Any}) where A
+function get_table_of_considered_visits(mcts, ::Tuple{Val{A},Any,Any}) where {A}
     ret = imap(1:A) do num_considered_actions
-        get_sequence_of_considered_visits(num_considered_actions, mcts.num_simulations) 
+        get_sequence_of_considered_visits(num_considered_actions, mcts.num_simulations)
     end
     return SVector{A}(ret)
 end
 
-function gumbel_select_root(mcts, tree, bid, gumbel, table_of_considered_visits, child_total_visits, tree_size::Tuple{Val{A}, Any, Val{B}}) where {A, B}
+function gumbel_select_root(
+    mcts,
+    tree,
+    bid,
+    gumbel,
+    table_of_considered_visits,
+    child_total_visits,
+    tree_size::Tuple{Val{A},Any,Val{B}},
+) where {A,B}
     num_valid_actions = sum(aid -> tree.valid_actions[aid, ROOT, bid], 1:A; init=NO_ACTION)
     num_considered = min(mcts.num_considered_actions, num_valid_actions)
 
@@ -675,14 +691,28 @@ function gumbel_select_root(mcts, tree, bid, gumbel, table_of_considered_visits,
     return Int16(argmax(scores; init=(NO_ACTION, -Inf32)))
 end
 
-function gumbel_select_and_eval!(mcts, tree, simnum, gumbel, table_of_considered_visits, tree_size::Tuple{Any, Any, Val{B}}) where B
+function gumbel_select_and_eval!(
+    mcts, tree, simnum, gumbel, table_of_considered_visits, tree_size::Tuple{Any,Any,Val{B}}
+) where {B}
     batch_indices = DeviceArray(mcts.device)(1:B)
     parent_frontier = map(batch_indices) do bid
-        aid = gumbel_select_root(mcts, tree, bid, gumbel, table_of_considered_visits, simnum - ROOT, tree_size)
+        aid = gumbel_select_root(
+            mcts,
+            tree,
+            bid,
+            gumbel,
+            table_of_considered_visits,
+            simnum - ROOT,
+            tree_size,
+        )
         @assert aid != NO_ACTION
 
         cnid = tree.children[aid, ROOT, bid]
-        (cnid != UNVISITED) ? select(mcts, tree, bid, tree_size; start=cnid) : (ROOT, aid)
+        if (cnid != UNVISITED)
+            select(mcts, tree, bid, tree_size; start=cnid)
+        else
+            (ROOT, aid)
+        end
     end
 
     return eval!(mcts, tree, simnum, parent_frontier)
@@ -693,11 +723,13 @@ function gumbel_explore(mcts, envs, rng::AbstractRNG)
     (; A, B, N) = size(tree)
     tree_size = (Val(A), Val(N), Val(B))
 
-    gumbel = SMatrix{A, B}(rand(rng, Gumbel(), (A, B)))
+    gumbel = SMatrix{A,B}(rand(rng, Gumbel(), (A, B)))
     table_of_considered_visits = get_table_of_considered_visits(mcts, tree_size)
 
     for simnum in 2:N
-        frontier = gumbel_select_and_eval!(mcts, tree, simnum, gumbel, table_of_considered_visits, tree_size)
+        frontier = gumbel_select_and_eval!(
+            mcts, tree, simnum, gumbel, table_of_considered_visits, tree_size
+        )
         backpropagate!(mcts, tree, frontier)
     end
     return tree

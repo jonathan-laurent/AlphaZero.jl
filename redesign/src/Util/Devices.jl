@@ -12,8 +12,8 @@ struct CPU <: Device end
 DeviceArray(::GPU) = CuArray
 DeviceArray(::CPU) = Array
 
-copy_to_CPU(x, ::CPU) = x
-copy_to_CPU(x, ::GPU) = Array(x)
+copy_to_CPU(arr) = arr
+copy_to_CPU(arr::CuArray) = Array(arr)
 
 """
 A device agnostic zeros array.
