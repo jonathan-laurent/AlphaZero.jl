@@ -62,6 +62,7 @@ using Random: AbstractRNG
 import Base.Iterators.map as imap
 using StaticArrays
 using CUDA: @allowscalar
+using EllipsisNotation
 
 using ..BatchedEnvs
 using ..Util.Devices
@@ -182,7 +183,10 @@ function check_oracle(oracle::EnvOracle, envs)
         "`init_fn`'s function should return a `value_policy` vector of length " *
         "`batch_id`, and of type `Float32`."
 
-    aids = [findfirst(init_res.valid_actions[:, bid]) for bid in 1:B if any(init_res.valid_actions[:, bid])]
+    aids = [
+        findfirst(init_res.valid_actions[:, bid]) for
+        bid in 1:B if any(init_res.valid_actions[:, bid])
+    ]
     envs = [env for (bid, env) in enumerate(envs) if any(init_res.valid_actions[:, bid])]
 
     transition_res = oracle.transition_fn(envs, aids)
@@ -281,7 +285,7 @@ function UniformTicTacToeEnvOracle()
     function transition_fn(envs, aids)
         A = @allowscalar num_actions(envs[1])
         B = length(envs)
-        
+
         @assert all(valid_action.(envs, aids)) "Tried to play an illegal move"
 
         act_info = act.(envs, aids)
@@ -415,14 +419,21 @@ function validate_prior(policy_prior, valid_actions)
     return @. prior / prior_sum
 end
 
+dims(arr::AbstractArray) = size(arr)
+dims(_) = ()
+
 function create_tree(mcts, envs)
+    @assert length(envs) != 0 "There should be at least environment"
+
     info = mcts.oracle.init_fn(envs)
     A, N, B = size(info.policy_prior)[1], mcts.num_simulations, length(envs)
 
     num_visits = zeros(Int16, mcts.device, (N, B))
     num_visits[ROOT, :] .= 1
-    internal_states = DeviceArray(mcts.device){eltype(info.internal_states)}(undef, (N, B))
-    internal_states[ROOT, :] = info.internal_states
+    internal_states = DeviceArray(mcts.device){eltype(info.internal_states)}(
+        undef, (dims(info.internal_states[1])..., N, B)
+    )
+    internal_states[.., ROOT, :] = info.internal_states
     valid_actions = zeros(Bool, mcts.device, (A, N, B))
     valid_actions[:, ROOT, :] = info.valid_actions
     policy_prior = zeros(Float32, mcts.device, (A, N, B))
@@ -561,7 +572,7 @@ function eval!(mcts, tree, simnum, parent_frontier)
     function get_parent_states(i)
         pid = parent_ids[i]
         bid = non_terminal_bids[i]
-        tree.state[pid, bid]
+        return tree.state[.., pid, bid]
     end
 
     parent_states = get_parent_states.(ids)
@@ -573,11 +584,11 @@ function eval!(mcts, tree, simnum, parent_frontier)
         aid = action_ids[i]
         cid = parent_ids[i]
         bid = non_terminal_bids[i]
-        tree.children[aid, cid, bid] = simnum
+        return tree.children[aid, cid, bid] = simnum
     end
     set_children.(ids)
 
-    tree.state[simnum, non_terminal_mask] = info.internal_states
+    tree.state[.., simnum, non_terminal_mask] = info.internal_states
     tree.terminal[simnum, non_terminal_mask] = info.terminal
     tree.valid_actions[:, simnum, non_terminal_mask] = info.valid_actions
     tree.prev_action[simnum, non_terminal_mask] = action_ids
