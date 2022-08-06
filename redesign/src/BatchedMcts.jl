@@ -35,6 +35,84 @@ simulator is available).
 
 
 # Usage
+The examples bellow assume that you run the following code before:
+```jldoctest
+julia> using RLZero
+julia> using .Tests
+```
+
+First we need to create a list of environments from which we would like to find the optimal
+action. Let's choose the Tic-Tac-Toe game for our experiment.
+```jldoctest
+julia> envs = [bitwise_tictactoe_draw(), bitwise_tictactoe_winning()]
+```
+
+Here, it's worth noting that we used bitwise versions of our position-specific environments
+in `./Tests/Common/BitwiseTicTacToe.jl`. Those environments are here to ease the
+experimentations and the tests of the package. Bitwise versions are sometimes necessary to
+complies with GPU constraints. But in this case, the only motivation to choose them was the
+compatibility it offers with `UniformTicTacToeEnvOracle`.
+
+In fact, any environments can be used in `BatchedMcts` if we provide the appropriate
+environment oracle. See `EnvOracle` for more details on this.
+    
+We should then provide a `Policy` to the Mcts. There are most noticeably two arguments to
+provide: `device` and `oracle`. The `device` specifies where the algorithm should run. Do
+you want it to run on the `CPU` or on the `GPU` ? It's straightforward. The `oracle`
+arguments is an `EnvOracle`. You can use the default provided one,
+`UniformTicTacToeEnvOracle` or create your own one for other games. For the latter, do not
+hesitate to check `EnvOracle` and `check_oracle`.
+
+The `Policy` also accepts other arguments. Refers to the corresponding section to know more.
+```jldoctest
+julia> policy = BatchedMcts.Policy(;
+    device=GPU(),
+    oracle=BatchedMcts.UniformTicTacToeEnvOracle()
+)
+```
+
+After those 2 simple steps we can now call the `explore` function to find out the optimal
+action to choose. In the context of AlphaZero/ MuZero, 2 possibilities are offered to you:
+`explore` and `gumbel_explore`. Each of them is adapted to a specific context.
+- `gumbel_explore` is more suited for the training context of AlphaZero/ MuZero as it
+encourages to explore sligthly sub-optimal actions.
+- `explore`, on the other hand, is more suited for the inference context of AlphaZero/
+MuZero.
+
+Therefore, if you are only interested in the optimal action, always use the `explore`
+function.
+```jldoctest
+julia> tree = BatchedMcts.explore(policy, envs)
+```
+
+If you are interested in the exploration undergone, you can check the `Tree` structure.
+Otherwise, a simple call to `completed_qvalues` will give you a comprehensive score of how
+good each action is. The higher the better of course. We can then use the `argmax` utility
+to pickup the best action.
+```jldoctest
+julia> function get_completed_qvalues(tree)
+           ROOT = 1
+           (; A, N, B) = BatchedMcts.size(tree)
+           tree_size = (Val(A), Val(N), Val(B))
+
+           return [
+               BatchedMcts.completed_qvalues(tree, ROOT, bid, tree_size)
+               for bid in 1:B
+           ]
+       end
+julia> qs = get_completed_qvalues(tree)
+julia> argmax.(qs) # The optimal action for each environment
+```
+
+This implementation of batched Mcts tries to provide flexible interfaces to run code on any
+devices. You can easily run the tree search on `CPU` or `GPU` with the `device` argument
+of `Policy`. If you want the state evaluation or the environment simulation to run on GPU,
+you will need to handle it in the `EnvOracle` definition.
+
+By default, `UniformTicTacToeEnvOracle`'s `transition_fn` runs on both `CPU` and `GPU`
+depending on the array type of `envs` (a.k.a GPU's `CuArray` vs classic CPU's `Array`). To
+write your own custom state evaluation or environment simulation, check `EnvOracle` and its
+example `UniformTicTacToeEnvOracle`.
 
 TODO: This section should show examples of using the module (using jltest?). Ideally, it
 should demonstrate different settings such as:
@@ -137,6 +215,7 @@ example) along with a vector of action ids. Action ids consist in integers betwe
     `init_fn` accepts the same type as the `envs` passed to `explore`.
     `transition_fn` accepts `Array` and `CuArray`, depending if you run the MCTS on CPU or GPU respectively.
         To ease the use of both `Array` and `CuArray`, give a look at `Util.Devices`.
+    The elements of `internal_states` should be `isbitstype` if we want it to run on GPU
 """
 @kwdef struct EnvOracle{I<:Function,T<:Function}
     init_fn::I
@@ -153,10 +232,11 @@ end
 This function performs some sanity checks to see if an environment oracle is correctly
 specified on a given environment instance.
 
-A list of environments `envs` must be specified.
+A list of environments `envs` must be specified, along with the `EnvOracle` to check.
 
 The function returns `nothing` if no problems are detected. Otherwise, helpful error
-messages are raised.
+messages are raised. More precisely, `check_oracle` verifies the keys of the returned
+named-tuples and the types and dimensions of their list.
 """
 function check_oracle(oracle::EnvOracle, envs)
     B = length(envs)
