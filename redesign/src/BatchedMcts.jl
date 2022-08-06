@@ -648,26 +648,15 @@ function eval!(mcts, tree, simnum, parent_frontier)
     action_ids = action.(parent_frontier[non_terminal_mask])
     non_terminal_bids = DeviceArray(mcts.device)(Base.OneTo(B))[non_terminal_mask]
 
-    ids = DeviceArray(mcts.device)(eachindex(non_terminal_bids))
-    function get_parent_states(i)
-        pid = parent_ids[i]
-        bid = non_terminal_bids[i]
-        return tree.state[.., pid, bid]
-    end
-
-    parent_states = get_parent_states.(ids)
+    parent_cartesian_ids = CartesianIndex.(parent_ids, non_terminal_bids)
+    parent_states = tree.state[.., parent_cartesian_ids]
     info = mcts.oracle.transition_fn(parent_states, action_ids)
 
     # Create nodes and save `info`
-    tree.parent[simnum, non_terminal_mask] = parent_ids
-    function set_children(i)
-        aid = action_ids[i]
-        cid = parent_ids[i]
-        bid = non_terminal_bids[i]
-        return tree.children[aid, cid, bid] = simnum
-    end
-    set_children.(ids)
+    children_cartesian_ids = CartesianIndex.(action_ids, parent_ids, non_terminal_bids)
 
+    tree.parent[simnum, non_terminal_mask] = parent_ids
+    tree.children[children_cartesian_ids] .= simnum
     tree.state[.., simnum, non_terminal_mask] = info.internal_states
     tree.terminal[simnum, non_terminal_mask] = info.terminal
     tree.valid_actions[:, simnum, non_terminal_mask] = info.valid_actions
