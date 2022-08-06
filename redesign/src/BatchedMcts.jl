@@ -111,8 +111,8 @@ you will need to handle it in the `EnvOracle` definition.
 
 By default, `UniformTicTacToeEnvOracle`'s `transition_fn` runs on both `CPU` and `GPU`
 depending on the array type of `envs` (a.k.a GPU's `CuArray` vs classic CPU's `Array`). To
-write your own custom state evaluation or environment simulation on the appropriate device, check `EnvOracle` and its
-example `UniformTicTacToeEnvOracle`.
+write your own custom state evaluation or environment simulation on the appropriate device,
+check `EnvOracle` and its example `UniformTicTacToeEnvOracle`.
 
 TODO: This section should show examples of using the module (using jltest?). Ideally, it
 should demonstrate different settings such as:
