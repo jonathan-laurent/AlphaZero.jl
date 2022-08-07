@@ -170,7 +170,8 @@ the same type than those passed to the `explore` and `gumbel_explore` functions.
 
 - `internal_states`: internal representations of the environment states as used by MCTS and
     manipulated by `transition_fn`. `internal_states` must be a single or multi-dimensional
-    array whose last dimension is a batch dimension (see examples below).
+    array whose last dimension is a batch dimension (see examples below). `internal_states`
+    must be `isbits` if it is desired to run `BatchedMcts` on `GPU`.
 - `valid_actions`: a vector of booleans with dimensions `num_actions` and `batch_id`
   indicating which actions are valid to take (this is disregarded in MuZero).
 - `policy_prior`: the policy prior for each states as an `AbstractArray{Float32,2}` with
@@ -179,10 +180,21 @@ the same type than those passed to the `explore` and `gumbel_explore` functions.
 
 # The `transition_fn` function
 
-`transition_fn` takes as arguments a vector of internal states (as returned by `init_fn` for
-example) along with a vector of action ids. Action ids consist in integers between 1 and
-`num_actions` and are valid indices for `policy_priors` and `value_priors`. The
-`transition_fn` function returns a named-tuple of arrays:
+`transition_fn` takes as arguments a vector of internal states (as returned by `init_fn`)
+along with a vector of action ids. Action ids consist in integers between 1 and
+`num_actions` and are valid indices for `policy_priors` and `value_priors`. 
+    
+Note that `init_fn` will always receive the same array than the one passed to `explore` or
+`gumbel_explore` as `envs` (which should be a CPU `Array`). But it's a bit more tricky for
+`transition_fn`. It may receive both CPU `Array` or GPU `CuArray` depending on the device
+specified in `Policy`. To handle both more easily give a look at `Util.Devices` and how it 
+is used in `UniformTicTacToeEnvOracle`.
+
+In the context of a `Policy` on the GPU, `transition_fn` can both return a CPU `Array` or a
+GPU `CuArray`. The `CuArray` is more adapted as it will prevent a memory transfers, but both
+works.
+
+The `transition_fn` function returns a named-tuple of arrays:
 
 - `internal_states`: new states reached after executing the proposed actions (see
     `init_fn`).
@@ -190,11 +202,9 @@ example) along with a vector of action ids. Action ids consist in integers betwe
     transitions.
 - `terminal`: vector of booleans indicating whether or not the reached states are terminal
     (this is always `false` in MuZero).
-- `valid_actions`: a vector of booleans with dimensions `num_actions` and `batch_id`
-  indicating which actions are valid to take (this is disregarded in MuZero).
 - `player_switched`: vector of booleans indicating whether or not the current player
     switched during the transition (always `true` in many board games).
-- `policy_prior`, `value_prior`: same as for `init_fn`.
+- `valid_actions`, `policy_prior`, `value_prior`: same as for `init_fn`.
 
 
 # Examples of internal state encodings
@@ -210,12 +220,6 @@ example) along with a vector of action ids. Action ids consist in integers betwe
 - When using MuZero, the `internal_states` field typically has type `AbstractArray{Float32,
   2}` where the first dimension corresponds to the size of latent states and the second
   dimension is the batch dimension.
-
-#TODO: Add a note on the accepted types of `transition_fn` and `init_fn`.
-    `init_fn` accepts the same type as the `envs` passed to `explore`.
-    `transition_fn` accepts `Array` and `CuArray`, depending if you run the MCTS on CPU or GPU respectively.
-        To ease the use of both `Array` and `CuArray`, give a look at `Util.Devices`.
-    The elements of `internal_states` should be `isbitstype` if we want it to run on GPU
 """
 @kwdef struct EnvOracle{I<:Function,T<:Function}
     init_fn::I
