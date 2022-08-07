@@ -220,12 +220,21 @@ The `transition_fn` function returns a named-tuple of arrays:
 - When using MuZero, the `internal_states` field typically has type `AbstractArray{Float32,
   2}` where the first dimension corresponds to the size of latent states and the second
   dimension is the batch dimension.
+
+See also [`check_oracle`](@ref), [`UniformTicTacToeEnvOracle`](@ref)
 """
 @kwdef struct EnvOracle{I<:Function,T<:Function}
     init_fn::I
     transition_fn::T
 end
 
+"""
+    check_keys(keys, ref_keys)
+
+Check that the two lists of symbols, `keys` and `ref_keys`, are identical.
+
+Small utilities used  in `check_oracle` to compare keys of named-tuple.
+"""
 function check_keys(keys, ref_keys)
     return Set(keys) == Set(ref_keys)
 end
@@ -240,7 +249,9 @@ A list of environments `envs` must be specified, along with the `EnvOracle` to c
 
 The function returns `nothing` if no problems are detected. Otherwise, helpful error
 messages are raised. More precisely, `check_oracle` verifies the keys of the returned
-named-tuples and the types and dimensions of their list.
+named-tuples from `init_fn` an `transition_fn` and the types and dimensions of their lists.
+
+See also [`EnvOracle`](@ref)
 """
 function check_oracle(oracle::EnvOracle, envs)
     B = length(envs)
@@ -322,7 +333,7 @@ function check_oracle(oracle::EnvOracle, envs)
 end
 
 # ## Example Environment Oracle
-# ### RandomWalk1D Environment Oracle
+# ### Tic-Tac-Toe Environment Oracle
 """
     UniformTicTacToeEnvOracle()
 
@@ -331,8 +342,12 @@ Define an `EnvOracle` object with a uniform policy for the game of Tic-Tac-Toe.
 This oracle environment is a wrapper around the BitwiseTicTacToeEnv.
 Checkout `./Tests/Common/BitwiseTicTacToe.jl`.
 
+It can be both used on `CPU` & `GPU`.
+
 It was inspired by the RL.jl library. For more details, checkout their documentation:
 https://juliareinforcementlearning.org/docs/rlenvs/#ReinforcementLearningEnvironments.TicTacToeEnv
+
+See also [`EnvOracle`](@ref)
 """
 function UniformTicTacToeEnvOracle()
     get_policy_prior(A, B) = ones(Float32, (A, B)) / A
@@ -346,10 +361,6 @@ function UniformTicTacToeEnvOracle()
         end
         return valid_actions
     end
-
-    get_state = info -> first(info)
-    get_reward = info -> last(info).reward
-    get_switched = info -> last(info).switched
 
     function init_fn(envs)
         A = num_actions(envs[1])
@@ -365,6 +376,13 @@ function UniformTicTacToeEnvOracle()
             value_prior=get_value_prior(B),
         )
     end
+
+    # Utilities to access elements returned by `act` in `transition_fn`.
+    # `act` return a tuple with the following form:
+    #   (state, (; reward, switched))
+    get_state(info) = first(info)
+    get_reward(info) = last(info).reward
+    get_switched(info) = last(info).switched
 
     function transition_fn(envs, aids)
         A = @allowscalar num_actions(envs[1])
