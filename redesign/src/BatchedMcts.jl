@@ -144,7 +144,6 @@ using EllipsisNotation
 
 using ..BatchedEnvs
 using ..Util.Devices
-using ..Util.Devices: ones
 using ..Util.Devices.KernelFuns: sum, argmax, maximum, softmax
 
 include("./Tests/Common/BitwiseTicTacToe.jl")
@@ -452,13 +451,13 @@ end
 
 # # Tree datastructure
 
-## Value stored in tree.parent for nodes with no parents
+## Value stored in `tree.parent` for nodes with no parents.
 const NO_PARENT = Int16(0)
-## Value stored in tree.children for unvisited children
+## Value stored in `tree.children` for unvisited children.
 const UNVISITED = Int16(0)
-## Value used in various tree's attributes to access root information
+## Value used in various tree's attributes to access root information.
 const ROOT = Int16(1)
-## Valud used when no action is selected
+## Valud used when no action is selected.
 const NO_ACTION = Int16(0)
 
 """
@@ -471,31 +470,32 @@ maximum number of nodes (i.e. number of simulations) and `A` the number of actio
 
 ## Tree structure and statistics
 
-- `parent`: the id of the parent node or `NO_PARENT` (N, B)
-- `num_visits`: number of times the node was visited (N, B)
-- `total_values`: the sum of all values backpropagated to a node (N, B)
-- `children`: node id of all children or UNVISITED for unvisited actions (A, N, B)
+- `parent`: the id of the parent node or `NO_PARENT` (N, B).
+- `num_visits`: number of times the node was visited (N, B).
+- `total_values`: the sum of all values backpropagated to a node (N, B).
+- `children`: node id of all children or `UNVISITED` for unvisited actions (A, N, B).
 
 ## Cached static information
 
 All these fields are used to store the results of calling the environment oracle.
 
-- `state`: state vector or embedding (..., N, B)
-- `terminal`: whether a node is a terminal node (N, B)
-- `valid_actions`: whether or not each action is valid or not (A, N, B)
-- `prev_action`: the id of the action leading to this node or 0 (N, B)
+- `state`: state vector or embedding as returned by `init_fn` of the `EnvOracle` (..., N, B).
+- `terminal`: whether a node is a terminal node (N, B).
+- `valid_actions`: whether or not each action is valid or not (A, N, B).
+- `prev_action`: the id of the action leading to this node or 0 (N, B).
 - `prev_reward`: the immediate reward obtained when transitioning from the parent from the
-   perspective of the parent's player (N, B)
+   perspective of the parent's player (N, B).
 - `prev_switched`: the immediate reward obtained when transitioning from the parent from the
-   perspective of the parent's player (N, B)
-- `policy_prior`: as given by the oracle (A, N, B)
-- `value_prior`: as given by the oracle (N, B)
+   perspective of the parent's player (N, B).
+- `policy_prior`: as given by the `EnvOracle` (A, N, B).
+- `value_prior`: as given by the `EnvOracle` (N, B).
 
 # Remarks
 
 - The `Tree` structure is parametric in its field array types since those could be
-  instantiated on CPU or GPU (e.g. Array{Bool, 3} or CuArray{Bool, 1, CUDA.Mem.DeviceBuffer}
-  for `BoolActionArray`). See `create_tree` for more details on how a `Tree` is created.
+  instantiated on CPU or GPU (e.g. `Array{Bool, 3}` or 
+  `CuArray{Bool, 1, CUDA.Mem.DeviceBuffer}` for `BoolActionArray`). See `create_tree` for
+  more details on how a `Tree` is created.
 - It is yet to be determined whether a batch of MCTS trees is more cache-friendly when
   represented as a structure of arrays (as is the case here) or as an array of structures
   (as in the `BatchedMctsAos` implementation).
@@ -505,6 +505,11 @@ All these fields are used to store the results of calling the environment oracle
   temporal locality since each thread is looking at a different batch. On the other hand, a
   `(B, N)` layout may provide better spatial locality when copying the results of the
   environment oracle and possibly when navigating trees.
+- To complete the previous point, keep in mind that Julia is column-major (compared to the
+  row-major, more classical paradigm, in most programming langage like Python). This has the
+  noticeable importance that first dimension of a Matrix is continuous. The order of
+  dimensions are then reversed compared to a Python implementation (like MCTX) to keep the
+  same cache locality.
 """
 @kwdef struct Tree{
     StateNodeArray,
@@ -534,6 +539,14 @@ end
 ## https://cuda.juliagpu.org/stable/tutorials/custom_structs/
 @adapt_structure Tree
 
+"""
+    validate_prior(policy_prior, valid_actions)
+    
+Correct `policy_prior` to ignore in`valid_actions`.
+
+More precisely, `policy_prior`  that are in`valid_actions` are set to 0. The rest of the
+`policy_prior` are then l1-normalised.
+"""
 function validate_prior(policy_prior, valid_actions)
     prior = map(zip(policy_prior, valid_actions)) do (prior, is_valid)
         (is_valid) ? prior : Float32(0)
@@ -542,25 +555,42 @@ function validate_prior(policy_prior, valid_actions)
         sum(prior_slice; init=Float32(0))
     end
     @assert any(prior_sum .!= Float32(0)) "No available actions"
-    return @. prior / prior_sum
+    return prior ./ prior_sum
 end
 
+"""
+    dims(arr::AbstractArray)
+    dims(_)
+
+Return the dimensions of an object.
+
+This utility is used inside `create_tree` so that non-array object have no dimension, rather
+than popping an error as `size` do.
+"""
 dims(arr::AbstractArray) = size(arr)
 dims(_) = ()
 
+"""
+    create_tree(mcts, envs)
+    
+Create a `Tree`.
+
+Note that the `ROOT` of the `Tree` are considered explored, as a call to `init_fn` is done
+on them. Moreover, `policy_prior` are corrected as specified in `validate_prior`.
+"""
 function create_tree(mcts, envs)
     @assert length(envs) != 0 "There should be at least environment"
 
     info = mcts.oracle.init_fn(envs)
     A, N, B = size(info.policy_prior)[1], mcts.num_simulations, length(envs)
 
-    num_visits = zeros(Int16, mcts.device, (N, B))
+    num_visits = fill(UNVISITED, mcts.device, (N, B))
     num_visits[ROOT, :] .= 1
     internal_states = DeviceArray(mcts.device){eltype(info.internal_states)}(
         undef, (dims(info.internal_states[1])..., N, B)
     )
     internal_states[.., ROOT, :] = info.internal_states
-    valid_actions = zeros(Bool, mcts.device, (A, N, B))
+    valid_actions = fill(false, mcts.device, (A, N, B))
     valid_actions[:, ROOT, :] = info.valid_actions
     policy_prior = zeros(Float32, mcts.device, (A, N, B))
     policy_prior[:, ROOT, :] = validate_prior(info.policy_prior, info.valid_actions)
@@ -568,16 +598,16 @@ function create_tree(mcts, envs)
     value_prior[ROOT, :] = info.value_prior
 
     return Tree(;
-        parent=zeros(Int16, mcts.device, (N, B)),
+        parent=fill(NO_PARENT, mcts.device, (N, B)),
         num_visits,
         total_values=zeros(Float32, mcts.device, (N, B)),
-        children=zeros(Int16, mcts.device, (A, N, B)),
+        children=fill(UNVISITED, mcts.device, (A, N, B)),
         state=internal_states,
-        terminal=zeros(Bool, mcts.device, (N, B)),
+        terminal=fill(false, mcts.device, (N, B)),
         valid_actions,
         prev_action=zeros(Int16, mcts.device, (N, B)),
         prev_reward=zeros(Float32, mcts.device, (N, B)),
-        prev_switched=zeros(Bool, mcts.device, (N, B)),
+        prev_switched=fill(false, mcts.device, (N, B)),
         policy_prior,
         value_prior,
     )

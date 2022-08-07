@@ -1,9 +1,10 @@
 module Devices
 
 using CUDA
-import Base.zeros
+import Base.zeros, Base.fill
 
 export Device, GPU, CPU, DeviceArray, copy_to_CPU
+export zeros, fill
 
 abstract type Device end
 struct GPU <: Device end
@@ -22,6 +23,9 @@ Base.zeros(T, ::CPU, dims...) = Base.zeros(T, dims...)
 Base.zeros(T, ::GPU, dims...) = CUDA.zeros(T, dims...)
 
 Base.zeros(device::Device, dims...) = zeros(Float64, device, dims)
+
+Base.fill(x, ::CPU, dims...) = Base.fill(x, dims...)
+Base.fill(x, ::GPU, dims...) = CUDA.fill(x, dims...)
 
 """
 A device agnostic parallel loop construct.
