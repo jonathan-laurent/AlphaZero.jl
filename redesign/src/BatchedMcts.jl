@@ -545,7 +545,7 @@ end
 Correct `policy_prior` to ignore in`valid_actions`.
 
 More precisely, `policy_prior`  that are in`valid_actions` are set to 0. The rest of the
-`policy_prior` are then l1-normalised.
+`policy_prior` (which are valid actions) are then l1-normalised.
 """
 function validate_prior(policy_prior, valid_actions)
     prior = map(zip(policy_prior, valid_actions)) do (prior, is_valid)
@@ -577,6 +577,8 @@ Create a `Tree`.
 
 Note that the `ROOT` of the `Tree` are considered explored, as a call to `init_fn` is done
 on them. Moreover, `policy_prior` are corrected as specified in `validate_prior`.
+
+See [`Tree`](@ref) for more details.
 """
 function create_tree(mcts, envs)
     @assert length(envs) != 0 "There should be at least environment"
@@ -613,19 +615,62 @@ function create_tree(mcts, envs)
     )
 end
 
+"""
+    Base.size(tree::Tree)
+
+Return the number of actions (`A`), the number of simulations (`N`) and the number of
+environments in the batch (`B`) of a `tree` as named-tuple `(; A, N, B)`.
+"""
 function Base.size(tree::Tree)
     A, N, B = size(tree.children)
     return (; A, N, B)
 end
 
+"""
+    batch_size(tree)
+
+Return the number of environments in the batch of a `tree`.
+"""
 batch_size(tree) = size(tree).B
 
 # # MCTS implementation
 
+# ## Basic MCTS functions
+
+"""
+    value(tree, cid, bid)
+
+Return the absolute value of game position.
+
+The formula for a given node is:
+    $$ (prior_value + total_rewards) / num_visits $$
+
+With `prior_value` the value as estimated by the oracle, `total_rewards` the sum of rewards
+obtained from episodes including this node during exploration and `num_visits` the number of
+episodes including this node.
+
+See also [`qvalue`](@ref)
+"""
 value(tree, cid, bid) = tree.total_values[cid, bid] / tree.num_visits[cid, bid]
 
+"""
+    qvalue(tree, cid, bid)
+
+Return the value of game position from the perspective of its parent node.
+I.e. a good position for your opponent is bad one for you.
+
+See also [`value`](@ref)
+"""
 qvalue(tree, cid, bid) = value(tree, cid, bid) * (-1)^tree.prev_switched[cid, bid]
 
+"""
+    root_value_estimate(tree, cid, bid, ::Tuple{Val{A},Any,Any}) where {A}
+
+Compute a value estimation of a node at this stage of the exploration.
+
+The estimation is based on its `value_prior`, its number of visits, the `qvalue` of its
+children and their associated `policy_prior`.
+"""
 function root_value_estimate(tree, cid, bid, ::Tuple{Val{A},Any,Any}) where {A}
     total_qvalues = Float32(0)
     total_prior = Float32(0)
@@ -643,6 +688,14 @@ function root_value_estimate(tree, cid, bid, ::Tuple{Val{A},Any,Any}) where {A}
     return (tree.value_prior[cid, bid] + total_visits * children_value) / (1 + total_visits)
 end
 
+"""
+    completed_qvalues(tree, cid, bid, tree_size::Tuple{Val{A},Any,Any}) where {A}
+    
+Return a list of estimated qvalue of all children for a given node.
+
+More precisely, if its child have been visited at least one time, it computes its real
+`qvalue`, otherwise, it uses the `root_value_estimate` of node instead.
+"""
 function completed_qvalues(tree, cid, bid, tree_size::Tuple{Val{A},Any,Any}) where {A}
     root_value = root_value_estimate(tree, cid, bid, tree_size)
     ret = imap(1:A) do aid
@@ -654,6 +707,11 @@ function completed_qvalues(tree, cid, bid, tree_size::Tuple{Val{A},Any,Any}) whe
     return SVector{A}(ret)
 end
 
+"""
+    get_num_child_visits(tree, cid, bid, ::Tuple{Val{A},Any,Any}) where {A}
+
+Return the number of visits of each children from the given node.
+"""
 function get_num_child_visits(tree, cid, bid, ::Tuple{Val{A},Any,Any}) where {A}
     ret = imap(1:A) do aid
         cnid = tree.children[aid, cid, bid]
@@ -662,6 +720,14 @@ function get_num_child_visits(tree, cid, bid, ::Tuple{Val{A},Any,Any}) where {A}
     return SVector{A}(ret)
 end
 
+"""
+    qcoeff(mcts, tree, cid, bid, tree_size)
+
+Compute a gumbel-related ponderation of `qvalue`.
+
+Through time, as the number of visits increase, the influence of `qvalue` builds up
+relatively to `policy_prior`.
+"""
 function qcoeff(mcts, tree, cid, bid, tree_size)
     # XXX: init is necessary for GPUCompiler right now...
     max_child_visit = maximum(
@@ -670,12 +736,26 @@ function qcoeff(mcts, tree, cid, bid, tree_size)
     return mcts.value_scale * (mcts.max_visit_init + max_child_visit)
 end
 
+"""
+    target_policy(mcts, tree, cid, bid, tree_size::Tuple{Val{A},Any,Any}) where {A}
+    
+Return the policy of a node.
+
+I.e. a softmaxed-score of how much each actions should be played. The higher, the better.
+"""
 function target_policy(mcts, tree, cid, bid, tree_size::Tuple{Val{A},Any,Any}) where {A}
     qs = completed_qvalues(tree, cid, bid, tree_size)
     policy = SVector{A}(imap(aid -> tree.policy_prior[aid, cid, bid], 1:A))
     return softmax(log.(policy) + qcoeff(mcts, tree, cid, bid, tree_size) * qs)
 end
 
+"""
+    select_nonroot_action(mcts, tree, cid, bid, tree_size)
+
+Select the most appropriate action to explore.
+
+`NO_ACTION` is returned if no actions are available.
+"""
 function select_nonroot_action(mcts, tree, cid, bid, tree_size)
     policy = target_policy(mcts, tree, cid, bid, tree_size)
     num_child_visits = get_num_child_visits(tree, cid, bid, tree_size)
@@ -688,6 +768,7 @@ function select_nonroot_action(mcts, tree, cid, bid, tree_size)
     )
 end
 
+# ## Core MCTS algorithm
 function select(mcts, tree, bid, tree_size; start=ROOT)
     cur = start
     while true
@@ -739,7 +820,7 @@ function eval!(mcts, tree, simnum, parent_frontier)
     tree.prev_action[simnum, non_terminal_mask] = action_ids
     tree.prev_reward[simnum, non_terminal_mask] = info.rewards
     tree.prev_switched[simnum, non_terminal_mask] = info.player_switched
-    tree.policy_prior[:, simnum, non_terminal_mask] = info.policy_prior
+    tree.policy_prior[:, simnum, non_terminal_mask] = info.policy_prior # TODO: validate_prior
     tree.value_prior[simnum, non_terminal_mask] = info.value_prior
 
     # Update frontier
