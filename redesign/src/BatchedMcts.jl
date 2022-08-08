@@ -643,7 +643,7 @@ batch_size(tree) = size(tree).B
 Return the absolute value of game position.
 
 The formula for a given node is:
-    $$ (prior_value + total_rewards) / num_visits $$
+    (prior_value + total_rewards) / num_visits
 
 With `prior_value` the value as estimated by the oracle, `total_rewards` the sum of rewards
 obtained from episodes including this node during exploration and `num_visits` the number of
