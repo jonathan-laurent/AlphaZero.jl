@@ -512,6 +512,11 @@ All these fields are used to store the results of calling the environment oracle
   noticeable importance that first dimension of a Matrix is continuous. The order of
   dimensions are then reversed compared to a Python implementation (like MCTX) to keep the
   same cache locality.
+- It might seems weird at first to have a doubly linked tree (i.e. with both `children` and
+  `parent` attributes), but is necessary to backpropagate values (`total_visits` and
+  `total_values`).
+
+See more about backpropagation in "Core MCTS algorithm"
 """
 @kwdef struct Tree{
     StateNodeArray,
