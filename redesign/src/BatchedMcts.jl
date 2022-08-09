@@ -1,9 +1,10 @@
 """
-    BatchedMcts
+BatchedMcts
 
 A batched implementation of MCTS that can run on CPU or GPU.
 
-Checkout the part "Core MCTS algorithm" if you want to know more about the MCTS algorithm.
+
+Check out the part "Core MCTS algorithm" if you want to know more about the MCTS algorithm.
 
 Because this implementation is batched, it is optimized for running MCTS on a large number
 of environment instances in parallel. In particular, this implementation is not suitable for
@@ -44,26 +45,26 @@ julia> using RLZero
 julia> using .Tests
 ```
 
-First we need to create a list of environments from which we would like to find the optimal
+First, we need to create a list of environments from which we would like to find the optimal
 action. Let's choose the Tic-Tac-Toe game for our experiment.
 ```jldoctest
 julia> envs = [bitwise_tictactoe_draw(), bitwise_tictactoe_winning()]
 ```
 
-Here, it's worth noting that we used bitwise versions of our position-specific environments
-in `./Tests/Common/BitwiseTicTacToe.jl`. Those environments are here to ease the
-experimentations and the tests of the package. Bitwise versions are sometimes necessary to
-complies with GPU constraints. But in this case, the only motivation to choose them was the
-compatibility it offers with `UniformTicTacToeEnvOracle`.
+Here, it's worth noting that we used the bitwise versions of our position-specific
+environments in `./Tests/Common/BitwiseTicTacToe.jl`. Those environments are here to ease
+the experimentations and the tests of the package. Bitwise versions are sometimes necessary
+to comply with GPU constraints. But in this case, the only motivation to choose them was
+the compatibility it offers with `UniformTicTacToeEnvOracle`.
 
-In fact, any environments can be used in `BatchedMcts` if we provide the appropriate
+In fact, any environment can be used in `BatchedMcts` if we provide the appropriate
 environment oracle. See `EnvOracle` for more details on this.
-    
+
 We should then provide a `Policy` to the Mcts. There are most noticeably two arguments to
 provide: `device` and `oracle`. The `device` specifies where the algorithm should run. Do
-you want it to run on the `CPU` or on the `GPU` ? It's straightforward. The `oracle`
+you want it to run on the `CPU` or the `GPU`? It's straightforward. The `oracle`
 arguments is an `EnvOracle`. You can use the default provided one,
-`UniformTicTacToeEnvOracle` or create your own one for other games. For the latter, do not
+`UniformTicTacToeEnvOracle` or create your one for other games. For the latter, do not
 hesitate to check `EnvOracle` and `check_oracle`.
 
 The `Policy` also accepts other arguments. Refers to the corresponding section to know more.
@@ -74,13 +75,15 @@ julia> policy = BatchedMcts.Policy(;
 )
 ```
 
-After those 2 simple steps we can now call the `explore` function to find out the optimal
-action to choose. In the context of AlphaZero/ MuZero, 2 possibilities are offered to you:
-`explore` and `gumbel_explore`. Each of them is adapted to a specific context.
-- `gumbel_explore` is more suited for the training context of AlphaZero/ MuZero as it
-encourages to explore sligthly sub-optimal actions.
-- `explore`, on the other hand, is more suited for the inference context of AlphaZero/
-MuZero.
+After those 2 simple steps, we can now call the `explore` function to find out the optimal
+action to choose. This implementation provides two MCTS exploration implementations:
+`explore` & `gumbel_explore`. In the context of AlphaZero/ MuZero, each of them is more
+adapted to a specific context:
+- `gumbel_explore` is more suited for the training context of AlphaZero/ MuZero. It encourages
+   exploring slightly sub-optimal actions and thus offers more diversity of
+   game positions to the neural network.
+- `explore`, on the other hand, is more suited for the inference context. No noise is added
+   to the exploration. It therefore hopefully finds the optimal policy.
 
 Therefore, if you are only interested in the optimal action, always use the `explore`
 function.
@@ -91,7 +94,7 @@ julia> tree = BatchedMcts.explore(policy, envs)
 If you are interested in the exploration undergone, you can check the `Tree` structure.
 Otherwise, a simple call to `completed_qvalues` will give you a comprehensive score of how
 good each action is. The higher the better of course. We can then use the `argmax` utility
-to pickup the best action.
+to pick up the best action.
 ```jldoctest
 julia> function get_completed_qvalues(tree)
            ROOT = 1
@@ -108,13 +111,13 @@ julia> argmax.(qs) # The optimal action for each environment
 ```
 
 This implementation of batched Mcts tries to provide flexible interfaces to run code on any
-devices. You can easily run the tree search on `CPU` or `GPU` with the `device` argument
-of `Policy`. If you want the state evaluation or the environment simulation to run on GPU,
-you will need to handle it in the `EnvOracle` definition.
+device. You can easily run the tree search on `CPU` or `GPU` with the `device` argument
+of `Policy`. If you want the state evaluation or the environment simulation to run on
+GPU as well, you can! This will be handled in the `EnvOracle` definition.
 
 By default, `UniformTicTacToeEnvOracle`'s `transition_fn` runs on both `CPU` and `GPU`
 depending on the array type of `envs` (a.k.a GPU's `CuArray` vs classic CPU's `Array`). To
-write your own custom state evaluation or environment simulation on the appropriate device,
+write your custom state evaluation or environment simulation on the appropriate device,
 check `EnvOracle` and its example `UniformTicTacToeEnvOracle`.
 
 TODO: This section should show examples of using the module (using jltest?). Ideally, it
@@ -131,7 +134,7 @@ sanity checks on user environments.
 
 # Naming conventions
 
-Here is a short list of variable names we used through out this file and what they mean, if
+Here is a short list of variable names we used throughout this file and what they mean, if
 it is not obvious:
 - bid: buffer index, used to index the batch (`B`) dimension.
 - cid: current simulation index, used to index the simulation (`N`) dimension.
@@ -180,17 +183,17 @@ CPU or both.
 # The `init_fn` function
 
 `init_fn` takes a vector of environment objects as an argument. Environment objects are of
-the same type than those passed to the `explore` and `gumbel_explore` functions. The
+the same type as those passed to the `explore` and `gumbel_explore` functions. The
 `init_fn` function returns a named-tuple of same-size arrays with the following fields:
 
 - `internal_states`: internal representations of the environment states as used by MCTS and
-    manipulated by `transition_fn`. `internal_states` must be a single or multi-dimensional
-    array whose last dimension is a batch dimension (see examples below). `internal_states`
-    must be `isbits` if it is desired to run `BatchedMcts` on `GPU`.
+   manipulated by `transition_fn`. `internal_states` must be a single or multi-dimensional
+   array whose last dimension is a batch dimension (see examples below). `internal_states`
+   must be `isbits` if it is desired to run `BatchedMcts` on `GPU`.
 - `valid_actions`: a vector of booleans with dimensions `num_actions` and `batch_id`
-  indicating which actions are valid to take (this is disregarded in MuZero).
+   indicating which actions are valid to take (this is disregarded in MuZero).
 - `policy_prior`: the policy prior for each state as an `AbstractArray{Float32,2}` with
-    dimensions `num_actions` and `batch_id`.
+   dimensions `num_actions` and `batch_id`.
 - `value_prior`: the value prior for each state as an `AbstractVector{Float32}`.
 
 # The `transition_fn` function
@@ -199,26 +202,26 @@ the same type than those passed to the `explore` and `gumbel_explore` functions.
 along with a vector of action ids. Action ids consist in integers between 1 and
 `num_actions` and are valid indices for `policy_priors` and `value_priors`. 
     
-Note that `init_fn` will always receive the same array than the one passed to `explore` or
+Note that `init_fn` will always receive the same array as the one passed to `explore` or
 `gumbel_explore` as `envs` (which should be a CPU `Array`). But it's a bit more tricky for
 `transition_fn`. It may receive both CPU `Array` or GPU `CuArray` depending on the device
-specified in `Policy`. To handle both more easily give a look at `Util.Devices` and how it 
+specified in `Policy`. To handle both more easily look at `Util.Devices` and how it 
 is used in `UniformTicTacToeEnvOracle`.
 
 In the context of a `Policy` on the GPU, `transition_fn` can both return a CPU `Array` or a
-GPU `CuArray`. The `CuArray` is more adapted as it will prevent a memory transfers, but both
+GPU `CuArray`. The `CuArray` is more adapted as it will prevent memory transfers, but both
 works.
 
 The `transition_fn` function returns a named-tuple of arrays:
 
 - `internal_states`: new states reached after executing the proposed actions (see
-    `init_fn`).
+   `init_fn`).
 - `rewards`: vector of `Float32` indicating the intermediate rewards collected during the
-    transitions.
+   transitions.
 - `terminal`: vector of booleans indicating whether or not the reached states are terminal
-    (this is always `false` in MuZero).
+   (this is always `false` in MuZero).
 - `player_switched`: vector of booleans indicating whether or not the current player
-    switched during the transition (always `true` in many board games).
+   switched during the transition (always `true` in many board games).
 - `valid_actions`, `policy_prior`, `value_prior`: same as for `init_fn`.
 
 
@@ -232,7 +235,7 @@ The `transition_fn` function returns a named-tuple of arrays:
   `Base.isbitstype(State)`. The latter representation may be easier to work with when
   broadcasting non-batched environment implementations on GPU (see
   `Tests.Common.BitwiseTicTacToe.BitwiseTicTacToe` for example).
-- When using MuZero, the `internal_states` field typically has type `AbstractArray{Float32,
+- When using MuZero, the `internal_states` field typically has the type `AbstractArray{Float32,
   2}` where the first dimension corresponds to the size of latent states and the second
   dimension is the batch dimension.
 
@@ -257,14 +260,14 @@ end
 """
     check_oracle(::EnvOracle, env)
 
-This function performs some sanity checks to see if an environment oracle is correctly
-specified on a given environment instance.
+Perform some sanity checks to see if an environment oracle is correctly specified on a
+given environment instance.
 
 A list of environments `envs` must be specified, along with the `EnvOracle` to check.
 
-The function returns `nothing` if no problems are detected. Otherwise, helpful error
-messages are raised. More precisely, `check_oracle` verifies the keys of the returned
-named-tuples from `init_fn` an `transition_fn` and the types and dimensions of their lists.
+Return `nothing` if no problems are detected. Otherwise, helpful error messages are raised.
+More precisely, `check_oracle` verifies the keys of the returned named-tuples from `init_fn`
+a `transition_fn` and the types and dimensions of their lists.
 
 See also [`EnvOracle`](@ref)
 """
@@ -348,18 +351,17 @@ function check_oracle(oracle::EnvOracle, envs)
 end
 
 # ## Example Environment Oracle
-# ### Tic-Tac-Toe Environment Oracle
+# ### Tic-Tac-Toe Environment Oracle with a Uniform policy
+
 """
     UniformTicTacToeEnvOracle()
 
 Define an `EnvOracle` object with a uniform policy for the game of Tic-Tac-Toe.
 
-This oracle environment is a wrapper around the BitwiseTicTacToeEnv.
-Checkout `./Tests/Common/BitwiseTicTacToe.jl`.
-
+This oracle environment is a wrapper around the `Tests.Common.BitwiseTicTacToeEnv`.
 It can be both used on `CPU` & `GPU`.
 
-It was inspired by the RL.jl library. For more details, checkout their documentation:
+It was inspired by the RL.jl library. For more details, check out their documentation:
 https://juliareinforcementlearning.org/docs/rlenvs/#ReinforcementLearningEnvironments.TicTacToeEnv
 
 See also [`EnvOracle`](@ref)
@@ -437,24 +439,26 @@ end
 
 A batch, device-specific MCTS Policy that leverages an external `EnvOracle`.
 
+
 # Keyword Arguments
 
 - `device::Device`: device on which the policy should preferably run (i.e. `CPU` or `GPU`).
 - `oracle::Oracle`: environment oracle handling the environment simulation and the state
-    evaluation.
+   evaluation.
 - `num_simulations::Int = 64`: number of simulations to run on the given Mcts `Tree`.
-- `num_considered_actions::Int = 8`: number of actions considered by gumbel during
-    exploration. Only the `num_conidered_actions` actions with the highest `value_prior`
-    probabilities and gumbel noise will be used. It should be a power of 2.
+- `num_considered_actions::Int = 8`: number of actions considered by Gumbel during
+   exploration. Only the `num_conidered_actions` actions with the highest scores will be
+   explored. It should preferably be a power of 2.
 - `value_scale::Float32 = 0.1f0`: multiplying coefficient to weight the qvalues against the
-    prior probabilities during exploration. Prior probabilities have, by default, a
-    decreasing weight when the number of visits increase.
+   prior probabilities during exploration. Prior probabilities have, by default, a
+   decreasing weight when the number of visits increases.
 - `max_visit_init::Int = 50`: artificial increase of the number of visits to weight qvalue
-    against prior probabilities on low visit count.
+   against prior probabilities on low visit count.
 
 # Notes
+
 The attributes `num_conidered_actions`, `value_scale` and `max_visit_init` are specific to
-the gumbel implementation.
+the Gumbel implementation.
 """
 @kwdef struct Policy{Device,Oracle<:EnvOracle}
     device::Device
@@ -522,15 +526,15 @@ All these fields are used to store the results of calling the environment oracle
   `(B, N)` layout may provide better spatial locality when copying the results of the
   environment oracle and possibly when navigating trees.
 - To complete the previous point, keep in mind that Julia is column-major (compared to the
-  row-major, more classical paradigm, in most programming langage like Python). This has the
-  noticeable importance that first dimension of a Matrix is continuous. The order of
-  dimensions are then reversed compared to a Python implementation (like MCTX) to keep the
+  row-major, more classical paradigm, in most programming language like Python). This has the
+  noticeable importance that the first dimension of a Matrix is continuous. The order of
+  dimensions is then reversed compared to a Python implementation (like MCTX) to keep the
   same cache locality.
-- It might seems weird at first to have a doubly linked tree (i.e. with both `children` and
+- It might seem weird at first to have a doubly linked tree (i.e. with both `children` and
   `parent` attributes), but is necessary to backpropagate values (`total_visits` and
   `total_values`).
 
-See more about backpropagation in "Core MCTS algorithm"
+See more about backpropagation in "Core MCTS algorithm".
 """
 @kwdef struct Tree{
     StateNodeArray,
@@ -562,11 +566,11 @@ end
 
 """
     validate_prior(policy_prior, valid_actions)
-    
+
 Correct `policy_prior` to ignore in`valid_actions`.
 
 More precisely, `policy_prior`  that are in`valid_actions` are set to 0. The rest of the
-`policy_prior` (which are valid actions) are then l1-normalised.
+`policy_prior` (which are valid actions) are then l1-normalized.
 """
 function validate_prior(policy_prior, valid_actions)
     prior = map(zip(policy_prior, valid_actions)) do (prior, is_valid)
@@ -585,7 +589,7 @@ end
 
 Return the dimensions of an object.
 
-This utility is used inside `create_tree` so that non-array object have no dimension, rather
+This utility is used inside `create_tree` so that non-array objects have no dimension, rather
 than popping an error as `size` do.
 """
 dims(arr::AbstractArray) = size(arr)
@@ -596,7 +600,7 @@ dims(_) = ()
     
 Create a `Tree`.
 
-Note that the `ROOT` of the `Tree` are considered explored, as a call to `init_fn` is done
+Note that the `ROOT` of the `Tree` is considered explored, as a call to `init_fn` is done
 on them. Moreover, `policy_prior` are corrected as specified in `validate_prior`.
 
 See [`Tree`](@ref) for more details.
@@ -639,7 +643,7 @@ end
 """
     Base.size(tree::Tree)
 
-Return the number of actions (`A`), the number of simulations (`N`) and the number of
+Return the number of actions (`A`), the number of simulations (`N`), and the number of
 environments in the batch (`B`) of a `tree` as named-tuple `(; A, N, B)`.
 """
 function Base.size(tree::Tree)
@@ -661,7 +665,7 @@ batch_size(tree) = size(tree).B
 """
     value(tree, cid, bid)
 
-Return the absolute value of game position.
+Return the absolute value of a game position.
 
 The formula for a given node is:
     (prior_value + total_rewards) / num_visits
@@ -677,8 +681,8 @@ value(tree, cid, bid) = tree.total_values[cid, bid] / tree.num_visits[cid, bid]
 """
     qvalue(tree, cid, bid)
 
-Return the value of game position from the perspective of its parent node.
-I.e. a good position for your opponent is bad one for you.
+Return the value of the game position from the perspective of its parent node.
+I.e. a good position for your opponent is a bad one for you
 
 See also [`value`](@ref)
 """
@@ -744,9 +748,9 @@ end
 """
     qcoeff(mcts, tree, cid, bid, tree_size)
 
-Compute a gumbel-related ponderation of `qvalue`.
+Compute a GUmbel-related ponderation of `qvalue`.
 
-Through time, as the number of visits increase, the influence of `qvalue` builds up
+Through time, as the number of visits increases, the influence of `qvalue` builds up
 relatively to `policy_prior`.
 """
 function qcoeff(mcts, tree, cid, bid, tree_size)
@@ -792,46 +796,46 @@ end
 # ## Core MCTS algorithm
 
 """
-Let's now dive in the core part of MCTS algorithm.
+Let's now dive into the core part of the MCTS algorithm.
 
 "MCTS" stands for "Monte Carlo Tree Search" and is a heuristic tree search algorithm, most
 noticeably applied in the context of board games. For the record, recent breakthroughs in
-the Reinforcement Learning fields applied MCTS to solve arcade game (e.g. Deepmind's MuZero)
-or inside the Tesla's autopilot software.
+the Reinforcement Learning fields applied MCTS to solve arcade games (e.g. Deepmind's MuZero)
+or inside Tesla's autopilot software.
 
-The tree search algorithms family focus on finding the optimal policy (I.e. the best move to
+The tree search algorithms family focuses on finding the optimal policy (i.e. the best move to
 play given a certain game position). Compared to other tree search algorithms, like the
 simple MinMax algorithm, MCTS only explores a subset of the total search space. It does so
-through exploration/ exploitation heurisitics that orient this search toward most promising
-actions. Since its creation MCTS has been shown to converge toward the MinMax algorithm as
-the number of simulations increase, but at a much lower computational cost.
+through exploration/ exploitation heuristics that orient this search toward the most promising
+actions. Since its creation, MCTS has been shown to converge toward the MinMax algorithm as
+the number of simulations increases, but at a much lower computational cost.
 
-Orinaly, the MCTS algorithm was based on a Monte Carlo method. This method consisted of a
+Originally, the MCTS algorithm was based on a Monte Carlo method. This method consisted of a
 random sampling of the search space to evaluate the current board position. Those were
-called "rollouts". Its creator, Bruce Abramson, attributes to the rollouts "to be precise,
-accurate, easily estimable, efficiently calculable, and domain-independent”. With the raise
+called "rollouts". Its creator, Bruce Abramson, attributes the rollouts "to be precise,
+accurate, easily estimable, efficiently calculable, and domain-independent”. With the rise
 of Deep Reinforcement Learning, rollouts were eventually replaced by Neural Networks. Those
 were shown to be a way more precise evaluation method for complex board games. Though
-modern MCTS do not involve any Monte Carlo methods anymore, it has still kept its name.
+modern MCTS does not involve any Monte Carlo methods anymore, it has still kept its name.
     
 
-The MCTS iteratively run simulations that expand a tree of explored game positions. Each
-iteration can basically be divided in 3 phases:
+The MCTS iteratively runs simulations that expand a tree of explored game positions. Each
+iteration can be divided into 3 phases:
 - Selection: Start at the root node (initial board state) and walk to the child that has
-    the best exploration/ exploitation tradeoff. This tradeoff was the source of lot of
-    research and has been formalized through different formulas, the most famous being UCB.
-    The walk recursion is done until you hit a leaf node (i.e. a board game position that
-    has never been explored or a terminal node like a win or a defeat). This reached leaf 
-    node is then saved for the next phase.
+  the best exploration/ exploitation tradeoff. This tradeoff was the source of a lot of
+  research and has been formalized through different formulas, the most famous being UCB.
+  The walk recursion is done until you hit a leaf node (i.e. a board game position that
+  has never been explored or a terminal node like a win or a defeat). This reached leaf 
+  node is then saved for the next phase.
 - Evaluation: Sometimes split into two sub-phases, "Simulation" & "Expansion", the 
-    evaluation phase respectively evaluates the current board position (either by rollout in
-    classic MCTS or through a Neural Network for more modern one) and generates the children
-    board position associated to each action.
+  evaluation phase respectively evaluates the current board position (either by a rollout in
+  classic MCTS or through a Neural Network for a more modern one) and generates the children
+  board position associated with each action.
 - Backpropagation: After simulating a game by iteratively choosing the most promising
-    actions (called `Episode`), and acquired some (intermediate or final) reward through its
-    last action, it is now needed to backpropagate these informations up in the tree until
-    the root node. The backpropagation updates the visit counts and total value of each node
-    in this episode.
+  actions (called `Episode`), and acquired some (intermediate or final) reward through its
+  the last action, it is now needed to backpropagate this information up in the tree until
+  the root node. The backpropagation updates the visit counts and total value of each node
+  in this episode.
 """
 
 function explore(mcts, envs)
@@ -852,13 +856,13 @@ Julia has a great CUDA API. It is sufficiently high-level so that the same Julia
 both compiled to CPU and GPU according to the context. As an example, a function `map`ped
 over a CUDA `CuArray` will be implicitly compiled and run on the GPU. In the same way, the
 same function `map`ped over a classic CPU `Array`, will then be run on the CPU. It is as
-simple as that. We extensively used this feature in AlphaZero.jl to extend code with a GPU
+simple as that. We extensively used this feature in AlphaZero.jl to extend code with GPU
 support.
 
-This principle brings both simplicity to the code (as no dupplication of code is needed to
+This principle brings both simplicity to the code (as no duplication of code is needed to
 run on CPU and GPU) but also computing power to easily run code on GPU. This was one of
-reasons, Julia was choosen for AlphaZero.jl. We hope to make this implementation accessible
-for students, researchers and hackers while also being sufficiently powerful and fast to
+the reasons, Julia was chosen for AlphaZero.jl. We hope to make this implementation accessible
+for students, researchers, and hackers while also being sufficiently powerful and fast to
 enable meaningful experiments on limited computing resources.
 
 The compilation on GPU still constraints a bit the way code is written. The following three
@@ -869,16 +873,16 @@ constraints should be respected:
 
 
 To respect the `isbits` constraint, we used `SVector` from `StaticArrays` in GPU functions
-to replace more standard `Base.Vector`. To respect the type-stability constraints,
-a `tree_size` is used as Value-as-parameter, so that size of `SVector` are known at
+to replace the more standard `Base.Vector`. To respect the type-stability constraints,
+a `tree_size` is used as Value-as-parameter, so that size of `SVector` is known at
 compile time. Some utility functions are provided in `Devices` module for easier use.
 
 
-And as you can see in `select` below, the parallelization is done over the environments.
-In other words, a `select` parallel call is done over each environment.
+And as you can see in `select` below, the parallelization is done over the environments
+list. In other words, a `select` parallel call is done over each environment.
 
-In the same way, `backpropagate!` launch GPU kernels over the environments. Those are the
-only two functions to launch kernels.
+In the same way, `backpropagate!` launch GPU kernels over the environments list. Those are
+the only two functions to launch kernels
 """
 function select(mcts, tree)
     (; A, N, B) = size(tree)
@@ -891,25 +895,25 @@ function select(mcts, tree)
 end
 
 """
-As a reminder, the selection phase walk trough the tree to find a frontier of nodes to
-expand. The selection starts at the root node (initial board state) and walk to the child
-that has the best exploration/ exploitation tradeoff with `select_action` utility function.
+As a reminder, the selection phase walks through the tree to find a frontier of nodes to
+expand. The selection starts at the root node (initial board state) and walks to the child
+that has the best exploration/ exploitation tradeoff with the `select_action` utility function.
 The walk recursion is done until you hit a leaf node (i.e. a board game position that has
 never been explored or a terminal node like a win or a defeat). This reached leaf node is
 then saved for the next phase.
 
-There is a subtlity here compared to BatchedMCtsAos version. Nodes are not created at
+There is a subtlety here compared to BatchedMCtsAos version. Nodes are not created at
 the `selection`, because the concept of Oracle evaluation and environment simulation are
-grouped in the `EnvOracle`. Those are split in BatchedMctsAos. Therefore, `select` function
-must return parent nodes of the frontier instead. That's why its returned value is catched
+grouped in the `EnvOracle`. Those are split in BatchedMctsAos. Therefore, the `select` function
+must return parent nodes of the frontier instead. That's why its returned value is caught
 as `parent_frontier` in `explore`. The action chosen is also returned along with the parent
 as a tuple, so that it prevents its recalculation.
 
-But this leaves the question of the return value for terminal nodes... It has been choosen
+But this leaves the question of the return value for terminal nodes... It has been chosen
 to return the terminal nodes themself (instead of their parents) with a `NO_ACTION` as the
 action in the tuple. This was necessary to respect the type-stability constraint. This way
-`select` always return a tuple `(node, action)`. The `NO_ACTION` action also makes it easy
-to detect terminal nodes in the `parent_frontier`.
+`select` always returns a tuple `(node, action)`. The `NO_ACTION` action also makes it easy
+to detect terminal nodes in the `parent_frontier`
 """
 function select(mcts, tree, bid, tree_size; start=ROOT)
     cur = start
@@ -934,28 +938,28 @@ end
 
 """
 The evaluation phase evaluates the current board position and simulates the environment with
-the `EnvOracle` through the `transition_fn` interface and then saved informations associated
+the `EnvOracle` through the `transition_fn` interface and then saved information associated
 to each action (i.e. `valid_actions` & `policy_prior`) along with the newly created nodes.
 
 The `transition_fn` call takes a vector of state encodings and a vector of actions as
-arguments. It therefore could not be parallelize over environments as `select` and
+arguments. It therefore could not be parallelized over environments as `select` and
 `backpropagate!` are.
 
 Note that if all nodes at the frontier are terminal ones, then no call to `transition_fn` is
-done (as no node need to be created). The terminal nodes are then directly returned.
+done (as no node needs to be created). The terminal nodes are then directly returned.
 
-Lastly, to save `state` returned from `transition_fn`, it was need to easily handle both
+Lastly, to save `state` returned from `transition_fn`, it was needed to easily handle both
 exact state encodings (like in AlphaZero) as well as latent space state encodings (like in
-MuZero, encoding wich will then have at least 1 dimension i.e. is a vector or a matrix).
-To solve this constraind, we used the EllipsisNotation ("..") which revealed to be
-particularly useful. The EllipsisNotation enables to handle any number of dimensions.
+MuZero, encoding which will then have at least 1 dimension i.e. is a vector or a matrix).
+To solve these constraints, we used the EllipsisNotation ("..") which was revealed to be
+particularly useful. The EllipsisNotation enables to handle of any number of dimensions.
 """
 function eval!(mcts, tree, simnum, parent_frontier)
     B = batch_size(tree)
 
     # 2 Utilities to easily access information in `parent_frontier`
     # `parent_frontier` is a list of tuples with the following format:
-    # (parent, action)
+    #   (parent, action)
     parent = first
     action = last
 
@@ -995,21 +999,22 @@ function eval!(mcts, tree, simnum, parent_frontier)
 end
 
 """
-Finaly the backpropagation comes in. 
+Finally, the backpropagation comes in. 
 
 After simulating a game by iteratively choosing the most promising actions (which list of 
-actions is called an `Episode`), and acquired some (intermediate or final) reward through
-its last action, it is now needed to backpropagate these informations up in the tree until
+actions are called an `Episode`), and acquired some (intermediate or final) reward through
+its last action, it is now needed to backpropagate this information up in the tree until
 the root node. The backpropagation updates the visits count and total value of each node in
 this episode.
 
 The visits count of each node in the episode is simply incremented by 1. The total value of
 each node is incremented by a certain value. This value is computed through TD learning
 until the newly created node (i.e. the value of the newly created node estimated by the
-oracle sumed up the cumulative reward until this point). Of course, the sign of the TD
-learned value must be switched when the player turn is switched as well.
+oracle summed up the cumulative reward until this point). Of course, the sign of the TD
+learned value must be switched when the player's turn is switched as well.
 
-And as stated before, `backpropagate! ` is parallelize in the same way than `select`.
+And as stated before, `backpropagate! ` is parallelized in the same way as `select` (i.e.
+over the environments list).
 """
 function backpropagate!(mcts, tree, frontier)
     B = batch_size(tree)
@@ -1035,37 +1040,38 @@ end
 # ### Gumbel MCTS variation
 
 """
-This implementation provides two MCTS implementations: `explore` & `gumbel_explore`. In the
-context of AlphaZero/ MuZero, each of them is more adapted to a specific context:
+This implementation provides two MCTS exploration implementations: `explore` &
+`gumbel_explore`. In the context of AlphaZero/ MuZero, each of them is more adapted to a
+specific context:
 - `gumbel_explore` is more suited for the training context of AlphaZero/ MuZero. It
-    encourages to explore sligthly sub-optimal actions and thus offers more diversity of
-    game positions to the neural network.
+   encourages to explore of slightly sub-optimal actions and thus offers more diversity of
+   game positions to the neural network.
 - `explore`, on the other hand, is more suited for the inference context. No noise is added
-    to the exploration. It therefore hopefully finds the optimal policy.
+   to the exploration. It therefore hopefully finds the optimal policy.
 
-In the end, `explore` and `gumbel_explore` only differs from each other from a single line,
+In the end, `explore` and `gumbel_explore` only differs from each other in a single line,
 the use of `gumbel_select` instead of `select`.
 
 
-The gumbel algorithm won't be explained here in details but you can learn more about it
+The Gumbel algorithm won't be explained here in detail but you can learn more about it
 here:
 https://www.deepmind.com/publications/policy-improvement-by-planning-with-gumbel
 
-The main idea behind `gumbel_explore` to successfuly explore sub-optimal actions resides in
+The main idea behind `gumbel_explore` to successfully explore sub-optimal actions resides in
 the addition of specific noise (the Gumbel noise) and a different simulations orchestration
 in the `selection` phase.
 
-Deepmind claims that this Gumbel variation do not polluate the policy latter learned by the
-Neural Network (on the contrary to dirichlet noise used originaly in AlphaZero/ MuZero).
-This has the advantage to help the neural network learn faster with fewer simulations. It
-therefore enables more meaningful experiments on limited computing resources.
+Deepmind claims that this Gumbel variation does not pollute the policy later learned by the
+Neural Network (on the contrary to Dirichlet noise used originally in AlphaZero/ MuZero).
+This has the advantage to help the neural network learn faster with fewer simulations. It,
+therefore, enables more meaningful experiments on limited computing resources.
 
-This implementation is largly inspired by Deepmind's MCTX. It has the particularity to 
+This implementation is largely inspired by Deepmind's MCTX. It has the particularity to 
 precompute the simulation orchestration which enables batch parallelization. This
 precomputation is done through `get_considered_visits_table`.
     
 
-See Deepmind's MCTX for more details:
+See Deepmind's MCTX for more details
 https://github.com/deepmind/mctx/tree/main/mctx/_src
 """
 function gumbel_explore(mcts, envs, rng::AbstractRNG)
@@ -1086,20 +1092,21 @@ end
 """
     get_considered_visits_sequence(max_num_actions, num_simulations)    
 
-Precompute the gumbel simulations orchestration.
+Precompute the Gumbel simulations orchestration.
 
-The gumbel simulations orchestration is done orginaly iteratively. At each steps a certain
-number of considered actions is explored and this number of considered actions is then
-divided by two until only 2 actions are explored.
+The Gumbel simulations orchestration is done originally iteratively. At each step, a certain
+number of considered actions is explored. At the end of exploration, the number of
+considered actions is then divided by two. The iterative process is repeated until only two
+actions are considered.
 
-Each step has an equal number of simulations, so that the total number of simulations is
-evenly distributed between them. Likewise, at each steps, the number of simulations of the
-step are evenly distributed between most promising considered actions.
+Each step has an equal number of simulations so that the total number of simulations is
+evenly distributed between them. Likewise, at each step, the number of simulations of the
+step is evenly distributed between the most promising considered actions.
 
-This simulation orchestration can in fact be precomputed as in MCTX by saving a sequence
-of considered number of visits for each simulations. Sayed in other words, this sequence
+This simulation orchestration can be precomputed as in MCTX by saving a sequence
+of the considered number of visits for each simulation. Sayed in other words, this sequence
 indicates for each simulation a constraint on the number of visits (i.e the number of
-visists that the selected action at root node should match).
+visits that the selected action at the root node should match)
 """
 function get_considered_visits_sequence(max_num_actions, num_simulations)
     (max_num_actions <= 1) && return SVector{num_simulations,Int16}(0:(num_simulations - 1))
@@ -1123,13 +1130,13 @@ end
 
 """
     get_considered_visits_table(mcts, num_actions)
-    
+
 Return a table containing the precomputed sequence of visits for each number of considered
 actions possible.
 
 Sayed in other words, for a given number of considered actions, this table contains a
 precomputed sequence. This sequence indicates for each simulation a constraint on the number
-of visits (i.e the number of visists that the selected action at root node should match).
+of visits (i.e the number of visits that the selected action at the root node should match).
 
 See also [`get_considered_visits_sequence`](@ref)
 """
@@ -1176,15 +1183,15 @@ end
         tree_size::Tuple{Val{A},Any,Any}
     ) where {A}
 
-Computes penality for actions that do not comply with the constraint on number of visits.
+Computes penalty for actions that do not comply with the constraint on the number of visits.
 
-More precisely, if an action do not respect this constraint, it will have a penality of
-`-Inf32` on its computed score before applying the argmax. This ultimatly blocks this action
-from being selected if at least another action has not been penalised (which should be the
+More precisely, if an action does not respect this constraint, it will have a penalty of
+`-Inf32` on its computed score before applying the argmax. This ultimately blocks this action
+from being selected if at least another action has not been penalized (which should be the
 case).
 
-Actions that comply with the constraint on the number of visits, have no penality (i.e. a
-penality of `0`).
+Actions that comply with the constraint on the number of visits have no penalty (i.e. a
+penalty of `0`)
 """
 function get_penality(
     mcts, tree, bid, considered_visits_table, child_visits, tree_size::Tuple{Val{A},Any,Any}
