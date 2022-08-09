@@ -3,6 +3,8 @@
 
 A batched implementation of MCTS that can run on CPU or GPU.
 
+Checkout the part "Core MCTS algorithm" if you want to know more about the MCTS algorithm.
+
 Because this implementation is batched, it is optimized for running MCTS on a large number
 of environment instances in parallel. In particular, this implementation is not suitable for
 running a large number of MCTS simulations on a single environment quickly (which would
@@ -35,7 +37,7 @@ simulator is available).
 
 
 # Usage
-The examples bellow assume that you run the following code before:
+The examples below assume that you run the following code before:
 ```jldoctest
 julia> using RLZero
 julia> using .Tests
@@ -173,7 +175,7 @@ the same type than those passed to the `explore` and `gumbel_explore` functions.
     must be `isbits` if it is desired to run `BatchedMcts` on `GPU`.
 - `valid_actions`: a vector of booleans with dimensions `num_actions` and `batch_id`
   indicating which actions are valid to take (this is disregarded in MuZero).
-- `policy_prior`: the policy prior for each states as an `AbstractArray{Float32,2}` with
+- `policy_prior`: the policy prior for each state as an `AbstractArray{Float32,2}` with
     dimensions `num_actions` and `batch_id`.
 - `value_prior`: the value prior for each state as an `AbstractVector{Float32}`.
 
@@ -710,7 +712,7 @@ end
 """
     get_num_child_visits(tree, cid, bid, ::Tuple{Val{A},Any,Any}) where {A}
 
-Return the number of visits of each children from the given node.
+Return the number of visits of each child from the given node.
 """
 function get_num_child_visits(tree, cid, bid, ::Tuple{Val{A},Any,Any}) where {A}
     ret = imap(1:A) do aid
@@ -769,6 +771,127 @@ function select_nonroot_action(mcts, tree, cid, bid, tree_size)
 end
 
 # ## Core MCTS algorithm
+
+"""
+Let's now dive in the core part of MCTS algorithm.
+
+"MCTS" stands for "Monte Carlo Tree Search" and is a heuristic tree search algorithm, most
+noticeably applied in the context of board games. For the record, recent breakthroughs in
+the Reinforcement Learning fields applied MCTS to solve arcade game (e.g. Deepmind's MuZero)
+or inside the Tesla's autopilot software.
+
+The tree search algorithms family focus on finding the optimal policy (I.e. the best move to
+play given a certain game position). Compared to other tree search algorithms, like the
+simple MinMax algorithm, MCTS only explores a subset of the total search space. It does so
+through exploration/ exploitation heurisitics that orient this search toward most promising
+actions. Since its creation MCTS has been shown to converge toward the MinMax algorithm as
+the number of simulations increase, but at a much lower computational cost.
+
+Orinaly, the MCTS algorithm was based on a Monte Carlo method. This method consisted of a
+random sampling of the search space to evaluate the current board position. Those were
+called "rollouts". Its creator, Bruce Abramson, attributes to the rollouts "to be precise,
+accurate, easily estimable, efficiently calculable, and domain-independent”. With the raise
+of Deep Reinforcement Learning, rollouts were eventually replaced by Neural Networks. Those
+were shown to be a way more precise evaluation method for complex board games. Though
+modern MCTS do not involve any Monte Carlo methods anymore, it has still kept its name.
+    
+
+The MCTS iteratively run simulations that expand a tree of explored game positions. Each
+iteration can basically be divided in 3 phases:
+- Selection: Start at the root node (initial board state) and walk to the child that has
+    the best exploration/ exploitation tradeoff. This tradeoff was the source of lot of
+    research and has been formalized through different formulas, the most famous being UCB.
+    The walk recursion is done until you hit a leaf node (i.e. a board game position that
+    has never been explored or a terminal node like a win or a defeat). This reached leaf 
+    node is then saved for the next phase.
+- Evaluation: Sometimes split into two sub-phases, "Simulation" & "Expansion", the 
+    evaluation phase respectively evaluates the current board position (either by rollout in
+    classic MCTS or through a Neural Network for more modern one) and generates the children
+    board position associated to each action.
+- Backpropagation: After simulating a game by iteratively choosing the most promising
+    actions (called `Episode`), and acquired some (intermediate or final) reward through its
+    last action, it is now needed to backpropagate these informations up in the tree until
+    the root node. The backpropagation updates the visit counts and total value of each node
+    in this episode.
+"""
+
+function explore(mcts, envs)
+    tree = create_tree(mcts, envs)
+    (; N) = size(tree)
+    for simnum in 2:N
+        parent_frontier = select(mcts, tree)
+        frontier = eval!(mcts, tree, simnum, parent_frontier)
+        backpropagate!(mcts, tree, frontier)
+    end
+    return tree
+end
+
+"""
+But in what way is this implementation exactly batched?
+
+Julia has a great CUDA API. It is sufficiently high-level so that the same Julia code can be
+both compiled to CPU and GPU according to the context. As an example, a function `map`ped
+over a CUDA `CuArray` will be implicitly compiled and run on the GPU. In the same way, the
+same function `map`ped over a classic CPU `Array`, will then be run on the CPU. It is as
+simple as that. We extensively used this feature in AlphaZero.jl to extend code with a GPU
+support.
+
+This principle brings both simplicity to the code (as no dupplication of code is needed to
+run on CPU and GPU) but also computing power to easily run code on GPU. This was one of
+reasons, Julia was choosen for AlphaZero.jl. We hope to make this implementation accessible
+for students, researchers and hackers while also being sufficiently powerful and fast to
+enable meaningful experiments on limited computing resources
+
+The compilation on GPU still constraints a bit the way code is written. The following three
+constraints should be respected:
+- Data copied to GPU should be `isbits`.
+- No dynamic allocation can be done on the GPU.
+- Functions compiled on GPU should be type-stable.
+
+
+To respect the `isbits` constraint, we used `SVector` from `StaticArrays` in GPU functions
+to replace more standard `Base.Vector`. To respect the type-stability constraints,
+a `tree_size` is used as Value-as-parameter, so that size of `SVector` are known at
+compile time. Some utility functions are provided in `Devices` module for easier use.
+
+
+And as you can see in `select` below, the parallelization is done over the environments.
+In other words, a `select` parallel call is done over each environment.
+
+In the same way, `backpropagate!` launch GPU kernels over the environments. Those are the
+only two functions to launch kernels.
+"""
+function select(mcts, tree)
+    (; A, N, B) = size(tree)
+    tree_size = (Val(A), Val(N), Val(B))
+
+    batch_indices = DeviceArray(mcts.device)(1:B)
+    return map(batch_indices) do bid
+        select(mcts, tree, bid, tree_size)
+    end
+end
+
+"""
+As a reminder, the selection phase walk trough the tree to find a frontier of nodes to
+expand. The selection starts at the root node (initial board state) and walk to the child
+that has the best exploration/ exploitation tradeoff with `select_action` utility function.
+The walk recursion is done until you hit a leaf node (i.e. a board game position that has
+never been explored or a terminal node like a win or a defeat). This reached leaf node is
+then saved for the next phase.
+
+There is a subtlity here compared to BatchedMCtsAos version. Nodes are not created at
+the `selection`, because the concept of Oracle evaluation and environment simulation are
+grouped in the `EnvOracle`. Those are split in BatchedMctsAos. Therefore, `select` function
+must return parent nodes of the frontier instead. That's why its returned value is catched
+as `parent_frontier` in `explore`. The action chosen is also returned along with the parent
+as a tuple, so that it prevents its recalculation.
+
+But this leaves the question of the return value for terminal nodes... It has been choosen
+to return the terminal nodes themself (instead of their parents) with a `NO_ACTION` as the
+action in the tuple. This was necessary to respect the type-stability constraint. This way
+`select` always return a tuple `(node, action)`. The `NO_ACTION` action also makes it easy
+to detect terminal nodes in the `parent_frontier`.
+"""
 function select(mcts, tree, bid, tree_size; start=ROOT)
     cur = start
     while true
@@ -776,7 +899,7 @@ function select(mcts, tree, bid, tree_size; start=ROOT)
             # returns current terminal, but no action played
             return cur, NO_ACTION
         end
-        aid = select_nonroot_action(mcts, tree, cur, bid, tree_size)
+        aid = select_action(mcts, tree, cur, bid, tree_size)
         @assert aid != NO_ACTION
 
         cnid = tree.children[aid, cur, bid]
@@ -790,17 +913,39 @@ function select(mcts, tree, bid, tree_size; start=ROOT)
     return nothing
 end
 
+"""
+The evaluation phase evaluates the current board position and simulates the environment with
+the `EnvOracle` through the `transition_fn` interface and then saved informations associated
+to each action (i.e. `valid_actions` & `policy_prior`) along with the newly created nodes.
+
+The `transition_fn` call takes a vector of state encodings and a vector of actions as
+arguments. It therefore could not be parallelize over environments as `select` and
+`backpropagate!` are.
+
+Note that if all nodes at the frontier are terminal ones, then no call to `transition_fn` is
+done (as no node need to be created). The terminal nodes are then directly returned.
+
+Lastly, to save `state` returned from `transition_fn`, it was need to easily handle both
+exact state encodings (like in AlphaZero) as well as latent space state encodings (like in
+MuZero, encoding wich will then have at least 1 dimension i.e. is a vector or a matrix).
+To solve this constraind, we used the EllipsisNotation ("..") which revealed to be
+particularly useful. The EllipsisNotation enables to handle any number of dimensions.
+"""
 function eval!(mcts, tree, simnum, parent_frontier)
     B = batch_size(tree)
-    # How the parent_frontier's tuples are formed
-    action = last
+
+    # 2 Utilities to easily access information in `parent_frontier`
+    # `parent_frontier` is a list of tuples with the following format:
+    # (parent, action)
     parent = first
+    action = last
 
     # Get terminal nodes at `parent_frontier`
     non_terminal_mask = @. action(parent_frontier) != NO_ACTION
     # No new node to expand (a.k.a only terminal node on the frontier)
     (!any(non_terminal_mask)) && return parent.(parent_frontier)
 
+    # Regroup `action_ids` and `parent_states` for `transition_fn`
     parent_ids = parent.(parent_frontier[non_terminal_mask])
     action_ids = action.(parent_frontier[non_terminal_mask])
     non_terminal_bids = DeviceArray(mcts.device)(Base.OneTo(B))[non_terminal_mask]
@@ -830,18 +975,23 @@ function eval!(mcts, tree, simnum, parent_frontier)
     return frontier
 end
 
-function select_and_eval!(mcts, tree, simnum)
-    (; A, N, B) = size(tree)
-    tree_size = (Val(A), Val(N), Val(B))
+"""
+Finaly the backpropagation comes in. 
 
-    batch_indices = DeviceArray(mcts.device)(1:B)
-    parent_frontier = map(batch_indices) do bid
-        select(mcts, tree, bid, tree_size)
-    end
+After simulating a game by iteratively choosing the most promising actions (which list of 
+actions is called an `Episode`), and acquired some (intermediate or final) reward through
+its last action, it is now needed to backpropagate these informations up in the tree until
+the root node. The backpropagation updates the visits count and total value of each node in
+this episode.
 
-    return eval!(mcts, tree, simnum, parent_frontier)
-end
+The visits count of each node in the episode is simply incremented by 1. The total value of
+each node is incremented by a certain value. This value is computed through TD learning
+until the newly created node (i.e. the value of the newly created node estimated by the
+oracle sumed up the cumulative reward until this point). Of course, the sign of the TD
+learned value must be switched when the player turn is switched as well.
 
+And as stated before, `backpropagate! ` is parallelize in the same way than `select`.
+"""
 function backpropagate!(mcts, tree, frontier)
     B = batch_size(tree)
     batch_ids = DeviceArray(mcts.device)(1:B)
