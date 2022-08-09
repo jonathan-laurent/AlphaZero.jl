@@ -748,23 +748,23 @@ end
     
 Return the policy of a node.
 
-I.e. a softmaxed-score of how much each actions should be played. The higher, the better.
+I.e. a score of how much each action should be played. The higher, the better.
 """
 function target_policy(mcts, tree, cid, bid, tree_size::Tuple{Val{A},Any,Any}) where {A}
     qs = completed_qvalues(tree, cid, bid, tree_size)
     policy = SVector{A}(imap(aid -> tree.policy_prior[aid, cid, bid], 1:A))
-    return softmax(log.(policy) + qcoeff(mcts, tree, cid, bid, tree_size) * qs)
+    return log.(policy) + qcoeff(mcts, tree, cid, bid, tree_size) * qs
 end
 
 """
-    select_nonroot_action(mcts, tree, cid, bid, tree_size)
+    select_action(mcts, tree, cid, bid, tree_size)
 
 Select the most appropriate action to explore.
 
 `NO_ACTION` is returned if no actions are available.
 """
-function select_nonroot_action(mcts, tree, cid, bid, tree_size)
-    policy = target_policy(mcts, tree, cid, bid, tree_size)
+function select_action(mcts, tree, cid, bid, tree_size)
+    policy = softmax(target_policy(mcts, tree, cid, bid, tree_size))
     num_child_visits = get_num_child_visits(tree, cid, bid, tree_size)
     total_visits = sum(num_child_visits; init=UNVISITED)
     return Int16(
@@ -845,7 +845,7 @@ This principle brings both simplicity to the code (as no dupplication of code is
 run on CPU and GPU) but also computing power to easily run code on GPU. This was one of
 reasons, Julia was choosen for AlphaZero.jl. We hope to make this implementation accessible
 for students, researchers and hackers while also being sufficiently powerful and fast to
-enable meaningful experiments on limited computing resources
+enable meaningful experiments on limited computing resources.
 
 The compilation on GPU still constraints a bit the way code is written. The following three
 constraints should be respected:
@@ -1018,84 +1018,132 @@ function backpropagate!(mcts, tree, frontier)
     return nothing
 end
 
-function explore(mcts, envs)
+# ### Gumbel MCTS variation
+
+"""
+This implementation provides two MCTS implementations: `explore` & `gumbel_explore`. In the
+context of AlphaZero/ MuZero, each of them is more adapted to a specific context:
+- `gumbel_explore` is more suited for the training context of AlphaZero/ MuZero. It
+    encourages to explore sligthly sub-optimal actions and thus offers more diversity of
+    game positions to the neural network.
+- `explore`, on the other hand, is more suited for the inference context. No noise is added
+    to the exploration. It therefore hopefully finds the optimal policy.
+
+In the end, `explore` and `gumbel_explore` only differs from each other from a single line,
+the use of `gumbel_select` instead of `select`.
+
+
+The gumbel algorithm won't be explained here in details but you can learn more about it
+here:
+https://www.deepmind.com/publications/policy-improvement-by-planning-with-gumbel
+
+The main idea behind `gumbel_explore` to successfuly explore sub-optimal actions resides in
+the addition of specific noise (the Gumbel noise) and a different simulations orchestration
+in the `selection` phase.
+
+Deepmind claims that this Gumbel variation do not polluate the policy latter learned by the
+Neural Network (on the contrary to dirichlet noise used originaly in AlphaZero/ MuZero).
+This has the advantage to help the neural network learn faster with fewer simulations. It
+therefore enables more meaningful experiments on limited computing resources.
+
+This implementation is largly inspired by Deepmind's MCTX. It has the particularity to 
+precompute the simulation orchestration which enables batch parallelization. This
+precomputation is done through `get_considered_visits_table`.
+    
+
+See Deepmind's MCTX for more details:
+https://github.com/deepmind/mctx/tree/main/mctx/_src
+"""
+function gumbel_explore(mcts, envs, rng::AbstractRNG)
     tree = create_tree(mcts, envs)
-    (; N) = size(tree)
+    (; A, B, N) = size(tree)
+
+    gumbel = DeviceArray(mcts.device)(rand(rng, Gumbel(), (A, B)))
+    considered_visits_table = DeviceArray(mcts.device)(get_considered_visits_table(mcts, A))
+
     for simnum in 2:N
-        frontier = select_and_eval!(mcts, tree, simnum)
+        parent_frontier = gumbel_select(mcts, tree, simnum, gumbel, considered_visits_table)
+        frontier = eval!(mcts, tree, simnum, parent_frontier)
         backpropagate!(mcts, tree, frontier)
     end
     return tree
 end
 
-function get_sequence_of_considered_visits(max_num_considered_actions, num_simulations)
-    (max_num_considered_actions <= 1) &&
-        return SVector{num_simulations,Int16}(0:(num_simulations - 1))
+"""
+    get_considered_visits_sequence(max_num_actions, num_simulations)    
 
-    num_halving_steps = Int(ceil(log2(max_num_considered_actions)))
+Precompute the gumbel simulations orchestration.
+
+The gumbel simulations orchestration is done orginaly iteratively. At each steps a certain
+number of considered actions is explored and this number of considered actions is then
+divided by two until only 2 actions are explored.
+
+Each step has an equal number of simulations, so that the total number of simulations is
+evenly distributed between them. Likewise, at each steps, the number of simulations of the
+step are evenly distributed between most promising considered actions.
+
+This simulation orchestration can in fact be precomputed as in MCTX by saving a sequence
+of considered number of visits for each simulations. Sayed in other words, this sequence
+indicates for each simulation a constraint on the number of visits (i.e the number of
+visists that the selected action at root node should match).
+"""
+function get_considered_visits_sequence(max_num_actions, num_simulations)
+    (max_num_actions <= 1) && return SVector{num_simulations,Int16}(0:(num_simulations - 1))
+
+    num_halving_steps = Int(ceil(log2(max_num_actions)))
     sequence = Int16[]
-    visits = zeros(Int16, max_num_considered_actions)
+    visits = zeros(Int16, max_num_actions)
 
-    num_considered = max_num_considered_actions
+    num_actions = max_num_actions
     while length(sequence) < num_simulations
-        num_extra_visits = max(1, num_simulations ÷ (num_halving_steps * num_considered))
+        num_extra_visits = max(1, num_simulations ÷ (num_halving_steps * num_actions))
         for _ in 1:num_extra_visits
-            append!(sequence, visits[1:num_considered])
-            visits[1:num_considered] .+= 1
+            append!(sequence, visits[1:num_actions])
+            visits[1:num_actions] .+= 1
         end
-        num_considered = max(2, num_considered ÷ 2)
+        num_actions = max(2, num_actions ÷ 2)
     end
 
     return SVector{num_simulations}(sequence[1:num_simulations])
 end
 
-function get_table_of_considered_visits(mcts, ::Tuple{Val{A},Any,Any}) where {A}
-    ret = imap(1:A) do num_considered_actions
-        get_sequence_of_considered_visits(num_considered_actions, mcts.num_simulations)
+"""
+    get_considered_visits_table(mcts, num_actions)
+    
+Return a table containing the precomputed sequence of visits for each number of considered
+actions possible.
+
+Sayed in other words, for a given number of considered actions, this table contains a
+precomputed sequence. This sequence indicates for each simulation a constraint on the number
+of visits (i.e the number of visists that the selected action at root node should match).
+
+See also [`get_considered_visits_sequence`](@ref)
+"""
+function get_considered_visits_table(mcts, num_actions)
+    ret = imap(1:num_actions) do num_considered_actions
+        get_considered_visits_sequence(num_considered_actions, mcts.num_simulations)
     end
-    return SVector{A}(ret)
+    return SVector{num_actions}(ret)
 end
 
-function gumbel_select_root(
-    mcts,
-    tree,
-    bid,
-    gumbel,
-    table_of_considered_visits,
-    child_total_visits,
-    tree_size::Tuple{Val{A},Any,Val{B}},
-) where {A,B}
-    num_valid_actions = sum(aid -> tree.valid_actions[aid, ROOT, bid], 1:A; init=NO_ACTION)
-    num_considered = min(mcts.num_considered_actions, num_valid_actions)
+"""
+    gumbel_select(mcts, tree, simnum, gumbel, considered_visits_table)
 
-    num_visits = get_num_child_visits(tree, ROOT, bid, tree_size)
-    considered_visits = table_of_considered_visits[num_considered][child_total_visits]
-    penality_value = imap(1:A) do aid
-        (num_visits[aid] == considered_visits) ? Float32(0) : -Inf32
-    end
-    penality = SVector{A}(penality_value)
+Gumbel's variation of classical `select`.
 
-    qs = completed_qvalues(tree, ROOT, bid, tree_size)
-    norm_qs = qs .* qcoeff(mcts, tree, ROOT, bid, tree_size)
-    policy = SVector{A}(imap(aid -> tree.policy_prior[aid, ROOT, bid], 1:A))
-    batch_gumbel = SVector{A}(imap(aid -> gumbel[aid, bid], 1:A))
-    scores = batch_gumbel + log.(policy) + norm_qs + penality
-    return Int16(argmax(scores; init=(NO_ACTION, -Inf32)))
-end
+The only difference lies in the use of `gumbel_select_root_action` to select the action at
+the root node. `gumbel_select` then fall back on `select` for non-root node.
+    
+See also [`gumbel_select_root_action`](@ref)
+"""
+function gumbel_select(mcts, tree, simnum, gumbel, considered_visits_table)
+    (; A, N, B) = size(tree)
+    tree_size = (Val(A), Val(N), Val(B))
 
-function gumbel_select_and_eval!(
-    mcts, tree, simnum, gumbel, table_of_considered_visits, tree_size::Tuple{Any,Any,Val{B}}
-) where {B}
     batch_indices = DeviceArray(mcts.device)(1:B)
-    parent_frontier = map(batch_indices) do bid
-        aid = gumbel_select_root(
-            mcts,
-            tree,
-            bid,
-            gumbel,
-            table_of_considered_visits,
-            simnum - ROOT,
-            tree_size,
+    return map(batch_indices) do bid
+        aid = gumbel_select_root_action(
+            mcts, tree, bid, gumbel, considered_visits_table, simnum - ROOT, tree_size
         )
         @assert aid != NO_ACTION
 
@@ -1106,27 +1154,71 @@ function gumbel_select_and_eval!(
             (ROOT, aid)
         end
     end
-
-    return eval!(mcts, tree, simnum, parent_frontier)
 end
 
-function gumbel_explore(mcts, envs, rng::AbstractRNG)
-    tree = create_tree(mcts, envs)
-    (; A, B, N) = size(tree)
-    tree_size = (Val(A), Val(N), Val(B))
+"""
+    get_penality(
+        mcts, tree, bid, considered_visits_table, child_visits,
+        tree_size::Tuple{Val{A},Any,Any}
+    ) where {A}
 
-    gumbel = DeviceArray(mcts.device)(rand(rng, Gumbel(), (A, B)))
-    table_of_considered_visits = DeviceArray(mcts.device)(
-        get_table_of_considered_visits(mcts, tree_size)
+Computes penality for actions that do not comply with the constraint on number of visits.
+
+More precisely, if an action do not respect this constraint, it will have a penality of
+`-Inf32` on its computed score before applying the argmax. This ultimatly blocks this action
+from being selected if at least another action has not been penalised (which should be the
+case).
+
+Actions that comply with the constraint on the number of visits, have no penality (i.e. a
+penality of `0`).
+"""
+function get_penality(
+    mcts, tree, bid, considered_visits_table, child_visits, tree_size::Tuple{Val{A},Any,Any}
+) where {A}
+    num_valid_actions = sum(aid -> tree.valid_actions[aid, ROOT, bid], 1:A; init=NO_ACTION)
+    num_considered_actions = min(mcts.num_considered_actions, num_valid_actions)
+
+    num_visits = get_num_child_visits(tree, ROOT, bid, tree_size)
+    considered_visits = considered_visits_table[num_considered_actions][child_visits]
+    penality = imap(1:A) do aid
+        (num_visits[aid] == considered_visits) ? Float32(0) : -Inf32
+    end
+    return SVector{A}(penality)
+end
+
+"""
+    gumbel_select_root_action(
+        mcts,
+        tree,
+        bid,
+        gumbel,
+        considered_visits_table,
+        child_total_visits,
+        tree_size::Tuple{Val{A},Any,Any},
+    ) where {A}
+
+Gumbel's variation of `select_action` for root node only.
+
+The only difference lies in the use of `gumbel` noise in the computation of the scores
+before applying the argmax and the additional constraints on the number of visits.
+"""
+function gumbel_select_root_action(
+    mcts,
+    tree,
+    bid,
+    gumbel,
+    considered_visits_table,
+    child_visits,
+    tree_size::Tuple{Val{A},Any,Any},
+) where {A}
+    batch_gumbel = SVector{A}(imap(aid -> gumbel[aid, bid], 1:A))
+    policy = target_policy(mcts, tree, ROOT, bid, tree_size)
+    penality = get_penality(
+        mcts, tree, bid, considered_visits_table, child_visits, tree_size
     )
 
-    for simnum in 2:N
-        frontier = gumbel_select_and_eval!(
-            mcts, tree, simnum, gumbel, table_of_considered_visits, tree_size
-        )
-        backpropagate!(mcts, tree, frontier)
-    end
-    return tree
+    scores = batch_gumbel + policy + penality
+    return Int16(argmax(scores; init=(NO_ACTION, -Inf32)))
 end
 
 end
