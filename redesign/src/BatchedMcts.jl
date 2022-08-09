@@ -1,5 +1,5 @@
 """
-BatchedMcts
+    BatchedMcts
 
 A batched implementation of MCTS that can run on CPU or GPU.
 
