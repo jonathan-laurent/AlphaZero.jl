@@ -37,6 +37,7 @@ simulator is available).
 
 
 # Usage
+
 The examples below assume that you run the following code before:
 ```jldoctest
 julia> using RLZero
@@ -126,6 +127,19 @@ should demonstrate different settings such as:
 
 This section should also demonstrate the use of the `check_policy` function to perform
 sanity checks on user environments.
+
+
+# Naming conventions
+
+Here is a short list of variable names we used through out this file and what they mean, if
+it is not obvious:
+- bid: buffer index, used to index the batch (`B`) dimension.
+- cid: current simulation index, used to index the simulation (`N`) dimension.
+- cnid: child index, used to index the simulation (`N`) dimension as well.
+- aid: action index, used to index the action (`A`) dimension.
+- aids: action index list, used to index the action (`A`) dimension.
+- qs: completed qvalues.
+- simnum: simulation number (which is also a simulation index).
 
 
 # References
@@ -1001,15 +1015,15 @@ function backpropagate!(mcts, tree, frontier)
     B = batch_size(tree)
     batch_ids = DeviceArray(mcts.device)(1:B)
     map(batch_ids) do bid
-        sid = frontier[bid]
-        val = tree.value_prior[sid, bid]
+        cid = frontier[bid]
+        val = tree.value_prior[cid, bid]
         while true
-            val += tree.prev_reward[sid, bid]
-            (tree.prev_switched[sid, bid]) && (val = -val)
-            tree.num_visits[sid, bid] += Int16(1)
-            tree.total_values[sid, bid] += val
-            if tree.parent[sid, bid] != NO_PARENT
-                sid = tree.parent[sid, bid]
+            val += tree.prev_reward[cid, bid]
+            (tree.prev_switched[cid, bid]) && (val = -val)
+            tree.num_visits[cid, bid] += Int16(1)
+            tree.total_values[cid, bid] += val
+            if tree.parent[cid, bid] != NO_PARENT
+                cid = tree.parent[cid, bid]
             else
                 return nothing
             end
