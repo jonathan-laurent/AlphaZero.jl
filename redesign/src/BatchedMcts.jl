@@ -375,7 +375,7 @@ function UniformTicTacToeEnvOracle()
     function get_valid_actions(A, B, envs)
         device = get_device(envs)
 
-        valid_ids = Tuple.(DeviceArray(device)(CartesianIndices((A, B))))
+        valid_ids = DeviceArray(device)(Tuple.(CartesianIndices((A, B))))
         return map(valid_ids) do (aid, bid)
             valid_action(envs[bid], aid)
         end
@@ -970,9 +970,9 @@ function eval!(mcts, tree, simnum, parent_frontier)
 
     # Get terminal nodes at `parent_frontier`
     non_terminal_mask = parent_frontier[ACTION, :] .!= NO_ACTION
-    non_terminal_bids = DeviceArray(mcts.device)(Base.OneTo(B))[non_terminal_mask]
+    non_terminal_bids = DeviceArray(mcts.device)(@view((1:B)[non_terminal_mask]))
     # No new node to expand (a.k.a only terminal node on the frontier)
-    (!any(non_terminal_mask)) && return parent_frontier[PARENT, :]
+    (length(non_terminal_bids) == 0) && return parent_frontier[PARENT, :]
 
     # Regroup `action_ids` and `parent_states` for `transition_fn`
     parent_ids = parent_frontier[PARENT, non_terminal_bids]
