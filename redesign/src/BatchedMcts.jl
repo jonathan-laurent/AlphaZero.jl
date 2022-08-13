@@ -985,20 +985,20 @@ function eval!(mcts, tree, simnum, parent_frontier)
     # Create nodes and save `info`
     children_cartesian_ids = CartesianIndex.(action_ids, parent_ids, non_terminal_bids)
 
-    tree.parent[simnum, non_terminal_bids] = parent_ids
-    tree.children[children_cartesian_ids] .= simnum
-    tree.state[.., simnum, non_terminal_bids] = info.internal_states
-    tree.terminal[simnum, non_terminal_bids] = info.terminal
-    tree.valid_actions[:, simnum, non_terminal_bids] = info.valid_actions
-    tree.prev_action[simnum, non_terminal_bids] = action_ids
-    tree.prev_reward[simnum, non_terminal_bids] = info.rewards
-    tree.prev_switched[simnum, non_terminal_bids] = info.player_switched
-    tree.policy_prior[:, simnum, non_terminal_bids] = info.policy_prior # TODO: validate_prior
-    tree.value_prior[simnum, non_terminal_bids] = info.value_prior
+    @inbounds tree.parent[simnum, non_terminal_bids] = parent_ids
+    @inbounds tree.children[children_cartesian_ids] .= simnum
+    @inbounds tree.state[.., simnum, non_terminal_bids] = info.internal_states
+    @inbounds tree.terminal[simnum, non_terminal_bids] = info.terminal
+    @inbounds tree.valid_actions[:, simnum, non_terminal_bids] = info.valid_actions
+    @inbounds tree.prev_action[simnum, non_terminal_bids] = action_ids
+    @inbounds tree.prev_reward[simnum, non_terminal_bids] = info.rewards
+    @inbounds tree.prev_switched[simnum, non_terminal_bids] = info.player_switched
+    @inbounds tree.policy_prior[:, simnum, non_terminal_bids] = info.policy_prior # TODO: validate_prior
+    @inbounds tree.value_prior[simnum, non_terminal_bids] = info.value_prior
 
     # Update frontier
     frontier = parent_frontier[PARENT, :]
-    frontier[non_terminal_mask] .= simnum
+    @inbounds frontier[non_terminal_bids] .= simnum
 
     return frontier
 end
