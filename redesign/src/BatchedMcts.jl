@@ -367,30 +367,32 @@ https://juliareinforcementlearning.org/docs/rlenvs/#ReinforcementLearningEnviron
 See also [`EnvOracle`](@ref)
 """
 function UniformTicTacToeEnvOracle()
-    get_policy_prior(A, B) = ones(Float32, (A, B)) / A
-    get_value_prior(B) = zeros(Float32, B)
+    A = 9 # Number of case in the Tic-Tac-Toe grid
+
+    get_policy_prior(A, B, device) = ones(Float32, device, (A, B)) / A
+    get_value_prior(B, device) = zeros(Float32, device, B)
 
     function get_valid_actions(A, B, envs)
-        CPU_envs = copy_to_CPU(envs)
-        valid_actions = zeros(Bool, (A, B))
-        for (bid, env) in enumerate(CPU_envs)
-            valid_actions[:, bid] = map(i -> valid_action(env, i), 1:A)
+        device = get_device(envs)
+
+        valid_ids = Tuple.(DeviceArray(device)(CartesianIndices((A, B))))
+        return map(valid_ids) do (aid, bid)
+            valid_action(envs[bid], aid)
         end
-        return valid_actions
     end
 
     function init_fn(envs)
-        A = num_actions(envs[1])
         B = length(envs)
+        device = get_device(envs)
 
         @assert B > 0
-        @assert all(e -> num_actions(e) == A, envs)
+        @assert all(@. num_actions(envs) == A)
 
         return (;
             internal_states=envs,
             valid_actions=get_valid_actions(A, B, envs),
-            policy_prior=get_policy_prior(A, B),
-            value_prior=get_value_prior(B),
+            policy_prior=get_policy_prior(A, B, device),
+            value_prior=get_value_prior(B, device),
         )
     end
 
@@ -402,8 +404,8 @@ function UniformTicTacToeEnvOracle()
     get_switched(info) = last(info).switched
 
     function transition_fn(envs, aids)
-        A = @allowscalar num_actions(envs[1])
         B = length(envs)
+        device = get_device(envs)
 
         @assert all(valid_action.(envs, aids)) "Tried to play an illegal move"
 
@@ -418,8 +420,8 @@ function UniformTicTacToeEnvOracle()
             terminal=terminated.(internal_states),
             valid_actions=get_valid_actions(A, B, internal_states),
             player_switched,
-            policy_prior=get_policy_prior(A, B),
-            value_prior=get_value_prior(B),
+            policy_prior=get_policy_prior(A, B, device),
+            value_prior=get_value_prior(B, device),
         )
     end
     return EnvOracle(; init_fn, transition_fn)

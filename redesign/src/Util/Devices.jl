@@ -1,10 +1,10 @@
 module Devices
 
 using CUDA
-import Base.zeros, Base.fill
+import Base.zeros, Base.ones, Base.fill
 
-export Device, GPU, CPU, DeviceArray, copy_to_CPU
-export zeros, fill
+export Device, GPU, CPU, DeviceArray, copy_to_CPU, get_device
+export zeros, ones, fill
 
 abstract type Device end
 struct GPU <: Device end
@@ -13,16 +13,25 @@ struct CPU <: Device end
 DeviceArray(::GPU) = CuArray
 DeviceArray(::CPU) = Array
 
+get_device(_) = @assert false "Input argument should be an `Array` or a `CuArray`."
+get_device(::Array) = CPU()
+get_device(::CuArray) = GPU()
+
 copy_to_CPU(arr) = arr
 copy_to_CPU(arr::CuArray) = Array(arr)
 
 """
-A device agnostic zeros array.
+A device agnostic zeros, ones & fill array.
 """
 Base.zeros(T, ::CPU, dims...) = Base.zeros(T, dims...)
 Base.zeros(T, ::GPU, dims...) = CUDA.zeros(T, dims...)
 
 Base.zeros(device::Device, dims...) = zeros(Float64, device, dims)
+
+Base.ones(T, ::CPU, dims...) = Base.ones(T, dims...)
+Base.ones(T, ::GPU, dims...) = CUDA.ones(T, dims...)
+
+Base.ones(device::Device, dims...) = ones(Float64, device, dims)
 
 Base.fill(x, ::CPU, dims...) = Base.fill(x, dims...)
 Base.fill(x, ::GPU, dims...) = CUDA.fill(x, dims...)
