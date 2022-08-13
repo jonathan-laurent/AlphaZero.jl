@@ -158,7 +158,7 @@ using Distributions: Gumbel
 using Random: AbstractRNG
 import Base.Iterators.map as imap
 using StaticArrays
-using CUDA: @allowscalar
+using CUDA: @inbounds
 using EllipsisNotation
 
 using ..BatchedEnvs
@@ -481,6 +481,11 @@ const UNVISITED = Int16(0)
 const ROOT = Int16(1)
 ## Valud used when no action is selected.
 const NO_ACTION = Int16(0)
+# 2 Utilities to easily access information in `parent_frontier`
+# `parent_frontier` is a list of tuples with the following format:
+#   (parent, action)
+const PARENT = Int16(1)
+const ACTION = Int16(2)
 
 """
 A batch of MCTS trees, represented as a structure of arrays.
@@ -890,10 +895,14 @@ function select(mcts, tree)
     (; A, N, B) = size(tree)
     tree_size = (Val(A), Val(N), Val(B))
 
-    batch_indices = DeviceArray(mcts.device)(1:B)
-    return map(batch_indices) do bid
-        select(mcts, tree, bid, tree_size)
+    parent_frontier = zeros(Int16, mcts.device, (2, B))
+    Devices.foreach(1:B, mcts.device) do bid
+        new_frontier = select(mcts, tree, bid, tree_size)
+        @inbounds parent_frontier[PARENT, bid] = new_frontier[PARENT]
+        @inbounds parent_frontier[ACTION, bid] = new_frontier[ACTION]
+        return nothing
     end
+    return parent_frontier
 end
 
 """
@@ -959,24 +968,18 @@ particularly useful. The EllipsisNotation enables to handle of any number of dim
 function eval!(mcts, tree, simnum, parent_frontier)
     B = batch_size(tree)
 
-    # 2 Utilities to easily access information in `parent_frontier`
-    # `parent_frontier` is a list of tuples with the following format:
-    #   (parent, action)
-    parent = first
-    action = last
-
     # Get terminal nodes at `parent_frontier`
-    non_terminal_mask = @. action(parent_frontier) != NO_ACTION
+    non_terminal_mask = parent_frontier[ACTION, :] .!= NO_ACTION
     # No new node to expand (a.k.a only terminal node on the frontier)
-    (!any(non_terminal_mask)) && return parent.(parent_frontier)
+    (!any(non_terminal_mask)) && return parent_frontier[PARENT, :]
 
     # Regroup `action_ids` and `parent_states` for `transition_fn`
     parent_ids = parent.(parent_frontier[non_terminal_mask])
     action_ids = action.(parent_frontier[non_terminal_mask])
     non_terminal_bids = DeviceArray(mcts.device)(Base.OneTo(B))[non_terminal_mask]
 
-    parent_cartesian_ids = CartesianIndex.(parent_ids, non_terminal_bids)
-    parent_states = tree.state[.., parent_cartesian_ids]
+    state_cartesian_ids = CartesianIndex.(parent_ids, non_terminal_bids)
+    parent_states = tree.state[.., state_cartesian_ids]
     info = mcts.oracle.transition_fn(parent_states, action_ids)
 
     # Create nodes and save `info`
@@ -994,7 +997,7 @@ function eval!(mcts, tree, simnum, parent_frontier)
     tree.value_prior[simnum, non_terminal_mask] = info.value_prior
 
     # Update frontier
-    frontier = parent.(parent_frontier)
+    frontier = parent_frontier[PARENT, :]
     frontier[non_terminal_mask] .= simnum
 
     return frontier
@@ -1163,20 +1166,20 @@ function gumbel_select(mcts, tree, simnum, gumbel, considered_visits_table)
     (; A, N, B) = size(tree)
     tree_size = (Val(A), Val(N), Val(B))
 
-    batch_indices = DeviceArray(mcts.device)(1:B)
-    return map(batch_indices) do bid
+    parent_frontier = zeros(Int16, mcts.device, (2, B))
+    Devices.foreach(1:B, mcts.device) do bid
         aid = gumbel_select_root_action(
             mcts, tree, bid, gumbel, considered_visits_table, simnum - ROOT, tree_size
         )
         @assert aid != NO_ACTION
 
         cnid = tree.children[aid, ROOT, bid]
-        if (cnid != UNVISITED)
-            select(mcts, tree, bid, tree_size; start=cnid)
-        else
-            (ROOT, aid)
-        end
+        new_frontier = (cnid != UNVISITED) ? select(mcts, tree, bid, tree_size; start=cnid) : (ROOT, aid)
+        @inbounds parent_frontier[PARENT, bid] = new_frontier[PARENT]
+        @inbounds parent_frontier[ACTION, bid] = new_frontier[ACTION]
+        return nothing
     end
+    return parent_frontier
 end
 
 """
