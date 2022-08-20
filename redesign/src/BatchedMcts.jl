@@ -96,17 +96,7 @@ Otherwise, a simple call to `completed_qvalues` will give you a comprehensive sc
 good each action is. The higher the better of course. We can then use the `argmax` utility
 to pick up the best action.
 ```jldoctest
-julia> function get_completed_qvalues(tree)
-           ROOT = 1
-           (; A, N, B) = BatchedMcts.size(tree)
-           tree_size = (Val(A), Val(N), Val(B))
-
-           return [
-               BatchedMcts.completed_qvalues(tree, ROOT, bid, tree_size)
-               for bid in 1:B
-           ]
-       end
-julia> qs = get_completed_qvalues(tree)
+julia> qs = completed_qvalues(tree)
 julia> argmax.(qs) # The optimal action for each environment
 ```
 
@@ -169,7 +159,7 @@ include("./Tests/Common/BitwiseTicTacToe.jl")
 using .BitwiseTicTacToe
 
 export EnvOracle, check_oracle, UniformTicTacToeEnvOracle
-export Policy, Tree, explore
+export Policy, Tree, explore, gumbel_explore, completed_qvalues
 
 # # Environment oracles
 
@@ -740,6 +730,21 @@ function completed_qvalues(tree, cid, bid, tree_size::Tuple{Val{A},Any,Any}) whe
 end
 
 """
+    completed_qvalues(tree)
+    
+Return the `completed_qvalues` for each environments.
+    
+It is a practical utility functions to get a usable policy after a `explore`.
+"""
+function completed_qvalues(tree)
+    ROOT = 1
+    (; A, N, B) = BatchedMcts.size(tree)
+    tree_size = (Val(A), Val(N), Val(B))
+
+    return [BatchedMcts.completed_qvalues(tree, ROOT, bid, tree_size) for bid in 1:B]
+end
+
+"""
     get_num_child_visits(tree, cid, bid, ::Tuple{Val{A},Any,Any}) where {A}
 
 Return the number of visits of each child from the given node.
@@ -1174,7 +1179,11 @@ function gumbel_select(mcts, tree, simnum, gumbel, considered_visits_table)
         @assert aid != NO_ACTION
 
         cnid = tree.children[aid, ROOT, bid]
-        new_frontier = (cnid != UNVISITED) ? select(mcts, tree, bid, tree_size; start=cnid) : (ROOT, aid)
+        new_frontier = if (cnid != UNVISITED)
+            select(mcts, tree, bid, tree_size; start=cnid)
+        else
+            (ROOT, aid)
+        end
         @inbounds parent_frontier[PARENT, bid] = new_frontier[PARENT]
         @inbounds parent_frontier[ACTION, bid] = new_frontier[ACTION]
         return nothing
