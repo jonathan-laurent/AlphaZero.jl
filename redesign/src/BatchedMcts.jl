@@ -1018,7 +1018,7 @@ until the newly created node (i.e. the value of the newly created node estimated
 oracle summed up the cumulative reward until this point). Of course, the sign of the TD
 learned value must be switched when the player's turn is switched as well.
 
-And as stated before, `backpropagate! ` is parallelized in the same way as `select` (i.e.
+And as stated before, `backpropagate!` is parallelized in the same way as `select` (i.e.
 over the environments list).
 """
 function backpropagate!(mcts, tree, frontier)
@@ -1054,7 +1054,7 @@ specific context:
 - `explore`, on the other hand, is more suited for the inference context. No noise is added
    to the exploration. It therefore hopefully finds the optimal policy.
 
-In the end, `explore` and `gumbel_explore` only differs from each other in a single line,
+In the end, `explore` and `gumbel_explore` only differ from each other in a single line,
 the use of `gumbel_select` instead of `select`.
 
 
@@ -1109,7 +1109,7 @@ evenly distributed between them. Likewise, at each step, the number of simulatio
 step is evenly distributed between the most promising considered actions.
 
 This simulation orchestration can be precomputed as in MCTX by saving a sequence
-of the considered number of visits for each simulation. Sayed in other words, this sequence
+of the considered number of visits for each simulation. In other words, this sequence
 indicates for each simulation a constraint on the number of visits (i.e the number of
 visits that the selected action at the root node should match)
 """
