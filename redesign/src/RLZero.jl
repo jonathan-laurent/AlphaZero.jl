@@ -17,6 +17,9 @@ include("BatchedMcts.jl")
 include("BatchedMctsAos.jl")
 @reexport using .BatchedMctsAos: BatchedMctsAos
 
+include("TrainableEnvOracle.jl")
+@reexport using .TrainableEnvOracleModule
+
 include("Storage.jl")
 using .Storage
 
