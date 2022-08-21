@@ -23,6 +23,9 @@ include("TrainableEnvOracle.jl")
 include("Storage.jl")
 using .Storage
 
+include("Train.jl")
+@reexport using .Train
+
 include("Tests/Tests.jl")
 @reexport using .Tests: Tests
 
