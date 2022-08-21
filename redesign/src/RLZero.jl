@@ -17,8 +17,8 @@ include("BatchedMcts.jl")
 include("BatchedMctsAos.jl")
 @reexport using .BatchedMctsAos: BatchedMctsAos
 
-include("GameHistory.jl")
-using .GameHistoryModule
+include("Storage.jl")
+using .Storage
 
 include("Tests/Tests.jl")
 @reexport using .Tests: Tests
