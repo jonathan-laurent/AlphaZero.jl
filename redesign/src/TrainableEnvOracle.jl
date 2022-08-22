@@ -4,8 +4,6 @@ and MuZero.
 """
 module TrainableEnvOracleModule
 
-using ..Storage
-
 export TrainableEnvOracle, make_feature_and_target, update_weights, get_EnvOracle
 
 abstract type TrainableEnvOracle end
