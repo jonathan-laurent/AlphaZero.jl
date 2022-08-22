@@ -45,7 +45,7 @@ function train(config)
     for _ in 1:(config.train_settings.training_steps)
         games = play_games(config, oracle)
         save(replay_buffer, games)
-        train(config.train_settings, oracle, replay_buffer)
+        train_network(config.train_settings, oracle, replay_buffer)
     end
 end
 
@@ -75,7 +75,7 @@ function play_games(config, trainable_oracle)
     return game_histories
 end
 
-function train(train_settings, trainable_oracle, replay_buffer)
+function train_network(train_settings, trainable_oracle, replay_buffer)
     batch = get_sample(replay_buffer, trainable_oracle, train_settings)
     update_weights(trainable_oracle, batch, train_settings)
     return nothing
