@@ -51,9 +51,7 @@ end
 
 function play_games(config, trainable_oracle)
     envs = [config.game_env() for _ in 1:(config.train_settings.training_envs)]
-    game_histories = [
-        GameHistory(config.game_env) for _ in 1:(config.train_settings.training_envs)
-    ]
+    game_histories = [GameHistory() for _ in 1:(config.train_settings.training_envs)]
     mcts = Policy(;
         device=config.train_settings.mcts_device, oracle=get_EnvOracle(trainable_oracle)
     )
