@@ -87,4 +87,24 @@ function BatchedEnvs.terminated(env::BitwiseTicTacToeEnv)
     return full_board(env) || is_win(env, CROSS) || is_win(env, NOUGHT)
 end
 
+function get_player_board(env::BitwiseTicTacToeEnv, player)
+    return [env.board[posidx(i, player)] for i in 1:9]
+end
+
+# Create a vectorize representation of the board.
+# The board is represented from the perspective of the next player to play.
+# It is a flatten 3x3x3 array with the following channels:
+#   free, next player, other player
+function BatchedEnvs.make_image(env::BitwiseTicTacToeEnv)
+    nought_board = get_player_board(env, NOUGHT)'
+    cross_board = get_player_board(env, CROSS)'
+
+    order = if (env.curplayer == NOUGHT)
+        [nought_board, cross_board]
+    else
+        [cross_board, nought_board]
+    end
+    return Float32.(hcat(.!(nought_board .|| cross_board), order...))
+end
+
 end

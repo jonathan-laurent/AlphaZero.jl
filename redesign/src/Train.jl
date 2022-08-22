@@ -59,7 +59,7 @@ function play_games(config, trainable_oracle)
     )
 
     while !all(terminated.(envs))
-        previous_images = deepcopy(envs)
+        previous_images = make_image.(envs)
         tree = config.train_settings.explore(mcts, envs, config.rng)
 
         infos = act.(envs, actions)

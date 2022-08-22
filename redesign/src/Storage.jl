@@ -13,14 +13,14 @@ export ReplayBuffer, save, get_sample
 
 Buffers saving all training-related information about a game.
 """
-struct GameHistory{GameEnv}
-    images::Vector{GameEnv}
+struct GameHistory
+    images::Vector{Vector{Float32}}
     actions::Vector{Int16}
     rewards::Vector{Float32}
     values::Vector{Float32}
     policies::Vector{Vector{Float32}}
 
-    GameHistory(GameEnv) = new{GameEnv}([], [], [], [], [])
+    GameHistory() = new([], [], [], [], [])
 end
 
 function save(history::GameHistory, image, action, reward, value, policy)
@@ -44,7 +44,7 @@ Fixed-size buffer storing simulated games.
 struct ReplayBuffer
     games::Vector{GameHistory}
     size
-    ReplayBuffer(size) = new(GameHistory[], size)
+    ReplayBuffer(size) = new([], size)
 end
 
 function save(replay_buffer::ReplayBuffer, game::GameHistory)
@@ -55,9 +55,7 @@ function save(replay_buffer::ReplayBuffer, game::GameHistory)
     return nothing
 end
 
-function save(
-    replay_buffer::ReplayBuffer, games::AbstractArray{GameHistory{GameEnv}}
-) where {GameEnv}
+function save(replay_buffer::ReplayBuffer, games::AbstractArray{GameHistory})
     map(game -> save(replay_buffer, game), games)
     return nothing
 end
