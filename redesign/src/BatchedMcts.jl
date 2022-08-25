@@ -561,6 +561,8 @@ end
 ## https://cuda.juliagpu.org/stable/tutorials/custom_structs/
 @adapt_structure Tree
 
+l1_normalise(policy) = policy / sum(policy; init=Float32(0))
+
 """
     validate_prior(policy_prior, valid_actions)
 
@@ -570,14 +572,12 @@ More precisely, `policy_prior`  that are in`valid_actions` are set to 0. The res
 `policy_prior` (which are valid actions) are then l1-normalized.
 """
 function validate_prior(policy_prior, valid_actions)
-    prior = map(zip(policy_prior, valid_actions)) do (prior, is_valid)
-        (is_valid) ? prior : Float32(0)
-    end
-    prior_sum = mapslices(prior; dims=1) do prior_slice
-        sum(prior_slice; init=Float32(0))
-    end
-    @assert any(prior_sum .!= Float32(0)) "No available actions"
-    return prior ./ prior_sum
+    valid_prior = policy_prior .* valid_actions
+    @assert begin
+        B = last(size(valid_prior))
+        all(any(valid_prior[:, bid] .!= Float32(0)) for bid in 1:B)
+    end "No available actions"
+    return mapslices(l1_normalise, valid_prior; dims=1)
 end
 
 """
