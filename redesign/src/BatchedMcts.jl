@@ -561,7 +561,7 @@ end
 ## https://cuda.juliagpu.org/stable/tutorials/custom_structs/
 @adapt_structure Tree
 
-l1_normalise(policy) = policy / sum(policy; init=Float32(0))
+l1_normalise(policy) = policy / abs(sum(policy; init=Float32(0)))
 
 """
     validate_prior(policy_prior, valid_actions)
