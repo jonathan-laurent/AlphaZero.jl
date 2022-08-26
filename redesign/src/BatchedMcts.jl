@@ -96,7 +96,7 @@ Otherwise, a simple call to `completed_qvalues` will give you a comprehensive sc
 good each action is. The higher the better of course. We can then use the `argmax` utility
 to pick up the best action.
 ```jldoctest
-julia> qs = completed_qvalues(tree)
+julia> qs = BatchedMcts.completed_qvalues(tree)
 julia> argmax.(qs) # The optimal action for each environment
 ```
 
