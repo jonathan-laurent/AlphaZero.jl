@@ -37,6 +37,7 @@ Training-related settings.
     training_envs
     window_size
     batch_size
+    nb_batches_per_training
     num_unroll_steps
     td_steps
     discount
@@ -82,8 +83,11 @@ function play_games(config, trainable_oracle)
 end
 
 function train_network(train_settings, trainable_oracle, replay_buffer)
-    batch = get_sample(replay_buffer, trainable_oracle, train_settings)
-    update_weights(trainable_oracle, batch, train_settings)
+    batches = [
+        get_sample(replay_buffer, trainable_oracle, train_settings) for
+        _ in 1:(train_settings.nb_batches_per_training)
+    ]
+    update_weights(trainable_oracle, batches, train_settings)
     return nothing
 end
 
