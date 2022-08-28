@@ -722,10 +722,12 @@ Return a list of estimated qvalue of all children for a given node.
 More precisely, if its child have been visited at least one time, it computes its real
 `qvalue`, otherwise, it uses the `root_value_estimate` of node instead.
 """
-function completed_qvalues(tree, cid, bid, tree_size::Tuple{Val{A},Any,Any}) where {A}
+function completed_qvalues(
+    tree, cid, bid, tree_size::Tuple{Val{A},Any,Any}; invalid_actions_value=-Inf32
+) where {A}
     root_value = root_value_estimate(tree, cid, bid, tree_size)
     ret = imap(1:A) do aid
-        (!tree.valid_actions[aid, cid, bid]) && return -Inf32
+        (!tree.valid_actions[aid, cid, bid]) && return invalid_actions_value
 
         cnid = tree.children[aid, cid, bid]
         return cnid != UNVISITED ? qvalue(tree, cnid, bid) : root_value
@@ -745,7 +747,12 @@ function completed_qvalues(tree)
     (; A, N, B) = BatchedMcts.size(tree)
     tree_size = (Val(A), Val(N), Val(B))
 
-    return [BatchedMcts.completed_qvalues(tree, ROOT, bid, tree_size) for bid in 1:B]
+    return map(1:B) do bid
+        q_values = BatchedMcts.completed_qvalues(
+            tree, ROOT, bid, tree_size; invalid_actions_value=-1
+        )
+        l1_normalise(q_values)
+    end
 end
 
 """
