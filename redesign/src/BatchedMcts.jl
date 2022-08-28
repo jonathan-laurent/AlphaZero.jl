@@ -183,14 +183,18 @@ the same type as those passed to the `explore` and `gumbel_explore` functions. T
 - `valid_actions`: a vector of booleans with dimensions `num_actions` and `batch_id`
    indicating which actions are valid to take (this is disregarded in MuZero).
 - `policy_prior`: the policy prior for each state as an `AbstractArray{Float32,2}` with
-   dimensions `num_actions` and `batch_id`.
-- `value_prior`: the value prior for each state as an `AbstractVector{Float32}`.
+   dimensions `num_actions` and `batch_id` and value within [0, 1]. An action with
+   `policy_prior` of `0` corresponds to the worst possible one or an illegal action. On the
+   other side, a value of `1` is associated with a winning action.
+- `value_prior`: the value prior for each state as an `AbstractVector{Float32}` and value
+   within [-1, 1]. In the same way than `policy_prior`, -1 and 1 respectively correspond to 
+   a bad and a good position.
 
 # The `transition_fn` function
 
 `transition_fn` takes as arguments a vector of internal states (as returned by `init_fn`)
 along with a vector of action ids. Action ids consist in integers between 1 and
-`num_actions` and are valid indices for `policy_priors` and `value_priors`. 
+`num_actions` and are valid indices for `policy_prior` and `value_prior`. 
     
 Note that `init_fn` will always receive the same array as the one passed to `explore` or
 `gumbel_explore` as `envs` (which should be a CPU `Array`). But it's a bit more tricky for
