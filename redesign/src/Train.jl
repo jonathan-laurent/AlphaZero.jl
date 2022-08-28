@@ -60,12 +60,13 @@ end
 
 function play_games(config, trainable_oracle)
     envs = [config.game_env() for _ in 1:(config.train_settings.training_envs)]
-    game_histories = [GameHistory() for _ in 1:(config.train_settings.training_envs)]
+    final_game_histories = [GameHistory() for _ in 1:(config.train_settings.training_envs)]
     mcts = BatchedMcts.Policy(;
         device=config.train_settings.mcts_device, oracle=get_EnvOracle(trainable_oracle)
     )
 
-    while !all(terminated.(envs))
+    game_histories = final_game_histories
+    while !isempty(envs)
         previous_images = make_image.(envs)
         tree = config.train_settings.explore(mcts, envs, config.rng)
 
@@ -78,8 +79,13 @@ function play_games(config, trainable_oracle)
         rewards = map(info -> last(info).reward, infos)
 
         save.(game_histories, previous_images, actions, rewards, values, policies)
+
+        envs = [env for env in envs if !terminated(env)]
+        game_histories = [
+            history for (env, history) in zip(envs, game_histories) if !terminated(env)
+        ]
     end
-    return game_histories
+    return final_game_histories
 end
 
 function train_network(train_settings, trainable_oracle, replay_buffer)
