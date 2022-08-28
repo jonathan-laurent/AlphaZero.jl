@@ -736,6 +736,17 @@ function completed_qvalues(
 end
 
 """
+    rescale(value; minima=-1, maxima=1)
+    
+Rescale `value` between [0; 1].
+
+It is needed to specify the minimum & maximum of `value`.
+"""
+function rescale(value; minima=-1, maxima=1)
+    return (value - minima) / (maxima - minima)
+end
+
+"""
     completed_qvalues(tree)
     
 Return the `completed_qvalues` for each environments.
@@ -751,7 +762,7 @@ function completed_qvalues(tree)
         q_values = BatchedMcts.completed_qvalues(
             tree, ROOT, bid, tree_size; invalid_actions_value=-1
         )
-        l1_normalise(q_values)
+        l1_normalise(rescale.(q_values))
     end
 end
 
