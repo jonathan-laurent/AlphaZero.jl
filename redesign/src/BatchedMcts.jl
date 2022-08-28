@@ -577,10 +577,10 @@ More precisely, `policy_prior`  that are in`valid_actions` are set to 0. The res
 """
 function validate_prior(policy_prior, valid_actions)
     valid_prior = policy_prior .* valid_actions
-    @assert begin
-        B = last(size(valid_prior))
-        all(any(valid_prior[:, bid] .!= Float32(0)) for bid in 1:B)
-    end "No available actions"
+    # @assert begin
+    #     B = last(size(valid_prior))
+    #     all(any(valid_prior[:, bid] .!= Float32(0)) for bid in 1:B)
+    # end "No available actions"
     return mapslices(l1_normalise, valid_prior; dims=1)
 end
 
