@@ -1020,9 +1020,7 @@ function eval!(mcts, tree, simnum, parent_frontier)
     @inbounds tree.prev_action[simnum, non_terminal_bids] = action_ids
     @inbounds tree.prev_reward[simnum, non_terminal_bids] = info.rewards
     @inbounds tree.prev_switched[simnum, non_terminal_bids] = info.player_switched
-    @inbounds tree.policy_prior[:, simnum, non_terminal_bids] = validate_prior(
-        info.policy_prior, info.valid_actions
-    )
+    @inbounds tree.policy_prior[:, simnum, non_terminal_bids] = info.policy_prior # TODO: validate_prior
     @inbounds tree.value_prior[simnum, non_terminal_bids] = info.value_prior
 
     # Update frontier
