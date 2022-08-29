@@ -2,9 +2,9 @@
 Interface that encapsulates inference (through `EnvOracle`) and training of both AlphaZero
 and MuZero.
 """
-module TrainableEnvOracleModule
+module TrainableEnvOracles
 
-export TrainableEnvOracle, make_feature_and_target, update_weights, get_EnvOracle
+export TrainableEnvOracle, make_feature_and_target, update_weights, get_env_oracle
 
 abstract type TrainableEnvOracle end
 
@@ -34,7 +34,7 @@ See also [`make_feature_and_target`](@ref)
 function update_weights end
 
 """
-    get_EnvOracle(::TrainableEnvOracle)
+    get_env_oracle(::TrainableEnvOracle)
     
 Return an Environement Oracle.
 
@@ -44,6 +44,6 @@ hidden behind this `EnvOracle`.
 
 See [`EnvOracle`](@ref) for more details.
 """
-function get_EnvOracle end
+function get_env_oracle end
 
 end

@@ -3,7 +3,7 @@ module Storage
 import Base.length
 
 using ..BatchedEnvs
-using ..TrainableEnvOracleModule
+using ..TrainableEnvOracles
 
 export GameHistory, save, sample_position, length
 export ReplayBuffer, save, get_sample
@@ -14,7 +14,7 @@ export ReplayBuffer, save, get_sample
 Buffers saving all training-related information about a game.
 """
 struct GameHistory
-    images::Vector{Vector{Float32}}
+    states::Vector{Vector{Float32}}
     actions::Vector{Int16}
     rewards::Vector{Float32}
     values::Vector{Float32}
@@ -23,8 +23,8 @@ struct GameHistory
     GameHistory() = new([], [], [], [], [])
 end
 
-function save(history::GameHistory, image, action, reward, value, policy)
-    push!(history.images, image)
+function save(history::GameHistory, state, action, reward, value, policy)
+    push!(history.states, state)
     push!(history.actions, action)
     push!(history.rewards, reward)
     push!(history.values, value)

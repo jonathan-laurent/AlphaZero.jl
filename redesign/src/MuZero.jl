@@ -4,7 +4,7 @@ using Flux
 using ParameterSchedulers: Scheduler, Cos
 
 using ..Storage
-using ..TrainableEnvOracleModule
+using ..TrainableEnvOracles
 
 export MuZeroTrainableEnvOracle
 
@@ -42,7 +42,7 @@ function make_target(history, state_index, target_end_unroll, train_settings)
     end
 end
 
-function TrainableEnvOracleModule.make_feature_and_target(
+function TrainableEnvOracles.make_feature_and_target(
     history::GameHistory, ::MuZeroTrainableEnvOracle, state_index, train_settings
 )
     target_end_unroll = state_index + train_settings.num_unroll_steps
@@ -51,9 +51,9 @@ function TrainableEnvOracleModule.make_feature_and_target(
 
     targets = make_target(history, state_index, target_end_unroll, train_settings)
     actions = history.actions[state_index:end_unroll]
-    image = history.images[state_index]
+    state = history.states[state_index]
 
-    return (image, actions, targets)
+    return (state, actions, targets)
 end
 
 """
@@ -818,13 +818,13 @@ Fill `actions` and `targets` of a `sample` so that they have the expected length
 Necessary to have a consistent size for `Flux.batch`.
 """
 function fill_actions_in_batch(sample, num_unroll_steps)
-    (image, actions, targets) = sample
+    (state, actions, targets) = sample
 
     extra_length = num_unroll_steps - length(actions)
     extra_actions = fill(1, extra_length) # XXX: fill with an arbitrary actions
     filled_actions = cat(actions, extra_actions; dims=1)
 
-    return (image, filled_actions, targets)
+    return (state, filled_actions, targets)
 end
 
 function onehot(action, num_actions; type=Float32)
@@ -834,9 +834,9 @@ function onehot(action, num_actions; type=Float32)
 end
 
 function encode_action_in_batch(sample, num_actions)
-    (image, actions, targets) = sample
+    (state, actions, targets) = sample
     encoded_actions = onehot.(actions, [num_actions])
-    return image, encoded_actions, targets
+    return state, encoded_actions, targets
 end
 
 function fluxify_batch(batch, num_unroll_steps, num_actions)
@@ -854,7 +854,7 @@ function fluxify_batch(batch, num_unroll_steps, num_actions)
     return map(f32, (; X, A_mask, As, Ps, Vs, Rs))
 end
 
-function TrainableEnvOracleModule.update_weights(
+function TrainableEnvOracles.update_weights(
     trainable_oracle::MuZeroTrainableEnvOracle, batches, train_settings
 )
     hyper = (;
@@ -888,7 +888,7 @@ function TrainableEnvOracleModule.update_weights(
 end
 
 using ..BatchedMcts
-function TrainableEnvOracleModule.get_EnvOracle(trainable_oracle::MuZeroTrainableEnvOracle)
+function TrainableEnvOracles.get_env_oracle(trainable_oracle::MuZeroTrainableEnvOracle)
     return UniformTicTacToeEnvOracle()
 end
 

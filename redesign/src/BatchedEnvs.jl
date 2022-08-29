@@ -3,7 +3,7 @@ Interface for batchable environements that can be run on the GPU.
 """
 module BatchedEnvs
 
-export num_actions, valid_action, act, terminated, make_image
+export num_actions, valid_action, act, terminated, vectorize_state
 
 function num_actions end
 
@@ -13,6 +13,6 @@ function act end
 
 function terminated end
 
-function make_image end
+function vectorize_state end
 
 end

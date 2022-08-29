@@ -10,7 +10,7 @@ import Base: @kwdef
 using ..BatchedEnvs
 using ..BatchedMcts # TODO: should be removed when the code is extended to be more generic
 using ..Storage
-using ..TrainableEnvOracleModule
+using ..TrainableEnvOracles
 using ..MuZero
 
 export Config, TrainSettings, train
@@ -54,7 +54,7 @@ function train(config)
     for _ in 1:(config.train_settings.training_steps)
         games = play_games(config, oracle)
         save(replay_buffer, games)
-        train_network(config.train_settings, oracle, replay_buffer)
+        train_iteration(config.train_settings, oracle, replay_buffer)
     end
 end
 
@@ -62,12 +62,12 @@ function play_games(config, trainable_oracle)
     envs = [config.game_env() for _ in 1:(config.train_settings.training_envs)]
     final_game_histories = [GameHistory() for _ in 1:(config.train_settings.training_envs)]
     mcts = BatchedMcts.Policy(;
-        device=config.train_settings.mcts_device, oracle=get_EnvOracle(trainable_oracle)
+        device=config.train_settings.mcts_device, oracle=get_env_oracle(trainable_oracle)
     )
 
     game_histories = final_game_histories
     while !isempty(envs)
-        previous_images = make_image.(envs)
+        previous_states = vectorize_state.(envs)
         tree = config.train_settings.explore(mcts, envs, config.rng)
 
         values = tree.total_values[ROOT, :]
@@ -78,7 +78,7 @@ function play_games(config, trainable_oracle)
         envs = first.(infos)
         rewards = map(info -> last(info).reward, infos)
 
-        save.(game_histories, previous_images, actions, rewards, values, policies)
+        save.(game_histories, previous_states, actions, rewards, values, policies)
 
         envs = [env for env in envs if !terminated(env)]
         game_histories = [
@@ -88,7 +88,7 @@ function play_games(config, trainable_oracle)
     return final_game_histories
 end
 
-function train_network(train_settings, trainable_oracle, replay_buffer)
+function train_iteration(train_settings, trainable_oracle, replay_buffer)
     batches = [
         get_sample(replay_buffer, trainable_oracle, train_settings) for
         _ in 1:(train_settings.nb_batches_per_training)

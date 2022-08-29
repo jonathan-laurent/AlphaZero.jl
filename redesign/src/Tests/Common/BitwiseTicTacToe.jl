@@ -92,14 +92,14 @@ function get_player_board(env::BitwiseTicTacToeEnv, player)
 end
 
 """
-    make_image(env::BitwiseTicTacToeEnv)
+    vectorize_state(env::BitwiseTicTacToeEnv)
 
 Create a vectorize representation of the board.
 The board is represented from the perspective of the next player to play.
 It is a flatten 3x3x3 array with the following channels:
   free, next player, other player
 """
-function BatchedEnvs.make_image(env::BitwiseTicTacToeEnv)
+function BatchedEnvs.vectorize_state(env::BitwiseTicTacToeEnv)
     nought_board = get_player_board(env, NOUGHT)
     cross_board = get_player_board(env, CROSS)
 
