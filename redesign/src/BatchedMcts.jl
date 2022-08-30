@@ -398,7 +398,7 @@ function UniformTicTacToeEnvOracle()
     get_switched(info) = last(info).switched
 
     function transition_fn(envs, aids)
-        B = length(envs)
+        B = size(envs)[end]
         device = get_device(envs)
 
         @assert all(valid_action.(envs, aids)) "Tried to play an illegal move"
@@ -615,7 +615,7 @@ function create_tree(mcts, envs)
     num_visits = fill(UNVISITED, mcts.device, (N, B))
     num_visits[ROOT, :] .= 1
     internal_states = DeviceArray(mcts.device){eltype(info.internal_states)}(
-        undef, (dims(info.internal_states[1])..., N, B)
+        undef, (dims(info.internal_states[.., 1])..., N, B)
     )
     internal_states[.., ROOT, :] = info.internal_states
     valid_actions = fill(false, mcts.device, (A, N, B))
