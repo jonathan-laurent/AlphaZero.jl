@@ -3,6 +3,7 @@ module MuZero
 using Flux
 using ParameterSchedulers: Scheduler, Cos
 
+using ..Util.Devices
 using ..Storage
 using ..TrainableEnvOracles
 
@@ -269,14 +270,14 @@ InitialOracle(nns::MuNetwork) = InitialOracle(nns.h, nns.f)
 #   V⁰ = [v[1] for v in V⁰]
 #   return collect(zip(P⁰, V⁰, S⁰, zero(V⁰)))
 # end
-function evaluate_batch(init::InitialOracle, batch)
-    X = Flux.batch(GI.vectorize_state(init.f.gspec, b) for b in batch) #obsrvation
+function evaluate_batch(init::InitialOracle, observations)
+    X = Flux.batch(observations)
     Xnet = to_nndevice(init.f, X)
     S⁰ = forward(init.h, Xnet) # hiddenstate
     P⁰, V⁰ = forward(init.f, S⁰) # policy, value
     P⁰, V⁰, S⁰ = map(convert_output, (P⁰, V⁰, S⁰))
     V⁰ = [v[1] for v in V⁰]
-    return collect(zip(P⁰, V⁰, S⁰, zero(V⁰)))
+    return P⁰, V⁰, S⁰
 end
 
 #TODO test nonmutable struct
@@ -289,18 +290,17 @@ RecurrentOracle(nns::MuNetwork) = RecurrentOracle(nns.g, nns.f)
 
 (recur::RecurrentOracle)((state, action)) = evaluate(recur, (state, action))
 
-function evaluate_batch(recur::RecurrentOracle, batch)
-    S = Flux.batch(b[1] for b in batch)
-    batchdim = ndims(S)
-    A = Flux.batch(encode_a(recur.f.gspec, b[2]; batchdim) for b in batch)
-    S_A = cat(S, A; dims=batchdim - 1)
+function evaluate_batch(recur::RecurrentOracle, observations, actions)
+    batchdim = ndims(observations)
+    A = Flux.batch(encode_a(recur.f.gspec, action; batchdim) for action in actions)
+    S_A = cat(observations, A; dims=batchdim - 1)
     S_A_net = to_nndevice(recur.f, S_A) # assuming all networks are on the same device
     R, S⁺¹ = forward(recur.g, S_A_net)
     P⁺¹, V⁺¹ = forward(recur.f, S⁺¹)
     P⁺¹, V⁺¹, R, S⁺¹ = map(convert_output, (P⁺¹, V⁺¹, R, S⁺¹))
-    V⁺¹ = (v[1] for v in V⁺¹)
-    R = (r[1] for r in R)
-    return collect(zip(P⁺¹, V⁺¹, S⁺¹, R)) #TODO check for memory consumption;s implement this everywhere,
+    V⁺¹ = first.(V⁺¹)
+    R = first.(R)
+    return P⁺¹, V⁺¹, S⁺¹, R
 end
 # TODO cleanup the rest
 evaluate(nn, x) = evaluate_batch(nn, [x])[1]
@@ -889,7 +889,54 @@ end
 
 using ..BatchedMcts
 function TrainableEnvOracles.get_env_oracle(trainable_oracle::MuZeroTrainableEnvOracle)
-    return UniformTicTacToeEnvOracle()
+    A = 9 # Number of case in the Tic-Tac-Toe grid
+    nns = Flux.testmode!(Flux.cpu(deepcopy(trainable_oracle.neural_networks)))
+
+    init_oracle = InitialOracle(nns)
+    recurrent_oracle = RecurrentOracle(nns)
+
+    get_fake_valid_actions(A, B, device) = fill(true, device, (A, B))
+    get_fake_player_switch(B, device) = fill(true, device, B)
+    get_fake_terminated(B, device) = fill(false, device, B)
+
+    function init_fn(envs)
+        B = length(envs)
+        device = get_device(envs)
+
+        @assert B > 0
+        policy_prior, value_prior, internal_states = evaluate_batch(init_oracle, envs)
+        internal_states = hcat(internal_states...)
+        policy_prior = hcat(policy_prior...)
+
+        return (;
+            internal_states,
+            valid_actions=get_fake_valid_actions(A, B, device),
+            policy_prior,
+            value_prior,
+        )
+    end
+
+    function transition_fn(envs, aids)
+        B = size(envs)[end]
+        device = get_device(envs)
+
+        policy_prior, value_prior, internal_states, rewards = evaluate_batch(
+            recurrent_oracle, envs, aids
+        )
+        internal_states = hcat(internal_states...)
+        policy_prior = hcat(policy_prior...)
+
+        return (;
+            internal_states,
+            rewards,
+            terminal=get_fake_terminated(B, device),
+            valid_actions=get_fake_valid_actions(A, B, device),
+            player_switched=get_fake_player_switch(B, device),
+            policy_prior,
+            value_prior,
+        )
+    end
+    return BatchedMcts.EnvOracle(; init_fn, transition_fn)
 end
 
 lossₚ(p̂, p)::Float32 = Flux.Losses.crossentropy(p̂, p) #TODO move to hyper
