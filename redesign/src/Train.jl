@@ -67,8 +67,8 @@ function play_games(config, trainable_oracle)
 
     game_histories = final_game_histories
     while !isempty(envs)
-        previous_states = vectorize_state.(envs)
-        tree = config.train_settings.explore(mcts, envs, config.rng)
+        states = vectorize_state.(envs)
+        tree = config.train_settings.explore(mcts, states, config.rng)
 
         values = tree.total_values[ROOT, :]
         policies = completed_qvalues(tree)
@@ -78,7 +78,7 @@ function play_games(config, trainable_oracle)
         envs = first.(infos)
         rewards = map(info -> last(info).reward, infos)
 
-        save.(game_histories, previous_states, actions, rewards, values, policies)
+        save.(game_histories, states, actions, rewards, values, policies)
 
         envs = [env for env in envs if !terminated(env)]
         game_histories = [
