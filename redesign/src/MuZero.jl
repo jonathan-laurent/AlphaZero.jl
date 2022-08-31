@@ -3,6 +3,8 @@ module MuZero
 using Flux
 using ParameterSchedulers: Scheduler, Cos
 
+using ..BatchedEnvs
+using ..Tests
 using ..Util.Devices
 using ..Storage
 using ..TrainableEnvOracles
@@ -917,11 +919,10 @@ function TrainableEnvOracles.get_env_oracle(trainable_oracle::MuZeroTrainableEnv
         )
     end
 
-    function transition_fn(envs, aids)
-        B = size(envs)[end]
-        device = get_device(envs)
+    function transition_fn(states, aids)
+        B = size(states)[end]
+        device = get_device(states)
 
-        states = vectorize_state.(envs)
         policy_prior, value_prior, internal_states, rewards = evaluate_batch(
             recurrent_oracle, states, aids
         )
