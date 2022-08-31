@@ -68,7 +68,7 @@ function play_games(config, trainable_oracle)
     game_histories = final_game_histories
     while !isempty(envs)
         states = vectorize_state.(envs)
-        tree = config.train_settings.explore(mcts, states, config.rng)
+        tree = config.train_settings.explore(mcts, envs, config.rng)
 
         values = tree.total_values[ROOT, :]
         policies = completed_qvalues(tree)

@@ -904,7 +904,8 @@ function TrainableEnvOracles.get_env_oracle(trainable_oracle::MuZeroTrainableEnv
         device = get_device(envs)
 
         @assert B > 0
-        policy_prior, value_prior, internal_states = evaluate_batch(init_oracle, envs)
+        states = vectorize_state.(envs)
+        policy_prior, value_prior, internal_states = evaluate_batch(init_oracle, states)
         internal_states = hcat(internal_states...)
         policy_prior = hcat(policy_prior...)
 
@@ -920,8 +921,9 @@ function TrainableEnvOracles.get_env_oracle(trainable_oracle::MuZeroTrainableEnv
         B = size(envs)[end]
         device = get_device(envs)
 
+        states = vectorize_state.(envs)
         policy_prior, value_prior, internal_states, rewards = evaluate_batch(
-            recurrent_oracle, envs, aids
+            recurrent_oracle, states, aids
         )
         internal_states = hcat(internal_states...)
         policy_prior = hcat(policy_prior...)
