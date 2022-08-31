@@ -48,14 +48,21 @@ end
 const ROOT = Int16(1)
 
 function train(config)
+    @info "Start agent training."
     oracle = config.trainable_oracle()
     replay_buffer = ReplayBuffer(config.train_settings.window_size)
 
-    for _ in 1:(config.train_settings.training_steps)
-        games = play_games(config, oracle)
+    for iter in 1:(config.train_settings.training_steps)
+        @info "Start training iteration no. $iter."
+
+        (;time) = @timed games = play_games(config, oracle)
         save(replay_buffer, games)
-        train_iteration(config.train_settings, oracle, replay_buffer)
+        @info "  Self-Play ended in $(time)s."
+
+        (;time) = @timed train_iteration(config.train_settings, oracle, replay_buffer)
+        @info "  Network training ended in $(time)s."
     end
+    @info "Finished agent training."
 end
 
 function play_games(config, trainable_oracle)
