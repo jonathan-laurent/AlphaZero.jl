@@ -4,7 +4,6 @@ using Flux
 using ParameterSchedulers: Scheduler, Cos
 
 using ..BatchedEnvs
-using ..Tests
 using ..Util.Devices
 using ..Storage
 using ..TrainableEnvOracles
