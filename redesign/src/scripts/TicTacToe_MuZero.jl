@@ -3,12 +3,12 @@ import Random: MersenneTwister
 using RLZero
 using .Tests
 
-train_settings = TrainSettings(; # Fake hyperparameters
-    training_steps=10,
-    training_envs=10,
-    window_size=100,
-    batch_size=10,
-    nb_batches_per_training=1,
+train_settings = TrainSettings(;
+    training_steps=1000, # 1000
+    training_envs=512, # 512
+    window_size=1e6, # 1e6
+    batch_size=512, # 512
+    nb_batches_per_training=10, # 10
     num_unroll_steps=5,
     td_steps=9,
     discount=1,
@@ -20,4 +20,23 @@ config = Config(
     BitwiseTicTacToeEnv, MuZeroTrainableEnvOracle, train_settings, MersenneTwister()
 )
 
+dummy_run_config = Config(
+    BitwiseTicTacToeEnv,
+    MuZeroTrainableEnvOracle,
+    TrainSettings(;
+        training_steps=1,
+        training_envs=1,
+        window_size=1,
+        batch_size=1,
+        nb_batches_per_training=1,
+        num_unroll_steps=1,
+        td_steps=1,
+        discount=1,
+        mcts_device=CPU(),
+        explore=BatchedMcts.gumbel_explore,
+    ),
+    MersenneTwister(),
+)
+
+train(dummy_run_config)
 train(config)
