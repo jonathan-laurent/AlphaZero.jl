@@ -248,7 +248,7 @@ end
 
 # takes output form neural netrork back to CPU, and unstack it along last dimmension
 function convert_output(X)
-    X = from_nndevice(nothing, X)
+    # X = from_nndevice(nothing, X)
     return Flux.unstack(X, ndims(X))
 end
 
@@ -293,14 +293,11 @@ RecurrentOracle(nns::MuNetwork) = RecurrentOracle(nns.g, nns.f)
 
 function evaluate_batch(recur::RecurrentOracle, observations, actions)
     batchdim = ndims(observations)
-    A = Flux.batch(encode_a(recur.f.gspec, action; batchdim) for action in actions)
+    A = hcat((onehot(action, 9) for action in actions)...)
     S_A = cat(observations, A; dims=batchdim - 1)
     S_A_net = to_nndevice(recur.f, S_A) # assuming all networks are on the same device
     R, S⁺¹ = forward(recur.g, S_A_net)
     P⁺¹, V⁺¹ = forward(recur.f, S⁺¹)
-    P⁺¹, V⁺¹, R, S⁺¹ = map(convert_output, (P⁺¹, V⁺¹, R, S⁺¹))
-    V⁺¹ = first.(V⁺¹)
-    R = first.(R)
     return P⁺¹, V⁺¹, S⁺¹, R
 end
 # TODO cleanup the rest
@@ -925,8 +922,6 @@ function TrainableEnvOracles.get_env_oracle(trainable_oracle::MuZeroTrainableEnv
         policy_prior, value_prior, internal_states, rewards = evaluate_batch(
             recurrent_oracle, states, aids
         )
-        internal_states = hcat(internal_states...)
-        policy_prior = hcat(policy_prior...)
 
         return (;
             internal_states,
