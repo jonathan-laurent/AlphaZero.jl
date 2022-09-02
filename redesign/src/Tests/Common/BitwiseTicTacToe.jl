@@ -102,13 +102,14 @@ It is a flatten 3x3x3 array with the following channels:
 function BatchedEnvs.vectorize_state(env::BitwiseTicTacToeEnv)
     nought_board = get_player_board(env, NOUGHT)
     cross_board = get_player_board(env, CROSS)
+    free_board = .!(nought_board .|| cross_board)
 
     order = if (env.curplayer == NOUGHT)
-        [nought_board, cross_board]
+        [free_board, nought_board, cross_board]
     else
-        [cross_board, nought_board]
+        [free_board, cross_board, nought_board]
     end
-    return Float32.(cat(.!(nought_board .|| cross_board), order...; dims=1))
+    return Float32.(vcat(order...))
 end
 
 end
