@@ -55,11 +55,11 @@ function train(config)
     for iter in 1:(config.train_settings.training_steps)
         @info "Start training iteration no. $iter."
 
-        (;time) = @timed games = play_games(config, oracle)
+        (; time) = @timed games = play_games(config, oracle)
         save(replay_buffer, games)
         @info "  Self-Play ended in $(time)s."
 
-        (;time) = @timed train_iteration(config.train_settings, oracle, replay_buffer)
+        (; time) = @timed train_iteration(config.train_settings, oracle, replay_buffer)
         @info "  Network training ended in $(time)s."
     end
     @info "Finished agent training."
