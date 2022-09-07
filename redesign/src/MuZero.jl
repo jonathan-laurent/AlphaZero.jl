@@ -1014,7 +1014,7 @@ function μtrain!(nns, loss, data, opt)
         Flux.update!(opt, ps, gs)
         # @info "debug" η=opt.optim.eta
     end
-    @info losses
+    @info "Losses" losses
     return mean_loss_total = mean(losses)
 end
 
