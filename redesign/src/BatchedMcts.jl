@@ -607,7 +607,7 @@ on them. Moreover, `policy_prior` are corrected as specified in `validate_prior`
 See [`Tree`](@ref) for more details.
 """
 function create_tree(mcts, envs)
-    @assert length(envs) != 0 "There should be at least environment"
+    @assert length(envs) != 0 "There should be at least one environment"
 
     info = mcts.oracle.init_fn(envs)
     A, N, B = size(info.policy_prior)[1], mcts.num_simulations, length(envs)
