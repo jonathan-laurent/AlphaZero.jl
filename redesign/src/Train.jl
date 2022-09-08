@@ -9,6 +9,7 @@ import Base: @kwdef
 
 using ..BatchedEnvs
 using ..BatchedMcts # TODO: should be removed when the code is extended to be more generic
+using ..Benchmark
 using ..Storage
 using ..TrainableEnvOracles
 using ..MuZero
@@ -43,6 +44,7 @@ Training-related settings.
     discount
     mcts_device
     explore
+    benchmark_frequence = 50
 end
 
 const ROOT = Int16(1)
@@ -61,6 +63,11 @@ function train(config)
 
         (; time) = @timed train_iteration(config.train_settings, oracle, replay_buffer)
         @info "  Network training ended in $(time)s."
+
+        if (iter % config.train_settings.benchmark_frequence == 0)
+            (; time) = @timed benchmark = benchmark_against_MCTS(get_env_oracle(oracle))
+            @info "  Benchmark (ran in $(time)s)." benchmark.wins benchmark.losses benchmark.draws
+        end
     end
     @info "Finished agent training."
 end
