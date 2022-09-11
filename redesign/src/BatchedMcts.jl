@@ -805,7 +805,14 @@ Return the policy of a node.
 
 I.e. a score of how much each action should be played. The higher, the better.
 """
-function target_policy(value_scale, max_visit_init, tree, cid, bid, tree_size::Tuple{Val{A},Any,Any}) where {A}
+function target_policy(
+    value_scale,
+    max_visit_init,
+    tree,
+    cid,
+    bid,
+    tree_size::Tuple{Val{A},Any,Any}
+) where {A}
     qs = completed_qvalues(tree, cid, bid, tree_size)
     policy = SVector{A}(imap(aid -> tree.policy_prior[aid, cid, bid], 1:A))
     return log.(policy) + qcoeff(value_scale, max_visit_init, tree, cid, bid, tree_size) * qs
@@ -1115,7 +1122,9 @@ function gumbel_explore(mcts, envs, rng::AbstractRNG)
     (; A, B, N) = size(tree)
 
     gumbel = DeviceArray(mcts.device)(rand(rng, Gumbel(), (A, B)))
-    considered_visits_table = DeviceArray(mcts.device)(get_considered_visits_table(mcts, A))
+    considered_visits_table = DeviceArray(mcts.device)(
+        get_considered_visits_table(mcts.num_simulations, A)
+    )
 
     for simnum in 2:N
         parent_frontier = gumbel_select(mcts, tree, simnum, gumbel, considered_visits_table)
@@ -1165,7 +1174,7 @@ function get_considered_visits_sequence(max_num_actions, num_simulations)
 end
 
 """
-    get_considered_visits_table(mcts, num_actions)
+    get_considered_visits_table(num_simulations, num_actions)
 
 Return a table containing the precomputed sequence of visits for each number of considered
 actions possible.
@@ -1176,9 +1185,9 @@ of visits (i.e the number of visits that the selected action at the root node sh
 
 See also [`get_considered_visits_sequence`](@ref)
 """
-function get_considered_visits_table(mcts, num_actions)
+function get_considered_visits_table(num_simulations, num_actions)
     ret = imap(1:num_actions) do num_considered_actions
-        get_considered_visits_sequence(num_considered_actions, mcts.num_simulations)
+        get_considered_visits_sequence(num_considered_actions, num_simulations)
     end
     return SVector{num_actions}(ret)
 end
@@ -1197,11 +1206,20 @@ function gumbel_select(mcts, tree, simnum, gumbel, considered_visits_table)
     (; A, N, B) = size(tree)
     tree_size = (Val(A), Val(N), Val(B))
 
-    value_scale, max_visit_init, num_considered_actions = mcts.value_scale, mcts.max_visit_init, mcts.num_considered_actions 
+    value_scale, max_visit_init = mcts.value_scale, mcts.max_visit_init 
+    num_considered_actions = mcts.num_considered_actions 
     parent_frontier = zeros(Int16, mcts.device, (2, B))
     Devices.foreach(1:B, mcts.device) do bid
         aid = gumbel_select_root_action(
-            value_scale, max_visit_init, num_considered_actions, tree, bid, gumbel, considered_visits_table, simnum - ROOT, tree_size
+            value_scale,
+            max_visit_init,
+            num_considered_actions,
+            tree,
+            bid,
+            gumbel,
+            considered_visits_table,
+            simnum - ROOT,
+            tree_size
         )
         @assert aid != NO_ACTION
 
@@ -1235,7 +1253,12 @@ Actions that comply with the constraint on the number of visits have no penalty 
 penalty of `0`)
 """
 function get_penality(
-    num_considered_actions, tree, bid, considered_visits_table, child_visits, tree_size::Tuple{Val{A},Any,Any}
+    num_considered_actions,
+    tree,
+    bid,
+    considered_visits_table,
+    child_visits,
+    tree_size::Tuple{Val{A},Any,Any}
 ) where {A}
     num_valid_actions = sum(aid -> tree.valid_actions[aid, ROOT, bid], 1:A; init=NO_ACTION)
     num_considered_actions = min(num_considered_actions, num_valid_actions)
