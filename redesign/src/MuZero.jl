@@ -893,6 +893,15 @@ function TrainableEnvOracles.get_env_oracle(trainable_oracle::MuZeroTrainableEnv
     init_oracle = InitialOracle(nns)
     recurrent_oracle = RecurrentOracle(nns)
 
+    function get_valid_actions(A, B, envs)
+        device = get_device(envs)
+
+        valid_ids = DeviceArray(device)(Tuple.(CartesianIndices((A, B))))
+        return map(valid_ids) do (aid, bid)
+            valid_action(envs[bid], aid)
+        end
+    end
+
     get_fake_valid_actions(A, B, device) = fill(true, device, (A, B))
     get_fake_player_switch(B, device) = fill(true, device, B)
     get_fake_terminated(B, device) = fill(false, device, B)
@@ -909,7 +918,7 @@ function TrainableEnvOracles.get_env_oracle(trainable_oracle::MuZeroTrainableEnv
 
         return (;
             internal_states,
-            valid_actions=get_fake_valid_actions(A, B, device),
+            valid_actions=get_valid_actions(A, B, envs),
             policy_prior,
             value_prior,
         )

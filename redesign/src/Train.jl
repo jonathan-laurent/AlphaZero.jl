@@ -6,6 +6,7 @@ Main file containing the algorithm to `train` both AlphaZero & MuZero.
 module Train
 
 import Base: @kwdef
+using CUDA: @inbounds
 
 using ..BatchedEnvs
 using ..BatchedMcts # TODO: should be removed when the code is extended to be more generic
@@ -80,24 +81,27 @@ function play_games(config, trainable_oracle)
     )
 
     game_histories = final_game_histories
+    n_iters = 0
     while !isempty(envs)
-        states = vectorize_state.(envs)
-        tree = config.train_settings.explore(mcts, envs, config.rng)
+        @info "n_games: $(length(envs)) | n_iters: $n_iters"
+        n_iters += 1
 
+        tree = config.train_settings.explore(mcts, envs, config.rng)
         values = tree.total_values[ROOT, :]
         policies = completed_qvalues(tree)
         actions = argmax.(policies)
 
+        @assert all(valid_action.(envs, actions)) "Tried to play an invalid action."
         infos = act.(envs, actions)
         envs = first.(infos)
+        states = vectorize_state.(envs)
         rewards = map(info -> last(info).reward, infos)
 
         save.(game_histories, states, actions, rewards, values, policies)
 
-        envs = [env for env in envs if !terminated(env)]
-        game_histories = [
-            history for (env, history) in zip(envs, game_histories) if !terminated(env)
-        ]
+        unterminated_envs = @. !terminated(envs)
+        @inbounds game_histories = game_histories[unterminated_envs]
+        @inbounds envs = envs[unterminated_envs]
     end
     return final_game_histories
 end
