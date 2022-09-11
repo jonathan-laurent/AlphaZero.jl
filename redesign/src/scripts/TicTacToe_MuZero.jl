@@ -40,7 +40,7 @@ function run_TTT_MZ_script()
     )
 
     config = Config(
-        BitwiseTicTacToeEnv, MuZeroTrainableEnvOracle, train_settings, MersenneTwister()
+        BitwiseTicTacToeEnv, MuZeroTrainableEnvOracle, train_settings, MersenneTwister(0)
     )
     train(config)
 end
