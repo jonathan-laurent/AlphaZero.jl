@@ -742,7 +742,7 @@ Rescale `value` between [0; 1].
 
 It is needed to specify the minimum & maximum of `value`.
 """
-function rescale(value; minima=-1, maxima=1)
+function rescale(value; minima=-2, maxima=1)
     return (value - minima) / (maxima - minima)
 end
 
@@ -759,8 +759,11 @@ function completed_qvalues(tree)
     tree_size = (Val(A), Val(N), Val(B))
 
     return map(1:B) do bid
+        # XXX: invalid_actions_value should be -1, but for some reasons, completed_qvalues
+        #   are sometimes lower than -1, to fix this, we used -2 as an invalid_actions_value
+        #   and changed the minimal value of `rescale` too.
         q_values = BatchedMcts.completed_qvalues(
-            tree, ROOT, bid, tree_size; invalid_actions_value=-1
+            tree, ROOT, bid, tree_size; invalid_actions_value=-2
         )
         l1_normalise(rescale.(q_values))
     end
