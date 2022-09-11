@@ -443,7 +443,7 @@ A batch, device-specific MCTS Policy that leverages an external `EnvOracle`.
    evaluation.
 - `num_simulations::Int = 64`: number of simulations to run on the given Mcts `Tree`.
 - `num_considered_actions::Int = 8`: number of actions considered by Gumbel during
-   exploration. Only the `num_conidered_actions` actions with the highest scores will be
+   exploration. Only the `num_considered_actions` actions with the highest scores will be
    explored. It should preferably be a power of 2.
 - `value_scale::Float32 = 0.1f0`: multiplying coefficient to weight the qvalues against the
    prior probabilities during exploration. Prior probabilities have, by default, a
@@ -453,7 +453,7 @@ A batch, device-specific MCTS Policy that leverages an external `EnvOracle`.
 
 # Notes
 
-The attributes `num_conidered_actions`, `value_scale` and `max_visit_init` are specific to
+The attributes `num_considered_actions`, `value_scale` and `max_visit_init` are specific to
 the Gumbel implementation.
 """
 @kwdef struct Policy{Device,Oracle<:EnvOracle}
