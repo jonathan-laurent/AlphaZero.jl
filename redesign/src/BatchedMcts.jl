@@ -783,43 +783,43 @@ function get_num_child_visits(tree, cid, bid, ::Tuple{Val{A},Any,Any}) where {A}
 end
 
 """
-    qcoeff(mcts, tree, cid, bid, tree_size)
+    qcoeff(value_scale, max_visit_init, tree, cid, bid, tree_size)
 
 Compute a GUmbel-related ponderation of `qvalue`.
 
 Through time, as the number of visits increases, the influence of `qvalue` builds up
 relatively to `policy_prior`.
 """
-function qcoeff(mcts, tree, cid, bid, tree_size)
+function qcoeff(value_scale, max_visit_init, tree, cid, bid, tree_size)
     # XXX: init is necessary for GPUCompiler right now...
     max_child_visit = maximum(
         get_num_child_visits(tree, cid, bid, tree_size); init=UNVISITED
     )
-    return mcts.value_scale * (mcts.max_visit_init + max_child_visit)
+    return value_scale * (max_visit_init + max_child_visit)
 end
 
 """
-    target_policy(mcts, tree, cid, bid, tree_size::Tuple{Val{A},Any,Any}) where {A}
+    target_policy(value_scale, max_visit_init, tree, cid, bid, tree_size::Tuple{Val{A},Any,Any}) where {A}
     
 Return the policy of a node.
 
 I.e. a score of how much each action should be played. The higher, the better.
 """
-function target_policy(mcts, tree, cid, bid, tree_size::Tuple{Val{A},Any,Any}) where {A}
+function target_policy(value_scale, max_visit_init, tree, cid, bid, tree_size::Tuple{Val{A},Any,Any}) where {A}
     qs = completed_qvalues(tree, cid, bid, tree_size)
     policy = SVector{A}(imap(aid -> tree.policy_prior[aid, cid, bid], 1:A))
-    return log.(policy) + qcoeff(mcts, tree, cid, bid, tree_size) * qs
+    return log.(policy) + qcoeff(value_scale, max_visit_init, tree, cid, bid, tree_size) * qs
 end
 
 """
-    select_action(mcts, tree, cid, bid, tree_size)
+    select_action(value_scale, max_visit_init, tree, cid, bid, tree_size)
 
 Select the most appropriate action to explore.
 
 `NO_ACTION` is returned if no actions are available.
 """
-function select_action(mcts, tree, cid, bid, tree_size)
-    policy = softmax(target_policy(mcts, tree, cid, bid, tree_size))
+function select_action(value_scale, max_visit_init, tree, cid, bid, tree_size)
+    policy = softmax(target_policy(value_scale, max_visit_init, tree, cid, bid, tree_size))
     num_child_visits = get_num_child_visits(tree, cid, bid, tree_size)
     total_visits = sum(num_child_visits; init=UNVISITED)
     return Int16(
@@ -925,9 +925,10 @@ function select(mcts, tree)
     (; A, N, B) = size(tree)
     tree_size = (Val(A), Val(N), Val(B))
 
+    value_scale, max_visit_init = mcts.value_scale, mcts.max_visit_init
     parent_frontier = zeros(Int16, mcts.device, (2, B))
     Devices.foreach(1:B, mcts.device) do bid
-        new_frontier = select(mcts, tree, bid, tree_size)
+        new_frontier = select(value_scale, max_visit_init, tree, bid, tree_size)
         @inbounds parent_frontier[PARENT, bid] = new_frontier[PARENT]
         @inbounds parent_frontier[ACTION, bid] = new_frontier[ACTION]
         return nothing
@@ -956,14 +957,14 @@ action in the tuple. This was necessary to respect the type-stability constraint
 `select` always returns a tuple `(node, action)`. The `NO_ACTION` action also makes it easy
 to detect terminal nodes in the `parent_frontier`
 """
-function select(mcts, tree, bid, tree_size; start=ROOT)
+function select(value_scale, max_visit_init, tree, bid, tree_size; start=ROOT)
     cur = start
     while true
         if tree.terminal[cur, bid]
             # returns current terminal, but no action played
             return cur, NO_ACTION
         end
-        aid = select_action(mcts, tree, cur, bid, tree_size)
+        aid = select_action(value_scale, max_visit_init, tree, cur, bid, tree_size)
         @assert aid != NO_ACTION
 
         cnid = tree.children[aid, cur, bid]
@@ -1196,16 +1197,17 @@ function gumbel_select(mcts, tree, simnum, gumbel, considered_visits_table)
     (; A, N, B) = size(tree)
     tree_size = (Val(A), Val(N), Val(B))
 
+    value_scale, max_visit_init, num_considered_actions = mcts.value_scale, mcts.max_visit_init, mcts.num_considered_actions 
     parent_frontier = zeros(Int16, mcts.device, (2, B))
     Devices.foreach(1:B, mcts.device) do bid
         aid = gumbel_select_root_action(
-            mcts, tree, bid, gumbel, considered_visits_table, simnum - ROOT, tree_size
+            value_scale, max_visit_init, num_considered_actions, tree, bid, gumbel, considered_visits_table, simnum - ROOT, tree_size
         )
         @assert aid != NO_ACTION
 
         cnid = tree.children[aid, ROOT, bid]
         new_frontier = if (cnid != UNVISITED)
-            select(mcts, tree, bid, tree_size; start=cnid)
+            select(value_scale, max_visit_init, tree, bid, tree_size; start=cnid)
         else
             (ROOT, aid)
         end
@@ -1233,10 +1235,10 @@ Actions that comply with the constraint on the number of visits have no penalty 
 penalty of `0`)
 """
 function get_penality(
-    mcts, tree, bid, considered_visits_table, child_visits, tree_size::Tuple{Val{A},Any,Any}
+    num_considered_actions, tree, bid, considered_visits_table, child_visits, tree_size::Tuple{Val{A},Any,Any}
 ) where {A}
     num_valid_actions = sum(aid -> tree.valid_actions[aid, ROOT, bid], 1:A; init=NO_ACTION)
-    num_considered_actions = min(mcts.num_considered_actions, num_valid_actions)
+    num_considered_actions = min(num_considered_actions, num_valid_actions)
 
     num_visits = get_num_child_visits(tree, ROOT, bid, tree_size)
     considered_visits = considered_visits_table[num_considered_actions][child_visits]
@@ -1248,7 +1250,9 @@ end
 
 """
     gumbel_select_root_action(
-        mcts,
+        value_scale,
+        max_visit_init,
+        num_considered_actions,
         tree,
         bid,
         gumbel,
@@ -1263,7 +1267,9 @@ The only difference lies in the use of `gumbel` noise in the computation of the 
 before applying the argmax and the additional constraints on the number of visits.
 """
 function gumbel_select_root_action(
-    mcts,
+    value_scale,
+    max_visit_init,
+    num_considered_actions,
     tree,
     bid,
     gumbel,
@@ -1272,9 +1278,9 @@ function gumbel_select_root_action(
     tree_size::Tuple{Val{A},Any,Any},
 ) where {A}
     batch_gumbel = SVector{A}(imap(aid -> gumbel[aid, bid], 1:A))
-    policy = target_policy(mcts, tree, ROOT, bid, tree_size)
+    policy = target_policy(value_scale, max_visit_init, tree, ROOT, bid, tree_size)
     penality = get_penality(
-        mcts, tree, bid, considered_visits_table, child_visits, tree_size
+        num_considered_actions, tree, bid, considered_visits_table, child_visits, tree_size
     )
 
     scores = batch_gumbel + policy + penality
