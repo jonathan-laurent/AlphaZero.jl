@@ -1,5 +1,6 @@
 module BatchedMctsTests
 
+using ...BatchedMctsUtility
 using ...BatchedMcts
 using ...Util.Devices
 using ...BatchedEnvs
@@ -37,11 +38,6 @@ function run_batched_mcts_tests()
         @testset "Compilation" begin
             run_batched_mcts_tests_on(CPU())
             CUDA.functional() && run_batched_mcts_tests_on(GPU())
-        end
-        @testset "UniformTicTacToeEnvOracle" begin
-            envs = tic_tac_toe_winning_envs()
-            check_oracle(UniformTicTacToeEnvOracle(), envs)
-            @test true
         end
         @testset "Policy" begin
             function test_exploration(tree, env, bid)

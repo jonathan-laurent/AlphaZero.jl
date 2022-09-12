@@ -11,6 +11,9 @@ using .BatchedEnvs
 include("SimpleMcts.jl")
 @reexport using .SimpleMcts
 
+include("BatchedMctsUtility.jl")
+@reexport using .BatchedMctsUtility
+
 include("BatchedMcts.jl")
 @reexport using .BatchedMcts: BatchedMcts
 
