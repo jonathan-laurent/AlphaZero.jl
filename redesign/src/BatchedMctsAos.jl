@@ -4,71 +4,78 @@ are represented in Array of Structs format.
 """
 module BatchedMctsAos
 
+using Flux
 using StaticArrays
-using Distributions: sample, Gumbel
+using Distributions: Gumbel
 using Random: AbstractRNG
 using Base: @kwdef
 using Setfield
 using Base.Iterators: map as imap
+using EllipsisNotation
 
-using ..BatchedEnvs
 using ..Util.Devices
 using ..Util.Devices.KernelFuns: sum, argmax, maximum, softmax
+using ..BatchedMctsUtility
 
-export Policy, explore, gumbel_explore, completed_qvalues
-export uniform_oracle, RolloutOracle
+export explore, gumbel_explore, completed_qvalues
 
-"""
-An MCTS Policy that leverages an external oracle and
-supporting a specific device.
-"""
-@kwdef struct Policy{Oracle,Device}
-    oracle::Oracle
-    device::Device
-    num_simulations::Int = 64
-    num_considered_actions::Int = 8
-    value_scale::Float32 = 0.1f0
-    max_visit_init::Int = 50
-end
+## Value stored in `tree.parent` for nodes with no parents.
+const NO_PARENT = Int16(0)
+## Value stored in `tree.children` for unvisited children.
+const UNVISITED = Int16(0)
+## Value used in various tree's attributes to access root information.
+const ROOT = Int16(1)
+## Valud used when no action is selected.
+const NO_ACTION = Int16(0)
 
 @kwdef struct Node{NumActions,State}
     # Static info created at initialization
     state::State
-    parent::Int16 = Int16(0)
-    prev_action::Int16 = Int16(0)
+    parent::Int16 = NO_PARENT
+    prev_action::Int16 = NO_ACTION
     prev_reward::Float32 = 0.0f0
     prev_switched::Bool = false
     terminal::Bool = false
-    valid_actions::SVector{NumActions,Bool} = @SVector zeros(Bool, NumActions)
+    valid_actions::SVector{NumActions,Bool} = @SVector fill(false, NumActions)
     # Oracle info
     prior::SVector{NumActions,Float32} = @SVector zeros(Float32, NumActions)
     oracle_value::Float32 = 0.0f0
     # Dynamic info
     children::SVector{NumActions,Int16} = @SVector zeros(Int16, NumActions)
-    num_visits::Int16 = Int16(0)
+    num_visits::Int16 = UNVISITED
     total_rewards::Float32 = 0.0f0
 end
 
-function Node{na}(state; args...) where {na}
-    terminal = terminated(state)
-    if terminal
-        valid_actions = SVector{na,Bool}(false for _ in 1:na)
-    else
-        valid_actions = SVector{na,Bool}(valid_action(state, i) for i in 1:na)
-    end
-    return Node{na,typeof(state)}(; state, terminal, valid_actions, args...)
+l1_normalise(policy) = policy / abs(sum(policy; init=Float32(0)))
+
+function Node{na}(state, valid_actions, prior, oracle_value) where {na}
+    prior = l1_normalise(prior .* valid_actions)
+    return Node{na,typeof(state)}(; state, valid_actions, prior, oracle_value, num_visits=1)
 end
 
 function create_tree(mcts, envs)
-    env = envs[1]
-    na = num_actions(env)
-    ne = length(envs)
-    ns = mcts.num_simulations
-    Arr = DeviceArray(mcts.device)
+    @assert length(envs) != 0 "There should be at least one environment."
+
+    info = mcts.oracle.init_fn(envs)
+    na, ne, ns = size(info.policy_prior)[1], length(envs), mcts.num_simulations
+
+    last_state_dims = length(size(info.internal_states))
+    internal_states = if last_state_dims == 1
+        info.internal_states
+    else
+        Flux.unstack(info.internal_states; dims=last_state_dims)
+    end
+    valid_actions = Flux.unstack(info.valid_actions; dims=2)
+    policy_prior = Flux.unstack(info.policy_prior; dims=2)
+
     # We index tree nodes with (batchnum, simnum)
     # This is unusual but this has better cache locality in this case
-    tree = Arr{Node{na,typeof(env)}}(undef, (ne, ns))
-    tree[:, 1] = Arr([Node{na}(e) for e in envs])
+    tree = DeviceArray(mcts.device){Node{na,typeof(info.internal_states[.., 1])}}(
+        undef, (ne, ns)
+    )
+    tree[:, ROOT] =
+        Node{na}.(internal_states, valid_actions, policy_prior, info.value_prior)
+
     return tree
 end
 
@@ -80,28 +87,57 @@ function tree_dims(tree::Tree{N,S}) where {N,S}
     return (; na, ne, ns)
 end
 
-function validate_prior(node, prior)
-    for (action_id, is_valid_action) in enumerate(node.valid_actions)
-        (is_valid_action) && continue
-        @set! prior[action_id] = Float32(0)
-    end
-    return prior ./ sum(prior; init=0)
-end
-
-function eval_states!(mcts, tree, frontier)
+function eval_states!(mcts, tree, simnum, parent_frontier)
     (; na, ne) = tree_dims(tree)
-    Devices.foreach(1:ne, mcts.device) do batchnum
-        nid = frontier[batchnum]
-        (nid == 0) && return nothing
-        node = tree[batchnum, nid]
-        if !node.terminal
-            prior, oracle_value = mcts.oracle(node.state)
-            @set! node.prior = validate_prior(node, prior)
-            @set! node.oracle_value = oracle_value
-            tree[batchnum, nid] = node
-        end
+
+    parent = first
+    action = last
+
+    non_terminal_mask = @. action(parent_frontier) != NO_ACTION
+    non_terminal_bids = DeviceArray(mcts.device)(@view((1:ne)[non_terminal_mask]))
+    # No new node to expand (a.k.a only terminal node on the frontier)
+    (length(non_terminal_bids) == 0) && return parent.(parent_frontier)
+
+    # Regroup `action_ids` and `parent_states` for `transition_fn`
+    parent_ids = parent.(parent_frontier[non_terminal_bids])
+    action_ids = action.(parent_frontier[non_terminal_bids])
+
+    parent_states = map(DeviceArray(mcts.device)(eachindex(parent_ids))) do i
+        tree[non_terminal_bids[i], parent_ids[i]].state
     end
-    return nothing
+    info = mcts.oracle.transition_fn(parent_states, action_ids)
+
+    # Create nodes and save `info`
+    Devices.foreach(eachindex(action_ids), mcts.device) do i
+        parent_id = parent_ids[i]
+        bid = non_terminal_bids[i]
+        aid = action_ids[i]
+
+        node = tree[bid, parent_id]
+        @set! node.children[aid] = simnum
+        tree[bid, parent_id] = node
+
+        state = info.internal_states[.., i]
+        tree[bid, simnum] = Node{na,typeof(state)}(;
+            state,
+            parent=parent_id,
+            prev_action=aid,
+            prev_reward=info.rewards[i],
+            prev_switched=info.player_switched[i],
+            terminal=info.terminal[i],
+            valid_actions=SVector{na}(info.valid_actions[:, i]),
+            prior=SVector{na}(info.policy_prior[:, i]),
+            oracle_value=info.value_prior[i],
+        )
+
+        return nothing
+    end
+
+    # Update frontier
+    frontier = parent.(parent_frontier)
+    @inbounds frontier[non_terminal_bids] .= simnum
+
+    return frontier
 end
 
 value(node) = node.total_rewards / node.num_visits
@@ -111,9 +147,9 @@ qvalue(child) = value(child) * (-1)^child.prev_switched
 function root_value_estimate(tree, node, bid)
     total_qvalues = 0.0f0
     total_prior = 0.0f0
-    total_visits = 0
+    total_visits = UNVISITED
     for (i, cnid) in enumerate(node.children)
-        if cnid > 0  # if the child was visited
+        if cnid != UNVISITED
             child = tree[bid, cnid]
             total_qvalues += node.prior[i] * qvalue(child)
             total_prior += node.prior[i]
@@ -134,20 +170,20 @@ function completed_qvalues(tree, node, bid)
         end
 
         cnid = node.children[i]
-        return cnid > 0 ? qvalue(tree[bid, cnid]) : root_value
+        return cnid != UNVISITED ? qvalue(tree[bid, cnid]) : root_value
     end
     return SVector{na}(ret)
 end
 
 function num_child_visits(tree, node, bid, i)
     cnid = node.children[i]
-    return cnid > 0 ? tree[bid, cnid].num_visits : Int16(0)
+    return cnid != UNVISITED ? tree[bid, cnid].num_visits : UNVISITED
 end
 
 function qcoeff(mcts, tree, node, bid)
     na = length(node.children)
     # init is necessary for GPUCompiler right now...
-    max_child_visit = maximum(1:na; init=Int16(0)) do i
+    max_child_visit = maximum(1:na; init=UNVISITED) do i
         num_child_visits(tree, node, bid, i)
     end
     return mcts.value_scale * (mcts.max_visit_init + max_child_visit)
@@ -161,59 +197,51 @@ end
 function select_nonroot_action(mcts, tree, node, bid)
     policy = target_policy(mcts, tree, node, bid)
     na = length(node.children)
-    total_visits = sum(i -> num_child_visits(tree, node, bid, i), 1:na; init=0)
-    return argmax(1:na; init=(0, -Inf32)) do i
-        ratio = Float32(num_child_visits(tree, node, bid, i)) / (total_visits + 1)
-        return policy[i] - ratio
-    end
-end
-
-function act_legal(node, aid)
-    @assert node.valid_actions[aid]
-    return act(node.state, aid)
+    total_visits = sum(i -> num_child_visits(tree, node, bid, i), 1:na; init=UNVISITED)
+    return Int16(
+        argmax(1:na; init=(NO_ACTION, -Inf32)) do i
+            ratio = Float32(num_child_visits(tree, node, bid, i)) / (total_visits + 1)
+            return policy[i] - ratio
+        end,
+    )
 end
 
 # `cur` is set to one so that selection starts at root node
-function select!(mcts, tree, simnum, bid; cur=Int16(1))
+function select(mcts, tree, bid; cur=ROOT)
     (; na) = tree_dims(tree)
     while true
         node = tree[bid, cur]
         if node.terminal
-            return cur
+            # returns current terminal, but no action played
+            return cur, NO_ACTION
         end
-        i = select_nonroot_action(mcts, tree, node, bid)
-        cnid = node.children[i]
-        if cnid > 0
+        aid = select_nonroot_action(mcts, tree, node, bid)
+        @assert aid != NO_ACTION
+
+        cnid = node.children[aid]
+        if cnid != UNVISITED
             # The child is already in the tree so we proceed.
             cur = cnid
         else
-            # The child is not in the tree so we add it and return.
-            newstate, info = act_legal(node, i)
-            child = Node{na}(
-                newstate;
-                parent=cur,
-                prev_action=i,
-                prev_reward=info.reward,
-                prev_switched=info.switched,
-            )
-            tree[bid, simnum] = child
-            @set! node.children[i] = simnum
-            tree[bid, cur] = node
-            return Int16(simnum)
+            # The child is not in the tree so we return its parent along with the action
+            # that leads to it.
+            return cur, aid
         end
     end
+    return nothing
 end
 
 # Start from the root and add a new frontier (whose index is returned)
 # After the node is added, one expect the oracle to be called on all
 # frontier nodes where terminal=false.
-function select!(mcts, tree, simnum)
+function select(mcts, tree)
     (; ne) = tree_dims(tree)
+
     batch_ids = DeviceArray(mcts.device)(1:ne)
-    frontier = map(batch_ids) do bid
-        return select!(mcts, tree, simnum, bid)
+    parent_frontier = map(batch_ids) do bid
+        return select(mcts, tree, bid)
     end
-    return frontier
+    return parent_frontier
 end
 
 # Value: if terminal node: terminal value / otherwise: network value
@@ -222,7 +250,6 @@ function backpropagate!(mcts, tree, frontier)
     batch_ids = DeviceArray(mcts.device)(1:ne)
     map(batch_ids) do bid
         sid = frontier[bid]
-        (sid == 0) && return nothing
         node = tree[bid, sid]
         val = node.oracle_value
         while true
@@ -231,7 +258,7 @@ function backpropagate!(mcts, tree, frontier)
             @set! node.num_visits += Int16(1)
             @set! node.total_rewards += val
             tree[bid, sid] = node
-            if node.parent > 0
+            if node.parent != NO_PARENT
                 sid = node.parent
                 node = tree[bid, sid]
             else
@@ -244,29 +271,13 @@ end
 
 function explore(mcts, envs)
     tree = create_tree(mcts, envs)
-    (; ne, ns) = tree_dims(tree)
-    frontier = DeviceArray(mcts.device)(ones(Int16, ne))
-    eval_states!(mcts, tree, frontier)
-    for i in 2:ns
-        frontier = select!(mcts, tree, i)
-        eval_states!(mcts, tree, frontier)
+    (; ns) = tree_dims(tree)
+    for simnum in 2:ns
+        parent_frontier = select(mcts, tree)
+        frontier = eval_states!(mcts, tree, simnum, parent_frontier)
         backpropagate!(mcts, tree, frontier)
     end
     return tree
-end
-
-#####
-## Some standard oracles
-#####
-
-"""
-Oracle that always returns a value of 0 and a uniform policy.
-"""
-function uniform_oracle(env)
-    n = num_actions(env)
-    P = (@SVector ones(Float32, n)) ./ n
-    V = Float32(0.0)
-    return P, V
 end
 
 end

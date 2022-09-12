@@ -1,5 +1,6 @@
 module BatchedMctsAosTests
 
+using ...BatchedMctsUtility
 using ...BatchedMctsAos
 using ...Util.Devices
 using ...BatchedEnvs
@@ -20,7 +21,7 @@ const MCTS = BatchedMctsAos
 
 function run_batched_mcts_aos_tests_on(device; num_simulations=2, num_envs=2)
     env = BitwiseTicTacToeEnv()
-    mcts = MCTS.Policy(; device=device, oracle=uniform_oracle, num_simulations)
+    mcts = Policy(; device=device, oracle=UniformTicTacToeEnvOracle(), num_simulations)
     tree = MCTS.explore(mcts, [env for _ in 1:num_envs])
     @test true
     return tree
@@ -28,15 +29,18 @@ end
 
 function run_batched_gumbel_mcts_aos_tests_on(device; num_simulations=2, num_envs=2)
     env = BitwiseTicTacToeEnv()
-    mcts = MCTS.Policy(; device=device, oracle=uniform_oracle, num_simulations)
+    mcts = Policy(; device=device, oracle=UniformTicTacToeEnvOracle(), num_simulations)
     tree = MCTS.gumbel_explore(mcts, [env for _ in 1:num_envs], MersenneTwister(0))
     @test true
     return tree
 end
 
 function uniform_mcts_tic_tac_toe(device; num_simulations=64)
-    return MCTS.Policy(;
-        oracle=MCTS.uniform_oracle, device=device, num_considered_actions=9, num_simulations
+    return Policy(;
+        oracle=UniformTicTacToeEnvOracle(),
+        device=device,
+        num_considered_actions=9,
+        num_simulations,
     )
 end
 
@@ -51,15 +55,6 @@ function run_batched_mcts_aos_tests()
             # run_batched_gumbel_mcts_aos_tests_on(CPU())
             CUDA.functional() && run_batched_mcts_aos_tests_on(GPU())
             # CUDA.functional() && run_batched_gumbel_mcts_aos_tests_on(GPU())
-        end
-        @testset "oracle" begin
-            @testset "uniform_oracle" begin
-                env = bitwise_tictactoe_winning()
-                prior, value = uniform_oracle(env)
-
-                @test value == 0
-                @test prior == ones(Float32, num_actions(env)) ./ num_actions(env)
-            end
         end
         @testset "policy" begin
             function test_exploration(tree, env, node, i)
