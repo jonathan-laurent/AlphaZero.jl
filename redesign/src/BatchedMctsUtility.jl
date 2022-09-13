@@ -7,8 +7,11 @@ include("./Tests/Common/BitwiseTicTacToe.jl")
 using .BitwiseTicTacToe
 
 using Base: @kwdef
+using StaticArrays
+import Base.Iterators.map as imap
 
 export Policy, EnvOracle, check_oracle, UniformTicTacToeEnvOracle
+export get_considered_visits_table
 
 # # Environment Oracle
 
@@ -312,6 +315,66 @@ the Gumbel implementation.
     num_considered_actions::Int = 8
     value_scale::Float32 = 0.1f0
     max_visit_init::Int = 50
+end
+
+# # Gumbel exploration utilities
+
+"""
+    get_considered_visits_table(num_simulations, num_actions)
+
+Return a table containing the precomputed sequence of visits for each number of considered
+actions possible.
+
+Sayed in other words, for a given number of considered actions, this table contains a
+precomputed sequence. This sequence indicates for each simulation a constraint on the number
+of visits (i.e the number of visits that the selected action at the root node should match).
+
+See also [`get_considered_visits_sequence`](@ref)
+"""
+function get_considered_visits_table(num_simulations, num_actions)
+    ret = imap(1:num_actions) do num_considered_actions
+        get_considered_visits_sequence(num_considered_actions, num_simulations)
+    end
+    return SVector{num_actions}(ret)
+end
+
+"""
+    get_considered_visits_sequence(max_num_actions, num_simulations)    
+
+Precompute the Gumbel simulations orchestration.
+
+The Gumbel simulations orchestration is done originally iteratively. At each step, a certain
+number of considered actions is explored. At the end of exploration, the number of
+considered actions is then divided by two. The iterative process is repeated until only two
+actions are considered.
+
+Each step has an equal number of simulations so that the total number of simulations is
+evenly distributed between them. Likewise, at each step, the number of simulations of the
+step is evenly distributed between the most promising considered actions.
+
+This simulation orchestration can be precomputed as in MCTX by saving a sequence
+of the considered number of visits for each simulation. In other words, this sequence
+indicates for each simulation a constraint on the number of visits (i.e the number of
+visits that the selected action at the root node should match)
+"""
+function get_considered_visits_sequence(max_num_actions, num_simulations)
+    (max_num_actions <= 1) && return SVector{num_simulations,Int16}(0:(num_simulations - 1))
+
+    num_halving_steps = Int(ceil(log2(max_num_actions)))
+    sequence = Int16[]
+    visits = zeros(Int16, max_num_actions)
+
+    num_actions = max_num_actions
+    while length(sequence) < num_simulations
+        num_extra_visits = max(1, num_simulations ÷ (num_halving_steps * num_actions))
+        for _ in 1:num_extra_visits
+            append!(sequence, visits[1:num_actions])
+            visits[1:num_actions] .+= 1
+        end
+        num_actions = max(2, num_actions ÷ 2)
+    end
+
+    return SVector{num_simulations}(sequence[1:num_simulations])
 end
 
 end
