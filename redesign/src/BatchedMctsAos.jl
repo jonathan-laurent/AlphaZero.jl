@@ -180,22 +180,24 @@ function num_child_visits(tree, node, bid, i)
     return cnid != UNVISITED ? tree[bid, cnid].num_visits : UNVISITED
 end
 
-function qcoeff(mcts, tree, node, bid)
+function qcoeff(value_scale, max_visit_init, tree, node, bid)
     na = length(node.children)
     # init is necessary for GPUCompiler right now...
     max_child_visit = maximum(1:na; init=UNVISITED) do i
         num_child_visits(tree, node, bid, i)
     end
-    return mcts.value_scale * (mcts.max_visit_init + max_child_visit)
+    return value_scale * (max_visit_init + max_child_visit)
 end
 
-function target_policy(mcts, tree, node, bid)
+function target_policy(value_scale, max_visit_init, tree, node, bid)
     qs = completed_qvalues(tree, node, bid)
-    return softmax(log.(node.prior) + qcoeff(mcts, tree, node, bid) * qs)
+    return softmax(
+        log.(node.prior) + qcoeff(value_scale, max_visit_init, tree, node, bid) * qs
+    )
 end
 
-function select_nonroot_action(mcts, tree, node, bid)
-    policy = target_policy(mcts, tree, node, bid)
+function select_nonroot_action(value_scale, max_visit_init, tree, node, bid)
+    policy = target_policy(value_scale, max_visit_init, tree, node, bid)
     na = length(node.children)
     total_visits = sum(i -> num_child_visits(tree, node, bid, i), 1:na; init=UNVISITED)
     return Int16(
@@ -207,7 +209,7 @@ function select_nonroot_action(mcts, tree, node, bid)
 end
 
 # `cur` is set to one so that selection starts at root node
-function select(mcts, tree, bid; cur=ROOT)
+function select(value_scale, max_visit_init, tree, bid; cur=ROOT)
     (; na) = tree_dims(tree)
     while true
         node = tree[bid, cur]
@@ -215,7 +217,7 @@ function select(mcts, tree, bid; cur=ROOT)
             # returns current terminal, but no action played
             return cur, NO_ACTION
         end
-        aid = select_nonroot_action(mcts, tree, node, bid)
+        aid = select_nonroot_action(value_scale, max_visit_init, tree, node, bid)
         @assert aid != NO_ACTION
 
         cnid = node.children[aid]
@@ -238,8 +240,9 @@ function select(mcts, tree)
     (; ne) = tree_dims(tree)
 
     batch_ids = DeviceArray(mcts.device)(1:ne)
+    value_scale, max_visit_init = mcts.value_scale, mcts.max_visit_init
     parent_frontier = map(batch_ids) do bid
-        return select(mcts, tree, bid)
+        return select(value_scale, max_visit_init, tree, bid)
     end
     return parent_frontier
 end
