@@ -191,13 +191,11 @@ end
 
 function target_policy(value_scale, max_visit_init, tree, node, bid)
     qs = completed_qvalues(tree, node, bid)
-    return softmax(
-        log.(node.prior) + qcoeff(value_scale, max_visit_init, tree, node, bid) * qs
-    )
+    return log.(node.prior) + qcoeff(value_scale, max_visit_init, tree, node, bid) * qs
 end
 
 function select_nonroot_action(value_scale, max_visit_init, tree, node, bid)
-    policy = target_policy(value_scale, max_visit_init, tree, node, bid)
+    policy = softmax(target_policy(value_scale, max_visit_init, tree, node, bid))
     na = length(node.children)
     total_visits = sum(i -> num_child_visits(tree, node, bid, i), 1:na; init=UNVISITED)
     return Int16(
@@ -277,6 +275,95 @@ function explore(mcts, envs)
     (; ns) = tree_dims(tree)
     for simnum in 2:ns
         parent_frontier = select(mcts, tree)
+        frontier = eval_states!(mcts, tree, simnum, parent_frontier)
+        backpropagate!(mcts, tree, frontier)
+    end
+    return tree
+end
+
+function get_penality(
+    num_considered_actions, tree, bid, considered_visits_table, child_visits
+)
+    (; na) = tree_dims(tree)
+    root_node = tree[bid, ROOT]
+
+    num_valid_actions = sum(root_node.valid_actions; init=NO_ACTION)
+    num_considered_actions = min(num_considered_actions, num_valid_actions)
+
+    considered_visits = considered_visits_table[num_considered_actions][child_visits]
+    penality = imap(1:na) do aid
+        if (num_child_visits(tree, root_node, bid, aid) == considered_visits)
+            Float32(0)
+        else
+            -Inf32
+        end
+    end
+    return SVector{na}(penality)
+end
+
+function gumbel_select_root_action(
+    value_scale,
+    max_visit_init,
+    num_considered_actions,
+    tree,
+    bid,
+    gumbel,
+    considered_visits_table,
+    child_visits,
+)
+    (; na) = tree_dims(tree)
+    root_node = tree[bid, ROOT]
+
+    batch_gumbel = SVector{na}(imap(aid -> gumbel[aid, bid], 1:na))
+    policy = target_policy(value_scale, max_visit_init, tree, root_node, bid)
+    penality = get_penality(
+        num_considered_actions, tree, bid, considered_visits_table, child_visits
+    )
+
+    scores = batch_gumbel + policy + penality
+    return Int16(argmax(scores; init=(NO_ACTION, -Inf32)))
+end
+
+function gumbel_select(mcts, tree, simnum, gumbel, considered_visits_table)
+    (; ne) = tree_dims(tree)
+
+    value_scale, max_visit_init = mcts.value_scale, mcts.max_visit_init
+    num_considered_actions = mcts.num_considered_actions
+
+    parent_frontier = map(DeviceArray(mcts.device)(1:ne)) do bid
+        aid = gumbel_select_root_action(
+            value_scale,
+            max_visit_init,
+            num_considered_actions,
+            tree,
+            bid,
+            gumbel,
+            considered_visits_table,
+            simnum - ROOT,
+        )
+        @assert aid != NO_ACTION
+
+        cnid = tree[bid, ROOT].children[aid]
+        if (cnid != UNVISITED)
+            return select(value_scale, max_visit_init, tree, bid; cur=cnid)
+        else
+            return (ROOT, aid)
+        end
+    end
+    return parent_frontier
+end
+
+function gumbel_explore(mcts, envs, rng::AbstractRNG)
+    tree = create_tree(mcts, envs)
+    (; na, ne, ns) = tree_dims(tree)
+
+    gumbel = DeviceArray(mcts.device)(rand(rng, Gumbel(), (na, ne)))
+    considered_visits_table = DeviceArray(mcts.device)(
+        get_considered_visits_table(mcts.num_simulations, na)
+    )
+
+    for simnum in 2:ns
+        parent_frontier = gumbel_select(mcts, tree, simnum, gumbel, considered_visits_table)
         frontier = eval_states!(mcts, tree, simnum, parent_frontier)
         backpropagate!(mcts, tree, frontier)
     end

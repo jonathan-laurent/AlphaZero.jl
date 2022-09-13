@@ -52,9 +52,9 @@ function run_batched_mcts_aos_tests()
     @testset "BatchedMctsAos" begin
         @testset "compilation" begin
             run_batched_mcts_aos_tests_on(CPU())
-            # run_batched_gumbel_mcts_aos_tests_on(CPU())
+            run_batched_gumbel_mcts_aos_tests_on(CPU())
             CUDA.functional() && run_batched_mcts_aos_tests_on(GPU())
-            # CUDA.functional() && run_batched_gumbel_mcts_aos_tests_on(GPU())
+            CUDA.functional() && run_batched_gumbel_mcts_aos_tests_on(GPU())
         end
         @testset "policy" begin
             function test_exploration(tree, env, node, i)
@@ -88,19 +88,19 @@ function run_batched_mcts_aos_tests()
                 tree = MCTS.explore(policy, envs)
                 test_exploration(tree, envs)
             end
-            # @testset "gumbel explore" begin
-            #     tree = MCTS.gumbel_explore(policy, envs, MersenneTwister(0))
-            #     test_exploration(tree, envs)
-            #     # All (valid) actions have been visited at least once
-            #     @test all(
-            #         all(root.children[root.valid_actions] .!= 0) for root in tree[:, 1]
-            #     )
-            #     # Only valid actions are explored
-            #     @test all(
-            #         !any(@. root.valid_actions == false && root.children > 0) for
-            #         root in tree[:, 1]
-            #     )
-            # end
+            @testset "gumbel explore" begin
+                tree = MCTS.gumbel_explore(policy, envs, MersenneTwister(0))
+                test_exploration(tree, envs)
+                # All (valid) actions have been visited at least once
+                @test all(
+                    all(root.children[root.valid_actions] .!= 0) for root in tree[:, 1]
+                )
+                # Only valid actions are explored
+                @test all(
+                    !any(@. root.valid_actions == false && root.children > 0) for
+                    root in tree[:, 1]
+                )
+            end
         end
         @testset "equivalence with SimpleMcts" begin
             sim_policy = SimTest.uniform_mcts_policy_tic_tac_toe(; num_simulations=64)
