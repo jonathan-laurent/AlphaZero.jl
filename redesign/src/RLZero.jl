@@ -20,21 +20,6 @@ include("BatchedMcts.jl")
 include("BatchedMctsAos.jl")
 @reexport using .BatchedMctsAos: BatchedMctsAos
 
-include("Benchmark.jl")
-using .Benchmark
-
-include("TrainableEnvOracle.jl")
-@reexport using .TrainableEnvOracles
-
-include("Storage.jl")
-using .Storage
-
-include("MuZero.jl")
-@reexport using .MuZero
-
-include("Train.jl")
-@reexport using .Train
-
 include("Tests/Tests.jl")
 @reexport using .Tests: Tests
 
