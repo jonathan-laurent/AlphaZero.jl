@@ -69,10 +69,10 @@ function create_tree(mcts, envs)
     internal_states = if last_state_dims == 1
         info.internal_states
     else
-        Flux.unstack(info.internal_states; dims=last_state_dims)
+        Flux.unstack(info.internal_states, last_state_dims)
     end
-    valid_actions = Flux.unstack(info.valid_actions; dims=2)
-    policy_prior = Flux.unstack(info.policy_prior; dims=2)
+    valid_actions = Flux.unstack(info.valid_actions, 2)
+    policy_prior = Flux.unstack(info.policy_prior, 2)
 
     # We index tree nodes with (batchnum, simnum)
     # This is unusual but this has better cache locality in this case
