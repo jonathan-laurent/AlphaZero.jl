@@ -313,7 +313,7 @@ function create_tree(mcts, envs)
     valid_actions = fill(false, mcts.device, (A, N, B))
     valid_actions[:, ROOT, :] = info.valid_actions
     policy_prior = zeros(Float32, mcts.device, (A, N, B))
-    policy_prior[:, ROOT, :] = validate_prior(info.policy_prior, info.valid_actions)
+    policy_prior[:, ROOT, :] = validate_prior(info.policy_prior, valid_actions[:, ROOT, :])
     value_prior = zeros(Float32, mcts.device, (N, B))
     value_prior[ROOT, :] = info.value_prior
 

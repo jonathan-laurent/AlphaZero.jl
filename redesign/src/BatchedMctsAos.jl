@@ -1,6 +1,12 @@
 """
 An batched MCTS implementation that can run on GPU where trees
 are represented in Array of Structs format.
+
+See `BatchedMcts` for more information.
+Those two implementations have the same interface at one exception:
+- The returned states from the `EnvOracle` used in the `Policy` must be `isbits` if we want
+to run the MCTS on GPU. It is therefore impossible to return a dimensional `CuArray` as a
+state representation.
 """
 module BatchedMctsAos
 
@@ -63,10 +69,10 @@ function create_tree(mcts, envs)
     internal_states = if last_state_dims == 1
         info.internal_states
     else
-        Flux.unstack(info.internal_states; dims=last_state_dims)
+        Flux.unstack(info.internal_states, last_state_dims)
     end
-    valid_actions = Flux.unstack(info.valid_actions; dims=2)
-    policy_prior = Flux.unstack(info.policy_prior; dims=2)
+    valid_actions = Flux.unstack(info.valid_actions, 2)
+    policy_prior = Flux.unstack(info.policy_prior, 2)
 
     # We index tree nodes with (batchnum, simnum)
     # This is unusual but this has better cache locality in this case
@@ -88,7 +94,7 @@ function tree_dims(tree::Tree{N,S}) where {N,S}
 end
 
 function eval_states!(mcts, tree, simnum, parent_frontier)
-    (; na, ne) = tree_dims(tree)
+    (; ne) = tree_dims(tree)
 
     parent = first
     action = last
@@ -109,6 +115,7 @@ function eval_states!(mcts, tree, simnum, parent_frontier)
 
     # Create nodes and save `info`
     Devices.foreach(eachindex(action_ids), mcts.device) do i
+        (; na) = tree_dims(tree)
         parent_id = parent_ids[i]
         bid = non_terminal_bids[i]
         aid = action_ids[i]
@@ -117,7 +124,7 @@ function eval_states!(mcts, tree, simnum, parent_frontier)
         @set! node.children[aid] = simnum
         tree[bid, parent_id] = node
 
-        state = info.internal_states[.., i]
+        state = info.internal_states[i]
         tree[bid, simnum] = Node{na,typeof(state)}(;
             state,
             parent=parent_id,
@@ -125,8 +132,8 @@ function eval_states!(mcts, tree, simnum, parent_frontier)
             prev_reward=info.rewards[i],
             prev_switched=info.player_switched[i],
             terminal=info.terminal[i],
-            valid_actions=SVector{na}(info.valid_actions[:, i]),
-            prior=SVector{na}(info.policy_prior[:, i]),
+            valid_actions=SVector{na}(imap(aid -> info.valid_actions[aid, i], 1:na)),
+            prior=SVector{na}(imap(aid -> info.policy_prior[aid, i], 1:na)),
             oracle_value=info.value_prior[i],
         )
 
