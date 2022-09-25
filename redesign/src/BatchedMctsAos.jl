@@ -108,10 +108,16 @@ function eval_states!(mcts, tree, simnum, parent_frontier)
     parent_ids = parent.(parent_frontier[non_terminal_bids])
     action_ids = action.(parent_frontier[non_terminal_bids])
 
-    parent_states = map(DeviceArray(mcts.device)(eachindex(parent_ids))) do i
+    parent_states = Flux.batch(map(DeviceArray(mcts.device)(eachindex(parent_ids))) do i
         tree[non_terminal_bids[i], parent_ids[i]].state
-    end
+    end)
     info = mcts.oracle.transition_fn(parent_states, action_ids)
+    last_state_dims = length(size(info.internal_states))
+    states = if last_state_dims == 1
+        info.internal_states
+    else
+        Flux.unstack(info.internal_states, last_state_dims)
+    end
 
     # Create nodes and save `info`
     Devices.foreach(eachindex(action_ids), mcts.device) do i
@@ -124,7 +130,7 @@ function eval_states!(mcts, tree, simnum, parent_frontier)
         @set! node.children[aid] = simnum
         tree[bid, parent_id] = node
 
-        state = info.internal_states[i]
+        state = states[i]
         tree[bid, simnum] = Node{na,typeof(state)}(;
             state,
             parent=parent_id,
