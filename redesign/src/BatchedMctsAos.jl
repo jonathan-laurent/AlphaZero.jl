@@ -125,8 +125,7 @@ function eval_states!(mcts, tree, simnum, parent_frontier)
 
         parent_states_ids = Tuple.(CartesianIndices((1:state_size, eachindex(action_ids))))
         Devices.foreach(parent_states_ids, mcts.device) do (state_i, i)
-            parent_states[state_i, i] =
-                tree[non_terminal_bids[i], parent_ids[i]].state[state_i]
+            parent_states[state_i, i] = tree[non_terminal_bids[i], parent_ids[i]].state[state_i]
             return nothing
         end
     end
