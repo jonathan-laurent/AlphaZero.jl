@@ -1,5 +1,7 @@
 module BitwiseTicTacToe
 
+using StaticArrays
+
 using ....BatchedEnvs
 using ....Util.StaticBitArrays
 
@@ -88,7 +90,7 @@ function BatchedEnvs.terminated(env::BitwiseTicTacToeEnv)
 end
 
 function get_player_board(env::BitwiseTicTacToeEnv, player)
-    return [env.board[posidx(i, player)] for i in 1:9]
+    return @SVector [env.board[posidx(i, player)] for i in 1:9]
 end
 
 """
@@ -105,11 +107,11 @@ function BatchedEnvs.vectorize_state(env::BitwiseTicTacToeEnv)
     free_board = .!(nought_board .|| cross_board)
 
     order = if (env.curplayer == NOUGHT)
-        [free_board, nought_board, cross_board]
+        @SVector [free_board, nought_board, cross_board]
     else
-        [free_board, cross_board, nought_board]
+        @SVector [free_board, cross_board, nought_board]
     end
-    return Float32.(vcat(order...))
+    return Float32.(reduce(vcat, order))
 end
 
 end
