@@ -67,6 +67,7 @@ See https://github.com/JuliaGPU/CUDA.jl/issues/1548.
 Ultimately, these definitions should be moved to CUDA.jl and use @device_override.
 """
 module KernelFuns
+using CUDA
 
 # It isn't clear all of these are needed, except argmax
 # since the version in Base does not have an `init` argument.
@@ -98,6 +99,9 @@ module KernelFuns
         end
         return best
     end
+    
+    sum(xs::Matrix{T}; dims) where T = Base.sum(xs; dims)
+    sum(xs::CuArray{T, 2}; dims) where T = CUDA.sum(xs; dims)
 
     function sum(xs; init)
         acc = init
