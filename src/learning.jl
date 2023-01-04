@@ -106,7 +106,7 @@ struct Trainer
     Hp = entropy_wmean(P, W)
     # Create a batches stream
     batchsize = min(params.batch_size, length(W))
-    batches = Flux.Data.DataLoader(data; batchsize, partial=false, shuffle=true)
+    batches = Flux.DataLoader(data; batchsize, partial=false, shuffle=true)
     batches_stream = map(batches) do b
       Network.convert_input_tuple(network, b)
     end |> Util.cycle_iterator |> Iterators.Stateful
@@ -166,7 +166,7 @@ end
 
 function learning_status(tr::Trainer)
   batchsize = min(tr.params.loss_computation_batch_size, num_samples(tr))
-  batches = Flux.Data.DataLoader(tr.data; batchsize, partial=true)
+  batches = Flux.DataLoader(tr.data; batchsize, partial=true)
   reports = map(batches) do batch
     batch = Network.convert_input_tuple(tr.network, batch)
     return learning_status(tr, batch)
