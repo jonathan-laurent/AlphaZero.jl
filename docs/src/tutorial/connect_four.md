@@ -24,7 +24,7 @@ To download AlphaZero.jl and start a new training session, just run the
 following:
 
 ```sh
-git clone --branch v0.5.0 https://github.com/jonathan-laurent/AlphaZero.jl.git
+git clone --branch v0.5.4 https://github.com/jonathan-laurent/AlphaZero.jl.git
 cd AlphaZero.jl
 julia --project -e 'import Pkg; Pkg.instantiate()'
 julia --project -e 'using AlphaZero; Scripts.train("connect-four")'
