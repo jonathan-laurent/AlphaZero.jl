@@ -5,8 +5,9 @@ using Test
 using ReinforcementLearningBase
 using Random: MersenneTwister
 using CUDA
+using JET
 
-export test_equivalent, test_batch_simulate
+export test_equivalent, test_batch_simulate, test_gpu_friendliness
 
 function test_equivalent(BatchedEnv, BaselineEnv)
     rng = MersenneTwister(0)
@@ -71,6 +72,50 @@ function test_batch_simulate(Env; N=10)
     end
     @test true
     return nothing
+end
+
+function test_isbits_type(Env)
+    env = Env()
+    @test isbits(env)
+end
+
+function test_is_immutable(Env)
+    env = Env()
+    @test isimmutable(env)
+    @test_throws MethodError env.board[1] = false
+    @test_throws ErrorException env.curplayer = false
+end
+
+function test_no_allocations(Env, num_actions)
+    env = Env()
+    actions = rand(1:num_actions, 5)
+    for i in 1:5
+        action = actions[i]
+        BatchedEnvs.valid_action(env, action)
+        allocations = @allocated begin
+            env, _ = BatchedEnvs.act(env, action)
+        end
+        @test allocations == 0
+    end
+end
+
+function test_static_inference(Env)
+    env = Env()
+    @inferred BatchedEnvs.valid_action(env, 1)
+    @inferred BatchedEnvs.act(env, 1)
+    @inferred BatchedEnvs.terminated(env)
+
+    env = Env()
+    @test_opt BatchedEnvs.valid_action(env, 1)
+    @test_opt BatchedEnvs.act(env, 1)
+    @test_opt BatchedEnvs.terminated(env)
+end
+
+function test_gpu_friendliness(Env; num_actions = 7)
+    test_isbits_type(Env)
+    test_is_immutable(Env)
+    test_no_allocations(Env, num_actions)
+    test_static_inference(Env)
 end
 
 end
