@@ -283,7 +283,7 @@ The AlphaZero training hyperparameters.
 |:---------------------------|:------------------------------------|:----------|
 | `self_play`                | [`SelfPlayParams`](@ref)            |  -        |
 | `learning`                 | [`LearningParams`](@ref)            |  -        |
-| `arena`                    | `Union{Nothing, ArenaParams`}       |  -        |
+| `arena`                    | `Union{Nothing, ArenaParams}`       |  -        |
 | `memory_analysis`          | `Union{Nothing, MemAnalysisParams}` | `nothing` |
 | `num_iters`                | `Int`                               |  -        |
 | `use_symmetries`           | `Bool`                              | `false`   |
