@@ -127,7 +127,7 @@ end
 # Have a "contender" network play against a "baseline" network (params::ArenaParams)
 # Return (rewards vector, redundancy)
 # Version for two-player games
-function pit_networks(gspec, contender, baseline, params, handler)
+function pit_networks(gspec, contender, baseline, params, handler, eval_gamma)
   make_oracles() = (
     Network.copy(contender, on_gpu=params.sim.use_gpu, test_mode=true),
     Network.copy(baseline, on_gpu=params.sim.use_gpu, test_mode=true))
@@ -139,11 +139,11 @@ function pit_networks(gspec, contender, baseline, params, handler)
   samples = simulate(
     simulator, gspec, params.sim,
     game_simulated=(() -> Handlers.checkpoint_game_played(handler)))
-  return rewards_and_redundancy(samples, gamma=params.mcts.gamma)
+  return rewards_and_redundancy(samples, gamma=eval_gamma)
 end
 
 # Evaluate a single neural network for a one-player game (params::ArenaParams)
-function evaluate_network(gspec, net, params, handler)
+function evaluate_network(gspec, net, params, handler, eval_gamma)
   make_oracles() = Network.copy(net, on_gpu=params.sim.use_gpu, test_mode=true)
   simulator = Simulator(make_oracles, record_trace) do oracle
     MctsPlayer(gspec, oracle, params.mcts)
@@ -151,21 +151,23 @@ function evaluate_network(gspec, net, params, handler)
   samples = simulate(
     simulator, gspec, params.sim,
     game_simulated=(() -> Handlers.checkpoint_game_played(handler)))
-  return rewards_and_redundancy(samples, gamma=params.mcts.gamma)
+  return rewards_and_redundancy(samples, gamma=eval_gamma)
 end
 
 # Compare two versions of a neural network (params::ArenaParams)
 # Works for both two-player and single-player games
-function compare_networks(gspec, contender, baseline, params, handler)
+function compare_networks(gspec, contender, baseline, params, handler, eval_gamma)
   legend = "Most recent NN versus best NN so far"
   if GI.two_players(gspec)
     (rewards_c, red), t =
-      @timed pit_networks(gspec, contender, baseline, params, handler)
+      @timed pit_networks(gspec, contender, baseline, params, handler, eval_gamma)
     avgr = mean(rewards_c)
     rewards_b = nothing
   else
-    (rewards_c, red_c), tc = @timed evaluate_network(gspec, contender, params, handler)
-    (rewards_b, red_b), tb = @timed evaluate_network(gspec, baseline, params, handler)
+    (rewards_c, red_c), tc =
+      @timed evaluate_network(gspec, contender, params, handler, eval_gamma)
+    (rewards_b, red_b), tb =
+      @timed evaluate_network(gspec, baseline, params, handler, eval_gamma)
     avgr = mean(rewards_c) - mean(rewards_b)
     red = mean([red_c, red_b])
     t = tc + tb
@@ -235,8 +237,9 @@ function learning_step!(env::Env, handler)
     else
       Handlers.checkpoint_started(handler)
       env.curnn = get_trained_network(trainer)
+      eval_gamma = env.params.ternary_rewards ? 1. : env.params.self_play.mcts.gamma
       eval_report =
-        compare_networks(env.gspec, env.curnn, env.bestnn, ap, handler)
+        compare_networks(env.gspec, env.curnn, env.bestnn, ap, handler, eval_gamma)
       teval += eval_report.time
       # If eval is good enough, replace network
       success = (eval_report.avgr >= best_evalr)
