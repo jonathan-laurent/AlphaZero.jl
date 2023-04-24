@@ -207,7 +207,7 @@ function run_duel(env::Env, duel; logger)
   show_space_after_progress_bar(logger)
   print_report(
     logger, report,
-    ternary_rewards=env.params.ternary_rewards)
+    ternary_outcome=env.params.ternary_outcome)
   return report
 end
 
@@ -431,10 +431,10 @@ function print_report(
     logger::Logger,
     report::Report.Evaluation;
     nn_replaced=false,
-    ternary_rewards=false)
+    ternary_outcome=false)
 
   r = fmt("+.2f", report.avgr)
-  if ternary_rewards
+  if ternary_outcome
     n = length(report.rewards)
     stats = Benchmark.TernaryOutcomeStatistics(report)
     pwon = percentage(stats.num_won, n)
@@ -454,11 +454,11 @@ function print_report(
   Log.print(logger, msg)
 end
 
-function print_report(logger::Logger, report::Report.Checkpoint; ternary_rewards=false)
+function print_report(logger::Logger, report::Report.Checkpoint; ternary_outcome=false)
   print_report(
     logger, report.evaluation,
     nn_replaced=report.nn_replaced,
-    ternary_rewards=ternary_rewards)
+    ternary_outcome=ternary_outcome)
 end
 
 #####
@@ -518,8 +518,8 @@ end
 
 function Handlers.checkpoint_finished(session::Session, report)
   show_space_after_progress_bar(session.logger)
-  ternary_rewards = session.env.params.ternary_rewards
-  print_report(session.logger, report, ternary_rewards=ternary_rewards)
+  ternary_outcome = session.env.params.ternary_outcome
+  print_report(session.logger, report, ternary_outcome=ternary_outcome)
 end
 
 function Handlers.learning_finished(session::Session, report)

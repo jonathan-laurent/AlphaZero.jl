@@ -61,7 +61,7 @@ params = Params(
   num_iters=2,
   memory_analysis=MemAnalysisParams(
     num_game_stages=4),
-  ternary_rewards=true,
+    ternary_outcome=true,
   use_symmetries=true,
   mem_buffer_size=PLSchedule(80_000))
 
