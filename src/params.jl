@@ -297,12 +297,11 @@ iteration can be decomposed into a self-play phase
 (see [`SelfPlayParams`](@ref)) and a learning phase
 (see [`LearningParams`](@ref)).
 
-  - `ternary_outcome`: set to `true` if the game environment is sparse
-     (all intermediate rewards are 0) and the reward at a terminal state
-     belongs to ``\\{-1, 0, 1\\}``. If set to `false`, then the sign of the
-     cumulative reward of an episode defines the winner; If it's positive
-     then it's a win, if it's negative then it's a loss, else it's a draw.
-     This property is used by logging and profiling tools to display statistics.
+  - `ternary_outcome`: set to `true` to enable the computation of ternary
+     (win/loss/draw) statistics, where the white player is considered a winner
+     if they obtain a positive discounted cumulative reward. This flag is used
+     by logging and profiling tools to display such statistics. When set to `false`,
+     only the average reward and redundancy statistics are computed and displayed.
   - `use_symmetries`: if set to `true`, board symmetries are used for
      data augmentation before learning.
   - `mem_buffer_size`: size schedule of the memory buffer, in terms of number
