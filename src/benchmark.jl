@@ -109,9 +109,9 @@ struct TernaryOutcomeStatistics
 end
 
 function TernaryOutcomeStatistics(rewards::AbstractVector{<:Number})
-  num_won  = count(==(1), rewards)
+  num_won  = count(>(0), rewards)
   num_draw = count(==(0), rewards)
-  num_lost = count(==(-1), rewards)
+  num_lost = count(<(0), rewards)
   @assert num_won + num_draw + num_lost == length(rewards)
   return TernaryOutcomeStatistics(num_won, num_draw, num_lost)
 end

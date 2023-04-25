@@ -127,12 +127,12 @@ function plot_benchmark(
   avgr = Plots.plot(0:n,
     avgr_data,
     title="Average Reward",
-    ylims=(params.ternary_rewards ? (-1.0, 1.0) : nothing),
+    ylims=(params.ternary_outcome ? (-1.0, 1.0) : nothing),
     legend=:bottomright,
     label=labels,
     xlabel="Iteration number")
   Plots.savefig(avgr, joinpath(dir, "benchmark_reward"))
-  if params.ternary_rewards
+  if params.ternary_outcome
     function compute_percentage(b, f)
       stats = Benchmark.TernaryOutcomeStatistics(b)
       return ceil(Int, 100 * (f(stats) / length(b.rewards)))

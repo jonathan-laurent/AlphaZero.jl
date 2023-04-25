@@ -287,7 +287,7 @@ The AlphaZero training hyperparameters.
 | `memory_analysis`          | `Union{Nothing, MemAnalysisParams}` | `nothing` |
 | `num_iters`                | `Int`                               |  -        |
 | `use_symmetries`           | `Bool`                              | `false`   |
-| `ternary_rewards`          | `Bool`                              | `false`   |
+| `ternary_outcome`          | `Bool`                              | `false`   |
 | `mem_buffer_size`          | `PLSchedule{Int}`                   |  -        |
 
 # Explanation
@@ -297,9 +297,11 @@ iteration can be decomposed into a self-play phase
 (see [`SelfPlayParams`](@ref)) and a learning phase
 (see [`LearningParams`](@ref)).
 
-  - `ternary_rewards`: set to `true` if the rewards issued by
-     the game environment always belong to ``\\{-1, 0, 1\\}`` so that
-     the logging and profiling tools can take advantage of this property.
+  - `ternary_outcome`: set to `true` to enable the computation of ternary
+     (win/loss/draw) statistics, where the white player is considered a winner
+     if they obtain a positive discounted cumulative reward. This flag is used
+     by logging and profiling tools to display such statistics. When set to `false`,
+     only the average reward and redundancy statistics are computed and displayed.
   - `use_symmetries`: if set to `true`, board symmetries are used for
      data augmentation before learning.
   - `mem_buffer_size`: size schedule of the memory buffer, in terms of number
@@ -324,7 +326,7 @@ In the original AlphaGo Zero paper:
   arena :: Union{Nothing, ArenaParams}
   num_iters :: Int
   use_symmetries :: Bool = false
-  ternary_rewards :: Bool = false
+  ternary_outcome :: Bool = false
   mem_buffer_size :: PLSchedule{Int}
 end
 

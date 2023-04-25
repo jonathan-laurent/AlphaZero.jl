@@ -53,7 +53,7 @@ params = Params(
   learning=learning,
   num_iters=5,
   memory_analysis=nothing,
-  ternary_rewards=false,
+  ternary_outcome=false,
   use_symmetries=false,
   mem_buffer_size=PLSchedule(80_000))
 
