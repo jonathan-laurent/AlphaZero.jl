@@ -1,5 +1,6 @@
 module TestEnvs
 
+using ReinforcementLearningBase
 using ReinforcementLearningEnvironments
 using Random: MersenneTwister
 using Statistics: mean
@@ -9,7 +10,8 @@ export tictactoe_draw, tictactoe_winning
 function tictactoe_position(actions)
     env = TicTacToeEnv()
     for a in actions
-        env(a)
+        RLBase.act!(env, a)
+        RLBase.next_player!(env)
     end
     return env
 end
