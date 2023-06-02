@@ -24,7 +24,7 @@ end
 
 """
 After actions [1, 2, 3, 4, 4, 3, 2, 1, 7, 7]
-final state should looks like this
+final state should look like this
 
 - - - - - - -         (1  -  7)  0 0 0 0 0 0 0     0 0 0 0 0 0 0  (43 - 49)
 - - - - - - -         (8  - 14)  0 0 0 0 0 0 0     0 0 0 0 0 0 0  (50 - 56)
