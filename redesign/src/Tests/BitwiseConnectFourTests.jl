@@ -33,7 +33,7 @@ final state should looks like this
 O X O X - - O         (29 - 35)  1 0 1 0 0 0 1     0 1 0 1 0 0 0  (71 - 77)
 X O X O - - X         (36 - 42)  0 1 0 1 0 0 0     1 0 1 0 0 0 1  (78 - 84)
 
-                                    NOUGHT PLAYER     CROSS PLAYER
+                                 NOUGHT PLAYER     CROSS PLAYER
 """
 function test_action_correctness()
     actions = [1, 2, 3, 4, 4, 3, 2, 1, 7, 7]
