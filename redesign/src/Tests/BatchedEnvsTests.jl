@@ -1,11 +1,13 @@
 module BatchedEnvsTests
 
 using ...BatchedEnvs
-using Test
-using ReinforcementLearningBase
-using Random: MersenneTwister
+using ....Util.StaticBitArrays
+
 using CUDA
 using JET
+using Random: MersenneTwister
+using ReinforcementLearningBase: RLBase
+using Test
 
 export test_equivalent, test_batch_simulate, test_gpu_friendliness
 
@@ -66,7 +68,7 @@ function test_batch_simulate(Env, device; N=32_000, L=9)
     return Array(envs)
 end
 
-function test_batch_simulate(Env; N=10)
+function test_batch_simulate(Env; N=1_000)
     test_batch_simulate(Env, Array; N)
     if CUDA.functional()
         test_batch_simulate(Env, CuArray; N)
@@ -83,19 +85,25 @@ end
 function test_is_immutable(Env)
     env = Env()
     @test isimmutable(env)
-    @test_throws MethodError env.board[1] = false
-    @test_throws ErrorException env.curplayer = false
+    for fieldname in fieldnames(typeof(env))
+        field_type = typeof(getfield(env, fieldname))
+        if field_type <: StaticBitArray
+            @test_throws MethodError env.board[1] = false
+        elseif field_type == Bool
+            @test_throws ErrorException env.curplayer = false
+        elseif field_type <: Integer
+            @test_throws ErrorException env.curplayer = 1
+        end
+    end
 end
 
 function test_no_allocations(Env, num_actions)
     env = Env()
-    actions = rand(1:num_actions, 5)
-    for i in 1:5
-        action = actions[i]
-        BatchedEnvs.valid_action(env, action)
-        allocations = @allocated begin
-            env, _ = BatchedEnvs.act(env, action)
-        end
+    rng = MersenneTwister(0)
+    actions = rand(rng, 1:num_actions, 5)
+    for action in actions
+        !BatchedEnvs.valid_action(env, action) && continue
+        allocations = @allocated env, _ = BatchedEnvs.act(env, action)
         @test allocations == 0
     end
 end
@@ -113,10 +121,10 @@ function test_static_inference(Env)
 end
 
 function test_gpu_friendliness(Env; num_actions = 7)
-    test_isbits_type(Env)
-    test_is_immutable(Env)
-    test_no_allocations(Env, num_actions)
-    test_static_inference(Env)
+    @testset "env type is isbits" test_isbits_type(Env)
+    @testset "env is immutable" test_is_immutable(Env)
+    @testset "env does not allocate" test_no_allocations(Env, num_actions)
+    @testset "env type inference" test_static_inference(Env)
 end
 
 end

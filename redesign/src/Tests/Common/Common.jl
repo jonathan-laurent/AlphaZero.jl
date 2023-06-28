@@ -2,6 +2,9 @@ module Common
 
 using Reexport
 
+include("BitwiseRandomWalk1D.jl")
+@reexport using .BitwiseRandomWalk1D
+
 include("BitwiseTicTacToe.jl")
 @reexport using .BitwiseTicTacToe
 
