@@ -1,6 +1,7 @@
 module BitwiseConnectFourTests
 
 using Test
+
 using ..BatchedEnvsTests
 using ..Common.BitwiseConnectFour
 using ...BatchedEnvs
@@ -18,14 +19,14 @@ function run_bitwise_connect_four_tests()
         @testset "terminated" test_terminated()
         @testset "won game" test_is_win()
         @testset "drawn game" test_full_board()
+        @testset "state vectorization" test_vectorize_state()
     end
     return nothing
 end
 
 
 """
-After actions [1, 2, 3, 4, 4, 3, 2, 1, 7, 7]
-final state should look like this
+After actions [1, 2, 3, 4, 4, 3, 2, 1, 7, 7], the final state should look like this:
 
 - - - - - - -         (1  -  7)  0 0 0 0 0 0 0     0 0 0 0 0 0 0  (43 - 49)
 - - - - - - -         (8  - 14)  0 0 0 0 0 0 0     0 0 0 0 0 0 0  (50 - 56)
@@ -135,6 +136,56 @@ function test_full_board()
     @test BitwiseConnectFour.full_board(env)
     @test !BitwiseConnectFour.is_win(env, BitwiseConnectFour.NOUGHT)
     @test !BitwiseConnectFour.is_win(env, BitwiseConnectFour.CROSS)
+end
+
+function test_vectorize_state()
+    env = BitwiseConnectFourEnv()
+    state = BatchedEnvs.vectorize_state(env)
+
+    free_board = [1.0 for _ in 1:6 * 7]
+    empty_board = [0.0 for _ in 1:6 * 7]
+    expected_state = Float32.(vcat(free_board, empty_board, empty_board))
+
+    @test state == expected_state
+
+    # check that the vectorized state is computed correctly after a couple of actions
+    env, _ = BatchedEnvs.act(env, 1)  # CROSS played
+    env, _ = BatchedEnvs.act(env, 2)  # NOUGHT played
+    env, _ = BatchedEnvs.act(env, 3)  # CROSS played
+    env, _ = BatchedEnvs.act(env, 2)  # NOUGHT played
+    state = BatchedEnvs.vectorize_state(env)
+
+    current_player_offest = 6 * 7
+    next_player_offset = 6 * 7 * 2
+
+    # CROSS to play - the CROSS board goes after the free board and before the NOUGHT board
+    expected_state[current_player_offest + 36] = 1.0
+    expected_state[36] = 0.0
+
+    expected_state[next_player_offset + 37] = 1.0
+    expected_state[37] = 0.0
+
+    expected_state[current_player_offest + 38] = 1.0
+    expected_state[38] = 0.0
+
+    expected_state[next_player_offset + 30] = 1.0
+    expected_state[30] = 0.0
+
+    # perform one more action to ensure the change in board order
+    env, _ = BatchedEnvs.act(env, 1)  # CROSS played
+    state = BatchedEnvs.vectorize_state(env)
+
+    # swap the two player boards in the expected state
+    free_board = expected_state[1:current_player_offest]
+    current_player_board = expected_state[next_player_offset + 1:end]
+    next_player_board = expected_state[current_player_offest + 1:next_player_offset]
+    expected_state = reduce(vcat, [free_board, current_player_board, next_player_board])
+
+    # NOUGHT to play - the NOUGHT board goes after the free board and before the CROSS board
+    expected_state[next_player_offset + 29] = 1.0
+    expected_state[29] = 0.0
+
+    @test state == expected_state
 end
 
 end

@@ -21,14 +21,14 @@ function run_bitwise_random_walk_tests()
         @testset "valid actions" test_valid_actions()
         @testset "terminated" test_terminated()
         @testset "won episode" test_is_win()
+        @testset "state vectorization" test_vectorize_state()
     end
     return nothing
 end
 
 
 """
-After actions [1, 2, 1, 1, 2, 2, 2, 2]
-final state should look like this
+After actions [1, 2, 1, 1, 2, 2, 2, 2], the final state should look like this:
 
 · · · · · · X · · ·
 """
@@ -108,6 +108,25 @@ function test_is_win()
 
     @test BatchedEnvs.terminated(env)
     @test info.reward == 1.0
+end
+
+function test_vectorize_state()
+    env = BitwiseRandomWalk1DEnv()
+    state = BatchedEnvs.vectorize_state(env)
+
+    expected_state = Float32.([0.0 for _ in 1:10])
+    expected_state[5] = 1.0
+
+    @test state == expected_state
+
+    # check that the vectorized state is computed correctly after an action
+    env, _ = BatchedEnvs.act(env, 1)
+    state = BatchedEnvs.vectorize_state(env)
+
+    expected_state = Float32.([0.0 for _ in 1:10])
+    expected_state[4] = 1.0
+
+    @test state == expected_state
 end
 
 end
