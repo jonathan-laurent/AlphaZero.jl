@@ -9,14 +9,15 @@ using ...Util.StaticBitArrays
 export run_bitwise_connect_four_tests
 
 function run_bitwise_connect_four_tests()
+    Env = BitwiseConnectFourEnv
     @testset "bitwise connect-four" begin
-        test_batch_simulate(BitwiseConnectFourEnv)
-        test_gpu_friendliness(BitwiseConnectFourEnv; num_actions=7)
-        test_action_correctness()
-        test_valid_actions()
-        test_full_board()
-        test_is_win()
-        test_terminated()
+        @testset "bitwise batch simulation" test_batch_simulate(Env)
+        @testset "GPU friendliness" test_gpu_friendliness(Env; num_actions=7)
+        @testset "action handling" test_action_correctness()
+        @testset "valid actions" test_valid_actions()
+        @testset "terminated" test_terminated()
+        @testset "won game" test_is_win()
+        @testset "drawn game" test_full_board()
     end
     return nothing
 end

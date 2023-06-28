@@ -1,5 +1,7 @@
 module BitwiseConnectFour
 
+using StaticArrays
+
 using ....BatchedEnvs
 using ....Util.StaticBitArrays
 
@@ -31,10 +33,9 @@ struct BitwiseConnectFourEnv
     curplayer::Bool
 end
 
-function BitwiseConnectFourEnv()
-    return BitwiseConnectFourEnv(bitboard(), CROSS)
-end
+BitwiseConnectFourEnv() = BitwiseConnectFourEnv(bitboard(), CROSS)
 
+BatchedEnvs.state_size(::BitwiseConnectFourEnv) = 42 * 3
 BatchedEnvs.num_actions(::BitwiseConnectFourEnv) = 7
 
 posidx(n, player) = n + 42 * player
@@ -59,18 +60,13 @@ function BatchedEnvs.act(env::BitwiseConnectFourEnv, action)
     at(i, j, player) = env.board[posidx(i, j, player)]
 
     curr_row = 6
-    while at(curr_row, action, env.curplayer) ||
-            at(curr_row, action, !env.curplayer)
+    while at(curr_row, action, env.curplayer) || at(curr_row, action, !env.curplayer)
         curr_row -= 1
     end
 
     board = Base.setindex(env.board, true, posidx(curr_row, action, env.curplayer))
     newenv = BitwiseConnectFourEnv(board, !env.curplayer)
-    if is_win(newenv, !env.curplayer)
-        reward = -1.0
-    else
-        reward = 0.0
-    end
+    reward = is_win(newenv, !env.curplayer) ? -1.0 : 0.0
 
     return newenv, (; reward, switched=true)
 end
@@ -92,14 +88,11 @@ function is_win(env::BitwiseConnectFourEnv, player::Bool)
         if at(i, j) == 1
             if i <= 3 && at(i+1, j) == at(i+2, j) == at(i+3, j) == 1
                 return true
-            end
-            if j <= 4 && at(i, j+1) == at(i, j+2) == at(i, j+3) == 1
+            elseif j <= 4 && at(i, j+1) == at(i, j+2) == at(i, j+3) == 1
                 return true
-            end
-            if (i <= 3 && j <= 4) && at(i+1, j+1) == at(i+2, j+2) == at(i+3, j+3) == 1
+            elseif (i <= 3 && j <= 4) && at(i+1, j+1) == at(i+2, j+2) == at(i+3, j+3) == 1
                 return true
-            end
-            if (i >= 4 && j <= 4) && at(i-1, j+1) == at(i-2, j+2) == at(i-3, j+3) == 1
+            elseif (i >= 4 && j <= 4) && at(i-1, j+1) == at(i-2, j+2) == at(i-3, j+3) == 1
                 return true
             end
         end
@@ -108,11 +101,32 @@ function is_win(env::BitwiseConnectFourEnv, player::Bool)
 end
 
 function BatchedEnvs.terminated(env::BitwiseConnectFourEnv)
-    return begin
-        is_win(env, env.curplayer) ||
-        is_win(env, !env.curplayer) ||
-        full_board(env)
+    is_win(env, env.curplayer) || is_win(env, !env.curplayer) || full_board(env)
+end
+
+function get_player_board(env::BitwiseConnectFourEnv, player)
+    return @SVector [env.board[posidx(i, player)] for i in 1:42]
+end
+
+"""
+    vectorize_state(env::BitwiseConnectFourEnv)
+
+Create a vectorize representation of the board.
+The board is represented from the perspective of the next player to play.
+It is a flatten 7x6x3 array with the following channels:
+  free, next player, other player
+"""
+function BatchedEnvs.vectorize_state(env::BitwiseConnectFourEnv)
+    nought_board = get_player_board(env, NOUGHT)
+    cross_board = get_player_board(env, CROSS)
+    free_board = .!(nought_board .|| cross_board)
+
+    order = if (env.curplayer == NOUGHT)
+        @SVector [free_board, nought_board, cross_board]
+    else
+        @SVector [free_board, cross_board, nought_board]
     end
+    return Float32.(reduce(vcat, order))
 end
 
 end
