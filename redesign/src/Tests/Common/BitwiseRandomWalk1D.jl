@@ -54,7 +54,7 @@ function BatchedEnvs.terminated(env::BitwiseRandomWalk1DEnv)
 end
 
 function BatchedEnvs.vectorize_state(env::BitwiseRandomWalk1DEnv)
-    return Float32.(@SVector [env.board[i] for i in 1:ENV_SIZE])
+    return Float32.([env.board[i] for i in 1:ENV_SIZE])
 end
 
 end
