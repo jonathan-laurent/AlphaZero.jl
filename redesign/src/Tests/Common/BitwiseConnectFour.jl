@@ -22,7 +22,7 @@ Bitboard representation:
 
                  NOUGHT PLAYER       CROSS PLAYER
 """
-const bitboard = StaticBitArray{42 * 2, 2}
+const bitboard = StaticBitArray{6 * 7 * 2, 2}
 
 """
 A connect-four environment implemented using bitwise operations

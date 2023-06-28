@@ -10,7 +10,7 @@ export BitwiseTicTacToeEnv
 const CROSS = true
 const NOUGHT = false
 
-const BitBoard = StaticBitArray{18,1}
+const BitBoard = StaticBitArray{3 * 3 * 2, 1}
 
 """
 A tictactoe environment implemented using bitwise operations
