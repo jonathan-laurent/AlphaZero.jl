@@ -11,13 +11,13 @@ include("Common/Common.jl")
 include("BatchedEnvsTests.jl")
 @reexport using .BatchedEnvsTests
 
-include("BitwiseRandomWalk1DTests.jl")
+include("EnvTests/BitwiseRandomWalk1DTests.jl")
 @reexport using .BitwiseRandomWalk1DTests
 
-include("BitwiseTicTacToeTests.jl")
+include("EnvTests/BitwiseTicTacToeTests.jl")
 @reexport using .BitwiseTicTacToeTests
 
-include("BitwiseConnectFourTests.jl")
+include("EnvTests/BitwiseConnectFourTests.jl")
 @reexport using .BitwiseConnectFourTests
 
 include("UtilTests.jl")

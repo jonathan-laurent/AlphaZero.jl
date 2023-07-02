@@ -2,13 +2,13 @@ module Common
 
 using Reexport
 
-include("BitwiseRandomWalk1D.jl")
+include("Envs/BitwiseRandomWalk1D.jl")
 @reexport using .BitwiseRandomWalk1D
 
-include("BitwiseTicTacToe.jl")
+include("Envs/BitwiseTicTacToe.jl")
 @reexport using .BitwiseTicTacToe
 
-include("BitwiseConnectFour.jl")
+include("Envs/BitwiseConnectFour.jl")
 @reexport using .BitwiseConnectFour
 
 include("TestEnvs.jl")
