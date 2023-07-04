@@ -5,6 +5,9 @@ using Reexport
 include("Util/Util.jl")
 @reexport using .Util
 
+include("Networks/Network.jl")
+@reexport using .Network
+
 include("BatchedEnvs.jl")
 using .BatchedEnvs
 

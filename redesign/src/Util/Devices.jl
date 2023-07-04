@@ -2,14 +2,18 @@ module Devices
 
 using CUDA
 
-export Device, GPU, CPU, DeviceArray
+export Device, GPU, CPU, DeviceArray, arr_is_on_gpu
 
 abstract type Device end
 struct GPU <: Device end
 struct CPU <: Device end
 
-DeviceArray(::GPU) = CuArray
 DeviceArray(::CPU) = Array
+DeviceArray(::GPU) = CuArray
+
+arr_is_on_gpu(::Array) = false
+arr_is_on_gpu(::CuArray) = true
+arr_is_on_gpu(arr) = error("Usupported array type: ", typeof(arr))
 
 """
 A device agnostic parallel loop construct.

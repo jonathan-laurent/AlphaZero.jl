@@ -8,6 +8,9 @@ export run_all_tests
 include("Common/Common.jl")
 @reexport using .Common
 
+include("NetworksTests.jl")
+@reexport using .NetworksTests
+
 include("BatchedEnvsTests.jl")
 @reexport using .BatchedEnvsTests
 
@@ -35,6 +38,7 @@ include("BatchedMctsAosTests.jl")
 function run_all_tests()
     @testset "RLZero tests" begin
         run_util_tests()
+        run_neural_networks_tests()
         run_bitwise_random_walk_tests()
         run_bitwise_tictactoe_tests()
         run_bitwise_connect_four_tests()
