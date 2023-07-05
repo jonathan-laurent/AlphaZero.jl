@@ -25,7 +25,7 @@ end
 function bitwise_random_walk_1d_position(actions)
     env = BitwiseRandomWalk1DEnv()
     for a in actions
-        env, _ = act!(env, a)
+        env, _ = act(env, a)
     end
     return env
 end
@@ -42,7 +42,7 @@ end
 function bitwise_tictactoe_position(actions)
     env = BitwiseTicTacToeEnv()
     for a in actions
-        env, _ = RLBase.act!(env, a)
+        env, _ = act(env, a)
     end
     return env
 end

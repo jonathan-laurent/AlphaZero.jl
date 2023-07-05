@@ -11,13 +11,19 @@ include("Networks/Network.jl")
 include("BatchedEnvs.jl")
 using .BatchedEnvs
 
-include("SimpleMcts.jl")
+include("MCTS/SimpleMcts.jl")
 @reexport using .SimpleMcts
 
-include("BatchedMcts.jl")
+include("MCTS/BatchedMctsUtilities.jl")
+@reexport using .BatchedMctsUtilities
+
+include("MCTS/Oracles.jl")
+@reexport using .EnvOracles
+
+include("MCTS/BatchedMcts.jl")
 @reexport using .BatchedMcts: BatchedMcts
 
-include("BatchedMctsAos.jl")
+include("MCTS/BatchedMctsAos.jl")
 @reexport using .BatchedMctsAos: BatchedMctsAos
 
 include("Tests/Tests.jl")

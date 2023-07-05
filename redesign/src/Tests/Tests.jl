@@ -26,13 +26,13 @@ include("EnvTests/BitwiseConnectFourTests.jl")
 include("UtilTests.jl")
 @reexport using .UtilTests
 
-include("SimpleMctsTests.jl")
+include("MctsTests/SimpleMctsTests.jl")
 @reexport using .SimpleMctsTests
 
-include("BatchedMctsTests.jl")
+include("MctsTests/BatchedMctsTests.jl")
 @reexport using .BatchedMctsTests
 
-include("BatchedMctsAosTests.jl")
+include("MctsTests/BatchedMctsAosTests.jl")
 @reexport using .BatchedMctsAosTests
 
 function run_all_tests()
@@ -44,6 +44,7 @@ function run_all_tests()
         run_bitwise_connect_four_tests()
         run_mcts_tests()
         run_batched_mcts_tests()
+        run_batched_mcts_aos_tests()
     end
     return nothing
 end

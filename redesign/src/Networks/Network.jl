@@ -7,7 +7,7 @@ using Random: MersenneTwister
 
 using ..Util.Devices: Device, CPU, GPU, arr_is_on_gpu
 
-export on_gpu, forward, to_cpu, to_gpu, set_test_mode!, SimpleNet, SimpleNetHP
+export FluxNetwork, on_gpu, forward, to_cpu, to_gpu, set_test_mode!, SimpleNet, SimpleNetHP
 
 
 """
