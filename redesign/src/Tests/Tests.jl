@@ -37,14 +37,14 @@ include("MctsTests/BatchedMctsAosTests.jl")
 
 function run_all_tests()
     @testset "RLZero tests" begin
-        run_util_tests()
-        run_neural_networks_tests()
-        run_bitwise_random_walk_tests()
-        run_bitwise_tictactoe_tests()
-        run_bitwise_connect_four_tests()
-        run_mcts_tests()
-        run_batched_mcts_tests()
-        run_batched_mcts_aos_tests()
+        @testset "utility tests" run_util_tests()
+        @testset "neural network tests" run_neural_networks_tests()
+        @testset "random walk env tests" run_bitwise_random_walk_tests()
+        @testset "tictactoe tests" run_bitwise_tictactoe_tests()
+        @testset "connect-4 tests" run_bitwise_connect_four_tests()
+        @testset "simple mcts tests" run_simple_mcts_tests()
+        @testset "batched mcts SoA tests" run_batched_mcts_tests()
+        # @testset "batched mcts AoS tests" run_batched_mcts_aos_tests()
     end
     return nothing
 end

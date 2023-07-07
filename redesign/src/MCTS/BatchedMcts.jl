@@ -392,7 +392,7 @@ Compute a value estimation of a node at this stage of the exploration.
 The estimation is based on its `value_prior`, its number of visits, the `qvalue` of its
 children and their associated `policy_prior`.
 """
-function root_value_estimate(tree, cid, bid, ::Tuple{Val{A},Any,Any}) where {A}
+function root_value_estimate(tree, cid, bid, ::Tuple{Val{A}, Any, Any}) where {A}
     total_qvalues = Float32(0)
     total_prior = Float32(0)
     total_visits = UNVISITED
@@ -418,7 +418,7 @@ More precisely, if its child have been visited at least one time, it computes it
 `qvalue`, otherwise, it uses the `root_value_estimate` of node instead.
 """
 function completed_qvalues(
-    tree, cid, bid, tree_size::Tuple{Val{A},Any,Any}; invalid_actions_value=-Inf32
+    tree, cid, bid, tree_size::Tuple{Val{A}, Any, Any}; invalid_actions_value=-Inf32
 ) where {A}
     root_value = root_value_estimate(tree, cid, bid, tree_size)
     ret = imap(1:A) do aid

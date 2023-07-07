@@ -91,7 +91,6 @@ Return a copy of the given network that has been transferred to the GPU
 if one is available. Otherwise, return the given network untouched.
 """
 function to_gpu(nn::FluxNetwork)
-    CUDA.allowscalar(false)
     return Flux.gpu(nn)
 end
 

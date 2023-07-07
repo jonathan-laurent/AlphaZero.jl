@@ -74,7 +74,7 @@ end
 Define an `EnvOracle` object with a Neural-Network-guided policy for any given environment.
 See also [`EnvOracle`](@ref)
 """
-function neural_network_env_oracle(nn::Net) where Net <: FluxNetwork
+function neural_network_env_oracle(; nn::Net) where Net <: FluxNetwork
 
     get_state(info) = first(info)
     get_reward(info) = last(info).reward

@@ -19,29 +19,29 @@ export Policy, gumbel_explore, explore, completed_qvalues
 export RolloutOracle, uniform_oracle
 
 """
-An MCTS tree.
-
-MCTS trees are represented by graph of structures in memory.
-We store Q-values for each nodes instead of of storing values
-so as to make it easier to handle terminal states.
-"""
-mutable struct Tree
-    oracle_value::Float32
-    children::Vector{Union{Nothing,Tree}}
-    prior::Vector{Float32}
-    num_visits::Vector{Int32}
-    total_rewards::Vector{Float64}
-end
-
-"""
 An MCTS Policy that leverages an external oracle.
 """
 @kwdef struct Policy{Oracle}
     oracle::Oracle
-    num_simulations::Int
-    num_considered_actions::Int
-    value_scale::Float64
-    max_visit_init::Int
+    num_simulations::Int = 64
+    num_considered_actions::Int = 8
+    value_scale::Float64 = 0.1f0
+    max_visit_init::Int = 50
+end
+
+"""
+An MCTS tree.
+
+MCTS trees are represented by graphs of structures in memory.
+We store Q-values for each nodes instead of storing values
+so as to make it easier to handle terminal states.
+"""
+mutable struct Tree
+    prior::Vector{Float32}
+    oracle_value::Float32
+    children::Vector{Union{Nothing,Tree}}
+    num_visits::Vector{Int32}
+    total_rewards::Vector{Float64}
 end
 
 num_children(node::Tree) = length(node.children)
@@ -87,13 +87,13 @@ function completed_qvalues(node::Tree)
 end
 
 function create_node(env::AbstractEnv, oracle)
-    prior, value = oracle(env)
+    prior, oracle_value = oracle(env)
     num_actions = length(legal_action_space(env))
     @assert num_actions > 0
     children = convert(Vector{Union{Nothing,Tree}}, fill(nothing, num_actions))
     num_visits = fill(Int32(0), num_actions)
     total_rewards = fill(Float64(0), num_actions)
-    return Tree(value, children, prior, num_visits, total_rewards)
+    return Tree(prior, oracle_value, children, num_visits, total_rewards)
 end
 
 """
@@ -148,7 +148,7 @@ Run MCTS search on the current state and return an MCTS tree.
 """
 function explore(mcts::Policy, env::AbstractEnv)
     node = create_node(env, mcts.oracle)
-    for _ in 1:(mcts.num_simulations)
+    for _ in 2:mcts.num_simulations
         run_simulation(mcts, node, copy(env))
     end
     return node
@@ -166,10 +166,12 @@ function run_simulation_from_child(mcts::Policy, node::Tree, env::AbstractEnv, i
     else
         if isnothing(node.children[i])
             node.children[i] = create_node(env, mcts.oracle)
+            next_value = node.children[i].oracle_value
+        else
+            child = node.children[i]
+            @assert !isnothing(child)
+            next_value = run_simulation(mcts, child, env)
         end
-        child = node.children[i]
-        @assert !isnothing(child)
-        next_value = run_simulation(mcts, child, env)
     end
     value = r + (switched ? -next_value : next_value)
     node.num_visits[i] += 1
