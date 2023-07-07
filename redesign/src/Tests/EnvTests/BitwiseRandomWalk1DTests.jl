@@ -4,9 +4,9 @@ using ReinforcementLearningEnvironments: RandomWalk1D
 using Test
 
 using ..BatchedEnvsTests
-using ..Common.BitwiseRandomWalk1D
-using ...BatchedEnvs
-using ...Util.StaticBitArrays
+using ...Common.BitwiseRandomWalk1D
+using ....BatchedEnvs
+using ....Util.StaticBitArrays
 
 export run_bitwise_random_walk_tests
 

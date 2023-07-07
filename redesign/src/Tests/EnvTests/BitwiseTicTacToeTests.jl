@@ -4,9 +4,9 @@ using ReinforcementLearningEnvironments: TicTacToeEnv
 using Test
 
 using ..BatchedEnvsTests
-using ..Common.BitwiseTicTacToe
-using ...BatchedEnvs
-using ...Util.StaticBitArrays
+using ...Common.BitwiseTicTacToe
+using ....BatchedEnvs
+using ....Util.StaticBitArrays
 
 export run_bitwise_tictactoe_tests
 

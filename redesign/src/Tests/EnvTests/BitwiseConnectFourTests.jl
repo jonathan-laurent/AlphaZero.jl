@@ -3,9 +3,9 @@ module BitwiseConnectFourTests
 using Test
 
 using ..BatchedEnvsTests
-using ..Common.BitwiseConnectFour
-using ...BatchedEnvs
-using ...Util.StaticBitArrays
+using ...Common.BitwiseConnectFour
+using ....BatchedEnvs
+using ....Util.StaticBitArrays
 
 export run_bitwise_connect_four_tests
 

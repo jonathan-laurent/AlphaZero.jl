@@ -1,7 +1,7 @@
 module BatchedEnvsTests
 
-using ...BatchedEnvs
-using ....Util.StaticBitArrays
+using ....BatchedEnvs
+using .....Util.StaticBitArrays
 
 using CUDA
 using JET

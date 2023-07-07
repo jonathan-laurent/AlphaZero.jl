@@ -8,43 +8,24 @@ export run_all_tests
 include("Common/Common.jl")
 @reexport using .Common
 
-include("NetworksTests.jl")
-@reexport using .NetworksTests
-
-include("BatchedEnvsTests.jl")
-@reexport using .BatchedEnvsTests
-
-include("EnvTests/BitwiseRandomWalk1DTests.jl")
-@reexport using .BitwiseRandomWalk1DTests
-
-include("EnvTests/BitwiseTicTacToeTests.jl")
-@reexport using .BitwiseTicTacToeTests
-
-include("EnvTests/BitwiseConnectFourTests.jl")
-@reexport using .BitwiseConnectFourTests
-
 include("UtilTests.jl")
-@reexport using .UtilTests
+@reexport using .UtilTests: run_util_tests
 
-include("MctsTests/SimpleMctsTests.jl")
-@reexport using .SimpleMctsTests
+include("NetworksTests/NetworksTests.jl")
+@reexport using .NetworksTests: run_neural_networks_tests
 
-include("MctsTests/BatchedMctsTests.jl")
-@reexport using .BatchedMctsTests
+include("EnvTests/EnvTests.jl")
+@reexport using .EnvTests: run_env_tests
 
-include("MctsTests/BatchedMctsAosTests.jl")
-@reexport using .BatchedMctsAosTests
+include("MctsTests/MctsTests.jl")
+@reexport using .MctsTests: run_mcts_tests
 
 function run_all_tests()
     @testset "RLZero tests" begin
         @testset "utility tests" run_util_tests()
         @testset "neural network tests" run_neural_networks_tests()
-        @testset "random walk env tests" run_bitwise_random_walk_tests()
-        @testset "tictactoe tests" run_bitwise_tictactoe_tests()
-        @testset "connect-4 tests" run_bitwise_connect_four_tests()
-        @testset "simple mcts tests" run_simple_mcts_tests()
-        @testset "batched mcts SoA tests" run_batched_mcts_tests()
-        # @testset "batched mcts AoS tests" run_batched_mcts_aos_tests()
+        @testset "env tests" run_env_tests()
+        @testset "mcts tests" run_mcts_tests()
     end
     return nothing
 end

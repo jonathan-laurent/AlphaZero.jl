@@ -5,16 +5,16 @@ using Flux: gpu
 using Random: MersenneTwister
 using Test
 
-using ..Common.Common
-using ...BatchedEnvs
-using ...BatchedMcts
-using ...BatchedMctsUtilities
-using ...EnvOracles
-using ...Network
-using ...Util.Devices
+using ...Common.Common
+using ....BatchedEnvs
+using ....BatchedMcts
+using ....BatchedMctsUtilities
+using ....EnvOracles
+using ....Network
+using ....Util.Devices
 
-import ..SimpleMctsTests as SimTest
-import ...SimpleMcts as Sim
+import ..SimpleMctsTests as SimpleMctsTests
+import ....SimpleMcts
 
 
 export run_batched_mcts_tests
@@ -162,10 +162,10 @@ end
 function test_equivalence_with_uniform_simple_mcts()
     device = GPU()
 
-    simple_mcts_policy = SimTest.uniform_mcts_policy(; num_simulations=64)
+    simple_mcts_policy = SimpleMctsTests.uniform_mcts_policy(; num_simulations=64)
     simple_mcts_env = tictactoe_winning()
-    simple_mcts_tree = Sim.explore(simple_mcts_policy, simple_mcts_env)
-    sim_qvalues = Sim.completed_qvalues(simple_mcts_tree)
+    simple_mcts_tree = SimpleMcts.explore(simple_mcts_policy, simple_mcts_env)
+    sim_qvalues = SimpleMcts.completed_qvalues(simple_mcts_tree)
 
     batch_mcts_policy = get_policy(device, uniform_env_oracle, Dict(); num_simulations=64)
     batch_mcts_envs = envs_array(bitwise_tictactoe_winning, device; n_envs=2)

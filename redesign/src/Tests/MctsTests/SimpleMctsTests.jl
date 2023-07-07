@@ -7,8 +7,8 @@ using ReinforcementLearningEnvironments
 using Random: MersenneTwister
 using Statistics: mean
 
-using ...SimpleMcts
-using ..Common.TestEnvs
+using ....SimpleMcts
+using ...Common.TestEnvs
 
 export run_simple_mcts_tests
 
