@@ -65,8 +65,7 @@ function SimpleNet(indim::Int, outdim::Int, hyper::SimpleNetHP)
 
     phead = Flux.Chain(
         hlayers(hyper.depth_phead)...,
-        Flux.Dense(hyper.width => outdim; init=weight_init()),
-        Flux.softmax
+        Flux.Dense(hyper.width => outdim; init=weight_init())
     )
 
     SimpleNet(hyper, common, vhead, phead)
@@ -78,9 +77,10 @@ hyperparams(nn::SimpleNet) = nn.hyper
 on_gpu(nn::SimpleNet) = arr_is_on_gpu(nn.vhead[end].bias)
 
 
-function forward(nn::SimpleNet, x)
+function forward(nn::SimpleNet, x, use_softmax_p=true)
     common = nn.common(x)
     v = nn.vhead(common)
     p = nn.phead(common)
+    use_softmax_p && (p = Flux.softmax(p))
     return v, p
 end
