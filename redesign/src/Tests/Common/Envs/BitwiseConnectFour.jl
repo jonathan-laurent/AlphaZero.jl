@@ -35,8 +35,8 @@ end
 
 BitwiseConnectFourEnv() = BitwiseConnectFourEnv(bitboard(), CROSS)
 
-BatchedEnvs.state_size(::BitwiseConnectFourEnv) = 6 * 7 * 3
-BatchedEnvs.num_actions(::BitwiseConnectFourEnv) = 7
+BatchedEnvs.state_size(::Type{BitwiseConnectFourEnv}) = 6 * 7 * 3
+BatchedEnvs.num_actions(::Type{BitwiseConnectFourEnv}) = 7
 
 posidx(n, player) = n + 42 * player
 posidx(x, y, player) = posidx(7 * (x - 1) + y, player)

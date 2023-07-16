@@ -17,7 +17,7 @@ function test_equivalent(BatchedEnv, BaselineEnv)
         env = BatchedEnv()
         env_baseline = BaselineEnv()
         while !BatchedEnvs.terminated(env)
-            valid_actions = filter(1:BatchedEnvs.num_actions(env)) do i
+            valid_actions = filter(1:BatchedEnvs.num_actions(BatchedEnv)) do i
                 BatchedEnvs.valid_action(env, i)
             end
             valid_actions_baseline = collect(RLBase.legal_action_space(env_baseline))

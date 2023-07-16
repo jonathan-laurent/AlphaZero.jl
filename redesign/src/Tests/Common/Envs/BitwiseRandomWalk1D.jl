@@ -29,8 +29,8 @@ function BitwiseRandomWalk1DEnv()
     return BitwiseRandomWalk1DEnv(board, start_pos)
 end
 
-BatchedEnvs.state_size(::BitwiseRandomWalk1DEnv) = ENV_SIZE
-BatchedEnvs.num_actions(::BitwiseRandomWalk1DEnv) = 2
+BatchedEnvs.state_size(::Type{BitwiseRandomWalk1DEnv}) = ENV_SIZE
+BatchedEnvs.num_actions(::Type{BitwiseRandomWalk1DEnv}) = 2
 
 function Base.show(io::IO, ::MIME"text/plain", env::BitwiseRandomWalk1DEnv)
     print_pos(pos) = (pos == env.cur_pos) ? print(io, "X ") : print(io, "· ")

@@ -23,8 +23,8 @@ end
 
 BitwiseTicTacToeEnv() = BitwiseTicTacToeEnv(BitBoard(), CROSS)
 
-BatchedEnvs.state_size(::BitwiseTicTacToeEnv) = 3 * 3 * 3
-BatchedEnvs.num_actions(::BitwiseTicTacToeEnv) = 9
+BatchedEnvs.state_size(::Type{BitwiseTicTacToeEnv}) = 3 * 3 * 3
+BatchedEnvs.num_actions(::Type{BitwiseTicTacToeEnv}) = 9
 
 posidx(n, player) = n + 9 * player
 posidx(x, y, player) = posidx(x + 3 * (y - 1), player)

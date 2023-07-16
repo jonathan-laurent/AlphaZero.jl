@@ -117,7 +117,8 @@ function test_uniform_exploration()
         tree_size = (Val(A), Val(N), Val(B))
 
         q_values = MCTS.completed_qvalues(tree, root, env_id, tree_size)
-        @test length(q_values) == length(tree.children[:, root, env_id]) == num_actions(env)
+        @test length(q_values) == length(tree.children[:, root, env_id])
+        @test length(q_values) == BatchedEnvs.num_actions(typeof(env))
 
         device = get_device(tree.policy_prior)
         policy_prior = DeviceArray(device)([0, 0.2, 0.2, 0.2, 0, 0, 0.2, 0.2, 0])
@@ -178,7 +179,6 @@ function test_equivalence_with_uniform_simple_mcts()
     batch_mcts_qvalues = [q for q in batch_mcts_qvalues_inf if q != -Inf32]
 
     @test sim_qvalues ≈ batch_mcts_qvalues
-
 end
 
 end
