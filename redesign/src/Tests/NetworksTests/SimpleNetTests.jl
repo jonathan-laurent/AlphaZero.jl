@@ -125,17 +125,17 @@ function test_modes()
     @testset "nothing by default" test_mode(nothing)
 
     @testset "training mode" begin
-        set_test_mode!(nn, false)
+        set_train_mode!(nn)
         test_mode(true)
     end
 
     @testset "test mode" begin
-        set_test_mode!(nn, true)
+        set_test_mode!(nn)
         test_mode(false)
     end
 
     @testset "back to training mode" begin
-        set_test_mode!(nn, false)
+        set_train_mode!(nn)
         test_mode(true)
     end
 end

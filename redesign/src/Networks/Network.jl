@@ -7,7 +7,9 @@ using Random: MersenneTwister
 
 using ..Util.Devices: Device, CPU, GPU, arr_is_on_gpu
 
-export FluxNetwork, on_gpu, forward, to_cpu, to_gpu, set_test_mode!, SimpleNet, SimpleNetHP
+export FluxNetwork
+export SimpleNet, SimpleNetHP
+export on_gpu, forward, to_cpu, to_gpu, set_train_mode!, set_test_mode!
 
 
 """
@@ -96,14 +98,24 @@ end
 
 
 """
-    set_test_mode!(mode)
+    set_train_mode!(nn::Net) where Net <: FluxNetwork
 
-Put a network in test mode or in training mode.
-This is relevant for networks featuring layers such as
-batch normalization layers.
+Put a network in train mode. This is relevant for networks
+featuring layers such as batch normalization layers.
 """
-function set_test_mode!(nn::FluxNetwork, mode)
-    Flux.testmode!(nn, mode)
+function set_train_mode!(nn::FluxNetwork)
+    Flux.trainmode!(nn)
+end
+
+
+"""
+    set_test_mode!(nn::Net) where Net <: FluxNetwork
+
+Put a network in test mode. This is relevant for networks
+featuring layers such as batch normalization layers.
+"""
+function set_test_mode!(nn::FluxNetwork)
+    Flux.testmode!(nn)
 end
 
 
