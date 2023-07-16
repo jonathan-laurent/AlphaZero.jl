@@ -82,7 +82,6 @@ function test_functor_params()
             @test size(nn.phead[2].weight) == (output_size, width)
             @test nn.phead[2].bias === functor_params[14]
             @test size(nn.phead[2].bias) == (output_size,)
-            @test nn.phead[3] === Flux.softmax
         end
     end
 end
@@ -169,7 +168,6 @@ function test_copy()
         @testset "dense1" test_dense_layer_equality(nn2.phead[1], nn.phead[1])
         @testset "dense-output" begin
             test_dense_layer_equality(nn2.phead[2], nn.phead[2])
-            @test nn2.phead[3] == nn.phead[3]
         end
     end
 end
@@ -181,7 +179,7 @@ function test_forward()
     rng = MersenneTwister(42)
     input = rand(rng, Float32, 126, batch_size)
 
-    nn_vhead_out, nn_phead_out = forward(nn, input)
+    nn_vhead_out, nn_phead_out = forward(nn, input, false)
 
     @testset "forward pass correct output size" begin
         @test size(nn_vhead_out) == (1, batch_size)
@@ -200,7 +198,7 @@ function test_forward()
 
         a1_phead = nn.phead[1].σ.(nn.phead[1].weight * common_out .+ nn.phead[1].bias)
         a2_phead = nn.phead[2].σ.(nn.phead[2].weight * a1_phead .+ nn.phead[2].bias)
-        phead_out = nn.phead[3](a2_phead)
+        phead_out = a2_phead
         @test size(phead_out) == (7, batch_size)
 
         @test nn_vhead_out ≈ vhead_out
