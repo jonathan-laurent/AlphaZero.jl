@@ -126,6 +126,16 @@ using CUDA
         return ys ./ sum(ys; init=z)
     end
 
+    function categorical_sample(probs_arr, pregenerated_prob)
+        current_prob_sum = 0.0
+        for (i, prob) in enumerate(probs_arr)
+            current_prob_sum += prob
+            if current_prob_sum >= pregenerated_prob
+                return i
+            end
+        end
+        return length(probs_arr)
+    end
 end
 
 end
