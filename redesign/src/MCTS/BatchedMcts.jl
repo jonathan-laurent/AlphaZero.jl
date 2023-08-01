@@ -151,7 +151,7 @@ using Random: AbstractRNG
 using StaticArrays
 
 using ..Util.Devices
-using ..Util.Devices.KernelFuns: sum, argmax, maximum, softmax
+using ..Util.Devices.KernelFuns: sum, argmax, maximum, softmax, categorical_sample
 using ..BatchedMctsUtilities
 
 import Base.Iterators.map as imap
@@ -442,24 +442,63 @@ function rescale(value; minima=-2, maxima=1)
 end
 
 """
-    completed_qvalues(tree)
+    get_mcts_policy(tree, device)
 
-Return the `completed_qvalues` for each environments.
-
-It is a practical utility functions to get a usable policy after a `explore`.
+Return an array of size (num_action, num_envs) containing the resulting MCTS
+policy for each environment. It can be used to get a usable policy from the MCTS tree
+after `explore` has been run.
 """
-function completed_qvalues(tree)
+function get_mcts_policy(tree, device)
     ROOT = 1
     (; A, N, B) = BatchedMcts.size(tree)
     tree_size = (Val(A), Val(N), Val(B))
 
-    return map(1:B) do bid
-        # XXX: invalid_actions_value should be -1, but for some reasons, completed_qvalues
-        #   are sometimes lower than -1, to fix this, we used -2 as an invalid_actions_value
-        #   and changed the minimal value of `rescale` too.
-        q_values = BatchedMcts.completed_qvalues(tree, ROOT, bid, tree_size; invalid_actions_value=-2)
-        l1_normalise(rescale.(q_values))
+    policy = zeros(Float32, device, A, B)
+    Devices.foreach(1:B, device) do bid
+        q_values = completed_qvalues(tree, ROOT, bid, tree_size; invalid_actions_value=-2f0)
+        policy[:, bid] .= l1_normalise(rescale.(q_values))
     end
+    return policy
+end
+
+"""
+    sample_actions(tree, device, probs)
+
+Returns an array of size (num_envs,) containing sampled actions according
+to the Q-values of the root node, for every environment. It can be used to sample
+actions from the MCTS tree after `explore` has been run.
+"""
+function sample_actions(tree, device, probs)
+    ROOT = 1
+    (; A, N, B) = BatchedMcts.size(tree)
+    tree_size = (Val(A), Val(N), Val(B))
+
+    actions = zeros(Int16, device, B)
+    Devices.foreach(1:B, device) do bid
+        q_values = completed_qvalues(tree, ROOT, bid, tree_size; invalid_actions_value=-2f0)
+        actions[bid] = categorical_sample(l1_normalise(rescale.(q_values)), probs[bid])
+    end
+    return actions
+end
+
+"""
+    get_greedy_policy(tree, device)
+
+Returns an array of size (num_envs,) containing the greedy policy (argmax actions)
+according to the Q-values of the root node, for every environment. It can be used
+to get the estimated best actions from the MCTS tree after `explore` has been run.
+"""
+function get_greedy_policy(tree, device)
+    ROOT = 1
+    (; A, N, B) = BatchedMcts.size(tree)
+    tree_size = (Val(A), Val(N), Val(B))
+
+    actions = zeros(Int16, device, B)
+    Devices.foreach(1:B, device) do bid
+        q_values = completed_qvalues(tree, ROOT, bid, tree_size; invalid_actions_value=-2f0)
+        actions[bid] = argmax(l1_normalise(rescale.(q_values)), init=(-1, -1))
+    end
+    return actions
 end
 
 """
