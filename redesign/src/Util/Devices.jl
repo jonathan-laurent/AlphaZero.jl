@@ -120,22 +120,13 @@ using CUDA
     # A softmax implementation that does not use in place updates
     # and therefore can also be used on StaticArrays.
     function softmax(xs; eps=1e-15)
+        minval = typemin(eltype(xs))
         z = zero(eltype(xs))
-        xs = xs .- maximum(xs; init=z)
+        xs = xs .- maximum(xs; init=minval)
         ys = exp.(xs) .+ eltype(xs)(eps)
         return ys ./ sum(ys; init=z)
     end
 
-    function categorical_sample(probs_arr, pregenerated_prob)
-        current_prob_sum = 0.0
-        for (i, prob) in enumerate(probs_arr)
-            current_prob_sum += prob
-            if current_prob_sum >= pregenerated_prob
-                return i
-            end
-        end
-        return length(probs_arr)
-    end
 end
 
 end
