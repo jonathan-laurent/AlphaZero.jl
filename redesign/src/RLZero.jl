@@ -8,8 +8,14 @@ include("Util/Util.jl")
 include("Networks/Network.jl")
 @reexport using .Network
 
+include("ReplayBuffer.jl")
+@reexport using .ReplayBuffers
+
 include("BatchedEnvs.jl")
 using .BatchedEnvs
+
+include("Minimax.jl")
+@reexport using .Minimax
 
 include("MCTS/SimpleMcts.jl")
 @reexport using .SimpleMcts
@@ -25,6 +31,15 @@ include("MCTS/BatchedMcts.jl")
 
 include("MCTS/BatchedMctsAos.jl")
 @reexport using .BatchedMctsAos: BatchedMctsAos
+
+include("Evaluation.jl")
+@reexport using .Evaluation
+
+include("LoggingUtilities.jl")
+@reexport using .LoggingUtilities
+
+include("Train.jl")
+@reexport using .Train
 
 include("Tests/Tests.jl")
 @reexport using .Tests: Tests

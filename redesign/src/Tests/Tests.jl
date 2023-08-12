@@ -14,8 +14,14 @@ include("UtilTests.jl")
 include("NetworksTests/NetworksTests.jl")
 @reexport using .NetworksTests: run_neural_networks_tests
 
+include("ReplayBufferTests.jl")
+@reexport using .ReplayBufferTests: run_replay_buffer_tests
+
 include("EnvTests/EnvTests.jl")
 @reexport using .EnvTests: run_env_tests
+
+include("MinimaxTests.jl")
+@reexport using .MinimaxTests: run_minimax_tests
 
 include("MctsTests/MctsTests.jl")
 @reexport using .MctsTests: run_mcts_tests
@@ -24,7 +30,9 @@ function run_all_tests()
     @testset "RLZero tests" begin
         @testset "utility tests" run_util_tests()
         @testset "neural network tests" run_neural_networks_tests()
+        @testset "replay buffer tests" run_replay_buffer_tests()
         @testset "env tests" run_env_tests()
+        @testset "minimax tests" run_minimax_tests()
         @testset "mcts tests" run_mcts_tests()
     end
     return nothing
