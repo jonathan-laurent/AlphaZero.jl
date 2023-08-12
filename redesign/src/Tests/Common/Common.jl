@@ -14,4 +14,10 @@ include("Envs/BitwiseConnectFour.jl")
 include("TestEnvs.jl")
 @reexport using .TestEnvs
 
+include("Evaluation/Heuristics/BitwiseTicTacToeHeuristic.jl")
+@reexport using .BitwiseTicTacToeHeuristic
+
+include("Evaluation/EvaluationFunctions/BitwiseTicTacToeEvaluationFns.jl")
+@reexport using .BiwtiseTicTacToeEvalFns
+
 end
