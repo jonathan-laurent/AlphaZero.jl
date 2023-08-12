@@ -1,6 +1,5 @@
 module BatchedMctsUtilities
 
-# using ..BatchedEnvs
 using ..Util.Devices
 
 using Base: @kwdef
@@ -31,6 +30,12 @@ the same type as those passed to the `explore` and `gumbel_explore` functions. T
    must be `isbits` if it is desired to run `BatchedMcts` on `GPU`.
 - `valid_actions`: a vector of booleans with dimensions `num_actions` and `batch_id`
    indicating which actions are valid to take (this is disregarded in MuZero).
+-  `logit_prior`: the logits of the policy prior for each state as an
+   `AbstractArray{Float32,2}` with dimensions `num_actions` and `batch_id`. The logits
+   should be unnormalized and can be computed from the policy prior using the softmax
+   function. An action with `logit_prior` of `-Inf` corresponds to the worst possible one
+   or an illegal action. On the other side, a value of `0` is associated with a winning
+   action.
 - `policy_prior`: the policy prior for each state as an `AbstractArray{Float32,2}` with
    dimensions `num_actions` and `batch_id` and value within [0, 1]. An action with
    `policy_prior` of `0` corresponds to the worst possible one or an illegal action. On the
@@ -65,7 +70,7 @@ The `transition_fn` function returns a named-tuple of arrays:
    (this is always `false` in MuZero).
 - `player_switched`: vector of booleans indicating whether or not the current player
    switched during the transition (always `true` in many board games).
-- `valid_actions`, `policy_prior`, `value_prior`: same as for `init_fn`.
+- `valid_actions`, `logit_prior`, `policy_prior`, `value_prior`: same as for `init_fn`.
 
 
 # Examples of internal state encodings
@@ -78,9 +83,9 @@ The `transition_fn` function returns a named-tuple of arrays:
   `Base.isbitstype(State)`. The latter representation may be easier to work with when
   broadcasting non-batched environment implementations on GPU (see
   `Tests.Common.BitwiseTicTacToe.BitwiseTicTacToe` for example).
-- When using MuZero, the `internal_states` field typically has the type `AbstractArray{Float32,
-  2}` where the first dimension corresponds to the size of latent states and the second
-  dimension is the batch dimension.
+- When using MuZero, the `internal_states` field typically has the type
+  `AbstractArray{Float32, 2}` where the first dimension corresponds to the size of
+  latent states and the second dimension is the batch dimension.
 
 See also [`check_oracle`](@ref), [`UniformTicTacToeEnvOracle`](@ref)
 """
@@ -120,24 +125,32 @@ function check_oracle(oracle::EnvOracle, envs)
     init_res = oracle.init_fn(envs)
     # Named-tuple check
     @assert check_keys(
-        keys(init_res), (:internal_states, :valid_actions, :policy_prior, :value_prior)
-    ) "The `EnvOracle`'s `init_fn` function should returned a named-tuple with the " *
-        "following fields: internal_states, valid_actions, policy_prior, " *
+        keys(init_res),
+        (:internal_states, :valid_actions, :logit_prior, :policy_prior, :value_prior)
+    ) "The `EnvOracle`'s `init_fn()` function should returned a named-tuple with the " *
+        "following fields: internal_states, valid_actions, logit_prior, policy_prior, " *
         "value_prior."
 
     # Type and dimensions check
     size_valid_actions = size(init_res.valid_actions)
     A, _ = size_valid_actions
-    @assert (size_valid_actions == (A, B) && eltype(init_res.valid_actions) == Bool) "The " *
-        "`init_fn`'s function should return a `valid_actions` vector with dimensions " *
-        "`num_actions` and `batch_id`, and of type `Bool`."
+    @assert (size_valid_actions == (A, B) && eltype(init_res.valid_actions) == Bool)
+        "The `init_fn()` function should return a `valid_actions` array of size " *
+        "(num_actions, num_envs), and of type `Bool`."
+    size_logit_prior = size(init_res.logit_prior)
     size_policy_prior = size(init_res.policy_prior)
-    @assert (size_policy_prior == (A, B) && eltype(init_res.policy_prior) == Float32) "The " *
-        "`init_fn`'s function should return a `policy_prior` vector with dimensions " *
-        "`num_actions` and `batch_id`, and of type `Float32`."
-    @assert (length(init_res.value_prior) == B && eltype(init_res.value_prior) == Float32) "The " *
-        "`init_fn`'s function should return a `value_policy` vector of length " *
-        "`batch_id`, and of type `Float32`."
+    @assert size_logit_prior == size_policy_prior "The `init_fn()` function should " *
+        "return a `logit_prior` array with the same dimensions as `policy_prior`."
+    @assert (size_logit_prior == (A, B) && eltype(init_res.logit_prior) == Float32)
+        "The `init_fn()` function should return a `logit_prior` array of size " *
+        "(num_actions, num_envs), and of type `Float32`."
+    @assert (size_policy_prior == (A, B) && eltype(init_res.policy_prior) == Float32) "" *
+        "The `init_fn()` function should return a `policy_prior` array of size " *
+        "(num_actions, num_envs), and of type `Float32`."
+    length_value_prior = length(init_res.value_prior)
+    @assert (length_value_prior == B && eltype(init_res.value_prior) == Float32) "The " *
+        "`init_fn()` function should return a `value_policy` vector of length " *
+        "(num_envs,), and of type `Float32`."
 
     aids = [
         findfirst(init_res.valid_actions[:, bid]) for
@@ -155,40 +168,47 @@ function check_oracle(oracle::EnvOracle, envs)
             :terminal,
             :valid_actions,
             :player_switched,
+            :logit_prior,
             :policy_prior,
             :value_prior,
         ),
-    ) "The `EnvOracle`'s `transition_fn` function should returned a named-tuple with the " *
-        "following fields: internal_states, rewards, terminal, valid_actions, " *
-        "player_switched, policy_prior, value_prior."
+    ) "The `EnvOracle`'s `transition_fn()` function should returned a named-tuple with " *
+        "the following fields: internal_states, rewards, terminal, valid_actions, " *
+        "player_switched, logit_prior, policy_prior, value_prior."
 
     # Type and dimensions check
     @assert (
         length(transition_res.rewards) == B && eltype(transition_res.rewards) == Float32
-    ) "The `transition_fn`'s function should return a `rewards` vector of length " *
-        "`batch_id` and of type `Float32`."
+    ) "The `transition_fn()` function should return a `rewards` vector of length " *
+        "(num_envs,), and of type `Float32`."
     @assert (
         length(transition_res.terminal) == B && eltype(transition_res.terminal) == Bool
-    ) "The `transition_fn`'s function should return a `terminal` vector of length " *
-        "`batch_id` and of type `Bool`."
+    ) "The `transition_fn()` function should return a `terminal` vector of length " *
+        "(num_envs,), and of type `Bool`."
     size_valid_actions = size(transition_res.valid_actions)
-    @assert (size_valid_actions == (A, B) && eltype(transition_res.valid_actions) == Bool) "The `" *
-        "transition_fn`'s function should return a `valid_actions` vector with " *
-        "dimensions `num_actions` and `batch_id`, and of type `Bool`."
+    @assert (size_valid_actions == (A, B) && eltype(transition_res.valid_actions) == Bool)
+        "The `transition_fn()` function should return a `valid_actions` array of " *
+        "size (num_actions, num_envs), and of type `Bool`."
     @assert (
         length(transition_res.player_switched) == B &&
         eltype(transition_res.player_switched) == Bool
-    ) "The `transition_fn`'s function should return a `player_switched` vector of length " *
-        "`batch_id`, and of type `Bool`."
+    ) "The `transition_fn()` function should return a `player_switched` vector of " *
+        "length (num_envs,), and of type `Bool`."
+    size_logit_prior = size(transition_res.logit_prior)
     size_policy_prior = size(transition_res.policy_prior)
-    @assert (size_policy_prior == (A, B) && eltype(transition_res.policy_prior) == Float32) "The " *
-        "`transition_fn`'s function should return a `policy_prior` vector with " *
-        "dimensions `num_actions` and `batch_id`, and of type `Float32`."
+    @assert size_logit_prior == size_policy_prior "The `transition_fn()` function should " *
+        "return a `logit_prior` array with the same dimensions as `policy_prior`."
+    @assert (size_logit_prior == (A, B) && eltype(transition_res.logit_prior) == Float32)
+        "The `transition_fn()` function should return a `logit_prior` array of " *
+        "size (num_actions, num_envs), and of type `Float32`."
+    @assert (size_policy_prior == (A, B) && eltype(transition_res.policy_prior) == Float32)
+        "The `transition_fn()` function should return a `policy_prior` array of " *
+        "size (num_actions, num_envs), and of type `Float32`."
     @assert (
         length(transition_res.value_prior) == B &&
         eltype(transition_res.value_prior) == Float32
-    ) "The `transition_fn`'s function should return a `value_policy` vector of length " *
-        "`batch_id`, and of type `Float32`."
+    ) "The `transition_fn()` function should return a `value_policy` vector of length " *
+        "(num_envs,), and of type `Float32`."
 
     return nothing
 end

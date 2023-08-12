@@ -151,7 +151,7 @@ using Random: AbstractRNG
 using StaticArrays
 
 using ..Util.Devices
-using ..Util.Devices.KernelFuns: sum, argmax, maximum, softmax, categorical_sample
+using ..Util.Devices.KernelFuns: sum, argmax, maximum, softmax
 using ..BatchedMctsUtilities
 
 import Base.Iterators.map as imap
@@ -168,7 +168,7 @@ const NO_PARENT = Int16(0)
 const UNVISITED = Int16(0)
 ## Value used in various tree's attributes to access root information.
 const ROOT = Int16(1)
-## Valud used when no action is selected.
+## Value used when no action is selected.
 const NO_ACTION = Int16(0)
 # 2 Utilities to easily access information in `parent_frontier`
 # `parent_frontier` is a list of tuples with the following format:
@@ -203,6 +203,7 @@ All these fields are used to store the results of calling the environment oracle
    perspective of the parent's player (N, B).
 - `prev_switched`: the immediate reward obtained when transitioning from the parent from the
    perspective of the parent's player (N, B).
+- `logit_prior`: as given by the `EnvOracle` (A, N, B).
 - `policy_prior`: as given by the `EnvOracle` (A, N, B).
 - `value_prior`: as given by the `EnvOracle` (N, B).
 
@@ -257,6 +258,7 @@ A: Number of actions
     prev_action::Int16NodeArray            # (N, B)      {Int16}
     prev_reward::Float32NodeArray          # (N, B)      {Float32}
     prev_switched::BoolNodeArray           # (N, B)      {Bool}
+    logit_prior::Float32ActionArray        # (A, N, B)   {Float32}
     policy_prior::Float32ActionArray       # (A, N, B)   {Float32}
     value_prior::Float32NodeArray          # (N, B)      {Float32}
 end
@@ -266,18 +268,6 @@ end
 
 l1_normalise(policy) = policy / sum(abs.(policy); init=Float32(0))
 
-"""
-    validate_prior(policy_prior, valid_actions)
-
-Correct `policy_prior` to ignore in`valid_actions`.
-
-More precisely, `policy_prior`  that are in`valid_actions` are set to 0. The rest of the
-`policy_prior` (which are valid actions) are then l1-normalized.
-"""
-function validate_prior(policy_prior, valid_actions)
-    valid_prior = policy_prior .* valid_actions
-    return valid_prior ./ sum(abs.(valid_prior); dims=1)
-end
 
 """
     dims(arr::AbstractArray)
@@ -309,14 +299,21 @@ function create_tree(mcts, envs)
 
     num_visits = fill(UNVISITED, mcts.device, (N, B))
     num_visits[ROOT, :] .= 1
+
     internal_states = DeviceArray(mcts.device){eltype(info.internal_states)}(
         undef, (dims(info.internal_states[.., 1])..., N, B)
     )
     internal_states[.., ROOT, :] = info.internal_states
+
     valid_actions = fill(false, mcts.device, (A, N, B))
     valid_actions[:, ROOT, :] = info.valid_actions
+
+    logit_prior = zeros(Float32, mcts.device, (A, N, B))
+    logit_prior[:, ROOT, :] = info.logit_prior
+
     policy_prior = zeros(Float32, mcts.device, (A, N, B))
-    policy_prior[:, ROOT, :] = validate_prior(info.policy_prior, info.valid_actions)
+    policy_prior[:, ROOT, :] = info.policy_prior
+
     value_prior = zeros(Float32, mcts.device, (N, B))
     value_prior[ROOT, :] = info.value_prior
 
@@ -331,6 +328,7 @@ function create_tree(mcts, envs)
         prev_action=zeros(Int16, mcts.device, (N, B)),
         prev_reward=zeros(Float32, mcts.device, (N, B)),
         prev_switched=fill(false, mcts.device, (N, B)),
+        logit_prior,
         policy_prior,
         value_prior,
     )
@@ -350,7 +348,7 @@ end
 """
     batch_size(tree)
 
-Return the number of environments in the batch of a `tree`.
+Return the number of parallel environments in `tree`.
 """
 batch_size(tree) = size(tree).B
 
@@ -385,7 +383,7 @@ See also [`value`](@ref)
 qvalue(tree, cid, bid) = value(tree, cid, bid) * (-1)^tree.prev_switched[cid, bid]
 
 """
-    root_value_estimate(tree, cid, bid, ::Tuple{Val{A},Any,Any}) where {A}
+    root_value_estimate(tree, cid, bid, ::Tuple{Val{A}, Any, Any}) where {A}
 
 Compute a value estimation of a node at this stage of the exploration.
 
@@ -410,7 +408,13 @@ function root_value_estimate(tree, cid, bid, ::Tuple{Val{A}, Any, Any}) where {A
 end
 
 """
-    completed_qvalues(tree, cid, bid, tree_size::Tuple{Val{A},Any,Any}) where {A}
+    completed_qvalues(
+        tree,
+        cid,
+        bid,
+        tree_size::Tuple{Val{A}, Any, Any};
+        invalid_actions_value=-Inf32
+    ) where {A}
 
 Return a list of estimated qvalue of all children for a given node.
 
@@ -418,7 +422,11 @@ More precisely, if its child have been visited at least one time, it computes it
 `qvalue`, otherwise, it uses the `root_value_estimate` of node instead.
 """
 function completed_qvalues(
-    tree, cid, bid, tree_size::Tuple{Val{A}, Any, Any}; invalid_actions_value=-Inf32
+    tree,
+    cid,
+    bid,
+    tree_size::Tuple{Val{A}, Any, Any};
+    invalid_actions_value = -Inf32
 ) where {A}
     root_value = root_value_estimate(tree, cid, bid, tree_size)
     ret = imap(1:A) do aid
@@ -428,77 +436,6 @@ function completed_qvalues(
         return cnid != UNVISITED ? qvalue(tree, cnid, bid) : root_value
     end
     return SVector{A}(ret)
-end
-
-"""
-    rescale(value; minima=-1, maxima=1)
-
-Rescale `value` between [0; 1].
-
-It is needed to specify the minimum & maximum of `value`.
-"""
-function rescale(value; minima=-2, maxima=1)
-    return (value - minima) / (maxima - minima)
-end
-
-"""
-    get_mcts_policy(tree, device)
-
-Return an array of size (num_action, num_envs) containing the resulting MCTS
-policy for each environment. It can be used to get a usable policy from the MCTS tree
-after `explore` has been run.
-"""
-function get_mcts_policy(tree, device)
-    ROOT = 1
-    (; A, N, B) = BatchedMcts.size(tree)
-    tree_size = (Val(A), Val(N), Val(B))
-
-    policy = zeros(Float32, device, A, B)
-    Devices.foreach(1:B, device) do bid
-        q_values = completed_qvalues(tree, ROOT, bid, tree_size; invalid_actions_value=-2f0)
-        policy[:, bid] .= l1_normalise(rescale.(q_values))
-    end
-    return policy
-end
-
-"""
-    sample_actions(tree, device, probs)
-
-Returns an array of size (num_envs,) containing sampled actions according
-to the Q-values of the root node, for every environment. It can be used to sample
-actions from the MCTS tree after `explore` has been run.
-"""
-function sample_actions(tree, device, probs)
-    ROOT = 1
-    (; A, N, B) = BatchedMcts.size(tree)
-    tree_size = (Val(A), Val(N), Val(B))
-
-    actions = zeros(Int16, device, B)
-    Devices.foreach(1:B, device) do bid
-        q_values = completed_qvalues(tree, ROOT, bid, tree_size; invalid_actions_value=-2f0)
-        actions[bid] = categorical_sample(l1_normalise(rescale.(q_values)), probs[bid])
-    end
-    return actions
-end
-
-"""
-    get_greedy_policy(tree, device)
-
-Returns an array of size (num_envs,) containing the greedy policy (argmax actions)
-according to the Q-values of the root node, for every environment. It can be used
-to get the estimated best actions from the MCTS tree after `explore` has been run.
-"""
-function get_greedy_policy(tree, device)
-    ROOT = 1
-    (; A, N, B) = BatchedMcts.size(tree)
-    tree_size = (Val(A), Val(N), Val(B))
-
-    actions = zeros(Int16, device, B)
-    Devices.foreach(1:B, device) do bid
-        q_values = completed_qvalues(tree, ROOT, bid, tree_size; invalid_actions_value=-2f0)
-        actions[bid] = argmax(l1_normalise(rescale.(q_values)), init=(-1, -1))
-    end
-    return actions
 end
 
 """
@@ -517,49 +454,82 @@ end
 """
     qcoeff(value_scale, max_visit_init, tree, cid, bid, tree_size)
 
-Compute a GUmbel-related ponderation of `qvalue`.
+Compute a Gumbel-related ponderation of `qvalue`.
 
 Through time, as the number of visits increases, the influence of `qvalue` builds up
 relatively to `policy_prior`.
 """
 function qcoeff(value_scale, max_visit_init, tree, cid, bid, tree_size)
-    # XXX: init is necessary for GPUCompiler right now...
-    max_child_visit = maximum(get_num_child_visits(tree, cid, bid, tree_size); init=UNVISITED)
-    return value_scale * (max_visit_init + max_child_visit)
+    children_visit_counts = get_num_child_visits(tree, cid, bid, tree_size)
+    max_child_visit = maximum(children_visit_counts; init=UNVISITED)
+    return (max_visit_init + max_child_visit) * value_scale
 end
 
 """
-    target_policy(value_scale, max_visit_init, tree, cid, bid, tree_size::Tuple{Val{A},Any,Any}) where {A}
+    transformed_qvalues(
+        value_scale,
+        max_visit_init,
+        tree,
+        cid,
+        bid,
+        tree_size::Tuple{Val{A}, Any, Any}
+    ) where {A}
 
 Return the policy of a node.
 
 I.e. a score of how much each action should be played. The higher, the better.
 """
-function target_policy(
-    value_scale, max_visit_init, tree, cid, bid, tree_size::Tuple{Val{A},Any,Any}
+function transformed_qvalues(
+    c_scale,
+    c_visit,
+    tree,
+    cid,
+    bid,
+    tree_size::Tuple{Val{A}, Any, Any}
 ) where {A}
-    qs = completed_qvalues(tree, cid, bid, tree_size)
-    policy = SVector{A}(imap(aid -> tree.policy_prior[aid, cid, bid], 1:A))
-    return log.(policy) + qcoeff(value_scale, max_visit_init, tree, cid, bid, tree_size) * qs
+    qvalues = completed_qvalues(tree, cid, bid, tree_size)
+    qcoefficient = qcoeff(c_scale, c_visit, tree, cid, bid, tree_size)
+    σ_q = qcoefficient * qvalues
+    return σ_q
 end
 
 """
-    select_action(value_scale, max_visit_init, tree, cid, bid, tree_size)
+    select_action(
+        c_scale,
+        c_visit,
+        tree,
+        cid,
+        bid,
+        tree_size::Tuple{Val{A}, Any, Any}
+    ) where {A}
 
 Select the most appropriate action to explore.
 
 `NO_ACTION` is returned if no actions are available.
 """
-function select_action(value_scale, max_visit_init, tree, cid, bid, tree_size)
-    policy = softmax(target_policy(value_scale, max_visit_init, tree, cid, bid, tree_size))
-    num_child_visits = get_num_child_visits(tree, cid, bid, tree_size)
+function select_action(
+    c_scale,
+    c_visit,
+    tree,
+    cid,
+    bid,
+    tree_size::Tuple{Val{A}, Any, Any}
+) where A
+    # compute the policy: π′ = softmax(logits + σ(completedQ))
+    logits = SVector{A}(imap(aid -> tree.logit_prior[aid, cid, bid], 1:A))
+    σ_q = transformed_qvalues(c_scale, c_visit, tree, cid, bid, tree_size)
+    policy = softmax(logits + σ_q)
+
+    # compute the scores: π′(a) - N(s, a) / (N(s) + 1)
+    num_child_visits = Float32.(get_num_child_visits(tree, cid, bid, tree_size))
     total_visits = sum(num_child_visits; init=UNVISITED)
-    return Int16(
-        argmax(
-            policy - Float32.(num_child_visits) / (total_visits + 1);
-            init=(NO_ACTION, -Inf32),
-        ),
-    )
+    scores = policy - num_child_visits / (total_visits + 1)
+
+    # mask invalid actions as scores for valid actions could be all negative
+    action_mask = SVector{A}(imap(a -> tree.valid_actions[a, cid, bid] ? 0f0 : -Inf32, 1:A))
+    scores = scores .+ action_mask
+
+    return Int16(argmax(scores; init=(NO_ACTION, -Inf32)))
 end
 
 # ## Core MCTS algorithm
@@ -569,15 +539,15 @@ Let's now dive into the core part of the MCTS algorithm.
 
 "MCTS" stands for "Monte Carlo Tree Search" and is a heuristic tree search algorithm, most
 noticeably applied in the context of board games. For the record, recent breakthroughs in
-the Reinforcement Learning fields applied MCTS to solve arcade games (e.g. Deepmind's MuZero)
-or inside Tesla's autopilot software.
+the Reinforcement Learning fields applied MCTS to solve arcade games
+(e.g. Deepmind's MuZero) or inside Tesla's autopilot software.
 
-The tree search algorithms family focuses on finding the optimal policy (i.e. the best move to
-play given a certain game position). Compared to other tree search algorithms, like the
+The tree search algorithms family focuses on finding the optimal policy (i.e. the best move
+to play given a certain game position). Compared to other tree search algorithms, like the
 simple MinMax algorithm, MCTS only explores a subset of the total search space. It does so
-through exploration/ exploitation heuristics that orient this search toward the most promising
-actions. Since its creation, MCTS has been shown to converge toward the MinMax algorithm as
-the number of simulations increases, but at a much lower computational cost.
+through exploration/ exploitation heuristics that orient this search toward the most
+promising actions. Since its creation, MCTS has been shown to converge toward the MinMax
+algorithm as the number of simulations increases, but at a much lower computational cost.
 
 Originally, the MCTS algorithm was based on a Monte Carlo method. This method consisted of a
 random sampling of the search space to evaluate the current board position. Those were
@@ -630,9 +600,9 @@ support.
 
 This principle brings both simplicity to the code (as no duplication of code is needed to
 run on CPU and GPU) but also computing power to easily run code on GPU. This was one of
-the reasons, Julia was chosen for AlphaZero.jl. We hope to make this implementation accessible
-for students, researchers, and hackers while also being sufficiently powerful and fast to
-enable meaningful experiments on limited computing resources.
+the reasons, Julia was chosen for AlphaZero.jl. We hope to make this implementation
+accessible for students, researchers, and hackers while also being sufficiently powerful
+and fast to enable meaningful experiments on limited computing resources.
 
 The compilation on GPU still constraints a bit the way code is written. The following three
 constraints should be respected:
@@ -656,8 +626,8 @@ the only two functions to launch kernels
 function select(mcts, tree)
     (; A, N, B) = size(tree)
     tree_size = (Val(A), Val(N), Val(B))
-
     value_scale, max_visit_init = mcts.value_scale, mcts.max_visit_init
+
     parent_frontier = zeros(Int16, mcts.device, (2, B))
     Devices.foreach(1:B, mcts.device) do bid
         new_frontier = select(value_scale, max_visit_init, tree, bid, tree_size)
@@ -671,17 +641,17 @@ end
 """
 As a reminder, the selection phase walks through the tree to find a frontier of nodes to
 expand. The selection starts at the root node (initial board state) and walks to the child
-that has the best exploration/ exploitation tradeoff with the `select_action` utility function.
-The walk recursion is done until you hit a leaf node (i.e. a board game position that has
-never been explored or a terminal node like a win or a defeat). This reached leaf node is
-then saved for the next phase.
+that has the best exploration/ exploitation tradeoff with the `select_action()`
+utility function. The walk recursion is done until you hit a leaf node (i.e. a board game
+position that has never been explored or a terminal node like a win or a defeat).
+This reached leaf node is then saved for the next phase.
 
 There is a subtlety here compared to BatchedMCtsAos version. Nodes are not created at
 the `selection`, because the concept of Oracle evaluation and environment simulation are
-grouped in the `EnvOracle`. Those are split in BatchedMctsAos. Therefore, the `select` function
-must return parent nodes of the frontier instead. That's why its returned value is caught
-as `parent_frontier` in `explore`. The action chosen is also returned along with the parent
-as a tuple, so that it prevents its recalculation.
+grouped in the `EnvOracle`. Those are split in BatchedMctsAos. Therefore, the `select()`
+function must return parent nodes of the frontier instead. That's why its returned value is
+caught as `parent_frontier` in `explore`. The action chosen is also returned along with
+the parent as a tuple, so that it prevents its recalculation.
 
 But this leaves the question of the return value for terminal nodes... It has been chosen
 to return the terminal nodes themself (instead of their parents) with a `NO_ACTION` as the
@@ -731,13 +701,13 @@ particularly useful. The EllipsisNotation enables to handle of any number of dim
 function eval!(mcts, tree, simnum, parent_frontier)
     B = batch_size(tree)
 
-    # Get terminal nodes at `parent_frontier`
+    # get terminal nodes at `parent_frontier`
     non_terminal_mask = parent_frontier[ACTION, :] .!= NO_ACTION
     non_terminal_bids = DeviceArray(mcts.device)(@view((1:B)[non_terminal_mask]))
     # No new node to expand (a.k.a only terminal node on the frontier)
     (length(non_terminal_bids) == 0) && return parent_frontier[PARENT, :]
 
-    # Regroup `action_ids` and `parent_states` for `transition_fn`
+    # regroup `action_ids` and `parent_states` for `transition_fn()`
     parent_ids = parent_frontier[PARENT, non_terminal_bids]
     action_ids = parent_frontier[ACTION, non_terminal_bids]
 
@@ -745,7 +715,7 @@ function eval!(mcts, tree, simnum, parent_frontier)
     parent_states = tree.state[.., state_cartesian_ids]
     info = mcts.oracle.transition_fn(parent_states, action_ids)
 
-    # Create nodes and save `info`
+    # create nodes and save `info`
     children_cartesian_ids = CartesianIndex.(action_ids, parent_ids, non_terminal_bids)
 
     @inbounds tree.parent[simnum, non_terminal_bids] = parent_ids
@@ -756,8 +726,14 @@ function eval!(mcts, tree, simnum, parent_frontier)
     @inbounds tree.prev_action[simnum, non_terminal_bids] = action_ids
     @inbounds tree.prev_reward[simnum, non_terminal_bids] = info.rewards
     @inbounds tree.prev_switched[simnum, non_terminal_bids] = info.player_switched
-    @inbounds tree.policy_prior[:, simnum, non_terminal_bids] = info.policy_prior # TODO: validate_prior
+    @inbounds tree.logit_prior[:, simnum, non_terminal_bids] = info.logit_prior
+    @inbounds tree.policy_prior[:, simnum, non_terminal_bids] = info.policy_prior
     @inbounds tree.value_prior[simnum, non_terminal_bids] = info.value_prior
+
+    # value priors are from the perspective of child nodes -> negate sign if needed
+    Devices.foreach(non_terminal_bids, mcts.device) do bid
+        @inbounds (tree.prev_switched[simnum, bid]) && (tree.value_prior[simnum, bid] *= -1)
+    end
 
     # Update frontier
     frontier = parent_frontier[PARENT, :]
@@ -785,24 +761,21 @@ And as stated before, `backpropagate!` is parallelized in the same way as `selec
 over the environments list).
 """
 function backpropagate!(mcts, tree, frontier)
-    B = batch_size(tree)
-    batch_ids = DeviceArray(mcts.device)(1:B)
-    map(batch_ids) do bid  # ToDo: Maybe use Devices.foreach()?
-        cid = frontier[bid]
-        val = tree.value_prior[cid, bid]
+    Devices.foreach(1:batch_size(tree), mcts.device) do bid
+        @inbounds cid = frontier[bid]
+        @inbounds val = tree.value_prior[cid, bid]
         while true
-            val += tree.prev_reward[cid, bid]
-            (tree.prev_switched[cid, bid]) && (val = -val)
-            tree.num_visits[cid, bid] += Int16(1)
-            tree.total_values[cid, bid] += val
-            if tree.parent[cid, bid] != NO_PARENT
-                cid = tree.parent[cid, bid]
+            @inbounds val += tree.prev_reward[cid, bid]
+            @inbounds (tree.prev_switched[cid, bid]) && (val = -val)
+            @inbounds tree.num_visits[cid, bid] += Int16(1)
+            @inbounds tree.total_values[cid, bid] += val
+            @inbounds if tree.parent[cid, bid] != NO_PARENT
+                @inbounds cid = tree.parent[cid, bid]
             else
                 return nothing
             end
         end
     end
-    return nothing
 end
 
 # ### Gumbel MCTS variation
@@ -846,17 +819,15 @@ function gumbel_explore(mcts, envs, rng::AbstractRNG)
     tree = create_tree(mcts, envs)
     (; A, B, N) = size(tree)
 
-    gumbel = DeviceArray(mcts.device)(rand(rng, Gumbel(), (A, B)))
-    considered_visits_table = DeviceArray(mcts.device)(
-        get_considered_visits_table(mcts.num_simulations, A)
-    )
+    gumbel = DeviceArray(mcts.device)(rand(rng, Gumbel(), A, B))
+    considered_visits_table = DeviceArray(mcts.device)(get_considered_visits_table(N, A))
 
     for simnum in 2:N
         parent_frontier = gumbel_select(mcts, tree, simnum, gumbel, considered_visits_table)
         frontier = eval!(mcts, tree, simnum, parent_frontier)
         backpropagate!(mcts, tree, frontier)
     end
-    return tree
+    return tree, gumbel
 end
 
 """
@@ -873,13 +844,14 @@ function gumbel_select(mcts, tree, simnum, gumbel, considered_visits_table)
     (; A, N, B) = size(tree)
     tree_size = (Val(A), Val(N), Val(B))
 
-    value_scale, max_visit_init = mcts.value_scale, mcts.max_visit_init
+    c_scale, c_visit = mcts.value_scale, mcts.max_visit_init
     num_considered_actions = mcts.num_considered_actions
-    parent_frontier = zeros(Int16, mcts.device, (2, B))
+    parent_frontier = zeros(Int16, mcts.device, 2, B)
+
     Devices.foreach(1:B, mcts.device) do bid
         aid = gumbel_select_root_action(
-            value_scale,
-            max_visit_init,
+            c_scale,
+            c_visit,
             num_considered_actions,
             tree,
             bid,
@@ -892,7 +864,7 @@ function gumbel_select(mcts, tree, simnum, gumbel, considered_visits_table)
 
         cnid = tree.children[aid, ROOT, bid]
         new_frontier = if (cnid != UNVISITED)
-            select(value_scale, max_visit_init, tree, bid, tree_size; start=cnid)
+            select(c_scale, c_visit, tree, bid, tree_size; start=cnid)
         else
             (ROOT, aid)
         end
@@ -904,9 +876,36 @@ function gumbel_select(mcts, tree, simnum, gumbel, considered_visits_table)
 end
 
 """
-    get_penality(
-        mcts, tree, bid, considered_visits_table, child_visits,
-        tree_size::Tuple{Val{A},Any,Any}
+    get_penalty(
+        tree,
+        bid,
+        considered_visits,
+        tree_size::Tuple{Val{A}, Any, Any}
+    ) where {A}
+
+Returns the penalty that will be applied to ROOT actions depending on their visit count.
+Specifically, actions with a visit count different from `considered_visits` will receive
+a penalty of -∞, while the others will receive a penalty of 0 (float32).
+"""
+function get_penalty(
+    tree,
+    bid,
+    considered_visits,
+    tree_size::Tuple{Val{A}, Any, Any}
+) where {A}
+    num_visits = get_num_child_visits(tree, ROOT, bid, tree_size)
+    penalty = imap(action -> (num_visits[action] == considered_visits) ? 0f0 : -Inf32, 1:A)
+    return SVector{A}(penalty)
+end
+
+"""
+    compute_penalty(
+        num_considered_actions,
+        tree,
+        bid,
+        considered_visits_table,
+        target_child_visits,
+        tree_size::Tuple{Val{A}, Any, Any}
     ) where {A}
 
 Computes penalty for actions that do not comply with the constraint on the number of visits.
@@ -919,36 +918,31 @@ case).
 Actions that comply with the constraint on the number of visits have no penalty (i.e. a
 penalty of `0`)
 """
-function get_penality(
+function compute_penalty(
     num_considered_actions,
     tree,
     bid,
     considered_visits_table,
-    child_visits,
-    tree_size::Tuple{Val{A},Any,Any},
+    target_child_visits,
+    tree_size::Tuple{Val{A}, Any, Any}
 ) where {A}
     num_valid_actions = sum(aid -> tree.valid_actions[aid, ROOT, bid], 1:A; init=NO_ACTION)
     num_considered_actions = min(num_considered_actions, num_valid_actions)
-
-    num_visits = get_num_child_visits(tree, ROOT, bid, tree_size)
-    considered_visits = considered_visits_table[num_considered_actions][child_visits]
-    penality = imap(1:A) do aid
-        (num_visits[aid] == considered_visits) ? Float32(0) : -Inf32
-    end
-    return SVector{A}(penality)
+    considered_visits = considered_visits_table[num_considered_actions][target_child_visits]
+    return get_penalty(tree, bid, considered_visits, tree_size)
 end
 
 """
     gumbel_select_root_action(
-        value_scale,
-        max_visit_init,
+        c_scale,
+        c_visit,
         num_considered_actions,
         tree,
         bid,
         gumbel,
         considered_visits_table,
-        child_total_visits,
-        tree_size::Tuple{Val{A},Any,Any},
+        target_child_visits,
+        tree_size::Tuple{Val{A}, Any, Any}
     ) where {A}
 
 Gumbel's variation of `select_action` for root node only.
@@ -957,24 +951,112 @@ The only difference lies in the use of `gumbel` noise in the computation of the 
 before applying the argmax and the additional constraints on the number of visits.
 """
 function gumbel_select_root_action(
-    value_scale,
-    max_visit_init,
+    c_scale,
+    c_visit,
     num_considered_actions,
     tree,
     bid,
     gumbel,
     considered_visits_table,
-    child_visits,
-    tree_size::Tuple{Val{A},Any,Any},
+    target_child_visits,
+    tree_size::Tuple{Val{A}, Any, Any}
 ) where {A}
-    batch_gumbel = SVector{A}(imap(aid -> gumbel[aid, bid], 1:A))
-    policy = target_policy(value_scale, max_visit_init, tree, ROOT, bid, tree_size)
-    penality = get_penality(
-        num_considered_actions, tree, bid, considered_visits_table, child_visits, tree_size
-    )
+    # gumbel random variables: g(a)
+    g = SVector{A}(imap(aid -> gumbel[aid, bid], 1:A))
 
-    scores = batch_gumbel + policy + penality
-    return Int16(argmax(scores; init=(NO_ACTION, -Inf32)))
+    # get logits and σ(completedQ)
+    logits = SVector{A}(imap(aid -> tree.logit_prior[aid, ROOT, bid], 1:A))
+    σ_q = transformed_qvalues(c_scale, c_visit, tree, ROOT, bid, tree_size)
+
+    # -∞ penalty to mask out actions not in `argtop(g(a) + logits + σ(completedQ), m)`
+    penalty = compute_penalty(num_considered_actions, tree, bid, considered_visits_table,
+                              target_child_visits, tree_size)
+
+    # select next action `A_{n+1}` to simulate as the argmax of:
+    #   A_{top(m)} = argtop(g(a) + logits + σ(completedQ), m)
+    scores = g + logits + σ_q
+    masked_scores = scores + penalty
+    return Int16(argmax(masked_scores; init=(NO_ACTION, -Inf32)))
+end
+
+"""
+    gumbel_mcts_action(
+        c_scale,
+        c_visit,
+        tree,
+        bid,
+        gumbel,
+        tree_size::Tuple{Val{A}, Any, Any}
+    ) where {A}
+
+A function that returns the action to play in the environment after `gumbel_explore()`
+has been run. It's similar to `gumbel_select_root_action()`, with the difference that
+it penalizes actions with a visit count smaller than the highest.
+"""
+function gumbel_mcts_action(
+    c_scale,
+    c_visit,
+    tree,
+    bid,
+    gumbel,
+    tree_size::Tuple{Val{A}, Any, Any}
+) where {A}
+    # gumbel random variables: g(a)
+    g = SVector{A}(imap(aid -> gumbel[aid, bid], 1:A))
+
+    # get logits and σ(completedQ)
+    logits = SVector{A}(imap(aid -> tree.logit_prior[aid, ROOT, bid], 1:A))
+    σ_q = transformed_qvalues(c_scale, c_visit, tree, ROOT, bid, tree_size)
+
+    # -∞ penalty to mask out actions with a visit count less than the highest
+    children_visit_counts = get_num_child_visits(tree, ROOT, bid, tree_size)
+    considered_visits = maximum(children_visit_counts; init=UNVISITED)
+    penalty = get_penalty(tree, bid, considered_visits, tree_size)
+
+    # select next action `A_{n+1}` to play in the environment
+    #   A_{top(m)} = argtop(g(a) + logits + σ(completedQ), m)
+    scores = g + logits + σ_q
+    masked_scores = scores + penalty
+    return Int16(argmax(masked_scores; init=(NO_ACTION, -Inf32)))
+end
+
+"""
+    gumbel_policy(tree, mcts, gumbel)
+
+Returns an array of size (num_action,) containing the resulting actions selected
+by the sequential halving procedure with gumbel for each environment. This function should
+be used after `gumbel_explore()` has been run.
+"""
+function gumbel_policy(tree, mcts, gumbel)
+    (; A, N, B) = size(tree)
+    tree_size = (Val(A), Val(N), Val(B))
+    c_scale, c_visit = mcts.value_scale, mcts.max_visit_init
+
+    actions = zeros(Int16, mcts.device, B)
+    Devices.foreach(1:B, mcts.device) do bid
+        actions[bid] = gumbel_mcts_action(c_scale, c_visit, tree, bid, gumbel, tree_size)
+    end
+
+    return actions
+end
+
+"""
+    evaluation_policy(tree, mcts)
+
+Returns an array of size (num_actions,) containing the actions with the highest visit
+count for each environment. This function should be used after `explore()` has been run.
+"""
+function evaluation_policy(tree, mcts)
+    (; A, N, B) = size(tree)
+    tree_size = (Val(A), Val(N), Val(B))
+
+    actions = zeros(Int16, mcts.device, B)
+    Devices.foreach(1:B, mcts.device) do bid
+        children_visit_counts = get_num_child_visits(tree, ROOT, bid, tree_size)
+        actions[bid] = Int16(argmax(children_visit_counts; init=(NO_ACTION, UNVISITED)))
+    end
+
+    return actions
 end
 
 end
