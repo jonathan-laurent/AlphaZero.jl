@@ -23,25 +23,28 @@ end
 
 BitwiseTicTacToeEnv() = BitwiseTicTacToeEnv(BitBoard(), CROSS)
 
-BatchedEnvs.state_size(::Type{BitwiseTicTacToeEnv}) = 3 * 3 * 3
+BatchedEnvs.state_size(::Type{BitwiseTicTacToeEnv}) = (3 * 3 * 3,)
 BatchedEnvs.num_actions(::Type{BitwiseTicTacToeEnv}) = 9
 
 posidx(n, player) = n + 9 * player
 posidx(x, y, player) = posidx(x + 3 * (y - 1), player)
 
 function Base.show(io::IO, ::MIME"text/plain", env::BitwiseTicTacToeEnv)
+    string_repr = Base.string(env)
+    print(io, string_repr)
+end
+
+function Base.string(env::BitwiseTicTacToeEnv)
+    X, O = CROSS, NOUGHT
+    s = ""
     for i in 1:3
         for j in 1:3
-            if env.board[posidx(i, j, CROSS)]
-                print(io, "X ")
-            elseif env.board[posidx(i, j, NOUGHT)]
-                print(io, "O ")
-            else
-                print(io, ". ")
-            end
+            s *= env.board[posidx(i, j, X)] ? "X" : (env.board[posidx(i, j, O)] ? "O" : "·")
+            (j < 3) && (s *= " ")
         end
-        print(io, "\n")
+        s *= "\n"
     end
+    return s
 end
 
 function BatchedEnvs.act(env::BitwiseTicTacToeEnv, pos)

@@ -29,7 +29,7 @@ function BitwiseRandomWalk1DEnv()
     return BitwiseRandomWalk1DEnv(board, start_pos)
 end
 
-BatchedEnvs.state_size(::Type{BitwiseRandomWalk1DEnv}) = ENV_SIZE
+BatchedEnvs.state_size(::Type{BitwiseRandomWalk1DEnv}) = (ENV_SIZE,)
 BatchedEnvs.num_actions(::Type{BitwiseRandomWalk1DEnv}) = 2
 
 function Base.show(io::IO, ::MIME"text/plain", env::BitwiseRandomWalk1DEnv)
