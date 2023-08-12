@@ -55,7 +55,7 @@ function on_gpu end
 
 
 """
-    forward(nn::FluxNetwork, states)
+    forward(nn::FluxNetwork, states, use_softmax=false)
 
 Compute the forward pass of a network on a batch of inputs.
 
@@ -63,9 +63,10 @@ Expect a `Float32` tensor `states` whose batch dimension is the last one.
 
 Return a `(v, p)` tuple where:
 
-- `v` is a row vector of size `(1, batch_size)`
-- `P` is a matrix of size `(num_actions, batch_size)`. It is allowed
-    to put weight on invalid actions (see [`evaluate`](@ref)).
+- `v` is a row vector of size `(1, batch_size)` containing the value
+    function estimates for each state in the batch.
+- `p` is a matrix of size `(num_actions, batch_size)` containing the logits/policy
+    (depending on `use_softmax`) for each state in the batch.
 """
 function forward end
 

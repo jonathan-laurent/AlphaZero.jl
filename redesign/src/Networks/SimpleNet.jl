@@ -77,10 +77,10 @@ hyperparams(nn::SimpleNet) = nn.hyper
 on_gpu(nn::SimpleNet) = arr_is_on_gpu(nn.vhead[end].bias)
 
 
-function forward(nn::SimpleNet, x, use_softmax_p=true)
+function forward(nn::SimpleNet, x, use_softmax=true)
     common = nn.common(x)
     v = nn.vhead(common)
     p = nn.phead(common)
-    use_softmax_p && (p = Flux.softmax(p))
+    use_softmax && (p = Flux.softmax(p))
     return v, p
 end
