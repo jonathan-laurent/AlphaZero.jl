@@ -9,6 +9,7 @@ using ..Util.Devices: Device, CPU, GPU, arr_is_on_gpu
 
 export FluxNetwork
 export SimpleNet, SimpleNetHP
+export SimpleResNet, SimpleResNetHP
 export on_gpu, forward, to_cpu, to_gpu, set_train_mode!, set_test_mode!
 
 
@@ -157,6 +158,6 @@ end
 #####
 
 include("SimpleNet.jl")
-# include("architectures/resnet.jl")
+include("SimpleResNet.jl")
 
 end

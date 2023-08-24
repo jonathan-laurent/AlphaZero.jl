@@ -6,19 +6,19 @@ using Test
 
 using ....Network
 
+
 export run_simplenet_tests
 
 
 function run_simplenet_tests()
-    @testset "Flux.params() correctness" test_functor_params()
-    @testset "model conversion to gpu and back" test_on_gpu()
-    @testset "model mode conversion" test_modes()
-    @testset "copy model" test_copy()
-    @testset "model forward" test_forward()
+    @testset "SimpleNet: Flux.params() correctness" test_simplenet_functor_params()
+    @testset "SimpleNet: model conversion to gpu and back" test_simplenet_on_gpu()
+    @testset "SimpleNet: model mode conversion" test_simplenet_modes()
+    @testset "SimpleNet: copy model" test_simplenet_copy()
+    @testset "SimpleNet: model forward" test_simplenet_forward()
 end
 
-
-function test_functor_params()
+function test_simplenet_functor_params()
     width = 13; depth_common = 2
     hp = SimpleNetHP(width=width, depth_common=depth_common, use_batch_norm=false)
 
@@ -86,7 +86,7 @@ function test_functor_params()
     end
 end
 
-function test_on_gpu()
+function test_simplenet_on_gpu()
     nn = SimpleNet(2, 4, SimpleNetHP(width=3, depth_common=3))
 
     @testset "not on GPU by default" begin
@@ -104,7 +104,7 @@ function test_on_gpu()
     end
 end
 
-function test_modes()
+function test_simplenet_modes()
     nn = SimpleNet(2, 4, SimpleNetHP(width=3, depth_common=3, use_batch_norm=true))
 
     function test_mode(mode)
@@ -140,13 +140,17 @@ function test_modes()
     end
 end
 
-function test_copy()
+function test_simplenet_copy()
     nn = SimpleNet(27, 9, SimpleNetHP(width=42, depth_common=2))
     nn2 = copy(nn)
 
     function test_dense_layer_equality(layer1, layer2)
         @test layer1.weight == layer2.weight
+        @test layer1.weight !== layer2.weight
+
         @test layer1.bias == layer2.bias
+        @test layer1.bias !== layer2.bias
+
         @test layer1.σ == layer2.σ
     end
 
@@ -172,7 +176,7 @@ function test_copy()
     end
 end
 
-function test_forward()
+function test_simplenet_forward()
     width = 64; batch_size = 3
     nn = SimpleNet(126, 7, SimpleNetHP(width=width, depth_common=2))
 
