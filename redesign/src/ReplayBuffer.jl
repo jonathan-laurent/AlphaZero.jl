@@ -32,7 +32,6 @@ function EpisodeBuffer(num_envs::Int, state_size::Tuple, initial_horizon::Int = 
     rewards = zeros(Float32, initial_horizon, num_envs)
     switches = zeros(Bool, initial_horizon, num_envs)
     ep_lengths = zeros(Int, num_envs)
-
     return EpisodeBuffer(states, actions, rewards, switches, ep_lengths)
 end
 
