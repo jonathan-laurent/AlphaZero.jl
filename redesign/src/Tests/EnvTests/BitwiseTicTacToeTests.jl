@@ -23,7 +23,6 @@ function run_bitwise_tictactoe_tests()
         @testset "drawn game" test_full_board()
         @testset "state vectorization" test_vectorize_state()
     end
-    return nothing
 end
 
 
@@ -126,9 +125,8 @@ function test_vectorize_state()
     env = BitwiseTicTacToeEnv()
     state = BatchedEnvs.vectorize_state(env)
 
-    free_board = [1.0 for _ in 1:3 * 3]
     empty_board = [0.0 for _ in 1:3 * 3]
-    expected_state = Float32.(vcat(free_board, empty_board, empty_board))
+    expected_state = Float32.(vcat(empty_board, empty_board))
 
     @test state == expected_state
 
@@ -139,35 +137,26 @@ function test_vectorize_state()
     env, _ = BatchedEnvs.act(env, 5)  # NOUGHT played
     state = BatchedEnvs.vectorize_state(env)
 
-    current_player_offest = 3 * 3
-    next_player_offset = 3 * 3 * 2
+    current_player_offest = 0
+    next_player_offset = 3 * 3
 
-    # CROSS to play - the CROSS board goes after the free board and before the NOUGHT board
+    # CROSS to play - the CROSS board goes before the NOUGHT board
     expected_state[current_player_offest + 1] = 1.0
-    expected_state[1] = 0.0
-
     expected_state[next_player_offset + 2] = 1.0
-    expected_state[2] = 0.0
-
     expected_state[current_player_offest + 3] = 1.0
-    expected_state[3] = 0.0
-
     expected_state[next_player_offset + 5] = 1.0
-    expected_state[5] = 0.0
 
     # perform one more action to ensure the change in board order
     env, _ = BatchedEnvs.act(env, 6)  # CROSS played
     state = BatchedEnvs.vectorize_state(env)
 
     # swap the two player boards in the expected state
-    free_board = expected_state[1:current_player_offest]
     current_player_board = expected_state[next_player_offset + 1:end]
     next_player_board = expected_state[current_player_offest + 1:next_player_offset]
-    expected_state = reduce(vcat, [free_board, current_player_board, next_player_board])
+    expected_state = reduce(vcat, [current_player_board, next_player_board])
 
-    # NOUGHT to play - the NOUGHT board goes after the free board and before the CROSS board
+    # NOUGHT to play - the NOUGHT board goes before the CROSS board
     expected_state[next_player_offset + 6] = 1.0
-    expected_state[6] = 0.0
 
     @test state == expected_state
 end

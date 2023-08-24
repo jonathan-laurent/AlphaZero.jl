@@ -7,6 +7,7 @@ using CUDA
 using JET
 using Random: MersenneTwister
 using ReinforcementLearningBase: RLBase
+using StaticArrays: StaticArray
 using Test
 
 export test_equivalent, test_batch_simulate, test_gpu_friendliness
@@ -80,6 +81,9 @@ end
 function test_isbits_type(Env)
     env = Env()
     @test isbits(env)
+    state = BatchedEnvs.vectorize_state(env)
+    @test isbits(state)
+    @test typeof(state) <: StaticArray
 end
 
 function test_is_immutable(Env)
@@ -105,6 +109,8 @@ function test_no_allocations(Env, num_actions)
         !BatchedEnvs.valid_action(env, action) && continue
         allocations = @allocated env, _ = BatchedEnvs.act(env, action)
         @test allocations == 0
+        allocations = @allocated state = BatchedEnvs.vectorize_state(env)
+        @test allocations == 0
     end
 end
 
@@ -113,11 +119,13 @@ function test_static_inference(Env)
     @inferred BatchedEnvs.valid_action(env, 1)
     @inferred BatchedEnvs.act(env, 1)
     @inferred BatchedEnvs.terminated(env)
+    @inferred BatchedEnvs.vectorize_state(env)
 
     env = Env()
     @test_opt BatchedEnvs.valid_action(env, 1)
     @test_opt BatchedEnvs.act(env, 1)
     @test_opt BatchedEnvs.terminated(env)
+    @test_opt BatchedEnvs.vectorize_state(env)
 end
 
 function test_gpu_friendliness(Env; num_actions = 7)

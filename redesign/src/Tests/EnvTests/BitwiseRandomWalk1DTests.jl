@@ -23,7 +23,6 @@ function run_bitwise_random_walk_tests()
         @testset "won episode" test_is_win()
         @testset "state vectorization" test_vectorize_state()
     end
-    return nothing
 end
 
 
