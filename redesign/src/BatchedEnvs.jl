@@ -15,6 +15,8 @@ function act end
 
 function terminated end
 
+function reset end
+
 function vectorize_state end
 
 end

@@ -7,6 +7,10 @@ using ....Util.StaticBitArrays
 
 export BitwiseConnectFourEnv
 
+const NUM_COLUMNS = 7
+const NUM_ROWS = 6
+const TO_CONNECT = 4
+
 const CROSS = true
 const NOUGHT = false
 
@@ -22,7 +26,7 @@ Bitboard representation:
 
                  NOUGHT PLAYER       CROSS PLAYER
 """
-const bitboard = StaticBitArray{6 * 7 * 2, 2}
+const bitboard = StaticBitArray{NUM_ROWS * NUM_COLUMNS * 2, 2}
 
 """
 A connect-four environment implemented using bitwise operations
@@ -35,39 +39,46 @@ end
 
 BitwiseConnectFourEnv() = BitwiseConnectFourEnv(bitboard(), CROSS)
 
-BatchedEnvs.state_size(::Type{BitwiseConnectFourEnv}) = (6 * 7 * 3,)
-BatchedEnvs.num_actions(::Type{BitwiseConnectFourEnv}) = 7
+BatchedEnvs.state_size(::Type{BitwiseConnectFourEnv}) = (NUM_ROWS * NUM_COLUMNS * 2,)
+BatchedEnvs.num_actions(::Type{BitwiseConnectFourEnv}) = NUM_COLUMNS
 
-posidx(n, player) = n + 42 * player
-posidx(x, y, player) = posidx(7 * (x - 1) + y, player)
+posidx(n, player) = n + (NUM_ROWS * NUM_COLUMNS) * player
+posidx(x, y, player) = posidx(NUM_COLUMNS * (x - 1) + y, player)
 
 function Base.show(io::IO, ::MIME"text/plain", env::BitwiseConnectFourEnv)
-    for i in 1:6
-        for j in 1:7
-            if env.board[posidx(i, j, CROSS)]
-                print(io, "X ")
-            elseif env.board[posidx(i, j, NOUGHT)]
-                print(io, "O ")
-            else
-                print(io, "· ")
-            end
+    string_repr = Base.string(env)
+    print(io, string_repr)
+end
+
+function Base.show(io::IO, env::BitwiseConnectFourEnv)
+    string_repr = Base.string(env)
+    print(io, string_repr)
+end
+
+function Base.string(env::BitwiseConnectFourEnv)
+    X, O = CROSS, NOUGHT
+    s = ""
+    for i in 1:NUM_ROWS
+        for j in 1:NUM_COLUMNS
+            s *= env.board[posidx(i, j, X)] ? "X" : (env.board[posidx(i, j, O)] ? "O" : "·")
+            (j < NUM_COLUMNS) && (s *= " ")
         end
-        println(io)
+        s *= "\n"
     end
+    return s
 end
 
 function BatchedEnvs.act(env::BitwiseConnectFourEnv, action)
     at(i, j, player) = env.board[posidx(i, j, player)]
 
-    curr_row = 6
+    curr_row = NUM_ROWS
     while at(curr_row, action, env.curplayer) || at(curr_row, action, !env.curplayer)
         curr_row -= 1
     end
 
     board = Base.setindex(env.board, true, posidx(curr_row, action, env.curplayer))
     newenv = BitwiseConnectFourEnv(board, !env.curplayer)
-    reward = is_win(newenv, !env.curplayer) ? -1.0 : 0.0
-
+    reward = is_win(newenv, env.curplayer) ? 1 : (is_win(newenv, !env.curplayer) ? -1 : 0)
     return newenv, (; reward, switched=true)
 end
 
@@ -79,12 +90,13 @@ function BatchedEnvs.valid_action(env::BitwiseConnectFourEnv, action)
 end
 
 function full_board(env::BitwiseConnectFourEnv)
-    return !any(BatchedEnvs.valid_action(env, action) for action in 1:7)
+    return !any(BatchedEnvs.valid_action(env, action) for action in 1:NUM_COLUMNS)
 end
 
 function is_win(env::BitwiseConnectFourEnv, player::Bool)
     at(i, j) = env.board[posidx(i, j, player)]
-    for i in 1:6, j in 1:7
+    for i in 1:NUM_ROWS, j in 1:NUM_COLUMNS
+        # ToDo: Adapt this so that it works for any `TO_CONNECT`
         if at(i, j) == 1
             if i <= 3 && at(i+1, j) == at(i+2, j) == at(i+3, j) == 1
                 return true
@@ -104,8 +116,12 @@ function BatchedEnvs.terminated(env::BitwiseConnectFourEnv)
     is_win(env, env.curplayer) || is_win(env, !env.curplayer) || full_board(env)
 end
 
+function BatchedEnvs.reset(::BitwiseConnectFourEnv)
+    return BitwiseConnectFourEnv()
+end
+
 function get_player_board(env::BitwiseConnectFourEnv, player)
-    return @SVector [env.board[posidx(i, player)] for i in 1:42]
+    return @SVector [env.board[posidx(i, player)] for i in 1:(NUM_ROWS * NUM_COLUMNS)]
 end
 
 """
@@ -113,19 +129,13 @@ end
 
 Create a vectorize representation of the board.
 The board is represented from the perspective of the next player to play.
-It is a flatten 7x6x3 array with the following channels:
-  free, next player, other player
+It is a flatten 2x7x6 array with the following channels:
+    [next player, other player]
 """
 function BatchedEnvs.vectorize_state(env::BitwiseConnectFourEnv)
-    nought_board = get_player_board(env, NOUGHT)
-    cross_board = get_player_board(env, CROSS)
-    free_board = .!(nought_board .|| cross_board)
-
-    order = if (env.curplayer == NOUGHT)
-        @SVector [free_board, nought_board, cross_board]
-    else
-        @SVector [free_board, cross_board, nought_board]
-    end
+    nbrd = get_player_board(env, NOUGHT)
+    cbrd = get_player_board(env, CROSS)
+    order = (env.curplayer == NOUGHT) ? (@SVector [nbrd, cbrd]) : (@SVector [cbrd, nbrd])
     return Float32.(reduce(vcat, order))
 end
 

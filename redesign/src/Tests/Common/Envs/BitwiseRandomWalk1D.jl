@@ -53,6 +53,10 @@ function BatchedEnvs.terminated(env::BitwiseRandomWalk1DEnv)
     return env.cur_pos == 1 || env.cur_pos == ENV_SIZE
 end
 
+function BatchedEnvs.reset(::BitwiseRandomWalk1DEnv)
+    return BitwiseRandomWalk1DEnv()
+end
+
 function BatchedEnvs.vectorize_state(env::BitwiseRandomWalk1DEnv)
     return Float32.(@SVector [env.board[i] for i in 1:ENV_SIZE])
 end

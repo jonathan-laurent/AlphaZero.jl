@@ -23,13 +23,18 @@ end
 
 BitwiseTicTacToeEnv() = BitwiseTicTacToeEnv(BitBoard(), CROSS)
 
-BatchedEnvs.state_size(::Type{BitwiseTicTacToeEnv}) = (3 * 3 * 3,)
+BatchedEnvs.state_size(::Type{BitwiseTicTacToeEnv}) = (2 * 3 * 3,)
 BatchedEnvs.num_actions(::Type{BitwiseTicTacToeEnv}) = 9
 
 posidx(n, player) = n + 9 * player
 posidx(x, y, player) = posidx(x + 3 * (y - 1), player)
 
 function Base.show(io::IO, ::MIME"text/plain", env::BitwiseTicTacToeEnv)
+    string_repr = Base.string(env)
+    print(io, string_repr)
+end
+
+function Base.show(io::IO, env::BitwiseTicTacToeEnv)
     string_repr = Base.string(env)
     print(io, string_repr)
 end
@@ -50,13 +55,7 @@ end
 function BatchedEnvs.act(env::BitwiseTicTacToeEnv, pos)
     board = Base.setindex(env.board, true, posidx(pos, env.curplayer))
     newenv = BitwiseTicTacToeEnv(board, !env.curplayer)
-    if is_win(newenv, env.curplayer)
-        reward = 1.0
-    elseif is_win(newenv, !env.curplayer)
-        reward = -1.0
-    else
-        reward = 0.0
-    end
+    reward = is_win(newenv, env.curplayer) ? 1 : (is_win(newenv, !env.curplayer) ? -1 : 0)
     return newenv, (; reward, switched=true)
 end
 
@@ -86,6 +85,10 @@ function BatchedEnvs.terminated(env::BitwiseTicTacToeEnv)
     return full_board(env) || is_win(env, CROSS) || is_win(env, NOUGHT)
 end
 
+function BatchedEnvs.reset(::BitwiseTicTacToeEnv)
+    return BitwiseTicTacToeEnv()
+end
+
 function get_player_board(env::BitwiseTicTacToeEnv, player)
     return @SVector [env.board[posidx(i, player)] for i in 1:9]
 end
@@ -95,20 +98,15 @@ end
 
 Create a vectorize representation of the board.
 The board is represented from the perspective of the next player to play.
-It is a flatten 3x3x3 array with the following channels:
-  free, next player, other player
+It is a flatten 2x3x3 array with the following channels:
+    [next player, other player]
 """
 function BatchedEnvs.vectorize_state(env::BitwiseTicTacToeEnv)
-    nought_board = get_player_board(env, NOUGHT)
-    cross_board = get_player_board(env, CROSS)
-    free_board = .!(nought_board .|| cross_board)
-
-    order = if (env.curplayer == NOUGHT)
-        @SVector [free_board, nought_board, cross_board]
-    else
-        @SVector [free_board, cross_board, nought_board]
-    end
+    nbrd = get_player_board(env, NOUGHT)
+    cbrd = get_player_board(env, CROSS)
+    order = (env.curplayer == NOUGHT) ? (@SVector [nbrd, cbrd]) : (@SVector [cbrd, nbrd])
     return Float32.(reduce(vcat, order))
 end
+
 
 end
