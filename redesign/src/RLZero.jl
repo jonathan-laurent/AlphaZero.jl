@@ -32,6 +32,9 @@ include("MCTS/BatchedMcts.jl")
 include("MCTS/BatchedMctsAos.jl")
 @reexport using .BatchedMctsAos: BatchedMctsAos
 
+include("TrainUtilities.jl")
+@reexport using .TrainUtilities
+
 include("Evaluation.jl")
 @reexport using .Evaluation
 
