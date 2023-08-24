@@ -44,7 +44,7 @@ include("LoggingUtilities.jl")
 include("Train.jl")
 @reexport using .Train
 
-include("Tests/Tests.jl")
+include("../test/Tests/Tests.jl")
 @reexport using .Tests: Tests
 
 end
