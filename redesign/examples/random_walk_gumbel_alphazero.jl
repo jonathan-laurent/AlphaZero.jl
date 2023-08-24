@@ -14,7 +14,7 @@ const SAVEDIR = "examples/models/random-walk-1d-checkpoints"
 state_dim = BatchedEnvs.state_size(BitwiseRandomWalk1DEnv)
 action_dim = BatchedEnvs.num_actions(BitwiseRandomWalk1DEnv)
 
-# small architecture
+# minimal architecture
 neural_net_hyperparams = SimpleNetHP(
     width=32,
     depth_common=1,

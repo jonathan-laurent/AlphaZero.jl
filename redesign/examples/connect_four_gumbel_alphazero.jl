@@ -14,7 +14,7 @@ const SAVEDIR = "examples/models/connect-four-checkpoints"
 state_dim = BatchedEnvs.state_size(BitwiseConnectFourEnv)
 action_dim = BatchedEnvs.num_actions(BitwiseConnectFourEnv)
 
-# small architecture
+# large architecture
 neural_net_hyperparams = SimpleResNetHP(
     width=512,
     depth_common=6,
