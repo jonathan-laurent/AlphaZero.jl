@@ -26,6 +26,9 @@ include("MinimaxTests.jl")
 include("MctsTests/MctsTests.jl")
 @reexport using .MctsTests: run_mcts_tests
 
+include("TrainTests.jl")
+@reexport using .TrainTests: run_train_tests
+
 function run_all_tests()
     @testset "RLZero tests" begin
         @testset "utility tests" run_util_tests()
@@ -34,6 +37,7 @@ function run_all_tests()
         @testset "env tests" run_env_tests()
         @testset "minimax tests" run_minimax_tests()
         @testset "mcts tests" run_mcts_tests()
+        @testset "train tests" run_train_tests()
     end
     return nothing
 end

@@ -1,163 +1,87 @@
 """
-    BatchedMcts
+    BatchedMCTS
 
-A batched implementation of MCTS that can run on CPU or GPU.
+A high-performance, batched implementation of the Monte Carlo Tree Search (MCTS) algorithm,
+suitable for execution on both CPU and GPU architectures.
 
+## Overview
 
-Check out the part "Core MCTS algorithm" if you want to know more about the MCTS algorithm.
+This module provides a generic implementation of MCTS capable of parallelizing simulations
+across multiple environment instances. The design is memory-efficient and facilitates a
+single, unified representation of all MCTS trees using fixed-size arrays. Data can reside
+either in CPU or GPU memory.
 
-Because this implementation is batched, it is optimized for running MCTS on a large number
-of environment instances in parallel. In particular, this implementation is not suitable for
-running a large number of MCTS simulations on a single environment quickly (which would
-probably require an asynchronous MCTS implementation with virtual loss).
+The core algorithm is abstracted from any specific environment interface, such as
+`ReinforcementLearningBase` or `CommonRLInterface`. Instead, it employs an external
+*Environment Oracle* (see `EnvOracle`) for state evaluation and transition simulation,
+enabling the use of this MCTS implementation in frameworks like MuZero,
+where the environment oracle is often a neural network.
 
-All MCTS trees are represented with a single structure of fixed-sized arrays. This structure
-can be hosted either on CPU memory or GPU memory.
+## Algorithm Characteristics and Limitations
 
-In addition, this implementation is not tied to a particular environment interface (such as
-`ReinforcementLearningBase` or `CommonRLInterface`). Instead, it relies on an external
-*environment oracle* (see `EnvOracle`) that simulates the environment and evaluates states.
-This is particularly useful to implement MuZero, in which case the full environment oracle
-is implemented by a neural network (in contrast with AlphaZero where a ground-truth
-simulator is available).
+- Designed for deterministic, two-player zero-sum games with optional intermediate rewards.
+  Single player games are also supported.
 
+- Memory footprint scales with the number of actions available in the environment,
+  potentially limiting suitability for environments with a very large or unbounded
+  action space.
 
-# Characteristics and limitations
+- Explicit state representation in the search tree optimizes for computational efficiency at
+  the expense of increased memory consumption. This is particularly beneficial for MuZero
+  where state evaluations are computationally expensive.
 
-- This implementation supports deterministic, two-player zero-sum games with or without
-  intermediate rewards. Support for one-player games should be easy to add and will probably
-  become available in the future.
-- The memory footprint of the MCTS tree is proportional to the number of environment actions
-  (e.g. 9 for tictactoe and ~19x19 for Go). Therefore, this implementation may not be
-  suitable for environments offering a very large (or unbounded) number of actions of which
-  only a small subset is available in every state.
-- States are represented explicitly in the search tree (in contrast with the `SimpleMcts`
-  implementation). This increases the memory footprint but avoids simulating the same
-  environment transition multiple times (which is essential for MuZero as doing so requires
-  making a costly call to a neural network).
+## Usage Example
 
+Firstly, initialize a list of environment instances for which optimal actions are to be
+determined. Then create an `MctsConfig` object and call an `explore` function:
 
-# Usage
-
-The examples below assume that you run the following code before:
 ```jldoctest
-julia> using RLZero
-julia> using .Tests
+julia> envs = [env_constructor() for _ in 1:num_envs]  # Must follow BatchedEnvs interface
+
+julia> device = Devices.GPU()  # can also be `Devices.CPU()`
+
+julia> oracle = EnvOracles.neural_network_env_oracle(; nn=custom_nn)
+
+julia> mcts_config = BatchedMctsUtilities.MctsConfig(; device, oracle, custom_mcts_args...)
+
+julia> tree = BatchedMcts.explore(mcts_config, envs)  # or gumbel_explore, alphazero_explore
 ```
 
-First, we need to create a list of environments from which we would like to find the optimal
-action. Let's choose the Tic-Tac-Toe game for our experiment.
-```jldoctest
-julia> envs = [bitwise_tictactoe_draw(), bitwise_tictactoe_winning()]
-```
+## Terminology
 
-Here, it's worth noting that we used the bitwise versions of our position-specific
-environments in `./Tests/Common/BitwiseTicTacToe.jl`. Those environments are here to ease
-the experimentations and the tests of the package. Bitwise versions are sometimes necessary
-to comply with GPU constraints. But in this case, the only motivation to choose them was
-the compatibility it offers with `UniformTicTacToeEnvOracle`.
-
-In fact, any environment can be used in `BatchedMcts` if we provide the appropriate
-environment oracle. See `EnvOracle` for more details on this.
-
-We should then provide a `Policy` to the Mcts. There are most noticeably two arguments to
-provide: `device` and `oracle`. The `device` specifies where the algorithm should run. Do
-you want it to run on the `CPU` or the `GPU`? It's straightforward. The `oracle`
-arguments is an `EnvOracle`. You can use the default provided one,
-`UniformTicTacToeEnvOracle` or create your one for other games. For the latter, do not
-hesitate to check `EnvOracle` and `check_oracle`.
-
-The `Policy` also accepts other arguments. Refers to the corresponding section to know more.
-```jldoctest
-julia> policy = BatchedMcts.Policy(;
-    device=GPU(),
-    oracle=BatchedMcts.UniformTicTacToeEnvOracle()
-)
-```
-
-After those 2 simple steps, we can now call the `explore` function to find out the optimal
-action to choose. This implementation provides two MCTS exploration implementations:
-`explore` & `gumbel_explore`. In the context of AlphaZero/ MuZero, each of them is more
-adapted to a specific context:
-- `gumbel_explore` is more suited for the training context of AlphaZero/ MuZero. It encourages
-   exploring slightly sub-optimal actions and thus offers more diversity of
-   game positions to the neural network.
-- `explore`, on the other hand, is more suited for the inference context. No noise is added
-   to the exploration. It therefore hopefully finds the optimal policy.
-
-Therefore, if you are only interested in the optimal action, always use the `explore`
-function.
-```jldoctest
-julia> tree = BatchedMcts.explore(policy, envs)
-```
-
-If you are interested in the exploration undergone, you can check the `Tree` structure.
-Otherwise, a simple call to `completed_qvalues` will give you a comprehensive score of how
-good each action is. The higher the better of course. We can then use the `argmax` utility
-to pick up the best action.
-```jldoctest
-julia> qs = BatchedMcts.completed_qvalues(tree)
-julia> argmax.(qs) # The optimal action for each environment
-```
-
-This implementation of batched Mcts tries to provide flexible interfaces to run code on any
-device. You can easily run the tree search on `CPU` or `GPU` with the `device` argument
-of `Policy`. If you want the state evaluation or the environment simulation to run on
-GPU as well, you can! This will be handled in the `EnvOracle` definition.
-
-By default, `UniformTicTacToeEnvOracle`'s `transition_fn` runs on both `CPU` and `GPU`
-depending on the array type of `envs` (a.k.a GPU's `CuArray` vs classic CPU's `Array`). To
-write your custom state evaluation or environment simulation on the appropriate device,
-check `EnvOracle` and its example `UniformTicTacToeEnvOracle`.
-
-TODO: This section should show examples of using the module (using jltest?). Ideally, it
-should demonstrate different settings such as:
-
-- An AlphaZero-like setting where everything runs on GPU.
-- An AlphaZero-like setting where state evaluation runs on GPU and all the rest runs on CPU
-  (tree search and environment simulation).
-- A MuZero-like setting where everything runs on GPU.
-
-This section should also demonstrate the use of the `check_policy` function to perform
-sanity checks on user environments.
-
-
-# Naming conventions
-
-Here is a short list of variable names we used throughout this file and what they mean, if
-it is not obvious:
-- bid: buffer index, used to index the batch (`B`) dimension.
-- cid: current simulation index, used to index the simulation (`N`) dimension.
-- cnid: child index, used to index the simulation (`N`) dimension as well.
-- aid: action index, used to index the action (`A`) dimension.
-- aids: action index list, used to index the action (`A`) dimension.
-- qs: completed qvalues.
-- simnum: simulation number (which is also a simulation index).
+- bid: Batch identifier, used for indexing the batch (B) dimension of environments.
+- cid: Current simulation identifier, used for indexing the simulation (N) dimension.
+- cnid: Child identifier, used for indexing the simulation (N) dimension.
+- aid: Action identifier, used for indexing the action (A) dimension.
+- aids: Vector containing action identifiers.
+- qs: Q-values.
 
 
 # References
 
-- Reference on the Gumbel MCTS extension:
-  https://www.deepmind.com/publications/policy-improvement-by-planning-with-gumbel
+- [Policy Improvement by Planning with Gumbel]
+(https://www.deepmind.com/publications/policy-improvement-by-planning-with-gumbel)
 """
 module BatchedMcts
 
 using Adapt: @adapt_structure
 using Base: @kwdef, size
 using CUDA: @inbounds
-using Distributions: Gumbel
+using Distributions: Dirichlet, Gumbel
 using EllipsisNotation
 using Random: AbstractRNG
 using StaticArrays
 
-using ..Util.Devices
-using ..Util.Devices.KernelFuns: sum, argmax, maximum, softmax
-using ..BatchedMctsUtilities
-
 import Base.Iterators.map as imap
 
+using ..BatchedMctsUtilities
+using ..Util.Devices
+using ..Util.Devices.KernelFuns: sum, argmax, maximum, softmax, categorical_sample
 
-export explore, gumbel_explore, completed_qvalues
+
+export gumbel_explore, explore
+export gumbel_policy, evaluation_policy
+export get_root_children_visits, get_completed_qvalues
 
 
 # # Tree datastructure
@@ -171,71 +95,68 @@ const ROOT = Int16(1)
 ## Value used when no action is selected.
 const NO_ACTION = Int16(0)
 # 2 Utilities to easily access information in `parent_frontier`
-# `parent_frontier` is a list of tuples with the following format:
-#   (parent, action)
+# `parent_frontier` is a list of tuples with the following format: (parent, action)
 const PARENT = Int16(1)
 const ACTION = Int16(2)
 
 """
-A batch of MCTS trees, represented as a structure of arrays.
+A data structure encapsulating a batch of Monte Carlo Tree Search (MCTS) trees, utilizing
+a Structure of Arrays (SoA) format for efficient computation.
 
 # Fields
 
-We provide shape information between parentheses: `B` denotes the batch size, `N` the
-maximum number of nodes (i.e. number of simulations) and `A` the number of actions.
+The shape of each array field is annotated in parentheses. The symbols `B`, `N`, and `A`
+stand for batch size, MCTS simulations, and action space size, respectively.
 
-## Tree structure and statistics
+## Tree Structure and Dynamic Statistics
 
-- `parent`: the id of the parent node or `NO_PARENT` (N, B).
-- `num_visits`: number of times the node was visited (N, B).
-- `total_values`: the sum of all values backpropagated to a node (N, B).
-- `children`: node id of all children or `UNVISITED` for unvisited actions (A, N, B).
+- `parent` (Int16NodeArray; Shape: [N, B]): Parent node identifiers or a constant
+    for root nodes (`NO_PARENT`).
+- `num_visits` (Int16NodeArray; Shape: [N, B]): Visit count for each node.
+- `total_values` (Float32NodeArray; Shape: [N, B]): Cumulative value estimates for
+    each node.
+- `children` (Int16ActionArray; Shape: [A, N, B]): Child node identifiers or a constant
+    for unexplored actions (`UNVISITED`).
 
-## Cached static information
+## Cached Static Information from Environment Oracle
 
-All these fields are used to store the results of calling the environment oracle.
+These fields are immutable post-population, and they are populated through calls to
+an environmental oracle.
 
-- `state`: state vector or embedding as returned by `init_fn` of the `EnvOracle` (..., N, B).
-- `terminal`: whether a node is a terminal node (N, B).
-- `valid_actions`: whether or not each action is valid or not (A, N, B).
-- `prev_action`: the id of the action leading to this node or 0 (N, B).
-- `prev_reward`: the immediate reward obtained when transitioning from the parent from the
-   perspective of the parent's player (N, B).
-- `prev_switched`: the immediate reward obtained when transitioning from the parent from the
-   perspective of the parent's player (N, B).
-- `logit_prior`: as given by the `EnvOracle` (A, N, B).
-- `policy_prior`: as given by the `EnvOracle` (A, N, B).
-- `value_prior`: as given by the `EnvOracle` (N, B).
+- `state` (StateNodeArray; Shape: [.., N, B]): State vectors or embeddings.
+- `terminal` (BoolNodeArray; Shape: [N, B]): Flags indicating terminal nodes.
+- `valid_actions` (BoolActionArray; Shape: [A, N, B]): Boolean flags indicating the
+    validity of each action.
+- `prev_action` (Int16NodeArray; Shape: [N, B]): Action identifiers that led to each node.
+- `prev_reward` (Float32NodeArray; Shape: [N, B]): Immediate rewards resulting from the
+    parent node transitions.
+- `prev_switched` (BoolNodeArray; Shape: [N, B]): Flags indicating a player switch
+    in the previous transition.
+- `logit_prior` (Float32ActionArray; Shape: [A, N, B]): Logit priors for each action
+    as returned by the environment oracle.
+- `policy_prior` (Float32ActionArray; Shape: [A, N, B]): Policy priors for each action.
+- `value_prior` (Float32NodeArray; Shape: [N, B]): Initial value estimates for each node.
 
 # Remarks
 
-- The `Tree` structure is parametric in its field array types since those could be
-  instantiated on CPU or GPU (e.g. `Array{Bool, 3}` or
-  `CuArray{Bool, 1, CUDA.Mem.DeviceBuffer}` for `BoolActionArray`). See `create_tree` for
-  more details on how a `Tree` is created.
-- It is yet to be determined whether a batch of MCTS trees is more cache-friendly when
-  represented as a structure of arrays (as is the case here) or as an array of structures
-  (as in the `BatchedMctsAos` implementation).
-- It is yet to be determined whether or not permuting the `N` and `B` dimensions of all
-  arrays would be more cache efficient. An `(N, B)` representation is more conventional, it
-  is used in Deepmind's MCTX library (and might be imposed by JAX) and it may provide better
-  temporal locality since each thread is looking at a different batch. On the other hand, a
-  `(B, N)` layout may provide better spatial locality when copying the results of the
-  environment oracle and possibly when navigating trees.
-- To complete the previous point, keep in mind that Julia is column-major (compared to the
-  row-major, more classical paradigm, in most programming language like Python). This has the
-  noticeable importance that the first dimension of a Matrix is continuous. The order of
-  dimensions is then reversed compared to a Python implementation (like MCTX) to keep the
-  same cache locality.
-- It might seem weird at first to have a doubly linked tree (i.e. with both `children` and
-  `parent` attributes), but is necessary to backpropagate values (`total_visits` and
-  `total_values`).
+- The `Tree` struct is type-parametric to allow CPU or GPU memory allocation
+    (e.g., using `Array` or `CuArray` types).
+- The efficacy of representing batched MCTS trees as a SoA versus an Array of Structures
+    (AoS) is still under investigation.
+- The optimal dimension order (`N, B` vs. `B, N`) for cache efficiency has
+    not been definitively established.
+- Julia's column-major array storage affects cache locality; thus, the dimension order is
+    reversed compared to Python implementations that are row-major.
+- Double-linking the tree (through `parent` and `children` fields) facilitates
+    efficient backpropagation of `num_visits` and `total_values`.
 
-See more about backpropagation in "Core MCTS algorithm".
+For additional information on backpropagation algorithms, refer to relevant literature
+on the core MCTS algorithm.
 
-N: Number of MCTS simulations
-B: Number of environments (batch size)
-A: Number of actions
+## Key for Array Types
+- N: Number of MCTS Simulations
+- B: Number of Parallel Environments (Batch Size)
+- A: Action Space Size
 """
 @kwdef struct Tree{
     StateNodeArray,
@@ -266,17 +187,17 @@ end
 ## https://cuda.juliagpu.org/stable/tutorials/custom_structs/
 @adapt_structure Tree
 
-l1_normalise(policy) = policy / sum(abs.(policy); init=Float32(0))
-
 
 """
     dims(arr::AbstractArray)
     dims(_)
 
-Return the dimensions of an object.
+Return the dimensions of an object, facilitating compatibility within `create_tree`.
 
-This utility is used inside `create_tree` so that non-array objects have no dimension, rather
-than popping an error as `size` do.
+This utility function is designed to handle both array and non-array objects.
+- For arrays, it returns their dimensions, equivalent to `size(arr)`.
+- For non-array objects, it returns an empty tuple, thereby avoiding errors that the
+    native `size` function would raise.
 """
 dims(arr::AbstractArray) = size(arr)
 dims(_) = ()
@@ -284,12 +205,26 @@ dims(_) = ()
 """
     create_tree(mcts, envs)
 
-Create a `Tree`.
+Construct an MCTS `Tree` instance with initial values populated based on the
+given environments.
 
-Note that the `ROOT` of the `Tree` is considered explored, as a call to `init_fn` is done
-on them. Moreover, `policy_prior` are corrected as specified in `validate_prior`.
+The root node of the tree is considered as explored; it is initialized through a
+call to the `init_fn()` of the environmental oracle.
 
-See [`Tree`](@ref) for more details.
+Parameters:
+- `mcts`: An MctsConfig instance containing the environmental oracle and
+    simulation settings.
+- `envs`: A batch of environments for which the tree is constructed.
+
+The function performs multiple initializations, including visit counts, internal states,
+and priors, based on the initial information provided by the oracle.
+
+Refer to the [`Tree`](@ref) struct for further details on the data structure.
+
+# Returns
+- A `Tree` instance with fields populated according to the initial state of
+    the environments and the MCTS algorithm settings.
+
 """
 function create_tree(mcts, envs)
     @assert length(envs) != 0 "There should be at least one environment"
@@ -335,10 +270,37 @@ function create_tree(mcts, envs)
 end
 
 """
+    add_dirichlet_noise_to_root!(tree, mcts_config, rng, ::Val{A}) where {A}
+
+Utility that adds Dirichlet noise to the root node's policy prior.
+"""
+function add_dirichlet_noise_to_root!(tree, mcts_config, rng, ::Val{A}) where {A}
+    dist = Dirichlet(A, mcts_config.alpha_dirichlet)
+    noise = DeviceArray(mcts_config.device)(hcat(rand(rng, dist, (batch_size(tree),))...))
+    ϵ = mcts_config.epsilon_dirichlet
+    Devices.foreach(1:batch_size(tree), mcts_config.device) do bid
+        policy_prior = SVector{A}(imap(aid -> tree.policy_prior[aid, ROOT, bid], 1:A))
+        bid_noise = SVector{A}(imap(aid -> noise[aid, bid], 1:A))
+        action_mask = SVector{A}(imap(aid -> tree.valid_actions[aid, ROOT, bid], 1:A))
+        π′ = (1 - ϵ) .* policy_prior .+ ϵ .* bid_noise
+        π′ = π′ .* action_mask
+        π′ = π′ ./ sum(π′; init=0f0)
+        tree.policy_prior[:, ROOT, bid] .= π′
+    end
+end
+
+"""
     Base.size(tree::Tree)
 
-Return the number of actions (`A`), the number of simulations (`N`), and the number of
-environments in the batch (`B`) of a `tree` as named-tuple `(; A, N, B)`.
+Retrieve the dimensions of the MCTS `Tree` instance as a named tuple `(; A, N, B)`.
+
+- `A`: Number of available actions.
+- `N`: Number of MCTS simulations.
+- `B`: Batch size, i.e., the number of environments.
+
+# Returns
+- A named tuple `(; A, N, B)` containing the respective dimensions of the tree.
+
 """
 function Base.size(tree::Tree)
     A, N, B = size(tree.children)
@@ -352,21 +314,33 @@ Return the number of parallel environments in `tree`.
 """
 batch_size(tree) = size(tree).B
 
+"""
+    n_actions(tree)
+
+Return the total number of actions in the environments simulated in the `tree`.
+"""
+n_actions(tree) = size(tree).A
+
 # # MCTS implementation
 
 # ## Basic MCTS functions
 
-"""
+raw"""
     value(tree, cid, bid)
 
-Return the absolute value of a game position.
+Calculate the absolute value of a game position at a given node.
 
-The formula for a given node is:
-    (prior_value + total_rewards) / num_visits
+The value is computed as:
+\[
+\frac{{\text{{prior_value}} + \text{{total_rewards}}}}{\text{{num_visits}}}
+\]
 
-With `prior_value` the value as estimated by the oracle, `total_rewards` the sum of rewards
-obtained from episodes including this node during exploration and `num_visits` the number of
-episodes including this node.
+- `prior_value`: Estimated value from the oracle.
+- `total_rewards`: Cumulative rewards obtained during exploration.
+- `num_visits`: Number of visits to the node.
+
+# Returns
+- The computed value for the node identified by `cid` in the environment batch `bid`.
 
 See also [`qvalue`](@ref)
 """
@@ -375,22 +349,32 @@ value(tree, cid, bid) = tree.total_values[cid, bid] / tree.num_visits[cid, bid]
 """
     qvalue(tree, cid, bid)
 
-Return the value of the game position from the perspective of its parent node.
-I.e. a good position for your opponent is a bad one for you
+Compute the value of a game position relative to its parent node.
+
+The returned value accounts for the perspective of the parent node, flipping the
+sign based on whether the turn has switched between the parent and the current node.
+
+# Returns
+- The value for the node identified by `cid` in the environment batch `bid`,
+adjusted for the parent's perspective.
 
 See also [`value`](@ref)
 """
 qvalue(tree, cid, bid) = value(tree, cid, bid) * (-1)^tree.prev_switched[cid, bid]
 
 """
-    root_value_estimate(tree, cid, bid, ::Tuple{Val{A}, Any, Any}) where {A}
+    root_value_estimate(tree, cid, bid, ::Val{A}) where {A}
 
-Compute a value estimation of a node at this stage of the exploration.
+Estimate the value of a node based on its children and prior information.
 
-The estimation is based on its `value_prior`, its number of visits, the `qvalue` of its
-children and their associated `policy_prior`.
+The function combines the node's `value_prior`, number of visits,
+the `qvalue` of its children, and their `policy_prior` to compute an estimate for the
+value of the root node.
+
+# Returns
+- The estimated value for the node identified by `cid` in the environment batch `bid`.
 """
-function root_value_estimate(tree, cid, bid, ::Tuple{Val{A}, Any, Any}) where {A}
+function root_value_estimate(tree, cid, bid, ::Val{A}) where {A}
     total_qvalues = Float32(0)
     total_prior = Float32(0)
     total_visits = UNVISITED
@@ -412,23 +396,26 @@ end
         tree,
         cid,
         bid,
-        tree_size::Tuple{Val{A}, Any, Any};
+        num_actions::Val{A};
         invalid_actions_value=-Inf32
     ) where {A}
 
-Return a list of estimated qvalue of all children for a given node.
+Estimate qvalues for all children of a node.
 
-More precisely, if its child have been visited at least one time, it computes its real
-`qvalue`, otherwise, it uses the `root_value_estimate` of node instead.
+For each child, if visited, it uses its actual `qvalue`. Else, it uses the node's
+`root_value_estimate`.
+
+# Returns
+- An SVector of size (num_actions,) containing the estimated qvalues for each action.
 """
 function completed_qvalues(
     tree,
     cid,
     bid,
-    tree_size::Tuple{Val{A}, Any, Any};
+    num_actions::Val{A};
     invalid_actions_value = -Inf32
 ) where {A}
-    root_value = root_value_estimate(tree, cid, bid, tree_size)
+    root_value = root_value_estimate(tree, cid, bid, num_actions)
     ret = imap(1:A) do aid
         (!tree.valid_actions[aid, cid, bid]) && return invalid_actions_value
 
@@ -439,11 +426,58 @@ function completed_qvalues(
 end
 
 """
-    get_num_child_visits(tree, cid, bid, ::Tuple{Val{A},Any,Any}) where {A}
+    alphazero_qvalues(tree, cid, bid, ::Val{A}) where {A}
 
-Return the number of visits of each child from the given node.
+Compute qvalues for all children of a node.
+
+Unlike in Gumbel MCTS, the qvalues of unvisited children are estimated as zero.
+
+# Returns
+- An SVector of size (num_actions,) containing the qvalues for each action.
 """
-function get_num_child_visits(tree, cid, bid, ::Tuple{Val{A},Any,Any}) where {A}
+function alphazero_qvalues(tree, cid, bid, ::Val{A}) where {A}
+    ret = imap(1:A) do aid
+        cnid = tree.children[aid, cid, bid]
+        (cnid != UNVISITED) ? qvalue(tree, cnid, bid) : 0f0
+    end
+    return SVector{A}(ret)
+end
+
+raw"""
+    get_puct_values(c_puct, tree, cid, bid, num_actions::Val{A}) where {A}
+
+Compute the PUCT scores for all children of a node.
+
+The PUCT score is computed as:
+\[
+c_{puct} \text{{policy_prior}} \frac{\sqrt{\text{{total_visits}}}}{1 + \text{{num_visits}}}
+\]
+
+# Returns
+- An SVector of size (num_actions,) containing the PUCT scores for each action.
+"""
+function get_puct_values(c_puct, tree, cid, bid, num_actions::Val{A}) where {A}
+    # get the policy prior P(s, a)
+    policy_prior = SVector{A}(imap(aid -> tree.policy_prior[aid, cid, bid], 1:A))
+    # get the visit counts N(s, a) and the total visits sum_b N(s, b) = N(s)
+    num_child_visits = Float32.(get_num_child_visits(tree, cid, bid, num_actions))
+    total_visits = sum(num_child_visits; init=UNVISITED)
+
+    # compute the scores: c_puct * P(s, a) * sqrt(N(s)) / (1 + N(s, a))
+    scores = c_puct * policy_prior .* (sqrt(total_visits) ./ (1 .+ num_child_visits))
+
+    return scores
+end
+
+"""
+    get_num_child_visits(tree, cid, bid, ::Val{A}) where {A}
+
+Returns an SVector of visit counts for each child of a given node.
+
+# Returns
+- An SVector of size (num_actions,) containing the number of visits for each child action.
+"""
+function get_num_child_visits(tree, cid, bid, ::Val{A}) where {A}
     ret = imap(1:A) do aid
         cnid = tree.children[aid, cid, bid]
         (cnid != UNVISITED) ? tree.num_visits[cnid, bid] : UNVISITED
@@ -452,32 +486,36 @@ function get_num_child_visits(tree, cid, bid, ::Tuple{Val{A},Any,Any}) where {A}
 end
 
 """
-    qcoeff(value_scale, max_visit_init, tree, cid, bid, tree_size)
+    qcoeff(value_scale, max_visit_init, tree, cid, bid, num_actions)
 
-Compute a Gumbel-related ponderation of `qvalue`.
+Computes a Gumbel-related weight for the qvalues based on visit counts and prior parameters.
 
-Through time, as the number of visits increases, the influence of `qvalue` builds up
-relatively to `policy_prior`.
+As visit counts increase over time, the influence of `qvalue` relative to `policy_prior`
+also increases.
+
+# Returns
+- A weight to adjust the influence of `qvalue`.
 """
-function qcoeff(value_scale, max_visit_init, tree, cid, bid, tree_size)
-    children_visit_counts = get_num_child_visits(tree, cid, bid, tree_size)
+function qcoeff(c_scale, c_visit, tree, cid, bid, num_actions)
+    children_visit_counts = get_num_child_visits(tree, cid, bid, num_actions)
     max_child_visit = maximum(children_visit_counts; init=UNVISITED)
-    return (max_visit_init + max_child_visit) * value_scale
+    return (c_visit + max_child_visit) * c_scale
 end
 
 """
     transformed_qvalues(
-        value_scale,
-        max_visit_init,
+        c_scale,
+        c_visit,
         tree,
         cid,
         bid,
-        tree_size::Tuple{Val{A}, Any, Any}
+        num_actions::Val{A}
     ) where {A}
 
-Return the policy of a node.
+Computes q-values (action scores), indicating how favorable each action is for a given node.
 
-I.e. a score of how much each action should be played. The higher, the better.
+# Returns
+- An SVector of size (num_actions,) containing the transformed qvalues for each action.
 """
 function transformed_qvalues(
     c_scale,
@@ -485,43 +523,38 @@ function transformed_qvalues(
     tree,
     cid,
     bid,
-    tree_size::Tuple{Val{A}, Any, Any}
+    num_actions::Val{A}
 ) where {A}
-    qvalues = completed_qvalues(tree, cid, bid, tree_size)
-    qcoefficient = qcoeff(c_scale, c_visit, tree, cid, bid, tree_size)
+    qvalues = completed_qvalues(tree, cid, bid, num_actions)
+    qcoefficient = qcoeff(c_scale, c_visit, tree, cid, bid, num_actions)
     σ_q = qcoefficient * qvalues
     return σ_q
 end
 
 """
-    select_action(
-        c_scale,
-        c_visit,
-        tree,
-        cid,
-        bid,
-        tree_size::Tuple{Val{A}, Any, Any}
-    ) where {A}
+    gumbel_select_action(c_scale, c_visit, tree, cid, bid, num_actions::Val{A}) where {A}
 
-Select the most appropriate action to explore.
+Selects the best action for exploration at a given node.
 
-`NO_ACTION` is returned if no actions are available.
+# Parameters
+- `c_scale`: Value scale parameter described in the Gumbel MCTS paper.
+- `c_visit`: Initial visit count parameter described in the Gumbel MCTS paper.
+- `tree`: The MCTS tree.
+- `cid`: Node identifier.
+- `bid`: Batch identifier.
+- `num_actions`: Number of possible actions.
+
+# Returns
+- The action to explore if there's at least one valid action; otherwise, `NO_ACTION`.
 """
-function select_action(
-    c_scale,
-    c_visit,
-    tree,
-    cid,
-    bid,
-    tree_size::Tuple{Val{A}, Any, Any}
-) where A
+function gumbel_select_action(c_scale, c_visit, tree, cid, bid, num_actions::Val{A}) where A
     # compute the policy: π′ = softmax(logits + σ(completedQ))
     logits = SVector{A}(imap(aid -> tree.logit_prior[aid, cid, bid], 1:A))
-    σ_q = transformed_qvalues(c_scale, c_visit, tree, cid, bid, tree_size)
+    σ_q = transformed_qvalues(c_scale, c_visit, tree, cid, bid, num_actions)
     policy = softmax(logits + σ_q)
 
     # compute the scores: π′(a) - N(s, a) / (N(s) + 1)
-    num_child_visits = Float32.(get_num_child_visits(tree, cid, bid, tree_size))
+    num_child_visits = Float32.(get_num_child_visits(tree, cid, bid, num_actions))
     total_visits = sum(num_child_visits; init=UNVISITED)
     scores = policy - num_child_visits / (total_visits + 1)
 
@@ -532,141 +565,246 @@ function select_action(
     return Int16(argmax(scores; init=(NO_ACTION, -Inf32)))
 end
 
+"""
+    alphazero_select_action(c_puct, tree, cid, bid, num_actions::Val{A}) where {A}
+
+Selects the best action for exploration at a given node, following the PUCT formula
+presented in the AlphaGoZero paper.
+
+# Parameters
+- `c_puct`: Exploration constant described in the AlphaGoZero paper.
+- `tree`: The MCTS tree.
+- `cid`: Node identifier.
+- `bid`: Batch identifier.
+- `num_actions`: Number of possible actions.
+
+# Returns
+- The action to explore if there's at least one valid action; otherwise, `NO_ACTION`.
+"""
+function alphazero_select_action(c_puct, tree, cid, bid, num_actions::Val{A}) where {A}
+    # get Q-values and U(s, a) (aka PUCT values)
+    qvalues = alphazero_qvalues(tree, cid, bid, num_actions)
+    puct_values = get_puct_values(c_puct, tree, cid, bid, num_actions)
+
+    # final scores are computed as the sum of qvalues and puct values
+    scores = qvalues + puct_values
+
+    # mask invalid actions and select the argmax action
+    action_mask = SVector{A}(imap(a -> tree.valid_actions[a, cid, bid] ? 0f0 : -Inf32, 1:A))
+    scores = scores .+ action_mask
+
+    return Int16(argmax(scores; init=(NO_ACTION, -Inf32)))
+end
+
+"""
+    get_considered_visits_table(num_simulations, num_actions)
+
+Returns a table containing the precomputed sequence of visits for each number of considered
+actions possible. This table introduces a constraint on the number of visits for each
+simulation, and is used to precompute the Gumbel simulations orchestration.
+"""
+function get_considered_visits_table(num_simulations, num_actions)
+    ret = imap(1:num_actions) do num_considered_actions
+        get_considered_visits_sequence(num_considered_actions, num_simulations)
+    end
+    return SVector{num_actions}(ret)
+end
+
+"""
+    get_considered_visits_sequence(max_num_actions, num_simulations)
+
+Precomputes the Gumbel simulations orchestration by applying the Sequential Halving
+algorithm iteratively. The output is a sequence of the considered number of visits for
+each simulation.
+"""
+function get_considered_visits_sequence(max_num_actions, num_simulations)
+    max_num_actions <= 1 && return SVector{num_simulations, Int16}(0:(num_simulations - 1))
+
+    num_halving_steps = Int(ceil(log2(max_num_actions)))
+    sequence = Int16[]
+    visits = zeros(Int16, max_num_actions)
+
+    num_actions = max_num_actions
+    while length(sequence) < num_simulations
+        num_extra_visits = max(1, num_simulations ÷ (num_halving_steps * num_actions))
+        for _ in 1:num_extra_visits
+            append!(sequence, visits[1:num_actions])
+            visits[1:num_actions] .+= 1
+        end
+        num_actions = max(2, num_actions ÷ 2)
+    end
+
+    return SVector{num_simulations}(sequence[1:num_simulations])
+end
+
 # ## Core MCTS algorithm
 
 """
-Let's now dive into the core part of the MCTS algorithm.
+# BatchedMcts Exploration Algorithms
 
-"MCTS" stands for "Monte Carlo Tree Search" and is a heuristic tree search algorithm, most
-noticeably applied in the context of board games. For the record, recent breakthroughs in
-the Reinforcement Learning fields applied MCTS to solve arcade games
-(e.g. Deepmind's MuZero) or inside Tesla's autopilot software.
+This module provides a batched implementation of Monte Carlo Tree Search (MCTS)
+featuring three exploration strategies:
+- `explore()`
+- `gumbel_explore()`
+- `alphazero_explore()`
 
-The tree search algorithms family focuses on finding the optimal policy (i.e. the best move
-to play given a certain game position). Compared to other tree search algorithms, like the
-simple MinMax algorithm, MCTS only explores a subset of the total search space. It does so
-through exploration/ exploitation heuristics that orient this search toward the most
-promising actions. Since its creation, MCTS has been shown to converge toward the MinMax
-algorithm as the number of simulations increases, but at a much lower computational cost.
+These algorithms are designed for different contexts and offer various trade-offs between
+exploration and exploitation.
 
-Originally, the MCTS algorithm was based on a Monte Carlo method. This method consisted of a
-random sampling of the search space to evaluate the current board position. Those were
-called "rollouts". Its creator, Bruce Abramson, attributes the rollouts "to be precise,
-accurate, easily estimable, efficiently calculable, and domain-independent”. With the rise
-of Deep Reinforcement Learning, rollouts were eventually replaced by Neural Networks. Those
-were shown to be a way more precise evaluation method for complex board games. Though
-modern MCTS does not involve any Monte Carlo methods anymore, it has still kept its name.
+## Core MCTS Algorithm
 
+"MCTS" stands for "Monte Carlo Tree Search," a heuristic tree search algorithm primarily
+applied in the context of board games and reinforcement learning. The algorithm focuses on
+finding the optimal policy — i.e., the best action given a specific state—by exploring a
+subset of the total search space. Over time, MCTS has been shown to approximate
+the MiniMax algorithm but at a reduced computational cost.
 
-The MCTS iteratively runs simulations that expand a tree of explored game positions. Each
-iteration can be divided into 3 phases:
-- Selection: Start at the root node (initial board state) and walk to the child that has
-  the best exploration/ exploitation tradeoff. This tradeoff was the source of a lot of
-  research and has been formalized through different formulas, the most famous being UCB.
-  The walk recursion is done until you hit a leaf node (i.e. a board game position that
-  has never been explored or a terminal node like a win or a defeat). This reached leaf
-  node is then saved for the next phase.
-- Evaluation: Sometimes split into two sub-phases, "Simulation" & "Expansion", the
-  evaluation phase respectively evaluates the current board position (either by a rollout in
-  classic MCTS or through a Neural Network for a more modern one) and generates the children
-  board position associated with each action.
-- Backpropagation: After simulating a game by iteratively choosing the most promising
-  actions (called `Episode`), and acquired some (intermediate or final) reward through its
-  the last action, it is now needed to backpropagate this information up in the tree until
-  the root node. The backpropagation updates the visit counts and total value of each node
-  in this episode.
+The original MCTS algorithm involved random sampling of the search space,
+known as "rollouts," to evaluate states. Modern variations often replace
+rollouts with neural network evaluations for increased accuracy.
+
+MCTS iteratively runs simulations to expand a tree of explored states. Each iteration
+consists of three main phases:
+- **Selection**: Traverse from the root to a leaf node based on a heuristic (e.g., UCB1),
+    considering both exploration and exploitation.
+- **Evaluation**: Evaluate the leaf node using either rollouts or a neural network and
+    expand it to include child nodes corresponding to possible actions.
+- **Backpropagation**: Update the visit count and value estimates of all nodes along
+    the traversed path based on the evaluation of the leaf node.
+
+## Exploration Strategies
+
+### `explore()`
+Suited for inference contexts, this function aims to find the optimal policy without
+added exploration noise.
+
+### `gumbel_explore()`
+Designed for training contexts in AlphaZero/MuZero frameworks, this function introduces
+Gumbel noise during the selection phase to encourage exploration of slightly sub-optimal
+actions.
+
+### `alphazero_explore()`
+This is the original MCTS algorithm as described in the AlphaGoZero paper. While it might
+be outperformed by newer algorithms, it serves as a solid baseline for comparisons.
+
+## Usage
+
+All *explore()* functions return a tree structure. See the main `BatchedMcts` description
+for an example and usage instructions, including how to specify different configurations
+using `MctsConfig`.
+
+## References
+- [DeepMind's MCTX](https://github.com/deepmind/mctx/tree/main/mctx/_src)
+- [Policy Improvement by Planning with Gumbel]
+(https://www.deepmind.com/publications/policy-improvement-by-planning-with-gumbel)
+
 """
+function gumbel_explore(mcts_config, envs, rng::AbstractRNG)
+    tree = create_tree(mcts_config, envs)
+    (; A, B, N) = size(tree)
+    gumbel = DeviceArray(mcts_config.device)(rand(rng, Gumbel(), A, B))
+    considered_visits = DeviceArray(mcts_config.device)(get_considered_visits_table(N, A))
+    for t in 2:N
+        parent_frontier = gumbel_select(mcts_config, tree, t, gumbel, considered_visits)
+        frontier = eval!(mcts_config, tree, t, parent_frontier)
+        backpropagate!(mcts_config, tree, frontier)
+    end
+    return tree, gumbel
+end
 
-function explore(mcts, envs)
-    tree = create_tree(mcts, envs)
+function alphazero_explore(mcts_config, envs, rng::AbstractRNG)
+    tree = create_tree(mcts_config, envs)
+    (; A, N) = size(tree)
+    add_dirichlet_noise_to_root!(tree, mcts_config, rng, Val(A))
+    for t in 2:N
+        parent_frontier = search(mcts_config, tree)
+        frontier = eval!(mcts_config, tree, t, parent_frontier)
+        backpropagate!(mcts_config, tree, frontier)
+    end
+    return tree
+end
+
+function explore(mcts_config, envs)
+    tree = create_tree(mcts_config, envs)
     (; N) = size(tree)
-    for simnum in 2:N
-        parent_frontier = select(mcts, tree)
-        frontier = eval!(mcts, tree, simnum, parent_frontier)
-        backpropagate!(mcts, tree, frontier)
+    for t in 2:N
+        parent_frontier = search(mcts_config, tree)
+        frontier = eval!(mcts_config, tree, t, parent_frontier)
+        backpropagate!(mcts_config, tree, frontier)
     end
     return tree
 end
 
 """
-But in what way is this implementation exactly batched?
+    search(mcts_config, tree)
 
-Julia has a great CUDA API. It is sufficiently high-level so that the same Julia code can be
-both compiled to CPU and GPU according to the context. As an example, a function `map`ped
-over a CUDA `CuArray` will be implicitly compiled and run on the GPU. In the same way, the
-same function `map`ped over a classic CPU `Array`, will then be run on the CPU. It is as
-simple as that. We extensively used this feature in AlphaZero.jl to extend code with GPU
-support.
+Returns the parent nodes of the frontier of nodes to expand. It uses either Gumbel MCTS
+of the original AlphaZero MCTS algorithm, depending on the type of `mcts_config`.
 
-This principle brings both simplicity to the code (as no duplication of code is needed to
-run on CPU and GPU) but also computing power to easily run code on GPU. This was one of
-the reasons, Julia was chosen for AlphaZero.jl. We hope to make this implementation
-accessible for students, researchers, and hackers while also being sufficiently powerful
-and fast to enable meaningful experiments on limited computing resources.
+### Note
+This implementation leverages Julia's CUDA API to allow the same code to run on both
+CPU and GPU. For instance, functions mapped over a CUDA `CuArray` will be implicitly
+compiled and run on the GPU, while the same functions mapped over a standard CPU `Array`
+will run on the CPU.
 
-The compilation on GPU still constraints a bit the way code is written. The following three
-constraints should be respected:
-- Data copied to GPU should be `isbits`.
-- No dynamic allocation can be done on the GPU.
-- Functions compiled on GPU should be type-stable.
+### GPU Constraints
+While enabling significant performance gains, GPU compilation imposes certain constraints:
+- Data must be `isbits` types.
+- No dynamic memory allocation on the GPU.
+- Functions compiled to GPU must be type-stable.
 
+To address these constraints, the `SVector` type from the `StaticArrays` package is used in
+GPU functions and pass `num_actions` as Value-as-parameter for type-stability.
 
-To respect the `isbits` constraint, we used `SVector` from `StaticArrays` in GPU functions
-to replace the more standard `Base.Vector`. To respect the type-stability constraints,
-a `tree_size` is used as Value-as-parameter, so that size of `SVector` is known at
-compile time. Some utility functions are provided in `Devices` module for easier use.
+### Parallelization
+The batch processing is parallelized over a vector of environments. The `search()` and
+`backpropagate!()` functions launch GPU kernels over this vector of environments,
+enabling efficient batch processing.
 
-
-And as you can see in `select` below, the parallelization is done over the environments
-list. In other words, a `select` parallel call is done over each environment.
-
-In the same way, `backpropagate!` launch GPU kernels over the environments list. Those are
-the only two functions to launch kernels
+## References
+- [DeepMind's MCTX](https://github.com/deepmind/mctx/tree/main/mctx/_src)
+- [Policy Improvement by Planning with Gumbel]
+(https://www.deepmind.com/publications/policy-improvement-by-planning-with-gumbel)
 """
-function select(mcts, tree)
-    (; A, N, B) = size(tree)
-    tree_size = (Val(A), Val(N), Val(B))
-    value_scale, max_visit_init = mcts.value_scale, mcts.max_visit_init
+function search(mcts_config, tree)
+    num_actions = Val(n_actions(tree))
+    use_gumbel = is_gumbel_mcts_config(mcts_config)
+    c_scale = use_gumbel ? mcts_config.value_scale : 0f0
+    c_visit = use_gumbel ? mcts_config.max_visit_init : 0f0
+    c_puct = use_gumbel ? 0f0 : mcts_config.c_puct
 
-    parent_frontier = zeros(Int16, mcts.device, (2, B))
-    Devices.foreach(1:B, mcts.device) do bid
-        new_frontier = select(value_scale, max_visit_init, tree, bid, tree_size)
+    parent_frontier = zeros(Int16, mcts_config.device, (2, batch_size(tree)))
+    Devices.foreach(1:batch_size(tree), mcts_config.device) do bid
+        if use_gumbel
+            new_frontier = gumbel_search(c_scale, c_visit, tree, bid, num_actions)
+        else
+            new_frontier = alphazero_search(c_puct, tree, bid, num_actions)
+        end
         @inbounds parent_frontier[PARENT, bid] = new_frontier[PARENT]
         @inbounds parent_frontier[ACTION, bid] = new_frontier[ACTION]
-        return nothing
     end
+
     return parent_frontier
 end
 
-"""
-As a reminder, the selection phase walks through the tree to find a frontier of nodes to
-expand. The selection starts at the root node (initial board state) and walks to the child
-that has the best exploration/ exploitation tradeoff with the `select_action()`
-utility function. The walk recursion is done until you hit a leaf node (i.e. a board game
-position that has never been explored or a terminal node like a win or a defeat).
-This reached leaf node is then saved for the next phase.
 
-There is a subtlety here compared to BatchedMCtsAos version. Nodes are not created at
-the `selection`, because the concept of Oracle evaluation and environment simulation are
-grouped in the `EnvOracle`. Those are split in BatchedMctsAos. Therefore, the `select()`
-function must return parent nodes of the frontier instead. That's why its returned value is
-caught as `parent_frontier` in `explore`. The action chosen is also returned along with
-the parent as a tuple, so that it prevents its recalculation.
-
-But this leaves the question of the return value for terminal nodes... It has been chosen
-to return the terminal nodes themself (instead of their parents) with a `NO_ACTION` as the
-action in the tuple. This was necessary to respect the type-stability constraint. This way
-`select` always returns a tuple `(node, action)`. The `NO_ACTION` action also makes it easy
-to detect terminal nodes in the `parent_frontier`
 """
-function select(value_scale, max_visit_init, tree, bid, tree_size; start=ROOT)
+    gumbel_search(value_scale, max_visit_init, tree, bid, num_actions; start=ROOT)
+
+Descends the search tree by choosing actions according to the sequential halving
+algorithm described in the Gumbel MCTS paper.
+
+# Returns
+- A tuple `(node, action)` containing the node and action to explore.
+"""
+function gumbel_search(value_scale, max_visit_init, tree, bid, num_actions; start=ROOT)
     cur = start
     while true
         if tree.terminal[cur, bid]
             # returns current terminal, but no action played
             return cur, NO_ACTION
         end
-        aid = select_action(value_scale, max_visit_init, tree, cur, bid, tree_size)
+        aid = gumbel_select_action(value_scale, max_visit_init, tree, cur, bid, num_actions)
         @assert aid != NO_ACTION
 
         cnid = tree.children[aid, cur, bid]
@@ -681,29 +819,58 @@ function select(value_scale, max_visit_init, tree, bid, tree_size; start=ROOT)
 end
 
 """
-The evaluation phase evaluates the current board position and simulates the environment with
-the `EnvOracle` through the `transition_fn` interface and then saved information associated
-to each action (i.e. `valid_actions` & `policy_prior`) along with the newly created nodes.
+    alphazero_search(c_puct, tree, bid, num_actions; start=ROOT)
 
-The `transition_fn` call takes a vector of state encodings and a vector of actions as
-arguments. It therefore could not be parallelized over environments as `select` and
-`backpropagate!` are.
+Descends the search tree by choosing actions according to the PUCT formula
+described in the original AlphaGoZero paper.
 
-Note that if all nodes at the frontier are terminal ones, then no call to `transition_fn` is
-done (as no node needs to be created). The terminal nodes are then directly returned.
-
-Lastly, to save `state` returned from `transition_fn`, it was needed to easily handle both
-exact state encodings (like in AlphaZero) as well as latent space state encodings (like in
-MuZero, encoding which will then have at least 1 dimension i.e. is a vector or a matrix).
-To solve these constraints, we used the EllipsisNotation ("..") which was revealed to be
-particularly useful. The EllipsisNotation enables to handle of any number of dimensions.
+# Returns
+- A tuple `(node, action)` containing the node and action to explore.
 """
-function eval!(mcts, tree, simnum, parent_frontier)
+function alphazero_search(c_puct, tree, bid, num_actions; start=ROOT)
+    cur = start
+    while true
+        if tree.terminal[cur, bid]
+            # returns current terminal, but no action played
+            return cur, NO_ACTION
+        end
+        aid = alphazero_select_action(c_puct, tree, cur, bid, num_actions)
+        @assert aid != NO_ACTION
+
+        cnid = tree.children[aid, cur, bid]
+        if cnid != UNVISITED
+            cur = cnid
+        else
+            # returns parent and action played
+            return cur, aid
+        end
+    end
+    return nothing
+end
+
+"""
+    eval!(mcts_config, tree, simnum, parent_frontier)
+
+Expands the frontier leaf nodes or returns them if they are terminal.
+
+## Note: Evaluation Phase
+
+The evaluation phase of the MCTS algorithm evaluates the current state and simulates
+the environment with the `EnvOracle` through the `transition_fn()` interface.
+Information related to each action (i.e., `valid_actions` & `policy_prior`)
+is saved along with the newly created nodes.
+
+### Note: State Handling
+To handle both exact state encodings (like in AlphaZero) and latent space state encodings
+(like in MuZero), the EllipsisNotation ("..") is used. It enables handling of states with
+any number of dimensions.
+"""
+function eval!(mcts_config, tree, simnum, parent_frontier)
     B = batch_size(tree)
 
     # get terminal nodes at `parent_frontier`
     non_terminal_mask = parent_frontier[ACTION, :] .!= NO_ACTION
-    non_terminal_bids = DeviceArray(mcts.device)(@view((1:B)[non_terminal_mask]))
+    non_terminal_bids = DeviceArray(mcts_config.device)(@view((1:B)[non_terminal_mask]))
     # No new node to expand (a.k.a only terminal node on the frontier)
     (length(non_terminal_bids) == 0) && return parent_frontier[PARENT, :]
 
@@ -713,7 +880,7 @@ function eval!(mcts, tree, simnum, parent_frontier)
 
     state_cartesian_ids = CartesianIndex.(parent_ids, non_terminal_bids)
     parent_states = tree.state[.., state_cartesian_ids]
-    info = mcts.oracle.transition_fn(parent_states, action_ids)
+    info = mcts_config.oracle.transition_fn(parent_states, action_ids)
 
     # create nodes and save `info`
     children_cartesian_ids = CartesianIndex.(action_ids, parent_ids, non_terminal_bids)
@@ -731,7 +898,7 @@ function eval!(mcts, tree, simnum, parent_frontier)
     @inbounds tree.value_prior[simnum, non_terminal_bids] = info.value_prior
 
     # value priors are from the perspective of child nodes -> negate sign if needed
-    Devices.foreach(non_terminal_bids, mcts.device) do bid
+    Devices.foreach(non_terminal_bids, mcts_config.device) do bid
         @inbounds (tree.prev_switched[simnum, bid]) && (tree.value_prior[simnum, bid] *= -1)
     end
 
@@ -743,25 +910,23 @@ function eval!(mcts, tree, simnum, parent_frontier)
 end
 
 """
-Finally, the backpropagation comes in.
+    backpropagate!(mcts_config, tree, frontier)
 
-After simulating a game by iteratively choosing the most promising actions (which list of
-actions are called an `Episode`), and acquired some (intermediate or final) reward through
-its last action, it is now needed to backpropagate this information up in the tree until
-the root node. The backpropagation updates the visits count and total value of each node in
-this episode.
+Backpropagates the value/reward information up the tree.
 
-The visits count of each node in the episode is simply incremented by 1. The total value of
-each node is incremented by a certain value. This value is computed through TD learning
-until the newly created node (i.e. the value of the newly created node estimated by the
-oracle summed up the cumulative reward until this point). Of course, the sign of the TD
-learned value must be switched when the player's turn is switched as well.
+## Info: Backpropagation Phase
+The backpropagation loop updates the visits count and total value of each node in the tree.
+The visits count of each node is incremented by 1, while the total value is updated using
+TD learning. The value of the newly created node is estimated by the oracle and summed up
+with the cumulative reward up to that point. When the player's turn is switched,
+the sign of the TD-learned value is also switched.
 
-And as stated before, `backpropagate!` is parallelized in the same way as `select` (i.e.
-over the environments list).
+Like `search()`, the `backpropagate!()` function is parallelized over the vector of
+environments.
+
 """
-function backpropagate!(mcts, tree, frontier)
-    Devices.foreach(1:batch_size(tree), mcts.device) do bid
+function backpropagate!(mcts_config, tree, frontier)
+    Devices.foreach(1:batch_size(tree), mcts_config.device) do bid
         @inbounds cid = frontier[bid]
         @inbounds val = tree.value_prior[cid, bid]
         while true
@@ -778,60 +943,8 @@ function backpropagate!(mcts, tree, frontier)
     end
 end
 
-# ### Gumbel MCTS variation
-
 """
-This implementation provides two MCTS exploration implementations: `explore` &
-`gumbel_explore`. In the context of AlphaZero/ MuZero, each of them is more adapted to a
-specific context:
-- `gumbel_explore` is more suited for the training context of AlphaZero/ MuZero. It
-   encourages to explore of slightly sub-optimal actions and thus offers more diversity of
-   game positions to the neural network.
-- `explore`, on the other hand, is more suited for the inference context. No noise is added
-   to the exploration. It therefore hopefully finds the optimal policy.
-
-In the end, `explore` and `gumbel_explore` only differ from each other in a single line,
-the use of `gumbel_select` instead of `select`.
-
-
-The Gumbel algorithm won't be explained here in detail but you can learn more about it
-here:
-https://www.deepmind.com/publications/policy-improvement-by-planning-with-gumbel
-
-The main idea behind `gumbel_explore` to successfully explore sub-optimal actions resides in
-the addition of specific noise (the Gumbel noise) and a different simulations orchestration
-in the `selection` phase.
-
-Deepmind claims that this Gumbel variation does not pollute the policy later learned by the
-Neural Network (on the contrary to Dirichlet noise used originally in AlphaZero/ MuZero).
-This has the advantage to help the neural network learn faster with fewer simulations. It,
-therefore, enables more meaningful experiments on limited computing resources.
-
-This implementation is largely inspired by Deepmind's MCTX. It has the particularity to
-precompute the simulation orchestration which enables batch parallelization. This
-precomputation is done through `get_considered_visits_table`.
-
-
-See Deepmind's MCTX for more details
-https://github.com/deepmind/mctx/tree/main/mctx/_src
-"""
-function gumbel_explore(mcts, envs, rng::AbstractRNG)
-    tree = create_tree(mcts, envs)
-    (; A, B, N) = size(tree)
-
-    gumbel = DeviceArray(mcts.device)(rand(rng, Gumbel(), A, B))
-    considered_visits_table = DeviceArray(mcts.device)(get_considered_visits_table(N, A))
-
-    for simnum in 2:N
-        parent_frontier = gumbel_select(mcts, tree, simnum, gumbel, considered_visits_table)
-        frontier = eval!(mcts, tree, simnum, parent_frontier)
-        backpropagate!(mcts, tree, frontier)
-    end
-    return tree, gumbel
-end
-
-"""
-    gumbel_select(mcts, tree, simnum, gumbel, considered_visits_table)
+    gumbel_select(mcts_config, tree, simnum, gumbel, considered_visits_table)
 
 Gumbel's variation of classical `select`.
 
@@ -840,15 +953,13 @@ the root node. `gumbel_select` then fall back on `select` for non-root node.
 
 See also [`gumbel_select_root_action`](@ref)
 """
-function gumbel_select(mcts, tree, simnum, gumbel, considered_visits_table)
-    (; A, N, B) = size(tree)
-    tree_size = (Val(A), Val(N), Val(B))
+function gumbel_select(mcts_config, tree, simnum, gumbel, considered_visits_table)
+    num_actions = Val(n_actions(tree))
+    c_scale, c_visit = mcts_config.value_scale, mcts_config.max_visit_init
+    num_considered_actions = mcts_config.num_considered_actions
 
-    c_scale, c_visit = mcts.value_scale, mcts.max_visit_init
-    num_considered_actions = mcts.num_considered_actions
-    parent_frontier = zeros(Int16, mcts.device, 2, B)
-
-    Devices.foreach(1:B, mcts.device) do bid
+    parent_frontier = zeros(Int16, mcts_config.device, 2, batch_size(tree))
+    Devices.foreach(1:batch_size(tree), mcts_config.device) do bid
         aid = gumbel_select_root_action(
             c_scale,
             c_visit,
@@ -858,13 +969,13 @@ function gumbel_select(mcts, tree, simnum, gumbel, considered_visits_table)
             gumbel,
             considered_visits_table,
             simnum - ROOT,
-            tree_size,
+            num_actions
         )
         @assert aid != NO_ACTION
 
         cnid = tree.children[aid, ROOT, bid]
         new_frontier = if (cnid != UNVISITED)
-            select(c_scale, c_visit, tree, bid, tree_size; start=cnid)
+            gumbel_search(c_scale, c_visit, tree, bid, num_actions; start=cnid)
         else
             (ROOT, aid)
         end
@@ -872,6 +983,7 @@ function gumbel_select(mcts, tree, simnum, gumbel, considered_visits_table)
         @inbounds parent_frontier[ACTION, bid] = new_frontier[ACTION]
         return nothing
     end
+
     return parent_frontier
 end
 
@@ -880,7 +992,7 @@ end
         tree,
         bid,
         considered_visits,
-        tree_size::Tuple{Val{A}, Any, Any}
+        num_actions::Val{A}
     ) where {A}
 
 Returns the penalty that will be applied to ROOT actions depending on their visit count.
@@ -891,9 +1003,9 @@ function get_penalty(
     tree,
     bid,
     considered_visits,
-    tree_size::Tuple{Val{A}, Any, Any}
+    num_actions::Val{A}
 ) where {A}
-    num_visits = get_num_child_visits(tree, ROOT, bid, tree_size)
+    num_visits = get_num_child_visits(tree, ROOT, bid, num_actions)
     penalty = imap(action -> (num_visits[action] == considered_visits) ? 0f0 : -Inf32, 1:A)
     return SVector{A}(penalty)
 end
@@ -905,15 +1017,15 @@ end
         bid,
         considered_visits_table,
         target_child_visits,
-        tree_size::Tuple{Val{A}, Any, Any}
+        num_actions::Val{A}
     ) where {A}
 
 Computes penalty for actions that do not comply with the constraint on the number of visits.
 
 More precisely, if an action does not respect this constraint, it will have a penalty of
-`-Inf32` on its computed score before applying the argmax. This ultimately blocks this action
-from being selected if at least another action has not been penalized (which should be the
-case).
+`-Inf32` on its computed score before applying the argmax. This ultimately blocks
+this action from being selected if at least another action has not been penalized
+(which should be the case).
 
 Actions that comply with the constraint on the number of visits have no penalty (i.e. a
 penalty of `0`)
@@ -924,12 +1036,12 @@ function compute_penalty(
     bid,
     considered_visits_table,
     target_child_visits,
-    tree_size::Tuple{Val{A}, Any, Any}
+    num_actions::Val{A}
 ) where {A}
     num_valid_actions = sum(aid -> tree.valid_actions[aid, ROOT, bid], 1:A; init=NO_ACTION)
     num_considered_actions = min(num_considered_actions, num_valid_actions)
     considered_visits = considered_visits_table[num_considered_actions][target_child_visits]
-    return get_penalty(tree, bid, considered_visits, tree_size)
+    return get_penalty(tree, bid, considered_visits, num_actions)
 end
 
 """
@@ -942,10 +1054,10 @@ end
         gumbel,
         considered_visits_table,
         target_child_visits,
-        tree_size::Tuple{Val{A}, Any, Any}
+        num_actions::Val{A}
     ) where {A}
 
-Gumbel's variation of `select_action` for root node only.
+Gumbel's variation of `gumbel_select_action()` for the root node only.
 
 The only difference lies in the use of `gumbel` noise in the computation of the scores
 before applying the argmax and the additional constraints on the number of visits.
@@ -959,18 +1071,18 @@ function gumbel_select_root_action(
     gumbel,
     considered_visits_table,
     target_child_visits,
-    tree_size::Tuple{Val{A}, Any, Any}
+    num_actions::Val{A}
 ) where {A}
     # gumbel random variables: g(a)
     g = SVector{A}(imap(aid -> gumbel[aid, bid], 1:A))
 
     # get logits and σ(completedQ)
     logits = SVector{A}(imap(aid -> tree.logit_prior[aid, ROOT, bid], 1:A))
-    σ_q = transformed_qvalues(c_scale, c_visit, tree, ROOT, bid, tree_size)
+    σ_q = transformed_qvalues(c_scale, c_visit, tree, ROOT, bid, num_actions)
 
     # -∞ penalty to mask out actions not in `argtop(g(a) + logits + σ(completedQ), m)`
     penalty = compute_penalty(num_considered_actions, tree, bid, considered_visits_table,
-                              target_child_visits, tree_size)
+                              target_child_visits, num_actions)
 
     # select next action `A_{n+1}` to simulate as the argmax of:
     #   A_{top(m)} = argtop(g(a) + logits + σ(completedQ), m)
@@ -986,7 +1098,7 @@ end
         tree,
         bid,
         gumbel,
-        tree_size::Tuple{Val{A}, Any, Any}
+        num_actions::Val{A}
     ) where {A}
 
 A function that returns the action to play in the environment after `gumbel_explore()`
@@ -999,19 +1111,19 @@ function gumbel_mcts_action(
     tree,
     bid,
     gumbel,
-    tree_size::Tuple{Val{A}, Any, Any}
+    num_actions::Val{A}
 ) where {A}
     # gumbel random variables: g(a)
     g = SVector{A}(imap(aid -> gumbel[aid, bid], 1:A))
 
     # get logits and σ(completedQ)
     logits = SVector{A}(imap(aid -> tree.logit_prior[aid, ROOT, bid], 1:A))
-    σ_q = transformed_qvalues(c_scale, c_visit, tree, ROOT, bid, tree_size)
+    σ_q = transformed_qvalues(c_scale, c_visit, tree, ROOT, bid, num_actions)
 
     # -∞ penalty to mask out actions with a visit count less than the highest
-    children_visit_counts = get_num_child_visits(tree, ROOT, bid, tree_size)
+    children_visit_counts = get_num_child_visits(tree, ROOT, bid, num_actions)
     considered_visits = maximum(children_visit_counts; init=UNVISITED)
-    penalty = get_penalty(tree, bid, considered_visits, tree_size)
+    penalty = get_penalty(tree, bid, considered_visits, num_actions)
 
     # select next action `A_{n+1}` to play in the environment
     #   A_{top(m)} = argtop(g(a) + logits + σ(completedQ), m)
@@ -1021,42 +1133,105 @@ function gumbel_mcts_action(
 end
 
 """
-    gumbel_policy(tree, mcts, gumbel)
+    gumbel_policy(tree, mcts_config, gumbel)
 
-Returns an array of size (num_action,) containing the resulting actions selected
+Returns an array of size (num_envs,) containing the resulting actions selected
 by the sequential halving procedure with gumbel for each environment. This function should
 be used after `gumbel_explore()` has been run.
 """
-function gumbel_policy(tree, mcts, gumbel)
-    (; A, N, B) = size(tree)
-    tree_size = (Val(A), Val(N), Val(B))
-    c_scale, c_visit = mcts.value_scale, mcts.max_visit_init
+function gumbel_policy(tree, mcts_config, gumbel)
+    num_actions = Val(n_actions(tree))
+    c_scale, c_visit = mcts_config.value_scale, mcts_config.max_visit_init
 
-    actions = zeros(Int16, mcts.device, B)
-    Devices.foreach(1:B, mcts.device) do bid
-        actions[bid] = gumbel_mcts_action(c_scale, c_visit, tree, bid, gumbel, tree_size)
+    actions = zeros(Int16, mcts_config.device, batch_size(tree))
+    Devices.foreach(1:batch_size(tree), mcts_config.device) do bid
+        actions[bid] = gumbel_mcts_action(c_scale, c_visit, tree, bid, gumbel, num_actions)
     end
 
     return actions
 end
 
 """
-    evaluation_policy(tree, mcts)
+    alphazero_policy(tree, mcts_config, rng::AbstractRNG)
 
-Returns an array of size (num_actions,) containing the actions with the highest visit
+Returns an array of size (num_envs,) containing the actions selected by the
+AlphaGoZero/AlphaZero action selection algorithm for each environment. This function
+should be used after `alphazero_explore()` has been run.
+"""
+function alphazero_policy(tree, mcts_config, current_steps, rng::AbstractRNG)
+    num_actions = Val(n_actions(tree))
+    τ = mcts_config.tau
+    deterministic_move_idx = mcts_config.collapse_tau_move
+    probs = DeviceArray(mcts_config.device)(rand(rng, Float32, batch_size(tree)))
+
+    actions = zeros(Int16, mcts_config.device, batch_size(tree))
+    Devices.foreach(1:batch_size(tree), mcts_config.device) do bid
+        children_visit_counts = get_num_child_visits(tree, ROOT, bid, num_actions)
+        if current_steps[bid] >= deterministic_move_idx || τ == 0f0
+            actions[bid] = Int16(argmax(children_visit_counts; init=(NO_ACTION, UNVISITED)))
+        else
+            tau_visits = children_visit_counts .^ (1 / τ)
+            tau_total_visits = sum(tau_visits; init=UNVISITED)
+            policy = tau_visits / tau_total_visits
+            actions[bid] = categorical_sample(policy, probs[bid])
+        end
+    end
+
+    return actions
+end
+
+"""
+    evaluation_policy(tree, mcts_config)
+
+Returns an array of size (num_envs,) containing the actions with the highest visit
 count for each environment. This function should be used after `explore()` has been run.
 """
-function evaluation_policy(tree, mcts)
-    (; A, N, B) = size(tree)
-    tree_size = (Val(A), Val(N), Val(B))
+function evaluation_policy(tree, mcts_config)
+    num_actions = Val(n_actions(tree))
 
-    actions = zeros(Int16, mcts.device, B)
-    Devices.foreach(1:B, mcts.device) do bid
-        children_visit_counts = get_num_child_visits(tree, ROOT, bid, tree_size)
+    actions = zeros(Int16, mcts_config.device, batch_size(tree))
+    Devices.foreach(1:batch_size(tree), mcts_config.device) do bid
+        children_visit_counts = get_num_child_visits(tree, ROOT, bid, num_actions)
         actions[bid] = Int16(argmax(children_visit_counts; init=(NO_ACTION, UNVISITED)))
     end
 
     return actions
+end
+
+"""
+    get_root_children_visits(tree, mcts_config)
+
+Returns an array of size (num_actions, num_envs) containing the number of visits for
+each action at the root node for each environment. This function should be used after
+`gumbel_explore()` or `explore()` has been run.
+"""
+function get_root_children_visits(tree, mcts_config)
+    num_actions = Val(n_actions(tree))
+
+    visits = zeros(Int16, mcts_config.device, (n_actions(tree), batch_size(tree)))
+    Devices.foreach(1:batch_size(tree), mcts_config.device) do bid
+        visits[:, bid] .= get_num_child_visits(tree, ROOT, bid, num_actions)
+    end
+
+    return visits
+end
+
+"""
+    get_completed_qvalues(tree, mcts_config)
+
+Returns an array of size (num_actions, num_envs) containing the completed qvalues
+for each action at the root node for each environment. This function should be used after
+`gumbel_explore()` or `explore()` has been run.
+"""
+function get_completed_qvalues(tree, mcts_config)
+    num_actions = Val(n_actions(tree))
+
+    qvalues = zeros(Float32, mcts_config.device, (n_actions(tree), batch_size(tree)))
+    Devices.foreach(1:batch_size(tree), mcts_config.device) do bid
+        qvalues[:, bid] .= completed_qvalues(tree, ROOT, bid, num_actions)
+    end
+
+    return qvalues
 end
 
 end

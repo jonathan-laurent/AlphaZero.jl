@@ -1,321 +1,187 @@
 module BatchedMctsUtilities
 
-using ..Util.Devices
-
 using Base: @kwdef
 using StaticArrays
+
 import Base.Iterators.map as imap
 
-export EnvOracle, Policy
-export check_oracle, get_considered_visits_table
+using ..BatchedEnvs
+using ..Util.Devices
+
+
+export EnvOracle
+export GumbelMctsConfig, AlphaZeroMctsConfig, is_gumbel_mcts_config
+export get_valid_actions
+
 
 # # Environment Oracle
 
 """
-    EnvOracle(; init_fn, transition_fn)
+    EnvOracle{I <: Function, T <: Function}(; init_fn, transition_fn)
 
-An environment oracle is defined by two functions: `init_fn` and `transition_fn`. These
-functions operate on batches of states directly, enabling efficient parallelization on GPU,
-CPU or both.
+The `EnvOracle` struct serves as an abstraction layer that encapsulates environment
+dynamics for Monte Carlo Tree Search (MCTS) procedures. It is specifically engineered to
+facilitate batch operations conducive for parallel computations across multiple
+computational units, such as GPUs and CPUs.
 
-# The `init_fn` function
+## Fields
 
-`init_fn` takes a vector of environment objects as an argument. Environment objects are of
-the same type as those passed to the `explore` and `gumbel_explore` functions. The
-`init_fn` function returns a named-tuple of same-size arrays with the following fields:
+- `init_fn::I`: Function for environment initialization.
+- `transition_fn::T`: Function for state transition given actions.
 
-- `internal_states`: internal representations of the environment states as used by MCTS and
-   manipulated by `transition_fn`. `internal_states` must be a single or multi-dimensional
-   array whose last dimension is a batch dimension (see examples below). `internal_states`
-   must be `isbits` if it is desired to run `BatchedMcts` on `GPU`.
-- `valid_actions`: a vector of booleans with dimensions `num_actions` and `batch_id`
-   indicating which actions are valid to take (this is disregarded in MuZero).
--  `logit_prior`: the logits of the policy prior for each state as an
-   `AbstractArray{Float32,2}` with dimensions `num_actions` and `batch_id`. The logits
-   should be unnormalized and can be computed from the policy prior using the softmax
-   function. An action with `logit_prior` of `-Inf` corresponds to the worst possible one
-   or an illegal action. On the other side, a value of `0` is associated with a winning
-   action.
-- `policy_prior`: the policy prior for each state as an `AbstractArray{Float32,2}` with
-   dimensions `num_actions` and `batch_id` and value within [0, 1]. An action with
-   `policy_prior` of `0` corresponds to the worst possible one or an illegal action. On the
-   other side, a value of `1` is associated with a winning action.
-- `value_prior`: the value prior for each state as an `AbstractVector{Float32}` and value
-   within [-1, 1]. In the same way than `policy_prior`, -1 and 1 respectively correspond to
-   a bad and a good position.
+### init_fn
 
-# The `transition_fn` function
+The `init_fn` function receives an array of environment objects and returns a
+NamedTuple with the following fields:
 
-`transition_fn` takes as arguments a vector of internal states (as returned by `init_fn`)
-along with a vector of action ids. Action ids consist in integers between 1 and
-`num_actions` and are valid indices for `policy_prior` and `value_prior`.
+- `internal_states`: An array-like data structure that encapsulates the internal state
+   representation, optimized for the MCTS algorithm and compatible with the `transition_fn`.
+   For AlphaZero it should be the environments themselves, for MuZero it can be state
+   representations.
+- `valid_actions`: A Boolean array with dimensions `(num_actions, num_envs)`, denoting the
+   admissibility of actions in each state.
+- `logit_prior`: An `AbstractArray{Float32,2}` with dimensions `(num_actions, num_envs)`.
+   Represents the unnormalized logarithm of action probabilities.
+- `policy_prior`: A probability array with dimensions `(num_actions, num_envs)`, denoting
+   the prior belief over actions.
+- `value_prior`: An `AbstractVector{Float32}` containing prior values for states with
+   dimensions `(num_envs,)`. In most environments, it's advised to constrain the values
+   within `[-1, 1]`.
 
-Note that `init_fn` will always receive the same array as the one passed to `explore` or
-`gumbel_explore` as `envs` (which should be a CPU `Array`). But it's a bit more tricky for
-`transition_fn`. It may receive both CPU `Array` or GPU `CuArray` depending on the device
-specified in `Policy`. To handle both more easily look at `Util.Devices` and how it
-is used in `UniformTicTacToeEnvOracle`.
+### transition_fn
 
-In the context of a `Policy` on the GPU, `transition_fn` can both return a CPU `Array` or a
-GPU `CuArray`. The `CuArray` is more adapted as it will prevent memory transfers, but both
-works.
+The `transition_fn` function takes an array of internal states and an array of action
+identifiers as inputs and returns a NamedTuple consisting of:
 
-The `transition_fn` function returns a named-tuple of arrays:
+- `internal_states`: New environments (AlphaZero) or updated state representations (MuZero).
+- `rewards`: An array of `Float32` indicating the immediate rewards resultant from the
+   transitions. Dimensions: `(num_envs,)`.
+- `terminal`: A Boolean array signifying whether the resultant states are terminal.
+   Dimensions: `(num_envs,)`.
+- `player_switched`: A Boolean array indicating if the player has changed during the
+   transition. Dimensions: `(num_envs,)`.
+- `valid_actions`, `logit_prior`, `policy_prior`, `value_prior`: Similar to `init_fn`,
+   with the difference that these fields are now computed for the new states. Note that
+   these values will be disregarded if the new states are terminal states.
 
-- `internal_states`: new states reached after executing the proposed actions (see
-   `init_fn`).
-- `rewards`: vector of `Float32` indicating the intermediate rewards collected during the
-   transitions.
-- `terminal`: vector of booleans indicating whether or not the reached states are terminal
-   (this is always `false` in MuZero).
-- `player_switched`: vector of booleans indicating whether or not the current player
-   switched during the transition (always `true` in many board games).
-- `valid_actions`, `logit_prior`, `policy_prior`, `value_prior`: same as for `init_fn`.
+### Constraints
 
+- All arrays must be of type `isbits` to ensure GPU compatibility.
+- Last dimension of all arrays should correspond to the batch dimension `(num_envs)`.
 
-# Examples of internal state encodings
+## Constraints on Computational Backends
 
-- When using AlphaZero on board games such as tictactoe, connect-four, Chess or Go, internal
-  states are exact state encodings (since AlphaZero can access an exact simulator). The
-  `internal_states` field can be made to have type `AbstractArray{Float32, 4}` with
-  dimensions `player_channel`, `board_width`, `board_height` and `batch_id`. Alternatively,
-  one can use a one-dimensional vector with element type `State` where
-  `Base.isbitstype(State)`. The latter representation may be easier to work with when
-  broadcasting non-batched environment implementations on GPU (see
-  `Tests.Common.BitwiseTicTacToe.BitwiseTicTacToe` for example).
-- When using MuZero, the `internal_states` field typically has the type
-  `AbstractArray{Float32, 2}` where the first dimension corresponds to the size of
-  latent states and the second dimension is the batch dimension.
+- Depending on the device specified in the `MctsConfig`, `init_fn` and `transition_fn` can
+  receive either a CPU-based array (`Array`) or a GPU-based array (`CuArray`).
 
-See also [`check_oracle`](@ref), [`UniformTicTacToeEnvOracle`](@ref)
+## Examples of Internal State Encodings
+
+- In AlphaZero the `internal_states` field should be the of the same type as the `envs`
+  argument. That is, a batch of environments structures.
+- In MuZero, the `internal_states` field should be of the type `AbstractArray{Float32, N}`,
+  where the first (N-1) dimensions represent the latent state, and the last dimension
+  corresponds to the batch dimension `(num_envs)`.
 """
 @kwdef struct EnvOracle{I <: Function, T <: Function}
     init_fn::I
     transition_fn::T
 end
 
-"""
-    check_keys(keys, ref_keys)
+# # MCTS Configurations definitions
 
-Check that the two lists of symbols, `keys` and `ref_keys`, are identical.
-
-Small utilities used  in `check_oracle` to compare keys of named-tuple.
-"""
-function check_keys(keys, ref_keys)
-    return Set(keys) == Set(ref_keys)
-end
+"""Abstract type of a MCTS configuration."""
+abstract type AbstractMctsConfig end
 
 """
-    check_oracle(::EnvOracle, env)
-
-Perform some sanity checks to see if an environment oracle is correctly specified on a
-given environment instance.
-
-A list of environments `envs` must be specified, along with the `EnvOracle` to check.
-
-Return `nothing` if no problems are detected. Otherwise, helpful error messages are raised.
-More precisely, `check_oracle` verifies the keys of the returned named-tuples from `init_fn`
-a `transition_fn` and the types and dimensions of their lists.
-
-See also [`EnvOracle`](@ref)
-"""
-function check_oracle(oracle::EnvOracle, envs)
-    B = length(envs)
-
-    init_res = oracle.init_fn(envs)
-    # Named-tuple check
-    @assert check_keys(
-        keys(init_res),
-        (:internal_states, :valid_actions, :logit_prior, :policy_prior, :value_prior)
-    ) "The `EnvOracle`'s `init_fn()` function should returned a named-tuple with the " *
-        "following fields: internal_states, valid_actions, logit_prior, policy_prior, " *
-        "value_prior."
-
-    # Type and dimensions check
-    size_valid_actions = size(init_res.valid_actions)
-    A, _ = size_valid_actions
-    @assert (size_valid_actions == (A, B) && eltype(init_res.valid_actions) == Bool)
-        "The `init_fn()` function should return a `valid_actions` array of size " *
-        "(num_actions, num_envs), and of type `Bool`."
-    size_logit_prior = size(init_res.logit_prior)
-    size_policy_prior = size(init_res.policy_prior)
-    @assert size_logit_prior == size_policy_prior "The `init_fn()` function should " *
-        "return a `logit_prior` array with the same dimensions as `policy_prior`."
-    @assert (size_logit_prior == (A, B) && eltype(init_res.logit_prior) == Float32)
-        "The `init_fn()` function should return a `logit_prior` array of size " *
-        "(num_actions, num_envs), and of type `Float32`."
-    @assert (size_policy_prior == (A, B) && eltype(init_res.policy_prior) == Float32) "" *
-        "The `init_fn()` function should return a `policy_prior` array of size " *
-        "(num_actions, num_envs), and of type `Float32`."
-    length_value_prior = length(init_res.value_prior)
-    @assert (length_value_prior == B && eltype(init_res.value_prior) == Float32) "The " *
-        "`init_fn()` function should return a `value_policy` vector of length " *
-        "(num_envs,), and of type `Float32`."
-
-    aids = [
-        findfirst(init_res.valid_actions[:, bid]) for
-        bid in 1:B if any(init_res.valid_actions[:, bid])
-    ]
-    envs = [env for (bid, env) in enumerate(envs) if any(init_res.valid_actions[:, bid])]
-
-    transition_res = oracle.transition_fn(envs, aids)
-    # Named-tuple check
-    @assert check_keys(
-        keys(transition_res),
-        (
-            :internal_states,
-            :rewards,
-            :terminal,
-            :valid_actions,
-            :player_switched,
-            :logit_prior,
-            :policy_prior,
-            :value_prior,
-        ),
-    ) "The `EnvOracle`'s `transition_fn()` function should returned a named-tuple with " *
-        "the following fields: internal_states, rewards, terminal, valid_actions, " *
-        "player_switched, logit_prior, policy_prior, value_prior."
-
-    # Type and dimensions check
-    @assert (
-        length(transition_res.rewards) == B && eltype(transition_res.rewards) == Float32
-    ) "The `transition_fn()` function should return a `rewards` vector of length " *
-        "(num_envs,), and of type `Float32`."
-    @assert (
-        length(transition_res.terminal) == B && eltype(transition_res.terminal) == Bool
-    ) "The `transition_fn()` function should return a `terminal` vector of length " *
-        "(num_envs,), and of type `Bool`."
-    size_valid_actions = size(transition_res.valid_actions)
-    @assert (size_valid_actions == (A, B) && eltype(transition_res.valid_actions) == Bool)
-        "The `transition_fn()` function should return a `valid_actions` array of " *
-        "size (num_actions, num_envs), and of type `Bool`."
-    @assert (
-        length(transition_res.player_switched) == B &&
-        eltype(transition_res.player_switched) == Bool
-    ) "The `transition_fn()` function should return a `player_switched` vector of " *
-        "length (num_envs,), and of type `Bool`."
-    size_logit_prior = size(transition_res.logit_prior)
-    size_policy_prior = size(transition_res.policy_prior)
-    @assert size_logit_prior == size_policy_prior "The `transition_fn()` function should " *
-        "return a `logit_prior` array with the same dimensions as `policy_prior`."
-    @assert (size_logit_prior == (A, B) && eltype(transition_res.logit_prior) == Float32)
-        "The `transition_fn()` function should return a `logit_prior` array of " *
-        "size (num_actions, num_envs), and of type `Float32`."
-    @assert (size_policy_prior == (A, B) && eltype(transition_res.policy_prior) == Float32)
-        "The `transition_fn()` function should return a `policy_prior` array of " *
-        "size (num_actions, num_envs), and of type `Float32`."
-    @assert (
-        length(transition_res.value_prior) == B &&
-        eltype(transition_res.value_prior) == Float32
-    ) "The `transition_fn()` function should return a `value_policy` vector of length " *
-        "(num_envs,), and of type `Float32`."
-
-    return nothing
-end
-
-
-# # Policy definition
-
-"""
-    Policy{Device, Oracle<:EnvOracle}(;
+    struct GumbelMctsConfig{Device, Oracle <: EnvOracle} <: AbstractMctsConfig
         device::Device
         oracle::Oracle
-        num_simulations::Int = 64
+        num_simulations::Int
         num_considered_actions::Int = 8
         value_scale::Float32 = 0.1f0
         max_visit_init::Int = 50
-    )
+    end
 
-A batch, device-specific MCTS Policy that leverages an external `EnvOracle`.
-
+A batch, device-specific Gumbel MCTS MctsConfig that leverages an external `EnvOracle`.
 
 # Keyword Arguments
 
-- `device::Device`: device on which the policy should preferably run (i.e. `CPU` or `GPU`).
-- `oracle::Oracle`: environment oracle handling the environment simulation and the state
+- `device::Device`: Device on which the policy should preferably run (i.e. `CPU` or `GPU`).
+- `oracle::Oracle`: Environment oracle handling the environment simulation and the state
    evaluation.
-- `num_simulations::Int = 64`: number of simulations to run on the given Mcts `Tree`.
-- `num_considered_actions::Int = 8`: number of actions considered by Gumbel during
+- `num_simulations::Int`: Number of simulations to run on the given MCTS `Tree`.
+- `num_considered_actions::Int = 8`: Number of actions considered by Gumbel during
    exploration. Only the `num_considered_actions` actions with the highest scores will be
    explored. It should preferably be a power of 2.
-- `value_scale::Float32 = 0.1f0`: multiplying coefficient to weight the qvalues against the
-   prior probabilities during exploration. Prior probabilities have, by default, a
-   decreasing weight when the number of visits increases.
-- `max_visit_init::Int = 50`: artificial increase of the number of visits to weight qvalue
-   against prior probabilities on low visit count.
-
-# Notes
-
-The attributes `num_considered_actions`, `value_scale` and `max_visit_init` are specific to
-the Gumbel implementation.
+- `value_scale::Float32 = 0.1f0`: `c_scale` parameter described in the Gumbel MCTS paper.
+- `max_visit_init::Int = 50`: `c_visit` parameter described in the Gumbel MCTS paper.
 """
-@kwdef struct Policy{Device, Oracle <: EnvOracle}
+@kwdef struct GumbelMctsConfig{Device, Oracle <: EnvOracle} <: AbstractMctsConfig
     device::Device
     oracle::Oracle
-    num_simulations::Int = 64
+    num_simulations::Int
     num_considered_actions::Int = 8
     value_scale::Float32 = 0.1f0
     max_visit_init::Int = 50
 end
 
-# # Gumbel exploration utilities
-
 """
-    get_considered_visits_table(num_simulations, num_actions)
-
-Return a table containing the precomputed sequence of visits for each number of considered
-actions possible.
-
-Sayed in other words, for a given number of considered actions, this table contains a
-precomputed sequence. This sequence indicates for each simulation a constraint on the number
-of visits (i.e the number of visits that the selected action at the root node should match).
-
-See also [`get_considered_visits_sequence`](@ref)
-"""
-function get_considered_visits_table(num_simulations, num_actions)
-    ret = imap(1:num_actions) do num_considered_actions
-        get_considered_visits_sequence(num_considered_actions, num_simulations)
+    struct AlphaZeroMctsConfig{Device, Oracle <: EnvOracle} <: AbstractMctsConfig
+        device::Device
+        oracle::Oracle
+        num_simulations::Int
+        c_puct::Float32 = 1.5f0
+        alpha_dirichlet::Float32 = 0.15f0
+        epsilon_dirichlet::Float32 = 0.25f0
+        tau::Float32 = 1f0
+        collapse_tau_move::Int = 30
     end
-    return SVector{num_actions}(ret)
+
+A batch, device-specific AlphaZero MCTS MctsConfig that leverages an external `EnvOracle`.
+
+# Keyword Arguments
+
+- `device::Device`: Device on which the policy should preferably run (i.e. `CPU` or `GPU`).
+- `oracle::Oracle`: Environment oracle handling the environment simulation and the state
+   evaluation.
+- `num_simulations::Int`: Number of simulations to run on the given MCTS `Tree`.
+- `c_puct::Float32 = 1.5f0`: `c_puct` parameter described in the AlphaZero MCTS paper.
+- `alpha_dirichlet::Float32 = 0.15f0`: `alpha` parameter of the Dirichlet exploration noise.
+- `epsilon_dirichlet::Float32 = 0.25f0`: `epsilon` weight of the Dirichlet noise.
+- `tau::Float32 = 1f0`: Exploration temperature.
+- `collapse_tau_move::Int = 30`: Number of actions after which the temperature tau is set
+   to 0 in an episode.
+"""
+@kwdef struct AlphaZeroMctsConfig{Device, Oracle <: EnvOracle} <: AbstractMctsConfig
+    device::Device
+    oracle::Oracle
+    num_simulations::Int
+    c_puct::Float32 = 1.5f0
+    alpha_dirichlet::Float32 = 0.15f0
+    epsilon_dirichlet::Float32 = 0.25f0
+    tau::Float32 = 1f0
+    collapse_tau_move::Int = 30
 end
 
+""" Check if a given `AbstractMctsConfig` is a `GumbelMctsConfig`. """
+is_gumbel_mcts_config(::GumbelMctsConfig) = true
+is_gumbel_mcts_config(::AlphaZeroMctsConfig) = false
+
 """
-    get_considered_visits_sequence(max_num_actions, num_simulations)
+    get_valid_actions(envs)
 
-Precompute the Gumbel simulations orchestration.
-
-The Gumbel simulations orchestration is done originally iteratively. At each step, a certain
-number of considered actions is explored. At the end of exploration, the number of
-considered actions is then divided by two. The iterative process is repeated until only two
-actions are considered.
-
-Each step has an equal number of simulations so that the total number of simulations is
-evenly distributed between them. Likewise, at each step, the number of simulations of the
-step is evenly distributed between the most promising considered actions.
-
-This simulation orchestration can be precomputed as in MCTX by saving a sequence
-of the considered number of visits for each simulation. In other words, this sequence
-indicates for each simulation a constraint on the number of visits (i.e the number of
-visits that the selected action at the root node should match)
+Returns an array of valid actions for each environment in `envs`.
+The array has size `(n_actions, n_envs)`, and each entry is 1 if the
+corresponding action is valid, and 0 otherwise.
 """
-function get_considered_visits_sequence(max_num_actions, num_simulations)
-    (max_num_actions <= 1) && return SVector{num_simulations,Int16}(0:(num_simulations - 1))
-
-    num_halving_steps = Int(ceil(log2(max_num_actions)))
-    sequence = Int16[]
-    visits = zeros(Int16, max_num_actions)
-
-    num_actions = max_num_actions
-    while length(sequence) < num_simulations
-        num_extra_visits = max(1, num_simulations ÷ (num_halving_steps * num_actions))
-        for _ in 1:num_extra_visits
-            append!(sequence, visits[1:num_actions])
-            visits[1:num_actions] .+= 1
-        end
-        num_actions = max(2, num_actions ÷ 2)
+function get_valid_actions(envs)
+    device = get_device(envs)
+    num_envs = length(envs)
+    n_actions = BatchedEnvs.num_actions(eltype(envs))
+    valid_ids = DeviceArray(device)(Tuple.(CartesianIndices((n_actions, num_envs))))
+    return map(valid_ids) do (action_id, batch_id)
+        BatchedEnvs.valid_action(envs[batch_id], action_id)
     end
-
-    return SVector{num_simulations}(sequence[1:num_simulations])
 end
 
 end

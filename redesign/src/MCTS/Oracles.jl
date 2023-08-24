@@ -12,24 +12,6 @@ export uniform_env_oracle, neural_network_env_oracle, get_valid_actions
 
 
 """
-    get_valid_actions(envs)
-
-Returns an array of valid actions for each environment in `envs`.
-The array has size `(n_actions, n_envs)`, and each entry is 1 if the
-corresponding action is valid, and 0 otherwise.
-"""
-function get_valid_actions(envs)
-    device = get_device(envs)
-    num_envs = length(envs)
-    n_actions = BatchedEnvs.num_actions(eltype(envs))
-    valid_ids = DeviceArray(device)(Tuple.(CartesianIndices((n_actions, num_envs))))
-    return map(valid_ids) do (action_id, batch_id)
-        BatchedEnvs.valid_action(envs[batch_id], action_id)
-    end
-end
-
-
-"""
     validate_logits(logits, valid_actions)
 
 Adds negative infinity to the logits of invalid actions so that when softmax is
@@ -40,18 +22,16 @@ function validate_logits(logits, valid_actions)
     return logits .+ action_mask
 end
 
-
 """
-    validate_value_prior(value_prior, envs)
+    validate_value_prior!(value_prior, envs)
 
 Sets the value prior to 0 for terminated environments. This is because by definition
 the value function of a terminal state is 0.
 """
-function validate_value_prior(value_prior, envs)
+function validate_value_prior!(value_prior, envs)
     terminated_envs = BatchedEnvs.terminated.(envs)
     value_prior[1, :] = value_prior[1, :] .* .!terminated_envs
 end
-
 
 """
     uniform_env_oracle()
@@ -114,7 +94,6 @@ function uniform_env_oracle()
     return EnvOracle(; init_fn, transition_fn)
 end
 
-
 """
     neural_network_env_oracle(; nn::Net) where Net <: FluxNetwork
 
@@ -141,7 +120,7 @@ function neural_network_env_oracle(; nn::Net) where Net <: FluxNetwork
         valid_actions = get_valid_actions(envs)
         logits = validate_logits(logits, valid_actions)
         policy_prior = Flux.softmax(logits; dims=1)
-        validate_value_prior(value_prior, envs)
+        validate_value_prior!(value_prior, envs)
 
         return (;
             internal_states=envs,
@@ -169,7 +148,7 @@ function neural_network_env_oracle(; nn::Net) where Net <: FluxNetwork
         valid_actions = get_valid_actions(new_envs)
         logits = validate_logits(logits, valid_actions)
         policy_prior = Flux.softmax(logits; dims=1)
-        validate_value_prior(value_prior, new_envs)
+        validate_value_prior!(value_prior, new_envs)
 
         return (;
             internal_states=new_envs,
@@ -185,6 +164,5 @@ function neural_network_env_oracle(; nn::Net) where Net <: FluxNetwork
 
     return EnvOracle(; init_fn, transition_fn)
 end
-
 
 end

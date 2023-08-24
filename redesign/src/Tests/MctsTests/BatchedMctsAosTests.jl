@@ -24,7 +24,6 @@ function run_batched_mcts_aos_tests()
     #     run_batched_mcts_tests_on(CPU())
     #     CUDA.functional() && run_batched_mcts_tests_on(GPU())
     # end
-    return nothing
 end
 
 end

@@ -6,6 +6,8 @@ using Random: MersenneTwister
 using Test
 
 using ...Common.Common
+using ...Common.BitwiseRandomWalk1D
+using ...Common.BitwiseTicTacToe
 using ....BatchedEnvs
 using ....BatchedMcts
 using ....BatchedMctsUtilities
@@ -20,17 +22,20 @@ import ....SimpleMcts
 export run_batched_mcts_tests
 
 
-const MCTS = BatchedMcts
-
+function run_batched_mcts_tests()
+    @testset "Compilation" test_compilation()
+    @testset "Uniform exploration" test_uniform_exploration()
+    @testset "Equivalence with Simple MCTS" test_equivalence_with_uniform_simple_mcts()
+end
 
 function envs_array(constructor, device; n_envs)
     envs = [constructor() for _ in 1:n_envs]
     return DeviceArray(device)(envs)
 end
 
-function get_policy(device, oracle_fn, oracle_kwargs; num_simulations)
+function get_mcts_config(device, oracle_fn, oracle_kwargs; num_simulations)
     oracle = oracle_fn(; oracle_kwargs...)
-    return Policy(; device, oracle=oracle, num_simulations)
+    return GumbelMctsConfig(; device, oracle, num_simulations)
 end
 
 function run_batched_mcts_tests_on(
@@ -42,35 +47,31 @@ function run_batched_mcts_tests_on(
     num_simulations=64
 )
     envs = envs_array(constructor, device; n_envs=n_envs)
-    mcts = get_policy(device, oracle_fn, oracle_kwargs; num_simulations=num_simulations)
-    tree = MCTS.explore(mcts, envs)
-    MCTS.gumbel_explore(mcts, envs, MersenneTwister(0))
+    mcts = get_mcts_config(device, oracle_fn, oracle_kwargs; num_simulations)
+    tree = BatchedMcts.explore(mcts, envs)
+    BatchedMcts.gumbel_explore(mcts, envs, MersenneTwister(0))
     @test true
     return tree
 end
 
-
-function run_batched_mcts_tests()
-    @testset "Compilation" test_compilation()
-    @testset "Uniform exploration" test_uniform_exploration()
-    @testset "Equivalence with Simple MCTS" test_equivalence_with_uniform_simple_mcts()
-end
-
-
 function test_compilation()
-    rw1d_contructor = bitwise_random_walk_winning
-    ttt_constructor = bitwise_tictactoe_winning
+    rw1d_contructor = TestEnvs.bitwise_random_walk_winning
+    ttt_constructor = TestEnvs.bitwise_tictactoe_winning
+
+    rw1d_state_size = BatchedEnvs.state_size(BitwiseRandomWalk1DEnv)
+    rw1d_na = BatchedEnvs.num_actions(BitwiseRandomWalk1DEnv)
+    ttt_state_size = BatchedEnvs.state_size(BitwiseTicTacToeEnv)
+    ttt_na = BatchedEnvs.num_actions(BitwiseTicTacToeEnv)
 
     uniform_kwargs = Dict()
 
     hp = SimpleNetHP(width=128, depth_common=2)
-    rw1d_nn_kwargs_cpu = Dict(:nn => SimpleNet(10, 2, hp))
-    rw1d_nn_kwargs_gpu = Dict(:nn => SimpleNet(10, 2, hp) |> gpu)
-    ttt_nn_kwargs_cpu = Dict(:nn => SimpleNet(27, 9, hp))
-    ttt_nn_kwargs_gpu = Dict(:nn => SimpleNet(27, 9, hp) |> gpu)
 
     @testset "CPU" begin
-        @testset "Single-Player Env: RandomWalk1D" begin
+        rw1d_nn_kwargs_cpu = Dict(:nn => SimpleNet(rw1d_state_size..., rw1d_na, hp))
+        ttt_nn_kwargs_cpu = Dict(:nn => SimpleNet(ttt_state_size..., ttt_na, hp))
+
+        @testset "Single-Player Env: BitwiseRandomWalk1D" begin
             run_batched_mcts_tests_on(
                 CPU(), rw1d_contructor, uniform_env_oracle, uniform_kwargs
             )
@@ -78,7 +79,7 @@ function test_compilation()
                 CPU(), rw1d_contructor, neural_network_env_oracle, rw1d_nn_kwargs_cpu
             )
         end
-        @testset "Two-Player Env: TicTacToe" begin
+        @testset "Two-Player Env: BitwiseTicTacToe" begin
             run_batched_mcts_tests_on(
                 CPU(), ttt_constructor, uniform_env_oracle, uniform_kwargs
             )
@@ -89,7 +90,10 @@ function test_compilation()
     end
 
     CUDA.functional() && @testset "GPU" begin
-        @testset "Single-Player Env: RandomWalk1D" begin
+        rw1d_nn_kwargs_gpu = Dict(:nn => SimpleNet(rw1d_state_size..., rw1d_na, hp) |> gpu)
+        ttt_nn_kwargs_gpu = Dict(:nn => SimpleNet(ttt_state_size..., ttt_na, hp) |> gpu)
+
+        @testset "Single-Player Env: BitwiseRandomWalk1D" begin
             run_batched_mcts_tests_on(
                 GPU(), rw1d_contructor, uniform_env_oracle, uniform_kwargs
             )
@@ -97,7 +101,7 @@ function test_compilation()
                 GPU(), rw1d_contructor, neural_network_env_oracle, rw1d_nn_kwargs_gpu
             )
         end
-        @testset "Two-Player Env: TicTacToe" begin
+        @testset "Two-Player Env: BitwiseTicTacToe" begin
             run_batched_mcts_tests_on(
                 GPU(), ttt_constructor, uniform_env_oracle, uniform_kwargs
             )
@@ -108,75 +112,68 @@ function test_compilation()
     end
 end
 
-
 function test_uniform_exploration()
 
-    function test_exploration_correctness(tree, env, env_id)
-        root = 1
-        (; A, N, B) = MCTS.size(tree)
-        tree_size = (Val(A), Val(N), Val(B))
-
-        q_values = MCTS.completed_qvalues(tree, root, env_id, tree_size)
-        @test length(q_values) == length(tree.children[:, root, env_id])
-        @test length(q_values) == BatchedEnvs.num_actions(typeof(env))
+    function test_exploration_correctness(tree, mcts, env_id, envs)
+        q_values = BatchedMcts.get_completed_qvalues(tree, mcts)[:, env_id]
+        @test length(q_values) == length(tree.children[:, BatchedMcts.ROOT, env_id])
+        @test length(q_values) == BatchedEnvs.num_actions(eltype(envs))
 
         device = get_device(tree.policy_prior)
         policy_prior = DeviceArray(device)([0, 0.2, 0.2, 0.2, 0, 0, 0.2, 0.2, 0])
-        @test tree.policy_prior[:, root, env_id] ≈ policy_prior
+        @test tree.policy_prior[:, BatchedMcts.ROOT, env_id] ≈ policy_prior
 
         value_prior = Float32(0)
-        @test tree.value_prior[root, env_id] == value_prior
+        tree_vp_cpu = Array(tree.value_prior)  # convert to CPU to avoid scalar indexing
+        @test tree_vp_cpu[BatchedMcts.ROOT, env_id] == value_prior
 
-        best = argmax(q_values)
+        best = argmax(Array(q_values))  # convert to CPU to avoid scalar indexing
         best_move = 3
         @test best == best_move
     end
 
-    function test_exploration_correctness_all_envs(tree, envs)
-        map(enumerate(envs)) do (env_id, env)
-            test_exploration_correctness(tree, env, env_id)
+    function test_exploration_correctness_all_envs(tree, envs, mcts)
+        num_envs = length(envs)
+        map(1:num_envs) do env_id
+            test_exploration_correctness(tree, mcts, env_id, envs)
         end
     end
 
     n_envs = 2
     n = 64
 
-    @testset "Two-Player Env: TicTacToe" begin
+    @testset "Two-Player Env: BitwiseTicTacToe" begin
         @testset "CPU" begin
             device = CPU()
             envs = envs_array(bitwise_tictactoe_winning, device; n_envs=n_envs)
-            mcts = get_policy(device, uniform_env_oracle, Dict(); num_simulations=n)
-            tree = MCTS.explore(mcts, envs)
-            @testset "Correctness" test_exploration_correctness_all_envs(tree, envs)
+            mcts = get_mcts_config(device, uniform_env_oracle, Dict(); num_simulations=n)
+            tree = BatchedMcts.explore(mcts, envs)
+            @testset "Correctness" test_exploration_correctness_all_envs(tree, envs, mcts)
         end
         CUDA.functional() && @testset "GPU" begin
             device = GPU()
             envs = envs_array(bitwise_tictactoe_winning, device; n_envs=n_envs)
-            mcts = get_policy(device, uniform_env_oracle, Dict(); num_simulations=n)
-            tree = MCTS.explore(mcts, envs)
-            @testset "Correctness" test_exploration_correctness_all_envs(tree, envs)
+            mcts = get_mcts_config(device, uniform_env_oracle, Dict(); num_simulations=n)
+            tree = BatchedMcts.explore(mcts, envs)
+            @testset "Correctness" test_exploration_correctness_all_envs(tree, envs, mcts)
         end
     end
 end
 
-
 function test_equivalence_with_uniform_simple_mcts()
     device = GPU()
 
-    simple_mcts_policy = SimpleMctsTests.uniform_mcts_policy(; num_simulations=64)
+    simple_mcts_config = SimpleMctsTests.uniform_mcts_policy(; num_simulations=64)
     simple_mcts_env = tictactoe_winning()
-    simple_mcts_tree = SimpleMcts.explore(simple_mcts_policy, simple_mcts_env)
+    simple_mcts_tree = SimpleMcts.explore(simple_mcts_config, simple_mcts_env)
     sim_qvalues = SimpleMcts.completed_qvalues(simple_mcts_tree)
 
-    batch_mcts_policy = get_policy(device, uniform_env_oracle, Dict(); num_simulations=64)
+    mcts_config = get_mcts_config(device, uniform_env_oracle, Dict(); num_simulations=64)
     batch_mcts_envs = envs_array(bitwise_tictactoe_winning, device; n_envs=2)
-    batch_mcts_tree = MCTS.explore(batch_mcts_policy, batch_mcts_envs)
+    batch_mcts_tree = BatchedMcts.explore(mcts_config, batch_mcts_envs)
 
-    (; A, N, B) = MCTS.size(batch_mcts_tree)
-    tree_size = (Val(A), Val(N), Val(B))
-
-    batch_mcts_qvalues_inf = MCTS.completed_qvalues(batch_mcts_tree, 1, 1, tree_size)
-    batch_mcts_qvalues = [q for q in batch_mcts_qvalues_inf if q != -Inf32]
+    batch_mcts_qvalues_inf = BatchedMcts.get_completed_qvalues(batch_mcts_tree, mcts_config)
+    batch_mcts_qvalues = [q for q in Array(batch_mcts_qvalues_inf)[:, 1] if q != -Inf32]
 
     @test sim_qvalues ≈ batch_mcts_qvalues
 end
