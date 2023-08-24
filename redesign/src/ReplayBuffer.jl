@@ -1,34 +1,10 @@
 module ReplayBuffers
 
 using EllipsisNotation
-using Flux: onehotbatch
+using Flux
 
-using ...Util.Devices
-
-export Sample
 export EpisodeBuffer, save!, empty_env_in_buffer!, compute_value_functions!
 export ReplayBuffer, add!, to_array
-
-
-"""
-    Sample
-
-A single sample of data from the environment.
-"""
-mutable struct Sample{NumStateDims}
-    state::Array{Float32, NumStateDims}
-    action::Int16
-    reward::Float32
-    switched::Bool
-end
-
-function Sample(state_size::Tuple)
-    state = zeros(Float32, state_size...)
-    action = 0
-    reward = 0.0
-    switched = false
-    return Sample{length(state_size)}(state, action, reward, switched)
-end
 
 
 """
@@ -38,46 +14,80 @@ Buffer saving all training-related information episode-data of parallel environm
 Data will be saved in the form of Vectors on the CPU to avoid filling the GPU memory,
 as it's needed to fit as many parralel environments as possible.
 """
-struct EpisodeBuffer
-    num_envs::Int
-    samples::Vector{Vector{Sample}}
+mutable struct EpisodeBuffer
+    states::Array{Float32}
+    actions::Array{Int16}
+    rewards::Array{Float32}
+    switches::Array{Bool}
+    ep_lengths::Array{Int}
 end
 
-Base.getindex(ep_buff::EpisodeBuffer, env_id::Int) = ep_buff.samples[env_id]
+state_dim(ep_buff::EpisodeBuffer) = size(ep_buff.states)[1:(end - 2)]
+horizon(ep_buff::EpisodeBuffer) = size(ep_buff.states)[end - 1]
+num_envs(ep_buff::EpisodeBuffer) = size(ep_buff.states)[end]
 
-function EpisodeBuffer(num_envs::Int)
-    samples = [Vector{Sample}([]) for _ in 1:num_envs]
-    return EpisodeBuffer(num_envs, samples)
+function EpisodeBuffer(num_envs::Int, state_size::Tuple, initial_horizon::Int = 10)
+    states = zeros(Float32, state_size..., initial_horizon, num_envs)
+    actions = zeros(Int16, initial_horizon, num_envs)
+    rewards = zeros(Float32, initial_horizon, num_envs)
+    switches = zeros(Bool, initial_horizon, num_envs)
+    ep_lengths = zeros(Int, num_envs)
+
+    return EpisodeBuffer(states, actions, rewards, switches, ep_lengths)
 end
 
-function save!(ep_buff, states, actions, rewards, switches)
-    states = copy_to_CPU(states)
-    actions = copy_to_CPU(actions)
-    rewards = copy_to_CPU(rewards)
+function _increase_horizon(ep_buff)
+    current_horizon = horizon(ep_buff)
+    new_horizon = 2current_horizon
 
-    map(1:ep_buff.num_envs) do env_id
-        sample = Sample(
-            Array(states[env_id]),
-            actions[env_id],
-            rewards[env_id],
-            switches[env_id]
-        )
-        push!(ep_buff.samples[env_id], sample)
+    new_states = zeros(Float32, state_dim(ep_buff)..., new_horizon, num_envs(ep_buff))
+    new_states[.., 1:current_horizon, :] .= ep_buff.states[.., 1:current_horizon, :]
+
+    new_actions = zeros(Int16, new_horizon, num_envs(ep_buff))
+    new_actions[1:current_horizon, :] .= ep_buff.actions[1:current_horizon, :]
+
+    new_rewards = zeros(Float32, new_horizon, num_envs(ep_buff))
+    new_rewards[1:current_horizon, :] .= ep_buff.rewards[1:current_horizon, :]
+
+    new_switches = zeros(Bool, new_horizon, num_envs(ep_buff))
+    new_switches[1:current_horizon, :] .= ep_buff.switches[1:current_horizon, :]
+
+    ep_buff.states = new_states
+    ep_buff.actions = new_actions
+    ep_buff.rewards = new_rewards
+    ep_buff.switches = new_switches
+end
+
+function save!(ep_buff, states::AbstractVector, actions, rewards, switches)
+    # if the buffer is full, increase the horizon
+    (maximum(ep_buff.ep_lengths) == horizon(ep_buff)) && _increase_horizon(ep_buff)
+
+    # transfer data to CPU
+    states, actions, rewards, switches = map(Array, (states, actions, rewards, switches))
+
+    # save data
+    ep_buff.ep_lengths .+= 1
+    map(1:num_envs(ep_buff)) do env_id
+        save_index = ep_buff.ep_lengths[env_id]
+        ep_buff.states[.., save_index, env_id] .= states[env_id]
+        ep_buff.actions[save_index, env_id] = actions[env_id]
+        ep_buff.rewards[save_index, env_id] = rewards[env_id]
+        ep_buff.switches[save_index, env_id] = switches[env_id]
     end
 end
 
 function compute_value_functions!(ep_buff, env_id, γ)
-    end_index = length(ep_buff[env_id])
+    end_index = ep_buff.ep_lengths[env_id]
     reward_to_go = 0
     for idx in end_index:-1:1
-        reward_to_go = γ * reward_to_go + ep_buff[env_id][idx].reward
-        ep_buff[env_id][idx].reward = reward_to_go
-        ep_buff[env_id][idx].switched && (reward_to_go = -reward_to_go)
+        reward_to_go = γ * reward_to_go + ep_buff.rewards[idx, env_id]
+        ep_buff.rewards[idx, env_id] = reward_to_go
+        ep_buff.switches[idx, env_id] && (reward_to_go = -reward_to_go)
     end
 end
 
 function empty_env_in_buffer!(ep_buff::EpisodeBuffer, env_id)
-    ep_buff.samples[env_id] = Vector{Sample}([])
+    ep_buff.ep_lengths[env_id] = 0
 end
 
 
@@ -86,129 +96,71 @@ end
 
 Replay Buffer used to save all training-related data of terminated episodes.
 """
-struct ReplayBuffer
-    num_envs::Int
-    max_steps::Int
-    state_size::Tuple
+mutable struct ReplayBuffer
+    max_size::Int
     num_actions::Int
-    states::Vector{Vector{Array{Float32}}}
-    actions::Vector{Vector{Int16}}
-    rewards::Vector{Vector{Float32}}
-    most_recent_idx::Vector{Int}
+    states::Array{Float32}
+    actions::Array{Int16}
+    values::Array{Float32}
+    current_size::Int
+    most_recent_pos::Int
 end
 
-function ReplayBuffer(
-    num_envs::Int,
-    max_steps_per_env::Int,
-    state_size::Tuple,
-    num_actions::Int
-)
-    states = [Vector{Array{Float32, length(state_size)}}([]) for _ in 1:num_envs]
-    actions = [Vector{Int16}([]) for _ in 1:num_envs]
-    rewards = [Vector{Float32}([]) for _ in 1:num_envs]
-    most_recent_idx = zeros(Int, num_envs)
-    return ReplayBuffer(num_envs, max_steps_per_env, state_size, num_actions,
-                        states, actions, rewards, most_recent_idx)
+function ReplayBuffer(max_size::Int, state_size::Tuple, num_actions::Int)
+    states = zeros(Float32, state_size..., max_size)
+    actions = zeros(Int16, max_size)
+    values = zeros(Float32, 1, max_size)
+    return ReplayBuffer(max_size, num_actions, states, actions, values, 0, 0)
 end
 
-function Base.length(rp_buff::ReplayBuffer)
-    return sum(map(env_id -> length(rp_buff.states[env_id]), 1:rp_buff.num_envs))
-end
+Base.length(rp_buff::ReplayBuffer) = rp_buff.current_size
 
-function _append!(rp_buff, ep_buff, ep_range, env_id)
-    append!(rp_buff.states[env_id], map(t -> ep_buff[env_id][t].state, ep_range))
-    append!(rp_buff.actions[env_id], map(t -> ep_buff[env_id][t].action, ep_range))
-    append!(rp_buff.rewards[env_id], map(t -> ep_buff[env_id][t].reward, ep_range))
-end
-
-function _overwrite!(rp_buff, rp_range, ep_buff, ep_range, env_id)
-    rp_buff.states[env_id][rp_range] .= map(t -> ep_buff[env_id][t].state, ep_range)
-    rp_buff.actions[env_id][rp_range] .= map(t -> ep_buff[env_id][t].action, ep_range)
-    rp_buff.rewards[env_id][rp_range] .= map(t -> ep_buff[env_id][t].reward, ep_range)
+function _overwrite!(rp_buff, rp_buff_range, ep_buff, ep_buff_range, env_id)
+    rp_buff.states[.., rp_buff_range] .= ep_buff.states[.., ep_buff_range, env_id]
+    rp_buff.actions[rp_buff_range] .= ep_buff.actions[ep_buff_range, env_id]
+    rp_buff.values[1, rp_buff_range] .= ep_buff.rewards[ep_buff_range, env_id]
 end
 
 function add!(rp_buff::ReplayBuffer, ep_buff::EpisodeBuffer, env_id::Int)
-    current_buffer_len = length(rp_buff.states[env_id])
-    episode_len = length(ep_buff[env_id])
+    episode_len = ep_buff.ep_lengths[env_id]
+    save_pos = rp_buff.most_recent_pos
 
-    # buffer is full, overwrite oldest data
-    if current_buffer_len == rp_buff.max_steps
-        most_recent_idx = rp_buff.most_recent_idx[env_id]
+    # if current episodes exceeds buffer size, overwrite oldest data
+    if save_pos + episode_len > rp_buff.max_size
+        steps_until_max = rp_buff.max_size - save_pos
+        rp_buff_range = (save_pos + 1):rp_buff.max_size
+        ep_buff_range = 1:steps_until_max
+        _overwrite!(rp_buff, rp_buff_range, ep_buff, ep_buff_range, env_id)
 
-        if most_recent_idx + episode_len > rp_buff.max_steps
-            steps_until_max = rp_buff.max_steps - most_recent_idx
-            rp_range = (most_recent_idx + 1):rp_buff.max_steps
-            ep_range = 1:steps_until_max
-            _overwrite!(rp_buff, rp_range, ep_buff, ep_range, env_id)
+        steps_from_start = episode_len - steps_until_max
+        rp_buff_range = 1:steps_from_start
+        ep_buff_range = (steps_until_max + 1):episode_len
+        _overwrite!(rp_buff, rp_buff_range, ep_buff, ep_buff_range, env_id)
 
-            steps_from_start = episode_len - steps_until_max
-            rp_range = 1:steps_from_start
-            ep_range = (steps_until_max + 1):episode_len
-            _overwrite!(rp_buff, rp_range, ep_buff, ep_range, env_id)
+        rp_buff.most_recent_pos = steps_from_start
+        rp_buff.current_size = rp_buff.max_size
 
-            rp_buff.most_recent_idx[env_id] = steps_from_start
-        else
-            most_recent_idx = rp_buff.most_recent_idx[env_id]
-            rp_range = (most_recent_idx + 1):(most_recent_idx + episode_len)
-            ep_range = 1:episode_len
-            _overwrite!(rp_buff, rp_range, ep_buff, ep_range, env_id)
-
-            rp_buff.most_recent_idx[env_id] = most_recent_idx + episode_len
-        end
-
-    # buffer is not full yet, append data
+    # else, current episode can be placed without looping around the buffer
     else
-        if current_buffer_len + episode_len > rp_buff.max_steps
-            steps_until_max = rp_buff.max_steps - current_buffer_len
-            ep_range = 1:steps_until_max
-            _append!(rp_buff, ep_buff, ep_range, env_id)
+        rp_buff_range = (save_pos + 1):(save_pos + episode_len)
+        ep_buff_range = 1:episode_len
+        _overwrite!(rp_buff, rp_buff_range, ep_buff, ep_buff_range, env_id)
 
-            steps_from_start = episode_len - steps_until_max
-            rp_range = 1:steps_from_start
-            ep_range = (steps_until_max + 1):episode_len
-            _overwrite!(rp_buff, rp_range, ep_buff, ep_range, env_id)
-
-            rp_buff.most_recent_idx[env_id] = steps_from_start
-        else
-            ep_range = 1:episode_len
-            _append!(rp_buff, ep_buff, ep_range, env_id)
-
-            rp_buff.most_recent_idx[env_id] = current_buffer_len + episode_len
-        end
+        rp_buff.most_recent_pos += episode_len
+        rp_buff.current_size = min(rp_buff.current_size + episode_len, rp_buff.max_size)
     end
 end
 
-function to_array(rp_buff::ReplayBuffer, device::Device)
-    num_samples = length(rp_buff)
-    cat_dim = length(rp_buff.state_size) + 1
-
-    # put all the states in a single array of size (state_size..., batch)
-    states = zeros(Float32, rp_buff.state_size..., num_samples)
-    actions = zeros(Int16, num_samples)
-    rewards = zeros(Float32, 1, num_samples)
-
-    current_pos = 0
-    for env_id in 1:rp_buff.num_envs
-        env_num_samples = length(rp_buff.states[env_id])
-        (env_num_samples == 0) && continue
-        target_range = (current_pos + 1):(current_pos + env_num_samples)
-
-        states[.., target_range] = cat(rp_buff.states[env_id]..., dims=cat_dim)
-        actions[target_range] = cat(rp_buff.actions[env_id]..., dims=cat_dim)
-        rewards[1, target_range] = cat(rp_buff.rewards[env_id]..., dims=cat_dim)
-
-        current_pos += env_num_samples
-    end
-
-    # convert to arrays in target device
-    states = DeviceArray(device)(states)
-    actions = DeviceArray(device)(actions)
-    rewards = DeviceArray(device)(rewards)
+function to_array(rp_buff::ReplayBuffer)
+    # get data up to current size
+    states = rp_buff.states[.., 1:length(rp_buff)]
+    actions = rp_buff.actions[1:length(rp_buff)]
+    state_values = rp_buff.values[:, 1:length(rp_buff)]
 
     # one-hot encode the actions
-    actions = onehotbatch(actions, 1:rp_buff.num_actions)
+    actions = Flux.onehotbatch(actions, 1:rp_buff.num_actions)
 
-    return states, actions, rewards
+    return states, actions, state_values
 end
 
 end
