@@ -37,14 +37,17 @@ function init_tb_logger(tb_logdir; overwrite_tb_logdir=false)
 end
 
 function init_loggers(config; overwrite_logfiles=false, overwrite_tb_logdir=false)
-    train_file_logger = init_file_logger(config.train_logfile; overwrite=overwrite_logfiles)
-    eval_file_logger = init_file_logger(config.eval_logfile; overwrite=overwrite_logfiles)
-    tb_logger = init_tb_logger(config.tb_logdir; overwrite_tb_logdir=overwrite_tb_logdir)
-    return Dict(
-        "train" => train_file_logger,
-        "eval" => eval_file_logger,
-        "tb" => tb_logger
-    )
+    loggers = Dict()
+
+    train_logfile, eval_logfile = config.train_logfile, config.eval_logfile
+    tb_logdir = config.tb_logdir
+
+    overwrite = overwrite_logfiles
+    (train_logfile != "") && (loggers["train"] = init_file_logger(train_logfile; overwrite))
+    (eval_logfile != "") && (loggers["eval"] = init_file_logger(eval_logfile; overwrite))
+    (tb_logdir != "") && (loggers["tb"] = init_tb_logger(tb_logdir; overwrite_tb_logdir))
+
+    return loggers
 end
 
 function log_losses(tb_logger, value_loss, policy_loss, loss)
