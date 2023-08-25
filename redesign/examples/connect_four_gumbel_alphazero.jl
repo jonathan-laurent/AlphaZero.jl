@@ -1,7 +1,7 @@
 using RLZero.BatchedEnvs
 using RLZero.Network
 using RLZero.Train
-using RLZero.TrainUtilities
+using RLZero.TrainUtilities: TrainConfig, print_execution_times
 using RLZero.Tests.Common.BitwiseConnectFour
 using RLZero.Tests.Common.BitwiseConnectFourEvalFns
 using RLZero.Util.Devices
@@ -130,7 +130,7 @@ function create_config()
     eval_freq = num_envs * 50
 
     # Total train steps
-    num_steps = num_envs * 1_000
+    num_steps = num_envs * 2_000
 
     return TrainConfig(;
         EnvCls=EnvCls,
@@ -179,4 +179,8 @@ nn = (device == CPU()) ? nn_cpu : Flux.gpu(nn_cpu)
 config = create_config()
 
 # train!
-selfplay!(config, device, nn)
+nn, execution_times = selfplay!(config, device, nn)
+
+# print some statistics
+println("\n")
+print_execution_times(execution_times)

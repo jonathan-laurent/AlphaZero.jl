@@ -1,7 +1,7 @@
 using RLZero.BatchedEnvs
 using RLZero.Network
 using RLZero.Train
-using RLZero.TrainUtilities: TrainConfig
+using RLZero.TrainUtilities: TrainConfig, print_execution_times
 using RLZero.Tests.Common.BitwiseTicTacToe
 using RLZero.Tests.Common.BitwiseTicTacToeEvalFns
 using RLZero.Util.Devices
@@ -89,7 +89,7 @@ function create_config()
     # environment variables
     EnvCls = BitwiseTicTacToeEnv
     env_kwargs = Dict()
-    num_envs = 20_000
+    num_envs = 25_000
 
     # common MCTS variables
     use_gumbel_mcts = false
@@ -179,4 +179,8 @@ nn = (device == CPU()) ? nn_cpu : Flux.gpu(nn_cpu)
 config = create_config()
 
 # train!
-selfplay!(config, device, nn)
+nn, execution_times = selfplay!(config, device, nn)
+
+# print some statistics
+println("\n")
+print_execution_times(execution_times)

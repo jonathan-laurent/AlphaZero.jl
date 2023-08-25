@@ -1,7 +1,7 @@
 using RLZero.BatchedEnvs
 using RLZero.Network
 using RLZero.Train
-using RLZero.TrainUtilities
+using RLZero.TrainUtilities: TrainConfig, print_execution_times
 using RLZero.Tests.Common.BitwiseRandomWalk1D
 using RLZero.Tests.Common.BitwiseRandomWalk1DEvalFns
 using RLZero.Util.Devices
@@ -126,4 +126,8 @@ nn = (device == CPU()) ? nn_cpu : Flux.gpu(nn_cpu)
 config = create_config()
 
 # train!
-selfplay!(config, device, nn)
+nn, execution_times = selfplay!(config, device, nn)
+
+# print some statistics
+println("\n")
+print_execution_times(execution_times)

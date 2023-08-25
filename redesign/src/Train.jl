@@ -144,13 +144,19 @@ end
 """
     selfplay!(config, device, nn)
 
-Runs the AlphaZero selfplay training loop.
+Runs the AlphaZero selfplay training loop. Returns the trained neural network and a
+`TrainExecutionTimes` object containing the execution times of the different steps of the
+training loop.
 
 # Arguments
 - `config`: A `TrainConfig` object specifying the training parameters/hyperparameters.
 - `device`: The device on which to run MCTS and NN training.
 - `nn`: The neural network to train.
 - `print_progress`: Whether to print progress messages in stdout.
+
+# Returns
+- `nn`: The trained neural network.
+- `times`: A `TrainExecutionTimes` object.
 """
 function selfplay!(config, device, nn, print_progress=true)
     state_size = BatchedEnvs.state_size(config.EnvCls)
@@ -165,7 +171,7 @@ function selfplay!(config, device, nn, print_progress=true)
 
     envs, steps_counter = init_envs(config, config.num_envs, device)
 
-    batch_env_steps = config.num_steps ÷ config.num_envs
+    batch_steps = config.num_steps ÷ config.num_envs
     batch_train_freq = config.train_freq ÷ config.num_envs
     batch_eval_freq = config.eval_freq ÷ config.num_envs
 
@@ -177,9 +183,10 @@ function selfplay!(config, device, nn, print_progress=true)
     mcts_rng = Random.MersenneTwister(3409)
     train_rng = Random.MersenneTwister(3409)
 
-    (config.nn_save_dir != "") && save_nn(nn, config.nn_save_dir, 0, batch_env_steps)
+    (config.nn_save_dir != "") && save_nn(nn, config.nn_save_dir, 0, batch_steps)
 
-    for step in 1:batch_env_steps
+    times = TrainExecutionTimes(batch_steps)
+    for step in 1:batch_steps
         print_progress && println("Step: $step.")
 
         # instiantiate mcts config object
@@ -187,34 +194,53 @@ function selfplay!(config, device, nn, print_progress=true)
 
         # run mcts
         if config.use_gumbel_mcts
-            tree, gumbel = MCTS.gumbel_explore(mcts_config, envs, mcts_rng)
-            actions = MCTS.gumbel_policy(tree, mcts_config, gumbel)
+            t = @elapsed tree, gumbel = MCTS.gumbel_explore(mcts_config, envs, mcts_rng)
+            times.explore_times[step] = t
+
+            t = @elapsed actions = MCTS.gumbel_policy(tree, mcts_config, gumbel)
+            times.selection_times[step] = t
         else
-            tree = MCTS.alphazero_explore(mcts_config, envs, mcts_rng)
-            actions = MCTS.alphazero_policy(tree, mcts_config, steps_counter, mcts_rng)
+            t = @elapsed tree = MCTS.alphazero_explore(mcts_config, envs, mcts_rng)
+            times.explore_times[step] = t
+
+            t = @elapsed begin
+                actions = MCTS.alphazero_policy(tree, mcts_config, steps_counter, mcts_rng)
+            end
+            times.selection_times[step] = t
         end
 
         # step, save data from terminated episodes and reset them
-        envs .= step_save_reset!(config, envs, steps_counter, actions, ep_buff, rp_buff)
+        t = @elapsed begin
+            envs .= step_save_reset!(config, envs, steps_counter, actions, ep_buff, rp_buff)
+        end
+        times.step_save_reset_times[step] = t
 
         # train the network if it's time to do so
         if step % batch_train_freq == 0 && length(rp_buff) >= config.min_train_samples
             print_progress && println("Training with $(length(rp_buff)) samples.")
-            set_train_mode!(nn)
-            nn = train!(nn, rp_buff, opt, device, config, loggers, train_rng)
-            set_test_mode!(nn)
-            (config.nn_save_dir != "") && save_nn(nn, config.nn_save_dir, step, batch_env_steps)
+            t = @elapsed begin
+                set_train_mode!(nn)
+                nn = train!(nn, rp_buff, opt, device, config, loggers, train_rng)
+                set_test_mode!(nn)
+            end
+            times.train_times[step] = t
+            (config.nn_save_dir != "") && save_nn(nn, config.nn_save_dir, step, batch_steps)
         end
 
         # evaluate the network if it's time to do so
         if batch_eval_freq > 0 && step % batch_eval_freq == 0 && length(config.eval_fns) > 0
             "eval" in keys(loggers) && log_msg(loggers["eval"], "Evaluating at step: $step")
-            for eval_fn in config.eval_fns
-                eval_fn(loggers, nn, config, step)
+            t = @elapsed begin
+                for eval_fn in config.eval_fns
+                    eval_fn(loggers, nn, config, step)
+                end
             end
+            times.eval_times[step] = t
             "eval" in keys(loggers) && write_msg(loggers["eval"], "\n")
         end
     end
+
+    return nn, times
 end
 
 

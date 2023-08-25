@@ -10,8 +10,8 @@ using ...Network
 using ...Util.Devices
 
 
-export TrainConfig
-export init_envs, init_mcts_config, save_nn
+export TrainConfig, TrainExecutionTimes
+export init_envs, init_mcts_config, save_nn, print_execution_times
 
 
 """
@@ -194,6 +194,72 @@ function save_nn(nn::Net, save_dir::String, step::Int, steps::Int) where Net <: 
     model_state = Flux.state(Flux.cpu(nn))
     step_str = lpad(step, length(string(steps)), "0")
     jldsave("$save_dir/model_$step_str.jld2"; model_state)
+end
+
+"""
+    TrainExecutionTimes
+
+Structure for storing execution times of important components of AlphaZeros's training loop.
+"""
+struct TrainExecutionTimes
+    explore_times::Array{Float64}
+    selection_times::Array{Float64}
+    step_save_reset_times::Array{Float64}
+    train_times::Array{Float64}
+    eval_times::Array{Float64}
+end
+
+function TrainExecutionTimes(total_steps)
+    explore_times = zeros(Float64, total_steps)
+    selection_times = zeros(Float64, total_steps)
+    step_save_reset_times = zeros(Float64, total_steps)
+    train_times = zeros(Float64, total_steps)
+    eval_times = zeros(Float64, total_steps)
+    return TrainExecutionTimes(
+        explore_times,
+        selection_times,
+        step_save_reset_times,
+        train_times,
+        eval_times
+    )
+end
+
+function print_execution_times(execution_times::TrainExecutionTimes)
+    batch_steps = length(execution_times.explore_times)
+
+    total_exp_time = sum(execution_times.explore_times)
+    avg_exp_time = total_exp_time / batch_steps
+
+    total_select_time = round(sum(execution_times.selection_times), digits=4)
+    avg_select_time = round(total_select_time / batch_steps, digits=4)
+
+    total_ssr_time = round(sum(execution_times.step_save_reset_times), digits=4)
+    avg_ssr_time = round(total_ssr_time / batch_steps, digits=4)
+
+    train_times = [t for t in execution_times.train_times if t != zero(Float64)]
+    total_train_time = round(sum(train_times), digits=4)
+    avg_train_time = round(total_train_time / length(train_times), digits=4)
+
+    eval_times = [t for t in execution_times.eval_times if t != zero(Float64)]
+    total_eval_time = round(sum(eval_times), digits=4)
+    avg_eval_time = round(total_eval_time / length(eval_times), digits=4)
+
+    println("Total explore time: $total_exp_time seconds.")
+    println("Total selection time: $total_select_time seconds.")
+    println("Total step-save-reset time: $total_ssr_time seconds.")
+    println("Total train time: $total_train_time seconds.")
+    println("Total eval time: $total_eval_time seconds.")
+    println()
+    println("Average explore time: $avg_exp_time seconds.")
+    println("Average selection time: $avg_select_time seconds.")
+    println("Average step-save-reset time: $avg_ssr_time seconds.")
+    println("Average train time: $avg_train_time seconds.")
+    println("Average eval time: $avg_eval_time seconds.")
+
+    train_loop_time = total_exp_time + total_select_time + total_ssr_time + total_train_time
+    train_loop_time = round(train_loop_time, digits=4)
+    println("\n")
+    println("Total train loop time: $train_loop_time seconds.")
 end
 
 end
