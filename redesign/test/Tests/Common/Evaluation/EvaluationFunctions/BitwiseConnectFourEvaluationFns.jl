@@ -261,10 +261,9 @@ function get_connect_four_benchmark_fns(kwargs)
 
     function add_info_to_env_str(env, a, opt, idx)
         env_encoding = string(env)
-        curplayer = (env.curplayer == BitwiseConnectFour.CROSS) ? "X" : "O"
         idx = lpad(idx, length(string(total_states)), "0")
         fixed = "State $idx:\n$env_encoding\n" *
-                "$curplayer to play. Action chosen: $a. Optimal Actions: $opt\n"
+                "Action chosen: $a. Optimal Actions: $opt\n"
         return fixed
     end
 

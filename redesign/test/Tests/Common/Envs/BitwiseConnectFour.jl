@@ -57,7 +57,8 @@ end
 
 function Base.string(env::BitwiseConnectFourEnv)
     X, O = CROSS, NOUGHT
-    s = ""
+    curplayer = (env.curplayer == X) ? "X" : "O"
+    s = "$curplayer to play:\n\n"
     for i in 1:NUM_ROWS
         for j in 1:NUM_COLUMNS
             s *= env.board[posidx(i, j, X)] ? "X" : (env.board[posidx(i, j, O)] ? "O" : "·")

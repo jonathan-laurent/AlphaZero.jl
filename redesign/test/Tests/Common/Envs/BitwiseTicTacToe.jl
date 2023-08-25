@@ -41,7 +41,8 @@ end
 
 function Base.string(env::BitwiseTicTacToeEnv)
     X, O = CROSS, NOUGHT
-    s = ""
+    curplayer = (env.curplayer == X) ? "X" : "O"
+    s = "$curplayer to play:\n\n"
     for i in 1:3
         for j in 1:3
             s *= env.board[posidx(i, j, X)] ? "X" : (env.board[posidx(i, j, O)] ? "O" : "·")

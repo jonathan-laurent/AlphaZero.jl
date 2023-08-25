@@ -192,14 +192,14 @@ function get_tictactoe_benchmark_fns(kwargs)
 
     function add_info_to_env_str(env, a, opt, idx)
         env_encoding = string(env)
-        curplayer = (env.curplayer == BitwiseTicTacToe.CROSS) ? "X" : "O"
         idx = lpad(idx, length(string(total_states)), "0")
         rows = split(env_encoding, "\n")
-        info = "$curplayer to play. Action chosen: $a. Optimal Actions: $opt"
-        fixed = "\n" *
-                "             " * rows[1] * "\n" *
-                "State $idx:  " * rows[2] * "\t$info\n" *
-                "             " * rows[3] * "\n"
+        curplayer_row, tictactoe_rows = rows[1], rows[3:end]
+        info = "Action chosen: $a. Optimal Actions: $opt"
+        fixed = "\n$curplayer_row\n" *
+                "             " * tictactoe_rows[1] * "\n" *
+                "State $idx:  " * tictactoe_rows[2] * "\t$info\n" *
+                "             " * tictactoe_rows[3] * "\n"
         return fixed
     end
 
