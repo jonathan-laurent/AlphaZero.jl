@@ -110,7 +110,6 @@ function create_config()
     min_train_samples = 1_000
     train_freq = num_envs * 10
     adam_learning_rate = 1e-3
-    weight_decay = 1e-4
     gradient_clip = 1e-3
     batch_size = 25_000
     train_epochs = 2
@@ -148,7 +147,6 @@ function create_config()
         min_train_samples=min_train_samples,
         train_freq=train_freq,
         adam_lr=adam_learning_rate,
-        weight_decay=weight_decay,
         gradient_clip=gradient_clip,
         batch_size=batch_size,
         train_epochs=train_epochs,
