@@ -47,9 +47,8 @@ function create_config()
 
     # Gumbel MCTS variables
     num_considered_actions = 2
-    # mcts_value_scale = 0.1f0
     mcts_value_scale = 1f0
-    mcts_max_visit_init = 10
+    mcts_max_visit_init = 50
 
     # AlphaZero MCTS variables
     # ...we can omit these since we're using Gumbel MCTS
@@ -58,8 +57,8 @@ function create_config()
     replay_buffer_size = num_envs * 50
     min_train_samples = 10
     train_freq = num_envs * 25
-    adam_learning_rate = 1e-3
-    gradient_clip = 1e-3
+    adam_learning_rate = 2e-3
+    weight_decay = 1e-4
     batch_size = 1_000
     train_epochs = 1
 
@@ -94,7 +93,7 @@ function create_config()
         min_train_samples=min_train_samples,
         train_freq=train_freq,
         adam_lr=adam_learning_rate,
-        gradient_clip=gradient_clip,
+        weight_decay=weight_decay,
         batch_size=batch_size,
         train_epochs=train_epochs,
 
