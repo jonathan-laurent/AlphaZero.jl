@@ -6,5 +6,5 @@ tb_logs/
 checkpoints/
 *.log
 src/debug_*
-cf_stuff/
+connect4/
 *-checkpoints/
