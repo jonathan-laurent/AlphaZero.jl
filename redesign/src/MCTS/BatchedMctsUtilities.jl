@@ -1,3 +1,27 @@
+"""
+    BatchedMctsUtilities
+
+This module provides utility structures and functions designed to facilitate the
+implementation of batched Monte Carlo Tree Search (MCTS) algorithms, specifically targeted
+for AlphaZero and Gumbel MCTS variants. It's designed for compatibility with both CPU and
+GPU backends, leveraging batch operations to improve parallelism and performance.
+
+## Main Components:
+
+- `EnvOracle`: A struct that serves as an abstraction layer to encapsulate environment
+   dynamics for MCTS. It contains two main fields, the `init_fn` and `transition_fn`
+   functions, which are responsible for environment initialization and state transitions,
+   respectively.
+
+- `GumbelMctsConfig` and `AlphaZeroMctsConfig`: Structs that define configurations for
+   running MCTS based on either the Gumbel or AlphaZero algorithm. These structs specify
+   parameters like the number of simulations to run, exploration parameters, and device
+   preferences.
+
+- `get_valid_actions`: A function that returns an array denoting the valid actions for
+   each environment in a batch.
+"""
+
 module BatchedMctsUtilities
 
 using Base: @kwdef

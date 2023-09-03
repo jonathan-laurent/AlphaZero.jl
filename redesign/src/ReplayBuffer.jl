@@ -1,3 +1,37 @@
+"""
+    ReplayBuffers
+
+This module provides the necessary data structures for implementing a replay buffer in
+AlphaZero-like algorithms. The two main structures are `EpisodeBuffer` and `ReplayBuffer`.
+
+## EpisodeBuffer
+
+- Maintains episode-related data for multiple parallel environments.
+- Saves data in vectors on the CPU to optimize memory usage, especially in the context of
+  GPU training.
+- Handles dynamic resizing based on the episode lengths, ensuring that all relevant
+  information is captured and memory isn't wasted.
+- Primarily used to store states, actions, rewards, and some metadata about each
+  environment's episode.
+
+## ReplayBuffer
+
+- Accumulates training-related data from terminated episodes.
+- Cyclically replaces older data if the capacity is reached, ensuring that the most recent
+  data is always available for training.
+- Allows for quick data retrieval and can convert the buffered data to arrays, suitable to
+  be used directly for neural network training.
+
+## Design Rationale
+
+The reason for implementing two distinct structures instead of a single, unified one is to
+cleanly separate the handling of ongoing episodes (`EpisodeBuffer`) from terminated ones
+(`ReplayBuffer`). In AlphaZero, only data from terminated episodes can be used for training.
+Having two structures simplifies the tracking of which data belongs to terminated episodes,
+making the code easier to read, manage, and debug. In the case of one unified structure,
+we would have to store a mask for "data-available-for-training", and this would become
+hard to read when data would cyclically be replaced, as well as a possible source of bugs.
+"""
 module ReplayBuffers
 
 using EllipsisNotation

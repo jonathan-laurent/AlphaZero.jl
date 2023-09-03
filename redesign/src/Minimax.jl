@@ -1,3 +1,30 @@
+"""
+    Minimax
+
+This module provides implementations for both deterministic and stochastic versions
+of the Minimax algorithm, designed to work both in 1-player and 2-player, turn-based games.
+The module also includes utility functions for optimizing and evaluating Minimax
+strategies. It relies on the `BatchedEnvs` package for defining game environments.
+
+## Evaluation Function
+
+The user-provided heuristic evaluation function must have the following signature:
+
+    eval_fn(env, player::Bool) -> Float32
+
+where `env` is an environment following the `BatchedEnvs` interface and `player`
+is a boolean indicating whether the current player is the maximizing player.
+
+## Example
+
+```julia
+using Minimax
+using MyGameEnvironment  # Assume you have a game environment compatible with BatchedEnvs
+
+env = MyGameEnvironment()
+best_action = minimax(env; depth=3, eval_fn=my_eval_function)
+```
+"""
 module Minimax
 
 using Distributions

@@ -1,3 +1,36 @@
+"""
+    EnvOracles
+
+This module provides implementations for environment oracles in the context of batched
+Monte Carlo Tree Search (MCTS) algorithms. Environment oracles are used to guide the
+exploration and exploitation behavior of the MCTS algorithm.
+
+The module defines two main types of environment oracles:
+
+1. `uniform_env_oracle`: Provides a uniform policy and value prior across all actions for a
+    given environment.
+2. `neural_network_env_oracle`: Uses a neural network to provide a learned policy and value
+    prior for a given environment.
+
+Both oracles return an `EnvOracle` object with the following structure:
+
+- `init_fn`: A function that initializes the environment states, valid actions, and priors.
+- `transition_fn`: A function that transitions the environments based on actions taken and
+   updates the priors.
+
+# Examples
+
+```julia
+# Using uniform_env_oracle
+oracle = uniform_env_oracle()
+initial_state = oracle.init_fn(envs)
+
+# Using neural_network_env_oracle
+nn = YourNN()  # replace with your own neural network that follows the FluxNetwork interface
+oracle = neural_network_env_oracle(; nn=nn)
+initial_state = oracle.init_fn(envs)
+```
+"""
 module EnvOracles
 
 using CUDA

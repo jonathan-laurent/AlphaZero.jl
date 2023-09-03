@@ -1,5 +1,55 @@
-module Network
+"""
+    Network
 
+The `Network` module defines an abstract type `FluxNetwork` that serves as an interface for
+neural networks built using the Flux framework. This interface allows for easy integration
+with other modules requiring neural network functionality.
+
+## Abstract Types
+
+- [`FluxNetwork`](@ref): Abstract type for neural networks. Implements most of the network
+  interface except for certain functions like `HyperParams`, `hyperparams`, `on_gpu`, and
+  `forward`.
+
+## Interface Functions
+
+- [`HyperParams(::Type{<:FluxNetwork})`](@ref): Returns the hyperparameter type associated
+    with a given network type.
+- [`hyperparams(nn::FluxNetwork)`](@ref): Returns the hyperparameters of a network.
+- [`on_gpu(nn::FluxNetwork) :: Bool`](@ref): Checks whether the network is on the GPU.
+- [`forward(nn::FluxNetwork, states, use_softmax=false)`](@ref): Performs a forward pass of
+    the network on a batch of inputs.
+
+## Derived Functions
+
+- [`to_cpu(::FluxNetwork)`](@ref): Transfers the network to the CPU.
+- [`to_gpu(::FluxNetwork)`](@ref): Transfers the network to the GPU if available.
+- [`set_train_mode!(nn::FluxNetwork)`](@ref): Puts the network in training mode.
+- [`set_test_mode!(nn::FluxNetwork)`](@ref): Puts the network in test mode.
+- [`num_parameters(nn::FluxNetwork)`](@ref): Returns the total number of parameters in
+    the network.
+- [`copy(nn::FluxNetwork)`](@ref): Copies the network.
+- [`gc(::FluxNetwork)`](@ref): Empties the GPU memory pool and performs full garbage
+    collection.
+
+## Included Libraries
+
+- SimpleNet.jl: Provides the implementation of Multi-Layer Perceptrons.
+- SimpleResNet.jl: Provides the implementation of Multi-Layer Perceptrons with Residual
+    blocks.
+
+## Example
+
+```julia
+# Create a network of a certain type
+hp = SimpleNetHP(...)  # replace ... with actual parameters
+nn = SimpleNet(input_size, output_size, hp)
+
+# Perform a forward pass
+v, p = forward(nn, states)
+```
+"""
+module Network
 
 using CUDA
 using Flux

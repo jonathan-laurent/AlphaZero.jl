@@ -1,3 +1,49 @@
+"""
+    LoggingUtilities
+
+This module provides utilities for logging various kinds of data, including training and
+evaluation metrics, to different output formats such as files and TensorBoard.
+
+## Initialization Functions
+
+The following functions can be used to initialize file and tensorboard loggers:
+
+- [`init_file_logger(logfile; overwrite=false, min_level=Logging.Info)`](@ref):
+    Initializes a `FileLogger`.
+- [`init_tb_logger(tb_logdir; overwrite_tb_logdir=false)`](@ref):
+    Initializes a TensorBoard logger.
+
+During training, we will most likely use multiple loggers at the same time. The following
+function can be used to initialize multiple loggers at once and return them in a Dictionary:
+
+- [`init_loggers(config; overwrite_logfiles=false, overwrite_tb_logdir=false)`](@ref):
+    Initializes multiple loggers based on a given configuration.
+
+## Logging Functions
+
+- [`log_losses(tb_logger, value_loss, policy_loss, loss)`](@ref):
+    Logs loss values using a TensorBoard logger.
+- [`log_msg(file_logger, msg)`](@ref): Logs a message to a file.
+- [`write_msg(file_logger, msg)`](@ref): Writes a message directly to a log file.
+
+## Example
+
+```julia
+# Initialize loggers
+config = Dict(
+    "train_logfile" => "train.log",
+    "eval_logfile" => "eval.log",
+    "tb_logdir" => "tensorboard-logs/"
+)
+loggers = init_loggers(config)
+
+# Log losses to TensorBoard
+log_losses(loggers["tb"], 0.2, 0.1, 0.3)
+
+# Log a message to a file
+log_msg(loggers["train"], "Training started.")
+```
+"""
 module LoggingUtilities
 
 using Logging
