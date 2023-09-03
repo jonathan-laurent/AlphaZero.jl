@@ -24,10 +24,17 @@ neural_net_hyperparams = SimpleResNetHP(
 nn_cpu = SimpleResNet(state_dim..., action_dim, neural_net_hyperparams)
 
 
+# values used to retrieve data when the Pons Benchmark is used
+global_times = Dict("az" => [], "nn" => [])
+global_errors = Dict("az" => [], "nn" => [])
+
+
 """Returns a list with all the evaluation functions to be called during evaluation sessions.
     Most of these functions are closures, which are being computed by the parent functions
-    defined in: Tests/Common/Evaluation/EvaluationFunctions/BitwiseConnectFourEvalFns.jl."""
-function get_eval_fns(num_mcts_simulations)
+    defined in: Tests/Common/Evaluation/EvaluationFunctions/BitwiseConnectFourEvalFns.jl.
+    The evaluation functions for Pascal Pons' benchmark are not used, as they should be
+    run separately. For those, another function that returns them is defined below."""
+function get_eval_fns(_)
 
     # This config object will be used by `TrainUtilities.init_mcts_config()`
     #   (in TrainUtilities.jl) to create a `MctsConfig` object for the evaluation functions.
@@ -35,11 +42,13 @@ function get_eval_fns(num_mcts_simulations)
     #   used during evaluation. In this case, only `use_gumbel_mcts`, `num_simulations`,
     #   `num_considered_actions`, `mcts_value_scale` and `mcts_max_visit_init` will be used.
     eval_config = (;
-        use_gumbel_mcts=true,
-        num_simulations=num_mcts_simulations,
-        num_considered_actions=7,
-        mcts_value_scale=0.1f0,
-        mcts_max_visit_init=1
+        use_gumbel_mcts=false,
+        num_simulations=600,
+        c_puct=2.0f0,
+        alpha_dirichlet=0.3f0,
+        epsilon_dirichlet=0.25f0,
+        tau=1.0f0,
+        collapse_tau_move=42
     )
 
     az_vs_random_kwargs = Dict(
@@ -52,13 +61,13 @@ function get_eval_fns(num_mcts_simulations)
         "num_bilateral_rounds" => 10
     )
     az_vs_minimax_kwargs = Dict(
-        "stochastic_minimax_depth" => 4,
+        "stochastic_minimax_depth" => 5,
         "stochastic_minimax_rng" => Random.MersenneTwister(42),
         "num_bilateral_rounds" => 5,
         "config" => deepcopy(eval_config)
     )
     nn_vs_minimax_kwargs = Dict(
-        "stochastic_minimax_depth" => 4,
+        "stochastic_minimax_depth" => 5,
         "stochastic_minimax_rng" => Random.MersenneTwister(42),
         "num_bilateral_rounds" => 50
     )
@@ -87,35 +96,70 @@ function get_eval_fns(num_mcts_simulations)
 end
 
 
+"""Same as `get_eval_fns()`, but returns only the evaluation functions for Pascal Pons'
+    benchmark."""
+function get_pos_benchmark_eval_fns(_)
+    eval_config = (;
+        use_gumbel_mcts=false,
+        num_simulations=600,
+        c_puct=2.0f0,
+        alpha_dirichlet=0.3f0,
+        epsilon_dirichlet=0.25f0,
+        tau=1.0f0,
+        collapse_tau_move=42
+    )
+
+    pos_benchmark_fns_kwargs = Dict(
+        "device" => GPU(),
+        "config" => deepcopy(eval_config)
+    )
+
+    fns = get_pons_benchmark_fn(global_times, global_errors, pos_benchmark_fns_kwargs)
+    az_pons_benchmark_fn, nn_pons_benchmark_fn = fns
+
+    return [
+        az_pons_benchmark_fn,
+        nn_pons_benchmark_fn
+    ]
+end
+
+
 """Returns a `TrainConfig` object. All the hyperparameters can be set here."""
 function create_config()
 
     # environment variables
     EnvCls = BitwiseConnectFourEnv
     env_kwargs = Dict()
-    num_envs = 50_000
+    # num_envs = 35_000
+    num_envs = 40_000
+    # num_envs = 100
 
     # common MCTS variables
-    use_gumbel_mcts = true
-    num_simulations = 64
+    use_gumbel_mcts = false
+    # num_simulations = 128
+    num_simulations = 256
+    # num_simulations = 16
 
     # Gumbel MCTS variables
-    num_considered_actions = 7
-    mcts_value_scale = 0.1f0
-    mcts_max_visit_init = 10
+    # ...we can omit these since we're using Traditional Alphazero MCTS
 
     # AlphaZero MCTS variables
-    # ...we can omit these since we're using Gumbel MCTS
+    c_puct = 2.0f0
+    alpha_dirichlet = 0.3f0
+    epsilon_dirichlet = 0.25f0
+    tau = 1.0f0
+    collapse_tau_move = 39
 
     # NN Training variables
-    replay_buffer_size = num_envs * 500
+    # replay_buffer_size = num_envs * 750
+    replay_buffer_size = num_envs * 750
+
     min_train_samples = 1_000
     train_freq = num_envs * 50
-    adam_learning_rate = 1e-3
-    weight_decay = 1e-4
+    adam_learning_rate = 2e-3
     gradient_clip = 1e-3
     batch_size = 50_000
-    train_epochs = 1
+    train_epochs = 2
 
     # Logging variables
     train_logfile = "train.log"
@@ -126,11 +170,15 @@ function create_config()
     nn_save_dir = SAVEDIR
 
     # Evaluation variables
-    evaluation_fns = get_eval_fns(num_simulations)
+    # evaluation_fns = get_eval_fns(num_simulations)
+    evaluation_fns = get_pos_benchmark_eval_fns(num_simulations)
     eval_freq = num_envs * 50
+    # eval_freq = num_envs * 25
 
     # Total train steps
-    num_steps = num_envs * 2_000
+    # num_steps = num_envs * 2_500
+    num_steps = num_envs * 1_000
+    # num_steps = num_envs * 50
 
     return TrainConfig(;
         EnvCls=EnvCls,
@@ -140,15 +188,16 @@ function create_config()
         use_gumbel_mcts=use_gumbel_mcts,
         num_simulations=num_simulations,
 
-        num_considered_actions=num_considered_actions,
-        mcts_value_scale=mcts_value_scale,
-        mcts_max_visit_init=mcts_max_visit_init,
+        c_puct=c_puct,
+        alpha_dirichlet=alpha_dirichlet,
+        epsilon_dirichlet=epsilon_dirichlet,
+        tau=tau,
+        collapse_tau_move=collapse_tau_move,
 
         replay_buffer_size=replay_buffer_size,
         min_train_samples=min_train_samples,
         train_freq=train_freq,
         adam_lr=adam_learning_rate,
-        weight_decay=weight_decay,
         gradient_clip=gradient_clip,
         batch_size=batch_size,
         train_epochs=train_epochs,
@@ -183,4 +232,4 @@ nn, execution_times = selfplay!(config, device, nn)
 
 # print some statistics
 println("\n")
-print_execution_times(execution_times)
+# print_execution_times(execution_times)

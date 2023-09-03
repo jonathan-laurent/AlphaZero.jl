@@ -14,7 +14,7 @@ const MCTS = BatchedMcts
 
 # set these constants to your preference
 const DEVICE = GPU()
-const MODEL_PATH = "examples/models/connect-four-checkpoints/model_0000.jld2"
+const MODEL_PATH = "examples/models/connect-four-checkpoints/model_1500.jld2"
 const nn_config = SimpleResNetHP(width=512, depth_common=6, depth_phead=1, depth_vhead=1)
 
 
@@ -111,28 +111,28 @@ end
 # load the neural network
 nn = load_nn()
 
-# set here the important values for the MCTS as a NamedTuple
-mcts_kwargs = (;
-    # common MCTS variables
-    use_gumbel_mcts = true,
-    num_simulations = 64,
+# # set here the important values for the MCTS as a NamedTuple
+# mcts_kwargs = (;
+#     # common MCTS variables
+#     use_gumbel_mcts = false,
+#     num_simulations = 600,
 
-    # Gumbel MCTS variables
-    num_considered_actions = 7,
-    mcts_value_scale = 0.1f0,
-    mcts_max_visit_init = 50,
+#     # Gumbel MCTS variables
+#     num_considered_actions = 7,
+#     mcts_value_scale = 0.1f0,
+#     mcts_max_visit_init = 50,
 
-    # AlphaZero MCTS variables -- No need to set those since we're using Gumbel, but
-    #   they're here for completeness
-    c_puct = 1.0f0,
-    alpha_dirichlet = 0.3f0,
-    epsilon_dirichlet = 0.25f0,
-    tau = 1.0f0,
-    collapse_tau_move = 30,
-)
+#     # AlphaZero MCTS variables -- No need to set those since we're using Gumbel, but
+#     #   they're here for completeness
+#     c_puct = 2.0f0,
+#     alpha_dirichlet = 0.3f0,
+#     epsilon_dirichlet = 0.25f0,
+#     tau = 1.0f0,
+#     collapse_tau_move = 42,
+# )
 
-# play against MCTS
-play_with_mcts(nn, mcts_kwargs, true)
+# # play against MCTS
+# play_with_mcts(nn, mcts_kwargs, true)
 
 # play against the neural network
 play_with_nn(nn, true)

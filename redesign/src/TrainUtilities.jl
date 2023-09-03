@@ -1,3 +1,48 @@
+"""
+    TrainUtilities
+
+This module provides utilities to facilitate the training of AlphaZero agents.
+
+The utilities focus on setting up environments, configuring MCTS algorithms, neural network
+training, and logging. It provides support for two types of MCTS algorithms: Traditional
+AlphaZero MCTS and Gumbel-MCTS.
+
+## Structs
+
+- `TrainConfig`: A structure to hold all the training parameters including environment
+   configuration, MCTS settings, neural network training variables, logging, and evaluation
+   settings.
+
+- `TrainExecutionTimes`: A structure for storing execution times of significant parts of
+   AlphaZero's training loop.
+
+## Functions
+
+- `init_envs`: Function to initialize environments for training based on a `TrainConfig`.
+
+- `init_mcts_config`: Function to initialize the configuration object for MCTS algorithms,
+   based on the type of MCTS algorithm specified in `TrainConfig`.
+
+- `save_nn`: Function to save the neural network model to disk.
+
+- `print_execution_times`: Function to print the execution times stored in a
+   `TrainExecutionTimes` object.
+
+## Example
+
+```julia
+using TrainUtilities
+
+config = TrainConfig(
+    EnvCls = MyEnv,  # must folow BatchedEnvs interface
+    env_kwargs = Dict(:size => 5),
+    num_envs = 20
+)
+
+envs, steps_counter = init_envs(config, 20, CPU())
+mcts_config = init_mcts_config(CPU(), myNN, config)
+```
+"""
 module TrainUtilities
 
 using Base: @kwdef
@@ -59,7 +104,6 @@ Note: The two types of implemented MCTS algorithms can be found in the following
    number of environments.
 - `adam_lr::Float32 = 3e-4`: Learning rate for the Adam optimizer.
 - `weight_decay::Float32 = 0f0`: L2 regularization weight decay.
-- `gradient_clip::Float32 = 1e-3`: Gradient clipping value.
 - `batch_size::Int = 50_000`: Batch size for training.
 - `train_epochs::Int = 1`: Number of epochs per training step.
 
@@ -109,7 +153,6 @@ Note: The two types of implemented MCTS algorithms can be found in the following
     train_freq::Int = 50
     adam_lr::Float32 = 3e-4
     weight_decay::Float32 = 0f0
-    gradient_clip::Float32 = 1e-3
     batch_size::Int = 50_000
     train_epochs::Int = 1
 

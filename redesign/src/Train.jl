@@ -1,3 +1,34 @@
+"""
+    Train
+
+This module is responsible for implementing the training loop for the AlphaZero algorithm
+in a batched environment setting. The module provides utility functions to perform
+self-play, step through environments, save transition data to episode and replay buffers,
+train the neural network, and evaluate its performance during training.
+
+## Key Features
+
+- [`selfplay!`](@ref) runs the AlphaZero self-play training loop.
+- [`train!`](@ref) performs the training step on a neural network model.
+- [`step_save_reset!`](@ref) steps through the environments, saves transition data, and
+    resets environments that have terminated.
+- [`alphazero_loss`](@ref) computes the loss for the AlphaZero network.
+
+## Usage
+
+To start the training process, you typically call `selfplay!()` with the desired
+configuration, device, and initial neural network model.
+
+```julia
+using Train
+using TrainUtilities
+
+config = TrainConfig(...)  # initialize your training configuration here
+device = ...  # specify the device to run on (CPU or GPU)
+nn = ...  # initialize or load your neural network model here
+trained_nn, execution_times = Train.selfplay!(config, device, nn)
+```
+"""
 module Train
 
 using CUDA
@@ -162,11 +193,7 @@ function selfplay!(config, device, nn, print_progress=true)
     state_size = BatchedEnvs.state_size(config.EnvCls)
     num_actions = BatchedEnvs.num_actions(config.EnvCls)
 
-    adam = Flux.Optimiser(
-        Flux.ClipValue(config.gradient_clip),
-        Flux.WeightDecay(config.weight_decay),
-        Flux.Adam(config.adam_lr)
-    )
+    adam = Flux.Optimiser(Flux.WeightDecay(config.weight_decay), Flux.Adam(config.adam_lr))
     opt = Flux.setup(adam, nn)
 
     envs, steps_counter = init_envs(config, config.num_envs, device)
