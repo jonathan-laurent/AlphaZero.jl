@@ -19,6 +19,7 @@ using ....Util.Devices
 export get_alphazero_vs_random_eval_fn, get_nn_vs_random_eval_fn
 export get_alphazero_vs_minimax_eval_fn, get_nn_vs_minimax_eval_fn
 export get_connect_four_benchmark_fns
+export get_pons_benchmark_fn
 
 const MCTS = BatchedMcts
 
@@ -179,6 +180,22 @@ function _create_pos_env(action_list)
     return env
 end
 
+function _get_solver_score(process, actions_seq, action)
+    input = actions_seq * string(action)
+    println(process, input)
+    line = readline(process)
+    score = parse(Float32, split(line)[end])
+    return score
+end
+
+function _get_optimal_actions(process, env, action_seq)
+    na = BatchedEnvs.num_actions(BitwiseConnectFourEnv)
+    valid_acts = [BatchedEnvs.valid_action(env, a) for a in 1:na]
+    # negate q-values because they are from the perspective of the opponent
+    qs = [(valid_acts[a] ? -_get_solver_score(process, action_seq, a) : -Inf) for a in 1:na]
+    return [a for a in 1:na if (sign(qs[a]) == maximum(sign, qs) && valid_acts[a])]
+end
+
 """
     _sample_states(rng, num_states)
 
@@ -196,7 +213,7 @@ function _sample_states(rng, num_states)
     final_states = []
     final_optimal_actions = []
 
-    cmd = pipeline(Cmd(`./c4solver`, dir="cf_stuff/connect4"), stderr=devnull)
+    cmd = pipeline(Cmd(`./c4solver`, dir="connect4"), stderr=devnull)
     process = open(cmd, "r+")
 
     for i in 1:num_states
@@ -228,15 +245,14 @@ function _sample_states(rng, num_states)
                 min_value = min(min_value, score)
                 continue
             end
-            input = random_action_subsequence_str * string(a)
-            println(process, input)
-            line = readline(process)
-            score = parse(Float32, split(line)[end])
+            score = _get_solver_score(process, random_action_subsequence_str, a)
             values[a] = score
             min_value = min(min_value, score)
         end
         (num_valid_actions == 1) && continue
-        optimal_actions = [action for action in 1:na if values[action] == min_value]
+
+        sign_min_value = sign(min_value)
+        optimal_actions = [a for a in 1:na if sign(values[a]) == sign_min_value]
 
         push!(final_envs, generated_env)
         push!(final_states, Array(BatchedEnvs.vectorize_state(generated_env)))
@@ -295,7 +311,7 @@ function get_connect_four_benchmark_fns(kwargs)
             end
         end
         log_msg(mcts_losses_logger, "\nTrue positive actions: $true_positives\n")
-        log_msg(mcts_losses_logger, "False positive actions: $false_positives\n")
+        log_msg(mcts_losses_logger, "\nFalse positive actions: $false_positives\n")
 
         mcts_accuracy = round(mcts_correct / total_states, digits=4)
         with_logger(loggers["tb"]) do
@@ -329,7 +345,7 @@ function get_connect_four_benchmark_fns(kwargs)
             end
         end
         log_msg(nn_losses_logger, "\nTrue positive actions: $true_positives\n")
-        log_msg(nn_losses_logger, "False positive actions: $false_positives\n")
+        log_msg(nn_losses_logger, "\nFalse positive actions: $false_positives\n")
 
         nn_accuracy = round(nn_correct / total_states, digits=4)
         with_logger(loggers["tb"]) do
@@ -341,5 +357,6 @@ function get_connect_four_benchmark_fns(kwargs)
     return benchmark_mcts_fn, benchmark_nn_fn
 end
 
+include("ConnectFour-pons-benchmark/pons_benchmark.jl")
 
 end
