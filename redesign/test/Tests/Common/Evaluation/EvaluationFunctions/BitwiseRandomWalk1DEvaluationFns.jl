@@ -26,7 +26,7 @@ function _get_nn_policy(cpu_nn, env)
     return Flux.softmax(p[:, 1])
 end
 
-function get_nn_evaluation_fn(global_times, global_metrics)
+function get_nn_evaluation_fn(times, metrics)
     start_time = time()
 
     function evaluate_nn(loggers, nn, _, _)
@@ -68,20 +68,19 @@ function get_nn_evaluation_fn(global_times, global_metrics)
         start_time += bench_end_time - bench_start_time
 
         eval_time = time() - start_time
-        push!(global_times, eval_time)
-        push!(global_metrics, (avg_steps, avg_win_rate, avg_right_prob))
+        push!(times, eval_time)
+        push!(metrics, (avg_steps, avg_win_rate, avg_right_prob))
     end
 
     return evaluate_nn
 end
 
-function plot_metrics(save_dir, global_times, global_metrics)
+function plot_metrics(save_dir, times, metrics)
     !isdir(save_dir) && mkpath(save_dir)
 
-    times = global_times
-    avg_steps = [metrics[1] for metrics in global_metrics]
-    avg_win_rates = [metrics[2] for metrics in global_metrics]
-    avg_right_probs = [metrics[3] for metrics in global_metrics]
+    avg_steps = [metrics[1] for metrics in metrics]
+    avg_win_rates = [metrics[2] for metrics in metrics]
+    avg_right_probs = [metrics[3] for metrics in metrics]
 
     l = @layout [a ; b ; c]
 

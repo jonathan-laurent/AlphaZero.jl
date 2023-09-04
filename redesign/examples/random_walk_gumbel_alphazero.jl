@@ -26,8 +26,8 @@ nn_cpu = SimpleNet(state_dim..., action_dim, neural_net_hyperparams)
 
 
 # global lists used to retrieve data from the benchmarks
-global_times = []
-global_metrics = []
+times = []
+metrics = []
 
 
 """Returns a list with all the evaluation functions to be called during evaluation sessions.
@@ -35,7 +35,7 @@ global_metrics = []
     the evaluation functions for the BitwiseRandomWalk1D environment can be found in:
     Tests/Common/Evaluation/EvaluationFunctions/BitwiseRandomWalk1DEvalFns.jl."""
 function get_eval_fns()
-    evaluate_nn_fn = get_nn_evaluation_fn(global_times, global_metrics)
+    evaluate_nn_fn = get_nn_evaluation_fn(times, metrics)
     return [evaluate_nn_fn]
 end
 
@@ -138,4 +138,4 @@ println("\n")
 print_execution_times(execution_times)
 
 # plot the metrics
-plot_metrics(PLOTSDIR, global_times, global_metrics)
+plot_metrics(PLOTSDIR, times, metrics)
