@@ -2,6 +2,7 @@ module BitwiseTicTacToeEvalFns
 
 using Flux
 using Logging
+using Plots
 using Random
 
 using ..BitwiseTicTacToe
@@ -20,6 +21,7 @@ using ....Util.Devices
 export get_alphazero_vs_random_eval_fn, get_nn_vs_random_eval_fn
 export get_alphazero_vs_minimax_eval_fn, get_nn_vs_minimax_eval_fn
 export get_tictactoe_benchmark_fns
+export plot_metrics
 
 
 const MCTS = BatchedMcts
@@ -39,7 +41,7 @@ function write_episode_action_sequence(loggers, episode, action_sequence, p1_rew
     write_msg(loggers["eval"], msg)
 end
 
-function get_alphazero_vs_random_eval_fn(random_kwargs)
+function get_alphazero_vs_random_eval_fn(random_kwargs, metrics)
 
     function evaluate_alphazero_vs_random(loggers, nn, _, _)
         az_args = (init_mcts_config(CPU(), Flux.cpu(nn), random_kwargs["config"]),)
@@ -67,12 +69,13 @@ function get_alphazero_vs_random_eval_fn(random_kwargs)
             @info "eval" loss_rate_az_vs_random=loss_rate log_step_increment=0
             @info "eval" draw_rate_az_vs_random=draw_rate log_step_increment=0
         end
+        push!(metrics["az"]["random"], (win_rate, loss_rate, draw_rate))
     end
 
     return evaluate_alphazero_vs_random
 end
 
-function get_nn_vs_random_eval_fn(random_kwargs)
+function get_nn_vs_random_eval_fn(random_kwargs, metrics)
 
     function evaluate_nn_vs_random(loggers, nn, _, _)
         cpu_nn = nn |> Flux.cpu
@@ -100,12 +103,13 @@ function get_nn_vs_random_eval_fn(random_kwargs)
             @info "eval" loss_rate_nn_vs_random=loss_rate log_step_increment=0
             @info "eval" draw_rate_nn_vs_random=draw_rate log_step_increment=0
         end
+        push!(metrics["nn"]["random"], (win_rate, loss_rate, draw_rate))
     end
 
     return evaluate_nn_vs_random
 end
 
-function get_alphazero_vs_minimax_eval_fn(minimax_kwargs)
+function get_alphazero_vs_minimax_eval_fn(minimax_kwargs, metrics)
 
     function evaluate_alphazero_vs_minimax(loggers, nn, _, _)
         az_args = (init_mcts_config(CPU(), Flux.cpu(nn), minimax_kwargs["config"]),)
@@ -134,12 +138,13 @@ function get_alphazero_vs_minimax_eval_fn(minimax_kwargs)
             @info "eval" loss_rate_az_vs_minimax=loss_rate log_step_increment=0
             @info "eval" draw_rate_az_vs_minimax=draw_rate log_step_increment=0
         end
+        push!(metrics["az"]["minimax"], (win_rate, loss_rate, draw_rate))
     end
 
     return evaluate_alphazero_vs_minimax
 end
 
-function get_nn_vs_minimax_eval_fn(minimax_kwargs)
+function get_nn_vs_minimax_eval_fn(minimax_kwargs, metrics)
 
     function evaluate_nn_vs_minimax(loggers, nn, _, _)
         cpu_nn = nn |> Flux.cpu
@@ -168,12 +173,13 @@ function get_nn_vs_minimax_eval_fn(minimax_kwargs)
             @info "eval" loss_rate_nn_vs_minimax=loss_rate log_step_increment=0
             @info "eval" draw_rate_nn_vs_minimax=draw_rate log_step_increment=0
         end
+        push!(metrics["nn"]["minimax"], (win_rate, loss_rate, draw_rate))
     end
 
     return evaluate_nn_vs_minimax
 end
 
-function get_tictactoe_benchmark_fns(kwargs)
+function get_tictactoe_benchmark_fns(kwargs, metrics)
     _, optimal_policy, possible_envs = minimax_compute_optimal_actions(
         BitwiseTicTacToeEnv();
         depth=10
@@ -236,6 +242,7 @@ function get_tictactoe_benchmark_fns(kwargs)
             @info "eval" mcts_benchmark_accuracy=mcts_accuracy log_step_increment=0
         end
         log_msg(loggers["eval"], "MCTS Accuracy: $mcts_accuracy")
+        push!(metrics["az"]["benchmark"], mcts_accuracy)
     end
 
     function benchmark_nn_fn(loggers, nn, _, step)
@@ -269,9 +276,72 @@ function get_tictactoe_benchmark_fns(kwargs)
             @info "eval" nn_benchmark_accuracy=nn_accuracy log_step_increment=0
         end
         log_msg(loggers["eval"], "Raw NN Accuracy: $nn_accuracy")
+        push!(metrics["nn"]["benchmark"], nn_accuracy)
     end
 
     return benchmark_mcts_fn, benchmark_nn_fn
+end
+
+function plot_metrics(save_dir, timestamps, metrics)
+    !isdir(save_dir) && mkpath(save_dir)
+
+    num_matches = length(metrics["az"]["random"])
+    az_random_wins = [metrics["az"]["random"][i][1] for i in 1:num_matches]
+    az_random_losses = [metrics["az"]["random"][i][2] for i in 1:num_matches]
+    az_random_draws = [metrics["az"]["random"][i][3] for i in 1:num_matches]
+
+    num_matches = length(metrics["nn"]["random"])
+    az_minimax_wins = [metrics["az"]["minimax"][i][1] for i in 1:num_matches]
+    az_minimax_losses = [metrics["az"]["minimax"][i][2] for i in 1:num_matches]
+    az_minimax_draws = [metrics["az"]["minimax"][i][3] for i in 1:num_matches]
+
+    num_matches = length(metrics["nn"]["random"])
+    nn_random_wins = [metrics["nn"]["random"][i][1] for i in 1:num_matches]
+    nn_random_losses = [metrics["nn"]["random"][i][2] for i in 1:num_matches]
+    nn_random_draws = [metrics["nn"]["random"][i][3] for i in 1:num_matches]
+
+    num_matches = length(metrics["nn"]["minimax"])
+    nn_minimax_wins = [metrics["nn"]["minimax"][i][1] for i in 1:num_matches]
+    nn_minimax_losses = [metrics["nn"]["minimax"][i][2] for i in 1:num_matches]
+    nn_minimax_draws = [metrics["nn"]["minimax"][i][3] for i in 1:num_matches]
+
+    num_evals = length(metrics["az"]["benchmark"])
+    az_benchmark_accuracies = [metrics["az"]["benchmark"][i] for i in 1:num_evals]
+
+    num_evals = length(metrics["nn"]["benchmark"])
+    nn_benchmark_accuracies = [metrics["nn"]["benchmark"][i] for i in 1:num_evals]
+
+    l = @layout [a b c ; d e f; _ g _]
+    timestamps /= 60
+
+    p1 = plot(timestamps, [az_random_wins, nn_random_wins], lc=[:auto :orange],
+              ylims=(0, 1.01), title="\nWin Rate vs Random\n", linewidth=2, legend=:best,
+              label=nothing, show=false)
+    p2 = plot(timestamps, [az_random_losses, nn_random_losses], lc=[:auto :orange],
+              ylims=(0, 1.01), title="\nLoss Rate vs Random\n", linewidth=2, legend=:best,
+              label=nothing, show=false)
+    p3 = plot(timestamps, [az_random_draws, nn_random_draws], lc=[:auto :orange],
+              ylims=(0, 1.01), title="\nDraw Rate vs Random\n", linewidth=2, legend=:best,
+              label=nothing, show=false)
+    p4 = plot(timestamps, [az_minimax_wins, nn_minimax_wins], lc=[:auto :orange],
+              ylims=(0, 1.01), title="Win Rate vs Minimax\n", linewidth=2, legend=:best,
+              label=nothing, show=false)
+    p5 = plot(timestamps, [az_minimax_losses, nn_minimax_losses], lc=[:auto :orange],
+              ylims=(0, 1.01), title="Loss Rate vs Minimax\n", linewidth=2, legend=:best,
+              label=nothing, show=false)
+    p6 = plot(timestamps, [az_minimax_draws, nn_minimax_draws], lc=[:auto :orange],
+              ylims=(0, 1.01), title="Draw Rate vs Minimax\n", linewidth=2, legend=:best,
+              label=nothing, show=false)
+    p7 = plot(timestamps, [az_benchmark_accuracies, nn_benchmark_accuracies],
+              lc=[:auto :orange], label=["AlphaZero" "Raw NN"], ylims=(0, 1.01),
+              xlabel="training time (min)\n", title="Benchmark Accuracy\n", linewidth=2,
+              legend=:best, legendfont=font(11), show=false)
+
+    plot_size = (1_600, Int(floor(1_600 / Base.MathConstants.golden)))
+    p = plot(p1, p2, p3, p4, p5, p6, p7, layout=l, size=plot_size, margin=(6, :mm), show=false)
+    savefig(p, joinpath(save_dir, "metrics.png"))
+
+    return nothing
 end
 
 end

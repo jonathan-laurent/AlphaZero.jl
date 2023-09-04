@@ -1,7 +1,7 @@
 using RLZero.BatchedEnvs
 using RLZero.Network
 using RLZero.Train
-using RLZero.TrainUtilities: TrainConfig, print_execution_times
+using RLZero.TrainUtilities: TrainConfig, get_train_timestamps, print_execution_times
 using RLZero.Tests.Common.BitwiseTicTacToe
 using RLZero.Tests.Common.BitwiseTicTacToeEvalFns
 using RLZero.Util.Devices
@@ -10,6 +10,7 @@ using Flux
 using Random
 
 const SAVEDIR = "examples/models/tictactoe-checkpoints"
+const PLOTSDIR = "examples/plots/tictactoe"
 
 state_dim = BatchedEnvs.state_size(BitwiseTicTacToeEnv)
 action_dim = BatchedEnvs.num_actions(BitwiseTicTacToeEnv)
@@ -24,6 +25,13 @@ neural_net_hyperparams = SimpleNetHP(
     batch_norm_momentum=0.6f0
 )
 nn_cpu = SimpleNet(state_dim..., action_dim, neural_net_hyperparams)
+
+
+# global lists used to retrieve data from the benchmarks
+metrics = Dict(
+    "az" => Dict("random" => [], "minimax" => [], "benchmark" => []),
+    "nn" => Dict("random" => [], "minimax" => [], "benchmark" => [])
+)
 
 
 """Returns a list with all the evaluation functions to be called during evaluation sessions.
@@ -66,11 +74,11 @@ function get_eval_fns(num_mcts_simulations)
     )
 
     # get the actual evaluation functions as closures
-    alphazero_vs_random_eval_fn = get_alphazero_vs_random_eval_fn(az_vs_random_kwargs)
-    nn_vs_random_eval_fn = get_nn_vs_random_eval_fn(nn_vs_random_kwargs)
-    alphazero_vs_minimax_eval_fn = get_alphazero_vs_minimax_eval_fn(az_vs_minimax_kwargs)
-    nn_vs_minimax_eval_fn = get_nn_vs_minimax_eval_fn(nn_vs_minimax_kwargs)
-    mcts_benchmark_fn, nn_benchmark_fn = get_tictactoe_benchmark_fns(benchmark_fns_kwargs)
+    alphazero_vs_random_eval_fn = get_alphazero_vs_random_eval_fn(az_vs_random_kwargs, metrics)
+    nn_vs_random_eval_fn = get_nn_vs_random_eval_fn(nn_vs_random_kwargs, metrics)
+    alphazero_vs_minimax_eval_fn = get_alphazero_vs_minimax_eval_fn(az_vs_minimax_kwargs, metrics)
+    nn_vs_minimax_eval_fn = get_nn_vs_minimax_eval_fn(nn_vs_minimax_kwargs, metrics)
+    mcts_benchmark_fn, nn_benchmark_fn = get_tictactoe_benchmark_fns(benchmark_fns_kwargs, metrics)
 
     return [
         alphazero_vs_random_eval_fn,
@@ -89,28 +97,28 @@ function create_config()
     # environment variables
     EnvCls = BitwiseTicTacToeEnv
     env_kwargs = Dict()
-    num_envs = 25_000
+    num_envs = 30_000
 
     # common MCTS variables
     use_gumbel_mcts = false
-    num_simulations = 64
+    num_simulations = 16
 
     # Gumbel MCTS variables
     # ...we can omit these since we're using Traditional Alphazero MCTS
 
     # AlphaZero MCTS variables
-    c_puct = 1.5f0
+    c_puct = 2.0f0
     alpha_dirichlet = 0.10f0
     epsilon_dirichlet = 0.25f0
     tau = 1.0f0
-    collapse_tau_move = 7
+    collapse_tau_move = 6
 
     # NN Training variables
-    replay_buffer_size = num_envs * 90
+    replay_buffer_size = num_envs * 100
     min_train_samples = 1_000
     train_freq = num_envs * 10
     adam_learning_rate = 1e-3
-    gradient_clip = 1e-3
+    weight_decay = 1e-4
     batch_size = 25_000
     train_epochs = 2
 
@@ -127,7 +135,7 @@ function create_config()
     eval_freq = num_envs * 10
 
     # Total train steps
-    num_steps = num_envs * 90
+    num_steps = num_envs * 100
 
     return TrainConfig(;
         EnvCls=EnvCls,
@@ -147,7 +155,7 @@ function create_config()
         min_train_samples=min_train_samples,
         train_freq=train_freq,
         adam_lr=adam_learning_rate,
-        gradient_clip=gradient_clip,
+        weight_decay=weight_decay,
         batch_size=batch_size,
         train_epochs=train_epochs,
 
@@ -164,8 +172,9 @@ function create_config()
     )
 end
 
-# empty the save directory
+# empty the save/plot directories
 run(`rm -rf $(SAVEDIR)`)
+run(`rm -rf $(PLOTSDIR)`)
 
 # choose the device to train AlphaZero on (`CPU()` or `GPU()`)
 device = GPU()
@@ -179,6 +188,12 @@ config = create_config()
 # train!
 nn, execution_times = selfplay!(config, device, nn)
 
+# get train timestamps
+timestamps = get_train_timestamps(execution_times, config)
+
 # print some statistics
 println("\n")
 print_execution_times(execution_times)
+
+# plot the metrics
+plot_metrics(PLOTSDIR, timestamps, metrics)
