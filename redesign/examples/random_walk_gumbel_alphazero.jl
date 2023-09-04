@@ -26,8 +26,8 @@ nn_cpu = SimpleNet(state_dim..., action_dim, neural_net_hyperparams)
 
 
 # global lists used to retrieve data from the benchmarks
-global_times = Dict("nn" => [])
-global_metrics = Dict("nn" => [])
+global_times = []
+global_metrics = []
 
 
 """Returns a list with all the evaluation functions to be called during evaluation sessions.

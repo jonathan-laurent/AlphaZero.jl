@@ -68,8 +68,8 @@ function get_nn_evaluation_fn(global_times, global_metrics)
         start_time += bench_end_time - bench_start_time
 
         eval_time = time() - start_time
-        push!(global_times["nn"], eval_time)
-        push!(global_metrics["nn"], (avg_steps, avg_win_rate, avg_right_prob))
+        push!(global_times, eval_time)
+        push!(global_metrics, (avg_steps, avg_win_rate, avg_right_prob))
     end
 
     return evaluate_nn
@@ -78,10 +78,10 @@ end
 function plot_metrics(save_dir, global_times, global_metrics)
     !isdir(save_dir) && mkpath(save_dir)
 
-    times = global_times["nn"]
-    avg_steps = [metrics[1] for metrics in global_metrics["nn"]]
-    avg_win_rates = [metrics[2] for metrics in global_metrics["nn"]]
-    avg_right_probs = [metrics[3] for metrics in global_metrics["nn"]]
+    times = global_times
+    avg_steps = [metrics[1] for metrics in global_metrics]
+    avg_win_rates = [metrics[2] for metrics in global_metrics]
+    avg_right_probs = [metrics[3] for metrics in global_metrics]
 
     l = @layout [a ; b ; c]
 
