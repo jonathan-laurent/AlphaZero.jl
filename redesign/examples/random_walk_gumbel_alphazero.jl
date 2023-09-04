@@ -10,6 +10,7 @@ using Flux
 using Random
 
 const SAVEDIR = "examples/models/random-walk-1d-checkpoints"
+const PLOTSDIR = "examples/plots/random-walk-1d-plots"
 
 state_dim = BatchedEnvs.state_size(BitwiseRandomWalk1DEnv)
 action_dim = BatchedEnvs.num_actions(BitwiseRandomWalk1DEnv)
@@ -24,12 +25,18 @@ neural_net_hyperparams = SimpleNetHP(
 nn_cpu = SimpleNet(state_dim..., action_dim, neural_net_hyperparams)
 
 
+# global lists used to retrieve data from the benchmarks
+global_times = Dict("nn" => [])
+global_metrics = Dict("nn" => [])
+
+
 """Returns a list with all the evaluation functions to be called during evaluation sessions.
     Since RandomWalk is a quite simple environment, only the NN will be evaluated. All
     the evaluation functions for the BitwiseRandomWalk1D environment can be found in:
     Tests/Common/Evaluation/EvaluationFunctions/BitwiseRandomWalk1DEvalFns.jl."""
 function get_eval_fns()
-    return [evaluate_nn]
+    evaluate_nn_fn = get_nn_evaluation_fn(global_times, global_metrics)
+    return [evaluate_nn_fn]
 end
 
 
@@ -110,8 +117,9 @@ function create_config()
     )
 end
 
-# empty the save directory
+# empty the save/plot directories
 run(`rm -rf $(SAVEDIR)`)
+run(`rm -rf $(PLOTSDIR)`)
 
 # choose the device to train AlphaZero on (`CPU()` or `GPU()`)
 device = CPU()
@@ -128,3 +136,6 @@ nn, execution_times = selfplay!(config, device, nn)
 # print some statistics
 println("\n")
 print_execution_times(execution_times)
+
+# plot the metrics
+plot_metrics(PLOTSDIR, global_times, global_metrics)
