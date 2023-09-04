@@ -1,7 +1,7 @@
 using RLZero.BatchedEnvs
 using RLZero.Network
 using RLZero.Train
-using RLZero.TrainUtilities: TrainConfig, print_execution_times
+using RLZero.TrainUtilities: TrainConfig, get_train_timestamps, print_execution_times
 using RLZero.Tests.Common.BitwiseRandomWalk1D
 using RLZero.Tests.Common.BitwiseRandomWalk1DEvalFns
 using RLZero.Util.Devices
@@ -25,8 +25,7 @@ neural_net_hyperparams = SimpleNetHP(
 nn_cpu = SimpleNet(state_dim..., action_dim, neural_net_hyperparams)
 
 
-# global lists used to retrieve data from the benchmarks
-times = []
+# global list used to retrieve data from the benchmarks
 metrics = []
 
 
@@ -35,7 +34,7 @@ metrics = []
     the evaluation functions for the BitwiseRandomWalk1D environment can be found in:
     Tests/Common/Evaluation/EvaluationFunctions/BitwiseRandomWalk1DEvalFns.jl."""
 function get_eval_fns()
-    evaluate_nn_fn = get_nn_evaluation_fn(times, metrics)
+    evaluate_nn_fn = get_nn_evaluation_fn(metrics)
     return [evaluate_nn_fn]
 end
 
@@ -133,9 +132,12 @@ config = create_config()
 # train!
 nn, execution_times = selfplay!(config, device, nn)
 
+# get train timestamps
+timestamps = get_train_timestamps(execution_times, config)
+
 # print some statistics
 println("\n")
 print_execution_times(execution_times)
 
 # plot the metrics
-plot_metrics(PLOTSDIR, times, metrics)
+plot_metrics(PLOTSDIR, timestamps, metrics)

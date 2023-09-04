@@ -26,11 +26,9 @@ function _get_nn_policy(cpu_nn, env)
     return Flux.softmax(p[:, 1])
 end
 
-function get_nn_evaluation_fn(times, metrics)
-    start_time = time()
+function get_nn_evaluation_fn(metrics)
 
     function evaluate_nn(loggers, nn, _, _)
-        bench_start_time = time()
         rng = Random.MersenneTwister(0)
         cpu_nn = Flux.cpu(nn)
         num_wins, total_steps, right_probs = 0, 0, 0f0
@@ -62,20 +60,13 @@ function get_nn_evaluation_fn(times, metrics)
             @info "eval" nn_avg_win_rate=avg_win_rate log_step_increment=0
             @info "eval" nn_avg_optimal_policy_prob=avg_right_prob log_step_increment=0
         end
-        bench_end_time = time()
-
-        # increment start time by the time it took to evaluate the benchmarks
-        start_time += bench_end_time - bench_start_time
-
-        eval_time = time() - start_time
-        push!(times, eval_time)
         push!(metrics, (avg_steps, avg_win_rate, avg_right_prob))
     end
 
     return evaluate_nn
 end
 
-function plot_metrics(save_dir, times, metrics)
+function plot_metrics(save_dir, timestamps, metrics)
     !isdir(save_dir) && mkpath(save_dir)
 
     avg_steps = [metrics[1] for metrics in metrics]
@@ -84,16 +75,16 @@ function plot_metrics(save_dir, times, metrics)
 
     l = @layout [a ; b ; c]
 
-    p1 = plot(times, avg_steps, label="Average steps to episode end", ylims=(0, 20),
+    p1 = plot(timestamps, avg_steps, label="Average steps to episode end", ylims=(0, 20),
               title="Metrics\n", linewidth=2, legend=:best, show=false)
-    p2 = plot(times, avg_win_rates, label="Average win rate over 10 episodes",
+    p2 = plot(timestamps, avg_win_rates, label="Average win rate over 10 episodes",
               ylims=(0, 1.01), linewidth=2, legend=:best, show=false)
-    p3 = plot(times, avg_right_probs, label="Average optimal policy selection",
+    p3 = plot(timestamps, avg_right_probs, label="Average optimal policy selection",
               xlabel="\ntraining time (s)", ylims=(0, 1.01), linewidth=2, legend=:best,
               show=false)
 
     plot_size = (Int(floor(1_000 / Base.MathConstants.golden)), 1_000)
-    p = plot(p1, p2, p3, layout=l, size=plot_size, margin=(5, :mm), show=false)
+    p = plot(p1, p2, p3, layout=l, size=plot_size, margin=(6, :mm), show=false)
     savefig(p, joinpath(save_dir, "metrics.png"))
 
     return nothing

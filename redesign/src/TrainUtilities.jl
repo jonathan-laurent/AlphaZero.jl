@@ -56,7 +56,7 @@ using ...Util.Devices
 
 
 export TrainConfig, TrainExecutionTimes
-export init_envs, init_mcts_config, save_nn, print_execution_times
+export init_envs, init_mcts_config, save_nn, get_train_timestamps, print_execution_times
 
 
 """
@@ -252,12 +252,12 @@ struct TrainExecutionTimes
     eval_times::Array{Float64}
 end
 
-function TrainExecutionTimes(total_steps)
-    explore_times = zeros(Float64, total_steps)
-    selection_times = zeros(Float64, total_steps)
-    step_save_reset_times = zeros(Float64, total_steps)
-    train_times = zeros(Float64, total_steps)
-    eval_times = zeros(Float64, total_steps)
+function TrainExecutionTimes(total_batch_steps)
+    explore_times = zeros(Float64, total_batch_steps)
+    selection_times = zeros(Float64, total_batch_steps)
+    step_save_reset_times = zeros(Float64, total_batch_steps)
+    train_times = zeros(Float64, total_batch_steps)
+    eval_times = zeros(Float64, total_batch_steps)
     return TrainExecutionTimes(
         explore_times,
         selection_times,
@@ -265,6 +265,24 @@ function TrainExecutionTimes(total_steps)
         train_times,
         eval_times
     )
+end
+
+function get_train_timestamps(execution_times::TrainExecutionTimes, config::TrainConfig)
+    total_batch_steps = config.num_steps ÷ config.num_envs
+    batch_eval_freq = config.eval_freq ÷ config.num_envs
+
+    timestamps = zeros(Float64, total_batch_steps)
+    train_timestamps = []
+    for step in 1:total_batch_steps
+        step_duration = execution_times.explore_times[step] +
+            execution_times.selection_times[step] +
+            execution_times.step_save_reset_times[step] +
+            execution_times.train_times[step]
+        timestamps[step] = step_duration + (step == 1 ? 0 : timestamps[step - 1])
+        (step % batch_eval_freq == 0) && push!(train_timestamps, timestamps[step])
+    end
+
+    return train_timestamps
 end
 
 function print_execution_times(execution_times::TrainExecutionTimes)
@@ -301,8 +319,11 @@ function print_execution_times(execution_times::TrainExecutionTimes)
 
     train_loop_time = total_exp_time + total_select_time + total_ssr_time + total_train_time
     train_loop_time = round(train_loop_time, digits=4)
+
+    total_time = round(train_loop_time + total_eval_time, digits=4)
     println("\n")
     println("Total train loop time: $train_loop_time seconds.")
+    println("Total time (train + eval): $total_time seconds.")
 end
 
 end
