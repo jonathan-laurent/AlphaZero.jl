@@ -270,8 +270,8 @@ end
 function print_execution_times(execution_times::TrainExecutionTimes)
     batch_steps = length(execution_times.explore_times)
 
-    total_exp_time = sum(execution_times.explore_times)
-    avg_exp_time = total_exp_time / batch_steps
+    total_exp_time = round(sum(execution_times.explore_times), digits=4)
+    avg_exp_time = round(total_exp_time / batch_steps, digits=4)
 
     total_select_time = round(sum(execution_times.selection_times), digits=4)
     avg_select_time = round(total_select_time / batch_steps, digits=4)
