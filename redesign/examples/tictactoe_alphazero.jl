@@ -74,18 +74,27 @@ function get_eval_fns(num_mcts_simulations)
     )
 
     # get the actual evaluation functions as closures
-    alphazero_vs_random_eval_fn = get_alphazero_vs_random_eval_fn(az_vs_random_kwargs, metrics)
+    alphazero_vs_random_eval_fn = get_alphazero_vs_random_eval_fn(
+        az_vs_random_kwargs,
+        metrics
+    )
     nn_vs_random_eval_fn = get_nn_vs_random_eval_fn(nn_vs_random_kwargs, metrics)
-    alphazero_vs_minimax_eval_fn = get_alphazero_vs_minimax_eval_fn(az_vs_minimax_kwargs, metrics)
+    alphazero_vs_minimax_eval_fn = get_alphazero_vs_minimax_eval_fn(
+        az_vs_minimax_kwargs,
+        metrics
+    )
     nn_vs_minimax_eval_fn = get_nn_vs_minimax_eval_fn(nn_vs_minimax_kwargs, metrics)
-    mcts_benchmark_fn, nn_benchmark_fn = get_tictactoe_benchmark_fns(benchmark_fns_kwargs, metrics)
+    az_benchmark_fn, nn_benchmark_fn = get_tictactoe_benchmark_fns(
+        benchmark_fns_kwargs,
+        metrics
+    )
 
     return [
         alphazero_vs_random_eval_fn,
         nn_vs_random_eval_fn,
         alphazero_vs_minimax_eval_fn,
         nn_vs_minimax_eval_fn,
-        mcts_benchmark_fn,
+        az_benchmark_fn,
         nn_benchmark_fn
     ]
 end
@@ -192,7 +201,6 @@ nn, execution_times = selfplay!(config, device, nn)
 timestamps = get_train_timestamps(execution_times, config)
 
 # print some statistics
-println("\n")
 print_execution_times(execution_times)
 
 # plot the metrics

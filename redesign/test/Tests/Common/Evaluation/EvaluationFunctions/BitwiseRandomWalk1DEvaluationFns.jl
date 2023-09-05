@@ -20,10 +20,8 @@ export get_nn_evaluation_fn, plot_metrics
 function _get_nn_policy(cpu_nn, env)
     state = BatchedEnvs.vectorize_state(env)
     state = Flux.unsqueeze(state, length(size(state)) + 1)
-    _, p = forward(cpu_nn, state)
-    invalid_actions = .!get_valid_actions([env])[:, 1]
-    p[invalid_actions, 1] .= -Inf
-    return Flux.softmax(p[:, 1])
+    _, p = forward(cpu_nn, state, true)
+    return p[:, 1]
 end
 
 function get_nn_evaluation_fn(metrics)
@@ -75,15 +73,15 @@ function plot_metrics(save_dir, timestamps, metrics)
 
     l = @layout [a ; b ; c]
 
-    p1 = plot(timestamps, avg_steps, label="Average steps to episode end", ylims=(0, 20),
-              title="Metrics\n", linewidth=2, legend=:best, show=false)
-    p2 = plot(timestamps, avg_win_rates, label="Average win rate over 10 episodes",
+    p1 = plot(timestamps, avg_steps, label="Average episode length", ylims=(0, 20),
+              title="Metrics", linewidth=2, legend=:best, show=false)
+    p2 = plot(timestamps, avg_win_rates, label="Win rate over 10 episodes",
               ylims=(0, 1.01), linewidth=2, legend=:best, show=false)
-    p3 = plot(timestamps, avg_right_probs, label="Average optimal policy selection",
-              xlabel="\ntraining time (s)", ylims=(0, 1.01), linewidth=2, legend=:best,
-              show=false)
+    p3 = plot(timestamps, avg_right_probs, label="Average optimal policy probability",
+              xlabel="\ntraining time (s)", ylims=(0, 1.01), linewidth=2,
+              legend=:bottomright, show=false)
 
-    plot_size = (Int(floor(1_000 / Base.MathConstants.golden)), 1_000)
+    plot_size = (Int(floor(750 / Base.MathConstants.golden)), 750)
     p = plot(p1, p2, p3, layout=l, size=plot_size, margin=(6, :mm), show=false)
     savefig(p, joinpath(save_dir, "metrics.png"))
 

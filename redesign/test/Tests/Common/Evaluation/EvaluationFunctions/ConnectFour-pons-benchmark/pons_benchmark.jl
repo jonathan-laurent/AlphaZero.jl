@@ -38,6 +38,7 @@ end
 
 
 function _load_benchmarks(dir, process)
+    println("Loading Pascal Pons' benchmark data...")
     @assert isdir(dir)
     benchmarks = Bench[]
     files = readdir(dir)
@@ -63,24 +64,18 @@ function _load_benchmarks(dir, process)
         findfirst(==(b.difficulty), DIFFICULTIES),
         findfirst(==(b.stage), STAGES))
     sort!(benchmarks, by=rank)
+    println("Finished loading Pascal Pons' benchmark data.")
 
     return benchmarks
 end
 
-function get_pons_benchmark_fn(global_times, global_errs, kwargs)
-    @warn "Disable other evaluation-functions/benchmarks to get accurate results on the " *
-          "pons benchmark."
-
+function get_pons_benchmark_fns(kwargs, metrics)
     cmd = pipeline(Cmd(`./c4solver`, dir="connect4"), stderr=devnull)
     process = open(cmd, "r+")
     benchmarks = _load_benchmarks(BENCHMARKS_DIR, process)
     close(process)
 
-    start_time = time()
-
     function az_pons_benchmark(loggers, nn, _, _)
-        bench_start_time = time()
-
         errs = []
         for bench in benchmarks
             envs = DeviceArray(kwargs["device"])([entry[1] for entry in bench.entries])
@@ -106,20 +101,10 @@ function get_pons_benchmark_fn(global_times, global_errs, kwargs)
             @info "eval" az_posbench_middle_medium=errs[5] log_step_increment=0
             @info "eval" az_posbench_beginning_hard=errs[6] log_step_increment=0
         end
-
-        bench_end_time = time()
-
-        # increment start time by the time it took to evaluate the benchmarks
-        start_time += bench_end_time - bench_start_time
-
-        eval_time = time() - start_time
-        push!(global_times["az"], eval_time)
-        push!(global_errs["az"], errs)
+        push!(metrics["az"]["pons"], errs)
     end
 
     function nn_pons_benchmark(loggers, nn, _, _)
-        bench_start_time = time()
-
         cpu_nn = Flux.cpu(nn)
         errs = []
         for bench in benchmarks
@@ -148,15 +133,7 @@ function get_pons_benchmark_fn(global_times, global_errs, kwargs)
             @info "eval" nn_posbench_beginning_hard=errs[6] log_step_increment=0
 
         end
-
-        bench_end_time = time()
-
-        # increment start time by the time it took to evaluate the benchmarks
-        start_time += bench_end_time - bench_start_time
-
-        eval_time = time() - start_time
-        push!(global_times["nn"], eval_time)
-        push!(global_errs["nn"], errs)
+        push!(metrics["nn"]["pons"], errs)
     end
 
     return az_pons_benchmark, nn_pons_benchmark

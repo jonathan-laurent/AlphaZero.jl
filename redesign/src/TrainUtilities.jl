@@ -305,6 +305,7 @@ function print_execution_times(execution_times::TrainExecutionTimes)
     total_eval_time = round(sum(eval_times), digits=4)
     avg_eval_time = round(total_eval_time / length(eval_times), digits=4)
 
+    println("\n")
     println("Total explore time: $total_exp_time seconds.")
     println("Total selection time: $total_select_time seconds.")
     println("Total step-save-reset time: $total_ssr_time seconds.")

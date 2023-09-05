@@ -8,12 +8,10 @@ using RLZero.Util.Devices
 using Flux
 using JLD2
 
-
 const MCTS = BatchedMcts
 
-
 # set these constants to your preference
-const DEVICE = GPU()
+const DEVICE = CPU()
 const MODEL_PATH = "examples/models/connect-four-checkpoints/model_1500.jld2"
 const nn_config = SimpleResNetHP(width=512, depth_common=6, depth_phead=1, depth_vhead=1)
 
@@ -117,13 +115,13 @@ nn = load_nn()
 #     use_gumbel_mcts = false,
 #     num_simulations = 600,
 
-#     # Gumbel MCTS variables
+#     # Gumbel MCTS variables -- No need to set those since we're using traditional MCTS,
+#     #   but they're here for completeness
 #     num_considered_actions = 7,
 #     mcts_value_scale = 0.1f0,
 #     mcts_max_visit_init = 50,
 
-#     # AlphaZero MCTS variables -- No need to set those since we're using Gumbel, but
-#     #   they're here for completeness
+#     # AlphaZero MCTS variable
 #     c_puct = 2.0f0,
 #     alpha_dirichlet = 0.3f0,
 #     epsilon_dirichlet = 0.25f0,

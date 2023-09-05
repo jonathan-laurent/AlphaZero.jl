@@ -10,7 +10,7 @@ using Flux
 using Random
 
 const SAVEDIR = "examples/models/random-walk-1d-checkpoints"
-const PLOTSDIR = "examples/plots/random-walk-1d-plots"
+const PLOTSDIR = "examples/plots/random-walk-1d"
 
 state_dim = BatchedEnvs.state_size(BitwiseRandomWalk1DEnv)
 action_dim = BatchedEnvs.num_actions(BitwiseRandomWalk1DEnv)
@@ -45,28 +45,28 @@ function create_config()
     # environment variables
     EnvCls = BitwiseRandomWalk1DEnv
     env_kwargs = Dict()
-    num_envs = 500
+    num_envs = 50
 
     # common MCTS variables
     use_gumbel_mcts = true
-    num_simulations = 4
+    num_simulations = 3
 
     # Gumbel MCTS variables
     num_considered_actions = 2
-    mcts_value_scale = 1f0
+    mcts_value_scale = 5f0
     mcts_max_visit_init = 50
 
     # AlphaZero MCTS variables
     # ...we can omit these since we're using Gumbel MCTS
 
     # NN Training variables
-    replay_buffer_size = num_envs * 50
+    replay_buffer_size = num_envs * 100
     min_train_samples = 10
     train_freq = num_envs * 25
     adam_learning_rate = 2e-3
     weight_decay = 1e-4
     batch_size = 1_000
-    train_epochs = 1
+    train_epochs = 2
 
     # Logging variables
     train_logfile = "train.log"
@@ -136,7 +136,6 @@ nn, execution_times = selfplay!(config, device, nn)
 timestamps = get_train_timestamps(execution_times, config)
 
 # print some statistics
-println("\n")
 print_execution_times(execution_times)
 
 # plot the metrics

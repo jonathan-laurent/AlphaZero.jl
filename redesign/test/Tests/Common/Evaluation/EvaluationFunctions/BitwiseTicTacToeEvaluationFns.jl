@@ -209,7 +209,7 @@ function get_tictactoe_benchmark_fns(kwargs, metrics)
         return fixed
     end
 
-    function benchmark_mcts_fn(loggers, nn, _, step)
+    function benchmark_az_fn(loggers, nn, _, step)
         envs = DeviceArray(kwargs["device"])(possible_envs)
         device_nn = (kwargs["device"] == GPU()) ? Flux.gpu(nn) : Flux.cpu(nn)
         mcts_config = init_mcts_config(kwargs["device"], device_nn, kwargs["config"])
@@ -221,12 +221,12 @@ function get_tictactoe_benchmark_fns(kwargs, metrics)
         log_msg(mcts_losses_logger, "Accuracy evaluation at step $step")
 
         false_positives = zeros(Int, 9)
-        mcts_correct = 0
+        az_correct = 0
         for i in 1:total_states
 
             chosen_action = policy[i]
             if chosen_action in optimal_actions[i]
-                mcts_correct += 1
+                az_correct += 1
             else
                 false_positives[chosen_action] += 1
                 env = possible_envs[i]
@@ -237,12 +237,12 @@ function get_tictactoe_benchmark_fns(kwargs, metrics)
         end
         log_msg(mcts_losses_logger, "\nFalse positive actions: $false_positives\n")
 
-        mcts_accuracy = round(mcts_correct / total_states, digits=4)
+        az_accuracy = round(az_correct / total_states, digits=4)
         with_logger(loggers["tb"]) do
-            @info "eval" mcts_benchmark_accuracy=mcts_accuracy log_step_increment=0
+            @info "eval" az_benchmark_accuracy=az_accuracy log_step_increment=0
         end
-        log_msg(loggers["eval"], "MCTS Accuracy: $mcts_accuracy")
-        push!(metrics["az"]["benchmark"], mcts_accuracy)
+        log_msg(loggers["eval"], "AlphaZero Accuracy: $az_accuracy")
+        push!(metrics["az"]["benchmark"], az_accuracy)
     end
 
     function benchmark_nn_fn(loggers, nn, _, step)
@@ -279,7 +279,7 @@ function get_tictactoe_benchmark_fns(kwargs, metrics)
         push!(metrics["nn"]["benchmark"], nn_accuracy)
     end
 
-    return benchmark_mcts_fn, benchmark_nn_fn
+    return benchmark_az_fn, benchmark_nn_fn
 end
 
 function plot_metrics(save_dir, timestamps, metrics)
@@ -290,7 +290,7 @@ function plot_metrics(save_dir, timestamps, metrics)
     az_random_losses = [metrics["az"]["random"][i][2] for i in 1:num_matches]
     az_random_draws = [metrics["az"]["random"][i][3] for i in 1:num_matches]
 
-    num_matches = length(metrics["nn"]["random"])
+    num_matches = length(metrics["az"]["minimax"])
     az_minimax_wins = [metrics["az"]["minimax"][i][1] for i in 1:num_matches]
     az_minimax_losses = [metrics["az"]["minimax"][i][2] for i in 1:num_matches]
     az_minimax_draws = [metrics["az"]["minimax"][i][3] for i in 1:num_matches]
@@ -315,30 +315,31 @@ function plot_metrics(save_dir, timestamps, metrics)
     timestamps /= 60
 
     p1 = plot(timestamps, [az_random_wins, nn_random_wins], lc=[:auto :orange],
-              ylims=(0, 1.01), title="\nWin Rate vs Random\n", linewidth=2, legend=:best,
+              ylims=(-0.01, 1.01), title="\nWin Rate vs Random\n", linewidth=2,
               label=nothing, show=false)
     p2 = plot(timestamps, [az_random_losses, nn_random_losses], lc=[:auto :orange],
-              ylims=(0, 1.01), title="\nLoss Rate vs Random\n", linewidth=2, legend=:best,
+              ylims=(-0.01, 1.01), title="\nLoss Rate vs Random\n", linewidth=2,
               label=nothing, show=false)
     p3 = plot(timestamps, [az_random_draws, nn_random_draws], lc=[:auto :orange],
-              ylims=(0, 1.01), title="\nDraw Rate vs Random\n", linewidth=2, legend=:best,
+              ylims=(-0.01, 1.01), title="\nDraw Rate vs Random\n", linewidth=2,
               label=nothing, show=false)
     p4 = plot(timestamps, [az_minimax_wins, nn_minimax_wins], lc=[:auto :orange],
-              ylims=(0, 1.01), title="Win Rate vs Minimax\n", linewidth=2, legend=:best,
+              ylims=(-0.01, 1.01), title="Win Rate vs Minimax\n", linewidth=2,
               label=nothing, show=false)
     p5 = plot(timestamps, [az_minimax_losses, nn_minimax_losses], lc=[:auto :orange],
-              ylims=(0, 1.01), title="Loss Rate vs Minimax\n", linewidth=2, legend=:best,
+              ylims=(-0.01, 1.01), title="Loss Rate vs Minimax\n", linewidth=2,
               label=nothing, show=false)
     p6 = plot(timestamps, [az_minimax_draws, nn_minimax_draws], lc=[:auto :orange],
-              ylims=(0, 1.01), title="Draw Rate vs Minimax\n", linewidth=2, legend=:best,
+              ylims=(-0.01, 1.01), title="Draw Rate vs Minimax\n", linewidth=2,
               label=nothing, show=false)
     p7 = plot(timestamps, [az_benchmark_accuracies, nn_benchmark_accuracies],
-              lc=[:auto :orange], label=["AlphaZero" "Raw NN"], ylims=(0, 1.01),
+              lc=[:auto :orange], label=["AlphaZero" "Network Only"], ylims=(-0.01, 1.01),
               xlabel="training time (min)\n", title="Benchmark Accuracy\n", linewidth=2,
               legend=:best, legendfont=font(11), show=false)
 
     plot_size = (1_600, Int(floor(1_600 / Base.MathConstants.golden)))
-    p = plot(p1, p2, p3, p4, p5, p6, p7, layout=l, size=plot_size, margin=(6, :mm), show=false)
+    p = plot(p1, p2, p3, p4, p5, p6, p7, layout=l, size=plot_size, margin=(6, :mm),
+             show=false)
     savefig(p, joinpath(save_dir, "metrics.png"))
 
     return nothing
