@@ -390,9 +390,9 @@ again in the same REPL.
     The current implementation is a fully-functional and fully-tested rewrite of the
     original code, but only for the SoA variant. Thus, for future work regarding MCTS:
 
-    - [] Fix/test/document the AoS batched MCTS variant.
-    - [] Add support for using the MCTS tree from previous iterations, to improve exploration.
-    - [] Add improved MCTS algorithms and/or action selection strategies, such as in
+    - [ ] Fix/test/document the AoS batched MCTS variant.
+    - [ ] Add support for using the MCTS tree from previous iterations, to improve exploration.
+    - [ ] Add improved MCTS algorithms and/or action selection strategies, such as in
         [[Grill et al. 2020]](https://arxiv.org/pdf/2007.12509.pdf).
     
     <br>
@@ -404,8 +404,8 @@ again in the same REPL.
     at the same time. This would require a slight re-write of the self-play phase, but the
     speed gains would outweigh the effort.
 
-    - [] Add support for multithreading, multiprocessing during self-play.
-    - [] Add support for parallelization of Baatched MCTS over mutiple GPUs, as well as
+    - [ ] Add support for multithreading, multiprocessing during self-play.
+    - [ ] Add support for parallelization of Baatched MCTS over mutiple GPUs, as well as
         for the Neural Network training.
 
     <br>
@@ -417,8 +417,8 @@ again in the same REPL.
     agents for environments such as Connect-Four, they may not produce good results for
     more complex environments.
 
-    - [] Add CNNs and Residual CNNs (like the ones used in the original AlphaGoZero paper).
-    - [] Add RNN and transformer models.
+    - [ ] Add CNNs and Residual CNNs (like the ones used in the original AlphaGoZero paper).
+    - [ ] Add RNN and transformer models.
 
     <br>
 
@@ -431,12 +431,12 @@ again in the same REPL.
     functions for tuning the hyperparameters of AlphaZero. This is a big problem, since
     hyperparameter tuning is a very important part of training AlphaZero-like agents.
 
-    - [] Add a function that checks whether a user-defined environment is GPU-friendly.
-    - [] Add a function that checks whether a user-defined environment adheres to the
+    - [ ] Add a function that checks whether a user-defined environment is GPU-friendly.
+    - [ ] Add a function that checks whether a user-defined environment adheres to the
         [BatchedEnvs.jl](src/BatchedEnvs.jl) interface.
-    - [] Add a function that checks whether custom Neural Networks adhere to the
+    - [ ] Add a function that checks whether custom Neural Networks adhere to the
         [Network.jl](src/Networks/Network.jl) interface.
-    - [] Add hyperparameter tuning utilities with quasi-random search methods.
+    - [ ] Add hyperparameter tuning utilities with quasi-random search methods.
 
     <br>
 
@@ -446,9 +446,9 @@ again in the same REPL.
     value/policy/total losses, and relies on the user to log other information during
     the evaluation function calls. Thus, for future work regarding logging:
 
-    - [] Add more logging information during training, such as average episode length,
+    - [ ] Add more logging information during training, such as average episode length,
         average reward (for single-player games), iteration time, etc..
-    - [] Log/save all imprortant metrics on files instead of having them in memory.
+    - [ ] Log/save all imprortant metrics on files instead of having them in memory.
 
     <br>
 
@@ -458,9 +458,9 @@ again in the same REPL.
     to understand. This is due to the fact that the redesign was focused on the performance
     of the code. Thus, for future work regarding the API:
 
-    - [] Rewrite the API such that the user can train agents with fewer lines of code.
-    - [] Add more tutorials for how to use the package.
-    - [] Add wrapper functions for MCTS/Network-Only inference (like what is done in
+    - [ ] Rewrite the API such that the user can train agents with fewer lines of code.
+    - [ ] Add more tutorials for how to use the package.
+    - [ ] Add wrapper functions for MCTS/Network-Only inference (like what is done in
         [interactive_play.jl](examples/interactive_play.jl)).
 
     <br>
