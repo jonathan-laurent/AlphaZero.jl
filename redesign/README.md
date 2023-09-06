@@ -1,38 +1,58 @@
-# Redesign of AlphaZero.jl
+# A simple, full-GPU implementation of AlphaZero
 
 This repository is the result of Andreas Spanopoulos' contribution to the redesign of the
 [AlphaZero.jl](https://github.com/jonathan-laurent/AlphaZero.jl) open-source AlphaZero
-implementation in Julia. The aims of this redesign are:
+implementation in Julia. With this redesign, we achieved a remarkable
+**6x speedup in performance** by running the Monte Carlo Tree Search (MCTS) fully on GPU.
+
+The aims of this redesign are:
 
 1. **Code readability and maintainability.**
 2. **Code modularity and extensibility.**
 3. **Code performance.**
 
+By meeting these aims, not only have we maintained high standards for the overall
+architecture and readability of the code of AlphaZero.jl, but we have also made a
+significant leap in performance, which will be discussed in detail in the evaluation
+section.
+
 The redesign is based on the original implementation by
-[Jonathan Laurent](https://www.cs.cmu.edu/~jlaurent/), who is the main author of AlphaZero.jl,
-and the mentor of this project.
+[Jonathan Laurent](https://www.cs.cmu.edu/~jlaurent/), who is the main author of
+AlphaZero.jl, and the mentor of this project.
 
 
-## When can AlphaZero be used?
+## When can this implementation be used?
+
+### When can AlphaZero be used?
 
 AlphaZero is a general-purpose reinforcement learning algorithm introduced by
 [Google Deepmind](https://www.deepmind.com/) that can be used to train agents for two-player
 zero-sum games. Since any single-player game can be extended into a two-player zero-sum game
 just by adding a dummy player that never plays and receives the opposite reward of the
-player that is being trained, AlphaZero can also be used to train agents for single-player games.
+player that is being trained, AlphaZero can also be used to train agents for single-player
+games.
 
 AlphaZero is a model-based reinforcement learning algorithm, which means that it leverages a
 model of the environment to train the agent. This means that the transition dynamics of the
-environment must be known and deterministic. For unknown and/or stochastic environments,
+environment must be known. For environments where the transition dynamics are unknown, the
 the user can refer to [MuZero](https://arxiv.org/pdf/1911.08265.pdf) and
 [Stochastic MuZero](https://openreview.net/pdf?id=X6D9bAHhBQ1).
 
-Furthermore, this implementation will work better when the number of possible actions in
-an environment is relatively small. This is due to the fact that the tree in the MCTS
-algorithm is implemented with an array, and therefore for games like chess were there
-are more than 4000 possible actions, even though the legal ones may be much less
-in any given state, the memory requirements will be extremely high, thus forcing the
-user to use a small batch of environments, which cancels the benefits of this implementation.
+### When can this implementation be used?
+
+This implementation works best when:
+
+1. The environments can be implemented and simulated on a GPU.
+2. The number of possible actions in an environment is relatively small.
+
+The former is important because the main bottleneck when training AlphaZero-like agents is
+the self-play phase, which is where the MCTS algorithm is run. If the environment can be
+implemented and simulated on a GPU, then the MCTS algorithm can be run fully on GPU. The
+latter is important because the MCTS algorithm is implemented with an array, and thus, for 
+games with big action spaces (like chess, where there are more than 4.000 possible actions,
+even though the legal ones may be much less in any given state), the memory requirements will
+be extremely high, thus forcing the user to use a small batch of environments, which cancels
+the benefits from the parallelism of GPUs.
 
 
 ## What's different from AlphaZero.jl?
@@ -55,32 +75,31 @@ Furthermore, a new variant of MCTS called **Gumbel MCTS**
 This variant allows for more efficient exploration, and thus faster training.
 
 
-## What's different from other implementations that do the same thing?
+ ## How does this implementation stand out?
 
-There are other open-source implementations of AlphaZero that run the MCTS algorithm fully on GPU,
-such as [boardlaw](https://github.com/andyljones/boardlaw) and
-[AlphaGPU](https://github.com/fabricerosay/AlphaGPU). However, these implementations lack the
-following:
+There are several other open-source AlphaZero implementations that utilize the GPU to run the MCTS
+algorithm, such as [boardlaw](https://github.com/andyljones/boardlaw) and
+[AlphaGPU](https://github.com/fabricerosay/AlphaGPU). While these are great contributions to the community,
+our redesign aims to introduce the following enhancements:
 
-- **Two-language problem**. Python's weaknesses (no parallelism due to
+- **Unified Language Implementation**. Python's weaknesses (no parallelism due to
     [GIL](https://tenthousandmeters.com/blog/python-behind-the-scenes-13-the-gil-and-its-effects-on-python-multithreading/),
     slow interpreter performance) require users to write the performance-critical parts of the
-    environment in C/Cython/Numba/JAX.
-- **Code readability and maintainability.** Code quality in some cases is not
-    great, and thus it's hard to understand what's going on, let alone extend the codebase
-    with new features.
+    environment in C/Cython/Numba/JAX. Our implementation is written entirely in Julia, and thus
+    it doesn't suffer from the two-languages problem.
 
-This redesign aims to solve these problems by using Julia, a high-level, high-performance
-programming language, which is also very easy to learn and use. The way Julia addresses
-these issues is by:
+- **Seamless CPU-GPU Transitions**. By incorporating [CUDA.jl](https://github.com/JuliaGPU/CUDA.jl),
+    our implementation allows code to run seamlessly on both CPU and GPU. This eliminates the need for
+    separate codebases for each, making development and debugging more straightforward.
 
-- Utilizing [CUDA.jl](https://github.com/JuliaGPU/CUDA.jl), it's possible to write code
-    that runs **both** on CPU and GPU, without having to write two separate implementations.
-    This allows us to write the environment implementation in Julia, without resorting to
-    another language or framework for performance-critical parts.
-- Julia's syntax is very similar to Python's, and it's easy to understand. By documenting
-    the code thoroughly, we can make it accessible to anyone who wants to learn how AlphaZero
-    works, and how to extend it with new features.
+- **Enhanced Modularity and Code Quality**. Our focus on modularity, simplicity, and well-documented code
+    makes it easier for others to understand the workings of AlphaZero and to contribute new features.
+    We aim to provide a well-documented game interface, and we do not rely on custom GPU kernels,
+    streamlining the user experience.
+
+These improvements were made possible by Julia, a high-level, high-performance programming language
+with syntax similarities to Python. This makes it easier for anyone who wants to understand the
+AlphaZero algorithm or extend it with new features to work with our codebase.
 
 
 ## Repository structure
@@ -239,7 +258,7 @@ AlphaZero is guaranteed to solve the game, it might be of more interest to test
 just the Neural Network in an environment, to see how it performs.
 
 The Neural Network will play for 10 episodes. In each episode, we will be sampling
-actions to play in the environment from the from the categorical distribution produced by the
+actions to play in the environment from the categorical distribution produced by the
 policy head. As training progresses, we would like to see the following things occur:
 
 - The average number of steps taken to solve the game should decrease, to a minimum
@@ -253,8 +272,10 @@ Indeed, the plots show that all of the above occur:
 
 <p align="center">
   <img src="examples/plots/random-walk-1d/metrics.png"
-        alt="RandomWalk1D AlphaZero Evaluation" width="600"/>
+        alt="RandomWalk1D AlphaZero Evaluation" width="350"/>
 </p>
+
+<!-- ToDo: Make plot horizontal. -->
 
 #### TicTacToe
 
@@ -369,7 +390,8 @@ Out of the 30 games played, the NN won 29, lost 1 and drew 0.
 
 ### Reproducing the results
 
-To reproduce the above plots, the example scripts mentioned in the previous section must be run. But note that due to julia's JIT compilation, the first time the scripts are run, they'll
+To reproduce the above plots, the example scripts mentioned in the previous section must be run.
+But notethat due to julia's JIT compilation, the first time the scripts are run, they'll
 take longer to finish. This will result in slightly slower train times. The difference will
 be negligible for larger experiments, such as Connect Four's.
 
@@ -383,10 +405,8 @@ again in the same REPL.
 - Monte Carlo Tree Search (MCTS)
 
     The current batched MCTS implementation has been built on top Guillaume Thomas'
-    [work](https://medium.com/@guillaume.thopas/an-almost-full-gpu-implementation-of-gumbel-muzero-in-julia-1d64b2ec04ca), which
-    introduces two variants: Structure of Arrays (SoA) and Array of Structures (AoS).
-    The [code](https://github.com/jonathan-laurent/AlphaZero.jl/pull/147) that was delivered
-    by Guillaume was untested, had breaking bugs and the results couldn't be reproduced.
+    [work](https://medium.com/@guillaume.thopas/an-almost-full-gpu-implementation-of-gumbel-muzero-in-julia-1d64b2ec04ca),
+    which introduces two variants: Structure of Arrays (SoA) and Array of Structures (AoS).
     The current implementation is a fully-functional and fully-tested rewrite of the
     original code, but only for the SoA variant. Thus, for future work regarding MCTS:
 
