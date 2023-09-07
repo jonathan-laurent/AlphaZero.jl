@@ -118,7 +118,7 @@ end
 
 # empty the save/plot directories
 run(`rm -rf $(SAVEDIR)`)
-# run(`rm -rf $(PLOTSDIR)`)
+run(`rm -rf $(PLOTSDIR)`)
 
 # choose the device to train AlphaZero on (`CPU()` or `GPU()`)
 device = CPU()
