@@ -321,7 +321,7 @@ Indeed, the plots below show that our expectations are met:
 #### Connect-Four
 
 Connect-Four is a much more complicated game than TicTacToe, as it has a much larger
-state space. The previous version of AlphaZero.jl manages to train a superhuman agent
+state space. The previous version of AlphaZero.jl manages to train a very strong agent
 in ~10 hours
 [[1]](https://jonathan-laurent.github.io/AlphaZero.jl/stable/tutorial/connect_four/#Benchmark-against-a-perfect-solver).
 To consider the redesigned AlphaZero.jl a success, we would like to see it achieve similar
@@ -357,7 +357,7 @@ For the third group, we can see the results in the following plot:
     <img src="examples/plots/connect-four/pascal_pons_benchmark_error_rates.png" alt="Connect-Four AlphaZero Evaluation"/>
 </p>
 
-As we can see, the redesigned AlphaZero.jl manages to train a superhuman agent in
+As we can see, the redesigned AlphaZero.jl manages to train a stronger agent in
 ~1.25 hours, which amounts to a ~8x speedup compared to the original AlphaZero.jl.
 By tuning hyperparameters, it is certainly possible to achieve even faster convergence.
 
