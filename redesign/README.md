@@ -3,7 +3,7 @@
 This repository is the result of Andreas Spanopoulos' contribution to the redesign of the
 [AlphaZero.jl](https://github.com/jonathan-laurent/AlphaZero.jl) open-source AlphaZero
 implementation in Julia. With this redesign, we achieved a remarkable
-**6x speedup in performance** by running the Monte Carlo Tree Search (MCTS) fully on GPU.
+**8x speedup in performance** by running the Monte Carlo Tree Search (MCTS) fully on GPU.
 
 The aims of this redesign are:
 
@@ -271,11 +271,8 @@ policy head. As training progresses, we would like to see the following things o
 Indeed, the plots show that all of the above occur:
 
 <p align="center">
-  <img src="examples/plots/random-walk-1d/metrics.png"
-        alt="RandomWalk1D AlphaZero Evaluation" width="350"/>
+  <img src="examples/plots/random-walk-1d/metrics.png" alt="RandomWalk1D AlphaZero Evaluation"/>
 </p>
-
-<!-- ToDo: Make plot horizontal. -->
 
 #### TicTacToe
 
@@ -361,7 +358,7 @@ For the third group, we can see the results in the following plot:
 </p>
 
 As we can see, the redesigned AlphaZero.jl manages to train a superhuman agent in
-~1.5 hours, which amounts to a ~6.25x speedup compared to the original AlphaZero.jl.
+~1.25 hours, which amounts to a ~8x speedup compared to the original AlphaZero.jl.
 By tuning hyperparameters, it is certainly possible to achieve even faster convergence.
 
 The hyperparameters used to achieve the above results can be found in

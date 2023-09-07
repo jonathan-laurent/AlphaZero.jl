@@ -71,17 +71,18 @@ function plot_metrics(save_dir, timestamps, metrics)
     avg_win_rates = [metrics[2] for metrics in metrics]
     avg_right_probs = [metrics[3] for metrics in metrics]
 
-    l = @layout [a ; b ; c]
+    l = @layout [a b c]
 
     p1 = plot(timestamps, avg_steps, label="Average episode length", ylims=(0, 20),
-              title="Metrics", linewidth=2, legend=:best, show=false)
-    p2 = plot(timestamps, avg_win_rates, label="Win rate over 10 episodes",
-              ylims=(0, 1.01), linewidth=2, legend=:best, show=false)
+              linewidth=2, legend=:best, show=false)
+    p2 = plot(timestamps, avg_win_rates, label="Win rate over 10 episodes", title="Metrics",
+              ylims=(0, 1.01), xlabel="\ntraining time (s)", linewidth=2, legend=:best,
+              show=false)
     p3 = plot(timestamps, avg_right_probs, label="Average optimal policy probability",
-              xlabel="\ntraining time (s)", ylims=(0, 1.01), linewidth=2,
+              ylims=(0, 1.01), linewidth=2,
               legend=:bottomright, show=false)
 
-    plot_size = (Int(floor(750 / Base.MathConstants.golden)), 750)
+    plot_size = (1_000, 400)
     p = plot(p1, p2, p3, layout=l, size=plot_size, margin=(6, :mm), show=false)
     savefig(p, joinpath(save_dir, "metrics.png"))
 

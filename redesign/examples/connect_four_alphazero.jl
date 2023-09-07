@@ -119,11 +119,11 @@ function create_config()
     # environment variables
     EnvCls = BitwiseConnectFourEnv
     env_kwargs = Dict()
-    num_envs = 40_000
+    num_envs = 50_000
 
     # common MCTS variables
     use_gumbel_mcts = false
-    num_simulations = 128
+    num_simulations = 64
 
     # Gumbel MCTS variables
     # ...we can omit these since we're using Traditional Alphazero MCTS
@@ -133,10 +133,10 @@ function create_config()
     alpha_dirichlet = 0.3f0
     epsilon_dirichlet = 0.25f0
     tau = 1.0f0
-    collapse_tau_move = 39
+    collapse_tau_move = 38
 
     # NN Training variables
-    replay_buffer_size = num_envs * 750
+    replay_buffer_size = num_envs * 500
     min_train_samples = 1_000
     train_freq = num_envs * 50
     adam_learning_rate = 2e-3
@@ -157,7 +157,7 @@ function create_config()
     eval_freq = num_envs * 50
 
     # Total train steps
-    num_steps = num_envs * 1_500
+    num_steps = num_envs * 2_000
 
     return TrainConfig(;
         EnvCls=EnvCls,

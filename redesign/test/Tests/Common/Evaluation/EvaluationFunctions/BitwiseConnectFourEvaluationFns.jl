@@ -404,7 +404,7 @@ function _plot_nn_and_accuracy_evaluations(save_dir, timestamps, metrics)
               xlabel="training time (hours)\n", title="Benchmark Accuracy", linewidth=2,
               legend=:best, legendfont=font(11), show=false)
 
-    plot_size = (1_750, Int(floor(1_750 / Base.MathConstants.golden)))
+    plot_size = (1_500, Int(floor(1_500 / Base.MathConstants.golden)))
     p = plot(p1, p2, p3, p4, p5, p6, p7, layout=l, size=plot_size, margin=(6, :mm),
              show=false)
     savefig(p, joinpath(save_dir, "nn_and_accuracy_evaluation_metrics.png"))
@@ -466,7 +466,7 @@ function _plot_pos_benchmark_metrics(save_dir, timestamps, metrics)
               ylims=(0, 0.4), xlabel="training time (hours)\n", title="Beginning - Hard",
               linewidth=[2 2 1.5], legend=:best, legendfont=font(10), show=false)
 
-    plot_size = (1_750, Int(floor(1_750 / Base.MathConstants.golden)))
+    plot_size = (1_500, Int(floor(1_500 / Base.MathConstants.golden)))
     p = plot(p1, p2, p3, p4, p5, p6, layout=l, size=plot_size, margin=(6, :mm), show=false)
     savefig(p, joinpath(save_dir, "pascal_pons_benchmark_error_rates.png"))
 end
