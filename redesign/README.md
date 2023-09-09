@@ -209,6 +209,11 @@ config = TrainConfig(
 trained_nn, execution_times = selfplay!(config, device, nn)
 ```
 
+Note: It may be useful to express parameters such as `replay_buffer_size`, `train_freq`,
+`eval_freq` and `num_steps` as a multiple of `num_envs`. This is because training ocurrs
+in batch steps, and thus it can feel more inituitive to express these parameters as a
+multiple of the number of environment.
+
 
 ## Training Examples
 
@@ -395,6 +400,14 @@ be negligible for larger experiments, such as Connect Four's.
 Yet, it is possible to reproduce the exact results, by launching a julia REPL, running the
 code once to trigger JIT compilation (just for a few iterations), and then running the code
 again in the same REPL.
+
+Note: The time logged in the plots includes only the training time (data generation and
+Neural Network training). In reality, when running the code, it will take a bit longer
+to execute, due to the time needed to run the evaluation functions, which depending
+on the benchmark, may not be negligible (e.g. pitting AlphaZero with 600 MCTS simulations
+against a minimax agent -- this will be slow). To minimize the time spent on evaluation,
+the user can reduce the number of evaluations that take place by setting the `eval_freq`
+parameter of `TrainConfig` to a high value.
 
 
 ## Future Work
