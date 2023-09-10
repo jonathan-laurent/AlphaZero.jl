@@ -401,13 +401,26 @@ Yet, it is possible to reproduce the exact results, by launching a julia REPL, r
 code once to trigger JIT compilation (just for a few iterations), and then running the code
 again in the same REPL.
 
-Note: The time logged in the plots includes only the training time (data generation and
-Neural Network training). In reality, when running the code, it will take a bit longer
-to execute, due to the time needed to run the evaluation functions, which depending
-on the benchmark, may not be negligible (e.g. pitting AlphaZero with 600 MCTS simulations
-against a minimax agent -- this will be slow). To minimize the time spent on evaluation,
-the user can reduce the number of evaluations that take place by setting the `eval_freq`
-parameter of `TrainConfig` to a high value.
+**Notes**
+
+- To run the Pascal Pons' benchmark and get the last plot, the solver has to be installed
+    in the current directory ([redesign](.)). Instructions for this can be found in this
+    [link](https://github.com/jonathan-laurent/AlphaZero.jl/blob/7b5cf057ce699b81ce948d22f5bb2ebd60fe6c56/games/connect-four/solver/README.md),
+    but we will present here as well for completeness:
+
+    ```shell
+    $ git clone https://github.com/PascalPons/connect4
+    $ cd connect4
+    $ wget https://github.com/PascalPons/connect4/releases/download/book/7x6.book
+    ```
+
+- The time logged in the plots includes only the training time (data generation and
+    Neural Network training). In reality, when running the code, it will take a bit longer
+    to execute, due to the time needed to run the evaluation functions, which depending
+    on the benchmark, may not be negligible (e.g. pitting AlphaZero with 600 MCTS simulations
+    against a minimax agent -- this will be slow). To minimize the time spent on evaluation,
+    the user can reduce the number of evaluations that take place by setting the `eval_freq`
+    parameter of `TrainConfig` to a high value.
 
 
 ## Future Work
