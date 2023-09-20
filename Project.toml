@@ -33,7 +33,7 @@ Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
 
 [compat]
 ArgParse = "1.1.4"
-CUDA = "3"
+CUDA = "3, 5"
 Colors = "0.12.7"
 CommonRLInterface = "0.3.1"
 Crayons = "4.0.4"
