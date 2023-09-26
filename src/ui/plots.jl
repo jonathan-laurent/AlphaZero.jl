@@ -59,14 +59,15 @@ function performances_plot(rep::Report.Iteration)
   push!(global_content, rep.perfs_learning.time)
   glob = Plots.pie(global_labels, global_content,
     title="Global",
-    legend=:right)
+    legend=:bottomright)
   # Self-play details
   self_play =
     let gcratio = rep.perfs_self_play.gc_time / rep.perfs_self_play.time
       Plots.pie(
         ["MCTS and Inference", "GC"],
         [1 - gcratio, gcratio],
-        title="Self Play")
+        title="Self Play",
+        legend=:topright)
     end
   # Learning details
   learning = Plots.pie(
@@ -75,7 +76,8 @@ function performances_plot(rep::Report.Iteration)
       rep.learning.time_loss,
       rep.learning.time_train,
       rep.learning.time_eval],
-    title="Learning")
+    title="Learning",
+    legend=:bottomright)
   return Plots.plot(glob, self_play, learning)
 end
 
