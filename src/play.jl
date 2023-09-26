@@ -308,6 +308,11 @@ function play_game(gspec, player; flip_probability=0.)
     actions, π_target = think(player, game)
     τ = player_temperature(player, game, length(trace))
     π_sample = apply_temperature(π_target, τ)
+    if length(actions) != length(π_target)
+      @warn "Actions array has length $(length(actions)) but Policy array has length $(length(π_target))"
+      @show actions
+      @show π_target
+    end
     a = actions[Util.rand_categorical(π_sample)]
     GI.play!(game, a)
     push!(trace, π_target, GI.white_reward(game), GI.current_state(game))

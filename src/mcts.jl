@@ -208,6 +208,12 @@ function run_simulation!(env::Env, game; η, root=true)
     else
       ϵ = root ? env.noise_ϵ : 0.
       scores = uct_scores(info, env.cpuct, ϵ, η)
+      if length(scores) != length(actions)
+        @warn "Scores array has length $(length(scores)) but Actions array has length $(length(actions))"
+        @show scores
+        @show state
+        @show actions
+      end
       action_id = argmax(scores)
       action = actions[action_id]
       wp = GI.white_playing(game)
