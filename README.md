@@ -24,7 +24,7 @@ Deepmind's AlphaZero algorithm:
 * Generic interfaces make it easy to add support for new games or new learning
   frameworks.
 * Being between one and two orders of magnitude faster than competing
-  alternatives written in Python, this implementation can solve
+  alternatives written in pure Python, this implementation can solve
   nontrivial games on a standard desktop computer with a GPU.
 * The same agent can be trained on a
   [cluster of machines](https://www.youtube.com/watch?v=JVUJ5Oohuhs) as easily as on a
