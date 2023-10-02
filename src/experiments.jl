@@ -13,8 +13,9 @@ A structure that contains the information necessary to replicate a training sess
 
 # Constructor
 
-    Experiment(gspec, params, mknet, netparams, benchmarks)
+    Experiment(name, gspec, params, mknet, netparams, benchmarks)
 
+- `name` is a string labelling the experiment
 - `gspec` is the specification of the game to be played
 - `params` has type [`Params`](@ref)
 - `mknet` is a neural network constructor taking arguments `(netparams, gspec)`
