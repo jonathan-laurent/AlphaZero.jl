@@ -348,7 +348,7 @@ AlphaZero.AlphaZeroPlayer(s::Session; args...) = AlphaZero.AlphaZeroPlayer(s.env
 ##### Utilities for printing reports
 #####
 
-const NUM_COL = Log.ColType(7, x -> fmt(".4f", x))
+const NUM_COL = Log.ColType(7, x -> pyfmt(".4f", x))
 const BIGINT_COL = Log.ColType(10, n -> format(ceil(Int, n), commas=true))
 
 const LEARNING_STATUS_TABLE = Log.Table([
@@ -401,7 +401,7 @@ end
 function print_report(logger::Logger, report::Report.SelfPlay)
   sspeed = format(round(Int, report.samples_gen_speed), commas=true)
   Log.print(logger, "Generating $(sspeed) samples per second on average")
-  avgdepth = fmt(".1f", report.average_exploration_depth)
+  avgdepth = pyfmt(".1f", report.average_exploration_depth)
   Log.print(logger, "Average exploration depth: $avgdepth")
   memf = format(report.mcts_memory_footprint, autoscale=:metric, precision=2)
   Log.print(logger, "MCTS memory footprint per worker: $(memf)B")
@@ -433,7 +433,7 @@ function print_report(
     nn_replaced=false,
     ternary_outcome=false)
 
-  r = fmt("+.2f", report.avgr)
+  r = pyfmt("+.2f", report.avgr)
   if ternary_outcome
     n = length(report.rewards)
     stats = Benchmark.TernaryOutcomeStatistics(report)
@@ -449,7 +449,7 @@ function print_report(
      push!(details, "network replaced")
   end
   details = isempty(details) ? "" : " (" * join(details, ", ") * ")"
-  red = fmt(".1f", 100 * report.redundancy)
+  red = pyfmt(".1f", 100 * report.redundancy)
   msg = "Average reward: $r$details, redundancy: $red%"
   Log.print(logger, msg)
 end

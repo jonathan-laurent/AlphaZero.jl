@@ -53,7 +53,7 @@ function debug_trace(gspec::AbstractGameSpec, t::Trace)
     game = GI.init(gspec, t.states[i])
     GI.render(game)
     for (a, p) in zip(GI.available_actions(game),  t.policies[i])
-      print("$(GI.action_string(gspec, a)): $(fmt(".3f", p))  ")
+      print("$(GI.action_string(gspec, a)): $(pyfmt(".3f", p))  ")
     end
     println("")
     println("Obtained reward of: $(t.rewards[i]).")

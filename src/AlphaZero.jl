@@ -6,7 +6,7 @@
 module AlphaZero
 
   import Distributed
-  using Formatting
+  using Format
   using Base: @kwdef
   using DataStructures: CircularBuffer
   using Distributions: Categorical, Dirichlet

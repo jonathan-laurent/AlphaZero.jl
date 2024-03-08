@@ -120,8 +120,8 @@ end
 #####
 
 function print_state_statistics(gspec, stats::StateStats)
-  prob   = Log.ColType(nothing, x -> fmt(".1f", 100 * x) * "%")
-  val    = Log.ColType(nothing, x -> fmt("+.2f", x))
+  prob   = Log.ColType(nothing, x -> pyfmt(".1f", 100 * x) * "%")
+  val    = Log.ColType(nothing, x -> pyfmt("+.2f", x))
   bigint = Log.ColType(nothing, n -> format(ceil(Int, n), commas=true))
   alabel = Log.ColType(nothing, identity)
   btable = Log.Table([

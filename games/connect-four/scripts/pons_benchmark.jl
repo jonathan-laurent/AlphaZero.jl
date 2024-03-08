@@ -84,7 +84,7 @@ const BENCHMARKS = load_benchmarks(BENCHMARKS_DIR)
 using AlphaZero
 using .Examples.ConnectFour: GameSpec, Solver, Training
 using ProgressMeter
-using Formatting
+using Format
 using Statistics: mean
 
 const gspec = GameSpec()
@@ -139,7 +139,7 @@ function test_player(make_player, oracle)
     err = test_player_on(make_player, oracle, bench, p)
     push!(errs, err)
     err_str =
-    println("($(bench.stage), $(bench.difficulty)): $(fmt(".2f", 100 * err))%")
+    println("($(bench.stage), $(bench.difficulty)): $(pyfmt(".2f", 100 * err))%")
   end
   return errs
 end

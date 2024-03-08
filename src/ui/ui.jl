@@ -16,7 +16,7 @@ module UserInterface
   import JSON3
   using Base: @kwdef
   using Statistics: mean
-  using Formatting: format, fmt
+  using Format: format, pyfmt
   using Crayons: @crayon_str
   using Colors: @colorant_str
   using ProgressMeter
