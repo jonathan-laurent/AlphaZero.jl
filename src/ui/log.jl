@@ -8,7 +8,7 @@ module Log
 export Logger
 
 using Crayons
-using Formatting: fmt
+using Format: pyfmt
 import ProgressMeter
 
 const INDENT_STEP = 2
@@ -130,7 +130,7 @@ end
 
 set_columns(tab, cols) = Table(cols, tab.header_style, tab.comments_style)
 
-fixed_width(str, width) = fmt(">$(width)s", first(str, width))
+fixed_width(str, width) = pyfmt(">$(width)s", first(str, width))
 
 intersperse(sep, words) = reduce((x, y) -> x * sep * y, words)
 
