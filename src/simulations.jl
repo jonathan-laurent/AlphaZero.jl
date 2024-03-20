@@ -1,3 +1,4 @@
+using Random
 #####
 ##### Utilities for distributed game simulation
 #####
@@ -217,8 +218,14 @@ function simulate(
     oracles = spawn_oracles()
     player = simulator.make_player(oracles)
     worker_sim_id = 0
+    seed = 0
     # For each worker
     function simulate_game(sim_id)
+      # Reset the player periodically
+      if !isnothing(p.reset_every) && worker_sim_id % p.reset_every == 0 
+        reset_player!(player)
+        seed = sim_id
+      end
       worker_sim_id += 1
       # Switch players' colors if necessary: "_pf" stands for "possibly flipped"
       if isa(player, TwoPlayers) && p.alternate_colors
@@ -229,12 +236,8 @@ function simulate(
         player_pf = player
       end
       # Play the game and generate a report
-      trace = play_game(gspec, player_pf, flip_probability=p.flip_probability)
+      trace = play_game(gspec, player_pf, flip_probability=p.flip_probability, rng=p.deterministic ? MersenneTwister(seed) : Random.GLOBAL_RNG)
       report = simulator.measure(trace, colors_flipped, player)
-      # Reset the player periodically
-      if !isnothing(p.reset_every) && worker_sim_id % p.reset_every == 0
-        reset_player!(player)
-      end
       # Signal that a game has been simulated
       game_simulated()
       return report

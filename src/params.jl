@@ -98,6 +98,7 @@ and benchmarking.
   reset_every :: Union{Nothing, Int} = 1
   flip_probability :: Float64 = 0.
   alternate_colors :: Bool = false
+  deterministic :: Bool = false
 end
 
 """
