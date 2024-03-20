@@ -1,3 +1,0 @@
-module BatchedMctsTests
-
-end

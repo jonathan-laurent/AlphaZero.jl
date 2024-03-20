@@ -1,3 +1,10 @@
 private/
 .vscode/
 Manifest.toml
+archive/
+tb_logs/
+checkpoints/
+*.log
+src/debug_*
+connect4/
+*-checkpoints/
