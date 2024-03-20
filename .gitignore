@@ -10,6 +10,7 @@ Manifest.toml
 /docs/build/
 /docs/site/
 
+private
 sessions
 archive
 
