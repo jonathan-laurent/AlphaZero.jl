@@ -14,6 +14,8 @@ Parameters of an MCTS player.
 | `dirichlet_noise_ϵ`    | `Float64`                    |  -                  |
 | `dirichlet_noise_α`    | `Float64`                    |  -                  |
 | `prior_temperature`    | `Float64`                    | `1.`                |
+| `fpu_strategy`         | `MCTS.FpuStrategy`           | `MCTS.reduction`    |
+| `fpu_value`            | `Float64`                    | `0.44`              |
 
 # Explanation
 
@@ -28,6 +30,14 @@ action was visited and ``τ`` the `temperature` parameter.
 It is typical to use a high value of the temperature parameter ``τ``
 during the first moves of a game to increase exploration and then switch to
 a small value. Therefore, `temperature` is am [`AbstractSchedule`](@ref).
+
+The "First Play Urgency" strategy (a.k.a `fpu_strategy`) specifies the
+evaluation strategy of unvisited nodes. It changes search behavior to
+visit unvisited nodes earlier or later by using a placeholder eval before
+checking the network. The value specified with `fpu_value` results in
+“reduction” subtracting that value from the parent eval while “absolute”
+directly uses that value. `fpu_value` is set to 0.44 by default,
+according to Leela-Chess value.
 
 For information on parameters `cpuct`, `dirichlet_noise_ϵ`,
 `dirichlet_noise_α` and `prior_temperature`, see [`MCTS.Env`](@ref).
@@ -54,6 +64,8 @@ In the original AlphaGo Zero paper:
   dirichlet_noise_ϵ :: Float64
   dirichlet_noise_α :: Float64
   prior_temperature :: Float64 = 1.
+  fpu_strategy :: MCTS.FpuStrategy = MCTS.reduction
+  fpu_value :: Float64 = 0.44
 end
 
 """

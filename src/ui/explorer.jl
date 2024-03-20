@@ -74,7 +74,7 @@ function state_statistics(game, player, turn, memory=nothing)
   if isa(player, MctsPlayer) && haskey(player.mcts.tree, state)
     mcts = player.mcts
     info = mcts.tree[state]
-    ucts = MCTS.uct_scores(info, mcts.cpuct, 0., nothing)
+    ucts = MCTS.uct_scores(info, mcts, 0., nothing, nothing)
     report.Nmcts = MCTS.Ntot(info)
     for (i, a) in enumerate(actions)
       astats = info.stats[i]
