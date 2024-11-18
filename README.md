@@ -8,9 +8,6 @@
   <a href="https://jonathan-laurent.github.io/AlphaZero.jl/stable" alt="Stable">
     <img src="https://img.shields.io/badge/docs-stable-blue.svg"/>
   </a>
-  <a href="https://travis-ci.com/jonathan-laurent/AlphaZero.jl" alt="Build Status">
-    <img src="https://travis-ci.com/jonathan-laurent/AlphaZero.jl.svg?branch=master"/>
-  </a>
   <a href="https://codecov.io/gh/jonathan-laurent/AlphaZero.jl" alt="Codecov">
     <img src="https://codecov.io/gh/jonathan-laurent/AlphaZero.jl/branch/master/graph/badge.svg"/>
   </a>
