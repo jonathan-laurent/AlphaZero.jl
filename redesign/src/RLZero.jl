@@ -9,7 +9,10 @@ include("BatchedEnvs.jl")
 using .BatchedEnvs
 
 include("SimpleMcts.jl")
-@reexport using .SimpleMcts
+@reexport using .SimpleMcts: SimpleMcts
+
+include("BatchedMctsUtility.jl")
+@reexport using .BatchedMctsUtility
 
 include("BatchedMcts.jl")
 @reexport using .BatchedMcts: BatchedMcts

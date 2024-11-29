@@ -1,8 +1,10 @@
 module Devices
 
 using CUDA
+import Base.zeros, Base.ones, Base.fill
 
-export Device, GPU, CPU, DeviceArray
+export Device, GPU, CPU, DeviceArray, copy_to_CPU, get_device
+export zeros, ones, fill
 
 abstract type Device end
 struct GPU <: Device end
@@ -10,6 +12,29 @@ struct CPU <: Device end
 
 DeviceArray(::GPU) = CuArray
 DeviceArray(::CPU) = Array
+
+get_device(_) = @assert false "Input argument should be an `Array` or a `CuArray`."
+get_device(::Array) = CPU()
+get_device(::CuArray) = GPU()
+
+copy_to_CPU(arr) = arr
+copy_to_CPU(arr::CuArray) = Array(arr)
+
+"""
+A device agnostic zeros, ones & fill array.
+"""
+Base.zeros(T, ::CPU, dims...) = Base.zeros(T, dims...)
+Base.zeros(T, ::GPU, dims...) = CUDA.zeros(T, dims...)
+
+Base.zeros(device::Device, dims...) = zeros(Float64, device, dims)
+
+Base.ones(T, ::CPU, dims...) = Base.ones(T, dims...)
+Base.ones(T, ::GPU, dims...) = CUDA.ones(T, dims...)
+
+Base.ones(device::Device, dims...) = ones(Float64, device, dims)
+
+Base.fill(x, ::CPU, dims...) = Base.fill(x, dims...)
+Base.fill(x, ::GPU, dims...) = CUDA.fill(x, dims...)
 
 """
 A device agnostic parallel loop construct.
@@ -42,6 +67,7 @@ See https://github.com/JuliaGPU/CUDA.jl/issues/1548.
 Ultimately, these definitions should be moved to CUDA.jl and use @device_override.
 """
 module KernelFuns
+using CUDA
 
 # It isn't clear all of these are needed, except argmax
 # since the version in Base does not have an `init` argument.
@@ -59,6 +85,11 @@ module KernelFuns
         return best_x
     end
 
+    function argmax(ys; init)
+        xs = 1:length(ys)
+        return argmax(x -> ys[x], xs; init)
+    end
+
     function maximum(xs; init)
         best = init
         for x in xs
@@ -68,6 +99,9 @@ module KernelFuns
         end
         return best
     end
+    
+    sum(xs::Matrix{T}; dims) where T = Base.sum(xs; dims)
+    sum(xs::CuArray{T, 2}; dims) where T = CUDA.sum(xs; dims)
 
     function sum(xs; init)
         acc = init
@@ -88,7 +122,5 @@ module KernelFuns
         ys = exp.(xs) .+ eltype(xs)(eps)
         return ys ./ sum(ys; init=z)
     end
-
 end
-
 end

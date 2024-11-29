@@ -1,5 +1,7 @@
 module BitwiseTicTacToe
 
+using StaticArrays
+
 using ....BatchedEnvs
 using ....Util.StaticBitArrays
 
@@ -54,6 +56,13 @@ function BatchedEnvs.act(env::BitwiseTicTacToeEnv, pos)
     return newenv, (; reward, switched=true)
 end
 
+function BatchedEnvs.act(env::BitwiseTicTacToeEnv, pos_list::AbstractArray)
+    for pos in pos_list
+        env, vec = BatchedEnvs.act(env, pos)
+    end
+    return env, vec # TODO: returning `vec` is surely not the best thing to do
+end
+
 function BatchedEnvs.valid_action(env::BitwiseTicTacToeEnv, pos)
     return !env.board[posidx(pos, CROSS)] && !env.board[posidx(pos, NOUGHT)]
 end
@@ -78,6 +87,31 @@ end
 
 function BatchedEnvs.terminated(env::BitwiseTicTacToeEnv)
     return full_board(env) || is_win(env, CROSS) || is_win(env, NOUGHT)
+end
+
+function get_player_board(env::BitwiseTicTacToeEnv, player)
+    return @SVector [env.board[posidx(i, player)] for i in 1:9]
+end
+
+"""
+    vectorize_state(env::BitwiseTicTacToeEnv)
+
+Create a vectorize representation of the board.
+The board is represented from the perspective of the next player to play.
+It is a flatten 3x3x3 array with the following channels:
+  free, next player, other player
+"""
+function BatchedEnvs.vectorize_state(env::BitwiseTicTacToeEnv)
+    nought_board = get_player_board(env, NOUGHT)
+    cross_board = get_player_board(env, CROSS)
+    free_board = .!(nought_board .|| cross_board)
+
+    order = if (env.curplayer == NOUGHT)
+        @SVector [free_board, nought_board, cross_board]
+    else
+        @SVector [free_board, cross_board, nought_board]
+    end
+    return Float32.(reduce(vcat, order))
 end
 
 end
