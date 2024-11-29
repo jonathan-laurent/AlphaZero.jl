@@ -1,7 +1,7 @@
 #####
 ##### Interface for players
 #####
-
+using Random: AbstractRNG, GLOBAL_RNG
 """
     AbstractPlayer
 
@@ -295,8 +295,8 @@ Simulate a game by an [`AbstractPlayer`](@ref).
   is _flipped_ randomly at every turn with probability ``p``,
   using [`GI.apply_random_symmetry!`](@ref).
 """
-function play_game(gspec, player; flip_probability=0.)
-  game = GI.init(gspec)
+function play_game(gspec, player; flip_probability=0., rng::AbstractRNG=Random.GLOBAL_RNG)
+  game = GI.init(gspec, rng)
   trace = Trace(GI.current_state(game))
   while true
     if GI.game_terminated(game)

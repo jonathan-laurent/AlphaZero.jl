@@ -1,4 +1,5 @@
 import AlphaZero.GI
+using Random: AbstractRNG
 using StaticArrays
 
 const BOARD_SIDE = 3
@@ -21,7 +22,7 @@ mutable struct GameEnv <: GI.AbstractGameEnv
   curplayer :: Player
 end
 
-GI.init(::GameSpec, state=INITIAL_STATE) = GameEnv(state.board, state.curplayer)
+GI.init(::GameSpec, ::AbstractRNG, state=INITIAL_STATE) = GameEnv(state.board, state.curplayer)
 
 GI.spec(::GameEnv) = GameSpec()
 

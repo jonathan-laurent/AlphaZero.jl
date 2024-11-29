@@ -5,6 +5,7 @@
 using CommonRLInterface
 using StaticArrays
 using Crayons
+using Random: AbstractRNG
 
 const RL = CommonRLInterface
 
@@ -33,7 +34,7 @@ function World()
     0)
 end
 
-RL.reset!(env::World) = (env.state = SA[rand(1:env.size[1]), rand(1:env.size[2])])
+RL.reset!(env::World, rng::AbstractRNG) = (env.state = SA[rand(rng, 1:env.size[1]), rand(rng, 1:env.size[2])])
 RL.actions(env::World) = [SA[1,0], SA[-1,0], SA[0,1], SA[0,-1]]
 RL.observe(env::World) = env.state
 

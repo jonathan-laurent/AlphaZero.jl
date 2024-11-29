@@ -2,6 +2,7 @@ import AlphaZero.GI
 
 using Crayons
 using StaticArrays
+using Random: AbstractRNG
 
 const NUM_COLS = 7
 const NUM_ROWS = 6
@@ -37,7 +38,7 @@ end
 
 GI.spec(::GameEnv) = GameSpec()
 
-function GI.init(::GameSpec)
+function GI.init(::GameSpec, ::AbstractRNG)
   board = INITIAL_STATE.board
   curplayer = INITIAL_STATE.curplayer
   finished = false
