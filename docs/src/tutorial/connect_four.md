@@ -24,6 +24,7 @@ To download AlphaZero.jl and start a new training session, just run the
 following:
 
 ```sh
+export GKSwstype=100  # To avoid an occasional GR bug
 git clone --branch v0.5.4 https://github.com/jonathan-laurent/AlphaZero.jl.git
 cd AlphaZero.jl
 julia --project -e 'import Pkg; Pkg.instantiate()'
@@ -33,6 +34,7 @@ julia --project -e 'using AlphaZero; Scripts.train("connect-four")'
 Instead of using [`Scripts.train`](@ref), one can do things more manually and run the following inside the Julia REPL:
 
 ```julia
+ENV["GKSwstype"]="100"  # To avoid an occasional GR bug
 using AlphaZero
 experiment = Examples.experiments["connect-four"]
 session = Session(experiment, dir="sessions/connect-four")
