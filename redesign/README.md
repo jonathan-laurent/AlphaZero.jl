@@ -1,5 +1,9 @@
 # AlphaZero.jl Redesign
 
+## Update
+
+Andreas Spanopoulos made great [progress](https://github.com/AndrewSpano/AlphaZero.jl/tree/dev/redesign) on this redesign project during his 2023 GSOC. Fabrice Rosay ran promising experiments and suggested [improvements](https://github.com/jonathan-laurent/AlphaZero.jl/issues/217). Some work remains to integrate those contributions, add proper documentation and reach feature parity with the original AlphaZero.jl library.
+
 ## Redesign Objectives
 
 - A codebase that is more accessible and easier to read
