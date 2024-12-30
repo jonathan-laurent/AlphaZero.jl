@@ -1,105 +1,517 @@
-# AlphaZero.jl Redesign
+# A simple, full-GPU implementation of AlphaZero
 
-## Redesign Objectives
+This repository is the result of Andreas Spanopoulos' contribution to the redesign of the
+[AlphaZero.jl](https://github.com/jonathan-laurent/AlphaZero.jl) open-source AlphaZero
+implementation in Julia. With this redesign, we achieved a remarkable
+**8x speedup in performance** by running the Monte Carlo Tree Search (MCTS) fully on GPU.
 
-- A codebase that is more accessible and easier to read
-  - The file hierarchy reflects the module hierarchy
-  - Literate programming using `Pollen`
-  - A layered API similar to the one used in FastAI?
-- Improved integration with the rest of the ecosystem:
-  - Use the `ReinforcementLearning.RLBase` interface for environments
-  - Use the `Logging` and `ProgressLogging` modules for logging
-  - Use the `PrettyTables` and `Term` packaged for the Terminal UI
-- Better support for distributed computing
-  - Agent-based architecture for leveraging multiple machines and GPU (the previous version only parallelizes data generation)
-- Improved performances
-  - The goal is to be competitive with Fabrice Rosay's `AZ.jl` implementation (or even `AlphaGPU`).
-- Improved modularity
-  - Support for both AlphaZero and MuZero algorithms
-  - Support for several MCTS implementations (including a batched MCTS implementation and a full-GPU implementation)
-- Batteries included
-  - Provide a test suite for new environments
-  - Check hyperparameters consistency
-  - Provide standard hyperparameter tuning utilities
-  - Provide profiling utilities
+The aims of this redesign are:
 
-## Mistakes to fix
+1. **Code readability and maintainability.**
+2. **Code modularity and extensibility.**
+3. **Code performance.**
 
-- Having a centralized hyperparameters structure is not a good idea as it introduces a lot of coupling in the codebase and prevents switching components easily. Having JSON serialization of all hyperparameters by default is also exceedingly rigid. In general, centralizing all hyperparameters in a serializable structure should happen at a higher API layer.
-- The way training statistics are logged using `Report` is too heavy. The logging library should be used for this.
-- Submodules are underused, which hurts discoverability.
-- Tests are lacking.
-- Latency is very high, in part due to making many types unnecessarily parametric.
-- Using multithreading for the workers and inference server may lead to bad performances at the GC constantly stops the world. Having multiple processes may be better (i.e. using Distributed).
-- Precompilation is broken since we rely on conditional loading (for the CUDA_MEMORY_POOL and USE_KNET flags). We should use `Preferences` instead.
-- To help with replicability, random number generators must be passed explicitly.
+By meeting these aims, not only have we maintained high standards for the overall
+architecture and readability of the code of AlphaZero.jl, but we have also made a
+significant leap in performance, which will be discussed in detail in the evaluation
+section.
 
-## Codebase Architecture
+The redesign is based on the original implementation by
+[Jonathan Laurent](https://www.cs.cmu.edu/~jlaurent/), who is the main author of
+AlphaZero.jl, and the mentor of this project.
 
-## Coding Style
 
-- This codebase enforces the [Blue Style](https://github.com/invenia/BlueStyle).
-- Each source file defines a submodule with the same name. The files hierarchy perfectly reflects the underlying module hierarchy.
-- All leaf module names must be unique. In particular, this makes it easier to open files in editors such as VSCode without running into ambiguities.
-- The tests for a leaf module with name `Module` is in `Tests/ModuleTests`. Note that the `Tests` directory has a flat structure. It also contains a `Common` submodule with definitions that are common to several test modules.
-- The imports in each submodule are split in two parts: the external package imports first and then the internal submodule imports.
-- We use the `Reexport` package so as to ease working with module hierarchies.
-- We should make sure that the codebase can be explored using the "Jump to definition" feature of VS-Code.
-- As specified by BlueStyle, multiline comments and docstrings should be wrapped at 92 lines. This is not enforced by the formatter but one can use a VSCode extension such as `Rewrap` to do this automatically (i.e. usinig the Alt-Q shortcut).
-- **Unresolved:** It is still in debate whether type annotations should be used liberally or only for the purpose of dispatch. (Let's do the latter for now.)
+## When can this implementation be used?
 
-## Testing
+### When can AlphaZero be used?
 
-We make an unusual architecture decision by including all tests in the main `RLZero` package. This enables organizing the tests neatly using submodules while still benefitting from good Revise/editor support. Indeed, Revise can only track code in a package or in a single standalone script (via includet). An alternative would be to have a separate testing package but the current tooling does not make this easy.
+AlphaZero is a general-purpose reinforcement learning algorithm introduced by
+[Google Deepmind](https://www.deepmind.com/) that can be used to train agents for two-player
+zero-sum games. Since any single-player game can be extended into a two-player zero-sum game
+just by adding a dummy player that never plays and receives the opposite reward of the
+player that is being trained, AlphaZero can also be used to train agents for single-player
+games.
 
-## Setup
+AlphaZero is a model-based reinforcement learning algorithm, which means that it leverages a
+model of the environment to train the agent. This means that the transition dynamics of the
+environment must be known. For environments where the transition dynamics are unknown, the
+the user can refer to [MuZero](https://arxiv.org/pdf/1911.08265.pdf) and
+[Stochastic MuZero](https://openreview.net/pdf?id=X6D9bAHhBQ1).
 
-We are working with the master version of ReinforcementLearning.jl so you should update your Manifest accordingly:
+### When can this implementation be used?
 
+This implementation works best when:
+
+1. The environments can be implemented and simulated on a GPU.
+2. The number of possible actions in an environment is relatively small.
+
+The former is important because the main bottleneck when training AlphaZero-like agents is
+the self-play phase, which is where the MCTS algorithm is run. If the environment can be
+implemented and simulated on a GPU, then the MCTS algorithm can be run fully on GPU. The
+latter is important because the MCTS algorithm is implemented with an array, and thus, for 
+games with big action spaces (like chess, where there are more than 4.000 possible actions,
+even though the legal ones may be much less in any given state), the memory requirements will
+be extremely high, thus forcing the user to use a small batch of environments, which cancels
+the benefits from the parallelism of GPUs.
+
+
+## What's different from AlphaZero.jl?
+
+The main bottleneck when training AlphaZero-like agents is the self-play phase. The slowness of
+this phase is usually due to the Monte Carlo Tree Search (MCTS) algorithm, which is used during
+action selection. In the original AlphaZero.jl implementation, the MCTS algorithm runs the
+environments simulations on CPU, and the neural network inference on GPU. This is not optimal,
+since the GPU is not used to its full potential, and there's a lot of data transferring between
+devices.
+
+In this redesign, the MCTS algorithm runs fully on GPU. By fully, we mean that the environment
+functions, the neural network inference, and the MCTS algorithm itself, all run on GPU, like
+in [[Jones, 2021]](https://arxiv.org/pdf/2104.03113.pdf). This allows us to parallelize the MCTS
+algorithm across a batch of environments, thus unlocking the full potential of the GPU, and
+creating training data much faster during the self-play phase.
+
+Furthermore, a new variant of MCTS called **Gumbel MCTS**
+[[Danihelka et al., 2022]](https://openreview.net/pdf?id=bERaNdoegnO) has been implemented.
+This variant allows for more efficient exploration, and thus faster training.
+
+
+ ## How does this implementation stand out?
+
+There are several other open-source AlphaZero implementations that utilize the GPU to run the MCTS
+algorithm, such as [boardlaw](https://github.com/andyljones/boardlaw) and
+[AlphaGPU](https://github.com/fabricerosay/AlphaGPU). While these are great contributions to the community,
+our redesign aims to introduce the following enhancements:
+
+- **Unified Language Implementation**. Python's weaknesses (no parallelism due to
+    [GIL](https://tenthousandmeters.com/blog/python-behind-the-scenes-13-the-gil-and-its-effects-on-python-multithreading/),
+    slow interpreter performance) require users to write the performance-critical parts of the
+    environment in C/Cython/Numba/JAX. Our implementation is written entirely in Julia, and thus
+    it doesn't suffer from the two-languages problem.
+
+- **Seamless CPU-GPU Transitions**. By incorporating [CUDA.jl](https://github.com/JuliaGPU/CUDA.jl),
+    our implementation allows code to run seamlessly on both CPU and GPU. This eliminates the need for
+    separate codebases for each, making development and debugging more straightforward.
+
+- **Enhanced Modularity and Code Quality**. Our focus on modularity, simplicity, and well-documented code
+    makes it easier for others to understand the workings of AlphaZero and to contribute new features.
+    We aim to provide a well-documented game interface, and we do not rely on custom GPU kernels,
+    streamlining the user experience.
+
+These improvements were made possible by Julia, a high-level, high-performance programming language
+with syntax similarities to Python. This makes it easier for anyone who wants to understand the
+AlphaZero algorithm or extend it with new features to work with our codebase.
+
+
+## Repository structure
+
+The repository is structured as follows:
+
+- [src](src): Contains the source code of the redesigned AlphaZero. The main components
+    are `MCTS`, the `Network` library, the `ReplayBuffer`, the `Train` function and utilities,
+    and some other. A more in-depth explanation can be found on [src/README.md](src/README.md).
+- [examples](examples): Contains example scripts that showcase how to use the redesigned
+    AlphaZero both for single-player and 2-player environments, for both CPU and GPU devices.
+- [test](test): Contains the tests of the redesigned AlphaZero. The tests
+    cover all the main components of the codebase. More details can be found in
+    [test/Tests/README.md](test/Tests/README.md).
+
+
+## Installation
+
+First, we have to clone the repository of the redesigned AlphaZero:
+
+```shell
+$ git clone https://github.com/AndrewSpano/AlphaZero.jl.git
+$ cd AlphaZero.jl
+$ git checkout dev
+$ cd redesign
 ```
-] add ReinforcementLearningBase#master ReinforcementLearningEnvironments#master
+
+For the project to run, julia has to be installed. If it isn't, the following
+[installation script](install_julia_1.9.3.sh), which installs julia 1.9.3, can
+be consulted. It can be run as follows:
+
+```shell
+$ ./install_julia_1.9.3.sh
 ```
 
-## Workflow
+Then, we have to instantiate the project:
 
-We use `JuliaFormatter` to format the code on save. To do so, use the following VSCode configuration:
-
-```json
-{
-    "[julia]": {
-      "editor.detectIndentation": false,
-      "editor.insertSpaces": true,
-      "editor.tabSize": 4,
-      "files.insertFinalNewline": true,
-      "files.trimFinalNewlines": true,
-      "files.trimTrailingWhitespace": true,
-      "editor.rulers": [92],
-      "editor.formatOnSave": true
-    }
-}
+```shell
+$ julia --project=. -e 'using Pkg; Pkg.instantiate()'
 ```
 
-To run the VSCode debugger within the REPL, just write:
+## Running tests
+
+```shell
+$ cd AlphaZero.jl/redesign
+$ julia --project=. test/runtests.jl
+```
+
+
+## Training AlphaZero
+
+To train an AlphaZero agent using this package, the following components must be
+implemented by the user:
+
+1. The environment/game to train on. Note that if user wishes to use a GPU, the
+    environment implementation has to be GPU-friendly. Refer to
+    [BatchedEnvs.jl](src/BatchedEnvs.jl) for the definition of GPU-friendliness.
+2. The Neural Network to train. The user can either use neural networks from
+    the [Network.jl](src/Networks/Network.jl) library provided by this package, or
+    implement their own. If the user wishes to use their own implementation, it
+    has to adhere to the interface defined in [Network.jl](src/Networks/Network.jl).
+3. \[Optional, but highly recommended\]: Evaluation functions to assess the performance
+    of agents during training. Since the policy/value/total losses don't always correlate
+    with the actual performance of the agent, it's recommended to use evaluation functions
+    to determine whether the agent is learning or not, during the self-play phase. The
+    user can refer to [Evaluation.jl](src/Evaluation.jl) for the definition of evaluation
+    functions and their specific format, as well as to
+    [EvaluationFunctions](test/Tests/Common/Evaluation/EvaluationFunctions/) for examples.
+4. Training Parameters/Hyperparameters. The user can refer to
+    [TrainUtilities.jl](src/TrainUtilities.jl) where the `TrainConfig` structure is
+    defined. This structure holds all the key information, and can uniquely define
+    a training session.
+5. The script that glues all of the above together. The user can refer to
+    [examples](examples) for examples of how to do this.
+
+
+A general overview of the code needed to train an AlphaZero agent is as follows:
 
 ```julia
-@run function_to_debug()
+using RLZero.BatchedEnvs
+using RLZero.Train: selfplay!
+using RLZero.TrainUtilities: TrainConfig
+using RLZero.Util.Devices
+
+using Flux
+
+# define the device on which MCTS and NN training will run
+device = MyDevice()  # `CPU()` or `GPU()`
+
+# define the NN and place it in the corresponding device
+nn = MyNN()
+if device == GPU()
+    nn = Flux.gpu(nn)
+end
+
+# define parameters/hyperparameters for training
+config = TrainConfig(
+    EnvCls=MyEnv,                           # the struct that defines the environment
+    env_kwargs=Dict(:kwarg1 => val1, ...),  # custom kwrags for the environment
+    num_envs=num_envs,                      # number of environments to run in parallel
+    # ...                                   # other parameters
+    eval_fns=[my_eval_fn1, ...],            # evaluation functions
+    num_steps=num_steps                     # number of total steps to run during self-play
+)
+
+# train
+trained_nn, execution_times = selfplay!(config, device, nn)
 ```
 
-Also, if the "Jump to Definition" VSCode feature does not work, you may one to relaunch the "Choose Julia Env" command. This can be done by clicking on the status bar.
+Note: It may be useful to express parameters such as `replay_buffer_size`, `train_freq`,
+`eval_freq` and `num_steps` as a multiple of `num_envs`. This is because training ocurrs
+in batch steps, and thus it can feel more inituitive to express these parameters as a
+multiple of the number of environment.
 
-By executing code directly in the editor window, the whole stack trace gets highlighted in red in the editor whenever an exception is raised.
 
-## Dev Plan
+## Training Examples
 
-- We start implementing a minimal version of AlphaZero as it is easier:
-  - Reset MCTS tree everytime for now.
+1. [RandomWalk1D](examples/random_walk_gumbel_alphazero.jl): A simple one-player
+    environment, where an agent sits on a straight line, and can move left or right.
+    The goal is to reach the end of the line, which is at the rightmost position.
+    This environment serves mostly as a sanity check for the correctness of the
+    implementation. Training can be launched with the following comman:
 
-## Useful Links
+    ```shell
+    julia --project=. examples/random_walk_gumbel_alphazero.jl
+    ```
 
-- [Fabrice Rosay's AlphaGPU](https://github.com/fabricerosay/AlphaGPU)
-- [MuZero Pseudocode](https://arxiv.org/src/1911.08265v2/anc/pseudocode.py)
-- [Michal Lukomski's GSOC Project](https://github.com/michelangelo21/MuZero)
-- [Werner Duvaud's implementation](https://github.com/werner-duvaud/muzero-general)
-- [Duvaud's Tictactoe Params](https://github.com/werner-duvaud/muzero-general/blob/master/games/tictactoe.py)
+2. [TicTacToe](examples/tictactoe_alphazero.jl): A two-player environment, where
+    two agents play [TicTacToe](https://playtictactoe.org/) against each other. This
+    environment also serves as a sanity check due to it's small state space. Training
+    can be launched with the following command:
 
-Note that in the MuZero pseudocode, they seem to be updating the network every 1000 batch updates (batches have size 2048). There are 1e6 updates in total so this makes 1000 iterations. The buffer is surprisingly small with 1e6 samples.
+    ```shell
+    julia --project=. examples/tictactoe_alphazero.jl
+    ```
+
+3. [Connect-Four](examples/connect_four_alphazero.jl): A two-player environment, where two
+    agents play [Connect4](https://en.wikipedia.org/wiki/Connect_Four) against each
+    other. This environment is more complex than TicTacToe, and thus it's a good
+    benchmark for the performance of the redesigned AlphaZero. Training can be launched
+    with the following command:
+
+    ```shell
+    julia --project=. examples/connect_four_alphazero.jl
+    ```
+
+
+##  Evaluation
+
+To assess whether the redesigned AlphaZero has been implemented correctly, we can
+evaluate the performance of the trained agents for the available environments.
+The example scripts mentioned in the previous section can be run to get the
+evaluation plots/results. Since each environment is different, we will be looking
+at different ways to evaluate the performance of AlphaZero in each one of them.
+
+#### RandomWalk1D
+
+In a simple environment like RandomWalk1D, we actually know what the optimal policy
+corresponds to; it's the policy that always moves right (second action). Since running
+AlphaZero is guaranteed to solve the game, it might be of more interest to test
+just the Neural Network in an environment, to see how it performs.
+
+The Neural Network will play for 10 episodes. In each episode, we will be sampling
+actions to play in the environment from the categorical distribution produced by the
+policy head. As training progresses, we would like to see the following things occur:
+
+- The average number of steps taken to solve the game should decrease, to a minimum
+    of 5 steps (since 5 steps are the minimum number of steps needed to solve the game).
+- The win rate (number of games solved divided by total number of games played) of the
+    Neural Network should converge to 1.
+- The average probability of choosing the optimal action (going right) should converge
+    to 1.
+
+Indeed, the plots show that all of the above occur:
+
+<p align="center">
+  <img src="examples/plots/random-walk-1d/metrics.png" alt="RandomWalk1D AlphaZero Evaluation"/>
+</p>
+
+#### TicTacToe
+
+While TicTacToe is a more complicated game than RandomWalk1D, it still has a relatively
+small state space. An initial naive approximation would assume that there are 9! = 362880
+states, but this is not the case due to the fact that a) Not all 9! positions can be
+reached from the starting position either because they're invalid, or the game would
+terminate earlier, and b) Different sequences of actions can lead to the same state
+(e.g. action sequences [1, 2, 3] and [3, 2, 1] lead to the same state).
+
+In fact, calculating the total number of states in TicTacToe is not trivial, but it
+can be done using brute-force. By running a minimax search from the root state, we
+can
+
+1. Traverse and store all the different states since the tree is not that big.
+2. Store the optimal policy for every state encountered.
+
+This shows that there are ~4.500 different states (excluding those where only 1 action
+is available).
+
+By having a list of all the states and their optimal policies, we can run MCTS and
+Neural Network inference on all of them, and see whether the selected actions belong
+to the optimal policy. This metric is defined as accuracy, and we can see it in the
+bottom plot at the image below. The plots above show win/loss/draw percentages against
+random and minimax agents of various depths. This isn't of particular value, but it can
+help us distinguish whether the policy head is converging to the optimal policy or not.
+
+To asses whether the agent is learning, we would expect to see:
+
+1.  - Win rate against random agents to converge to 1.
+    - Loss rate against random agents to converge to 0.
+    - Draw rate against random agents to converge to 0.
+    <br></br>
+2.  - Win rate against minimax agents to converge to 0.
+    - Loss rate against minimax agents to converge to 0.
+    - Draw rate against minimax agents to converge to 1.
+    <br></br>
+3. The accuracy in the all-states-optimal-policy-benchmark to converge to 1.
+
+Indeed, the plots below show that our expectations are met:
+
+<p align="center">
+    <img src="examples/plots/tictactoe/metrics.png" alt="TicTacToe AlphaZero Evaluation"/>
+</p>
+
+#### Connect-Four
+
+Connect-Four is a much more complicated game than TicTacToe, as it has a much larger
+state space. The previous version of AlphaZero.jl manages to train a very strong agent
+in ~10 hours
+[[1]](https://jonathan-laurent.github.io/AlphaZero.jl/stable/tutorial/connect_four/#Benchmark-against-a-perfect-solver).
+To consider the redesigned AlphaZero.jl a success, we would like to see it achieve similar
+results in a shorter amount of time. To assess the performance of the agent during training,
+we will:
+
+1. Pit the Neural Network against Random and Minimax (width depth 5 and a strong heuristic)
+    agents, and plot the win/loss/draw percentages. We expect the win rates to converge
+    to 1 and the loss/draw rates to converge to 0.
+2. Sample random Connect-Four states, use [Pascal Pons'](https://github.com/PascalPons)
+    [perfect solver](https://github.com/PascalPons/connect4) to compute the optimal policy
+    in those states (like in TicTacToe), and track the accuracies of AlphaZero and the
+    Neural Network by itself. We expect the accuracies to converge to 1.
+3. This step is similar to the previous one, but instead of sampling random states, we
+    will use the
+    [benchmark](http://blog.gamesolver.org/solving-connect-four/02-test-protocol/) created
+    by Pascal Pons. This benchmark consists of 6.000 states or various difficulties, and
+    it was used to evaluate the performance of the original AlphaZero.jl. Thus, by using
+    the same benchmark and the same simulation budget during evaluation, we will be able
+    to make a fair comparison in terms of performance.
+
+For the first two evaluation groups, we can see the results in the following plots.
+The first 6 plots correspond to the first group, while the last corresponds to the
+second:
+
+<p align="center">
+    <img src="examples/plots/connect-four/nn_and_accuracy_evaluation_metrics.png" alt="Connect-Four AlphaZero Evaluation"/>
+</p>
+
+For the third group, we can see the results in the following plot:
+
+<p align="center">
+    <img src="examples/plots/connect-four/pascal_pons_benchmark_error_rates.png" alt="Connect-Four AlphaZero Evaluation"/>
+</p>
+
+As we can see, the redesigned AlphaZero.jl manages to train a stronger agent in
+~1.25 hours, which amounts to a ~8x speedup compared to the original AlphaZero.jl.
+By tuning hyperparameters, it is certainly possible to achieve even faster convergence.
+
+The hyperparameters used to achieve the above results can be found in
+[connect_four_alphazero.jl](examples/connect_four_alphazero.jl), while the hyperparameters
+for the experiment of the original AlphaZero.jl can be found
+[here](https://jonathan-laurent.github.io/AlphaZero.jl/stable/tutorial/connect_four/#c4-config).
+Note that in both cases, the same evaluation-MCTS-budget (600 simulations) was used.
+
+Apart from these assessments, the Neural Network (NN) was evaluated against three average
+human players. Each human played a total of 10 games, 5 with the Cross (X) symbol (plays
+first) and 5 with the Nought (O) symbol (plays second). Actions from the NN were selected
+as the argmax of the policy head, out of all the valid actions. The results are as follows:
+
+|  Opponent  | NN Win Rate | NN Loss Rate | NN Draw Rate |
+| :--------: | :---------: | :----------: | :----------: |
+|   Human 1  |    100%     |       0%     |       0%     |
+|   Human 2  |    100%     |       0%     |       0%     |
+|   Human 3  |     90%     |      10%     |       0%     |
+
+Out of the 30 games played, the NN won 29, lost 1 and drew 0.
+
+### Hardware
+
+- CPU: Intel(R) Xeon(R) CPU E5-2603 v4 @ 1.70GHz
+- GPU: NVIDIA Tesla V100-PCIE-16GB
+
+### Reproducing the results
+
+To reproduce the above plots, the example scripts mentioned in the previous section must be run.
+But notethat due to julia's JIT compilation, the first time the scripts are run, they'll
+take longer to finish. This will result in slightly slower train times. The difference will
+be negligible for larger experiments, such as Connect Four's.
+
+Yet, it is possible to reproduce the exact results, by launching a julia REPL, running the
+code once to trigger JIT compilation (just for a few iterations), and then running the code
+again in the same REPL.
+
+**Notes**
+
+- To run the Pascal Pons' benchmark and get the last plot, the solver has to be installed
+    in the current directory ([redesign](.)). Instructions for this can be found in this
+    [link](https://github.com/jonathan-laurent/AlphaZero.jl/blob/7b5cf057ce699b81ce948d22f5bb2ebd60fe6c56/games/connect-four/solver/README.md),
+    but we will present here as well for completeness:
+
+    ```shell
+    $ git clone https://github.com/PascalPons/connect4
+    $ cd connect4
+    $ wget https://github.com/PascalPons/connect4/releases/download/book/7x6.book
+    ```
+
+- The time logged in the plots includes only the training time (data generation and
+    Neural Network training). In reality, when running the code, it will take a bit longer
+    to execute, due to the time needed to run the evaluation functions, which depending
+    on the benchmark, may not be negligible (e.g. pitting AlphaZero with 600 MCTS simulations
+    against a minimax agent -- this will be slow). To minimize the time spent on evaluation,
+    the user can reduce the number of evaluations that take place by setting the `eval_freq`
+    parameter of `TrainConfig` to a high value.
+
+
+## Future Work
+
+- Monte Carlo Tree Search (MCTS)
+
+    The current batched MCTS implementation has been built on top Guillaume Thomas'
+    [work](https://medium.com/@guillaume.thopas/an-almost-full-gpu-implementation-of-gumbel-muzero-in-julia-1d64b2ec04ca),
+    which introduces two variants: Structure of Arrays (SoA) and Array of Structures (AoS).
+    The current implementation is a fully-functional and fully-tested rewrite of the
+    original code, but only for the SoA variant. Thus, for future work regarding MCTS:
+
+    - [ ] Fix/test/document the AoS batched MCTS variant.
+    - [ ] Add support for using the MCTS tree from previous iterations, to improve exploration.
+    - [ ] Add improved MCTS algorithms and/or action selection strategies, such as in
+        [[Grill et al. 2020]](https://arxiv.org/pdf/2007.12509.pdf).
+    
+    <br>
+
+- Multithreading, Multiprocessing and Multi-GPU Support
+
+    The current self-play phase implementation makes use of a single device, either a CPU
+    or a GPU. It would greatly speed-up the process if we could leverage multiple devices
+    at the same time. This would require a slight re-write of the self-play phase, but the
+    speed gains would outweigh the effort.
+
+    - [ ] Add support for multithreading, multiprocessing during self-play.
+    - [ ] Add support for parallelization of Baatched MCTS over mutiple GPUs, as well as
+        for the Neural Network training.
+
+    <br>
+
+- More Neural Network Libraries
+
+    In the current implementation, the only "ready-to-use" Neural Network models are
+    Multi-Layer Perceptrons (MLPs) and Residuals MLPs. While these are enough to train
+    agents for environments such as Connect-Four, they may not produce good results for
+    more complex environments.
+
+    - [ ] Add CNNs and Residual CNNs (like the ones used in the original AlphaGoZero paper).
+    - [ ] Add RNN and transformer models.
+
+    <br>
+
+- Batteries included
+
+    The current implementation lacks the mechanism to automatically check whether a user-defined
+    environment is GPU-friendly or adheres to the [BatchedEnvs.jl](src/BatchedEnvs.jl) interface.
+    If the user doesn't have much experience with GPU programming in Julia, it might be hard for
+    them to understand how to write GPU-friendly code. Furthermore, currently there are no
+    functions for tuning the hyperparameters of AlphaZero. This is a big problem, since
+    hyperparameter tuning is a very important part of training AlphaZero-like agents.
+
+    - [ ] Add a function that checks whether a user-defined environment is GPU-friendly.
+    - [ ] Add a function that checks whether a user-defined environment adheres to the
+        [BatchedEnvs.jl](src/BatchedEnvs.jl) interface.
+    - [ ] Add a function that checks whether custom Neural Networks adhere to the
+        [Network.jl](src/Networks/Network.jl) interface.
+    - [ ] Add hyperparameter tuning utilities with quasi-random search methods.
+
+    <br>
+
+- More logging
+
+    The current logging system is not very informative, as it currently only logs the
+    value/policy/total losses, and relies on the user to log other information during
+    the evaluation function calls. Thus, for future work regarding logging:
+
+    - [ ] Add more logging information during training, such as average episode length,
+        average reward (for single-player games), iteration time, etc..
+    - [ ] Log/save all imprortant metrics on files instead of having them in memory.
+
+    <br>
+
+- API
+
+    The current API is not the most user-friendly, and thus some users might find it hard
+    to understand. This is due to the fact that the redesign was focused on the performance
+    of the code. Thus, for future work regarding the API:
+
+    - [ ] Rewrite the API such that the user can train agents with fewer lines of code.
+    - [ ] Add more tutorials for how to use the package.
+    - [ ] Add wrapper functions for MCTS/Network-Only inference (like what is done in
+        [interactive_play.jl](examples/interactive_play.jl)).
+
+    <br>
+
+
+## Acknowledgements
+
+I would like to thank the [Julia organization](https://julialang.org/) for founding this
+project via their [Julia Summer of Code](https://julialang.org/jsoc/archive/) program,
+as well as my mentor Jonathan Laurent, who taught me invaluable lessons about programming
+and software engineering practices, and mentored me throughout the summer.
