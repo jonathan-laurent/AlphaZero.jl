@@ -52,7 +52,7 @@ Requires = "1.1.3"
 Setfield = "0.7.0, 0.8, 1"
 StaticArrays = "1.1.1"
 ThreadPools = "2.0.0"
-Zygote = "0.6.10"
+Zygote = "0.6.10, 0.7"
 julia = "1.6"
 
 [extras]
