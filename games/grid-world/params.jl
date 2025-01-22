@@ -61,7 +61,8 @@ benchmark_sim = SimParams(
   arena.sim;
   num_games=500,
   num_workers=10,
-  batch_size=10)
+  batch_size=10,
+  deterministic=true)
 
 benchmark = [
   Benchmark.Single(
