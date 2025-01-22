@@ -37,7 +37,6 @@ learning = LearningParams(
   use_gpu=false,
   use_position_averaging=false,
   samples_weighing_policy=CONSTANT_WEIGHT,
-  rewards_renormalization=10,
   l2_regularization=1e-4,
   optimiser=Adam(lr=5e-3),
   batch_size=64,
