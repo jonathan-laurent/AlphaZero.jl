@@ -107,7 +107,8 @@ function Network.train!(
     opt.momentum_low,
     opt.momentum_high, n=n)
   optimiser = Knet.Nesterov(lr=opt.lr_low, gamma=opt.momentum_high)
-  for (i, l) in enumerate(Knet.minimize(loss, data, optimiser))
+  knet_loss(batch...) = loss(nn, batch)
+  for (i, l) in enumerate(Knet.minimize(knet_loss, data, optimiser))
     callback(i, l)
     optimiser.lr = lr[i]
     optimiser.gamma = momentum[i]
@@ -116,7 +117,8 @@ end
 
 function Network.train!(callback, nn::KNetwork, opt::Adam, loss, data, n)
   optimiser = Knet.Adam(lr=opt.lr)
-  for (i, l) in enumerate(Knet.minimize(loss, data, optimiser))
+  knet_loss(batch...) = loss(nn, batch)
+  for (i, l) in enumerate(Knet.minimize(knet_loss, data, optimiser))
     callback(i, l)
   end
 end

@@ -64,8 +64,14 @@ entropy_wmean(π, w) = -sum(π .* log.(π .+ eps(eltype(π))) .* w) / sum(w)
 
 wmean(x, w) = sum(x .* w) / sum(w)
 
-function losses(nn, regws, params, Wmean, Hp, (W, X, A, P, V))
-  # `regws` must be equal to `Network.regularized_params(nn)`
+function losses(nn, params, Wmean, Hp, (W, X, A, P, V))
+  # Ideally, we would only apply the L2 penalty to weight parameters and not
+  # bias parameters. However, Flux currently cannot differentiate through
+  # `Flux.modules`, which is used in the implementation of
+  # `Network.regularized_params`. Thus, we regularize with respect to ALL
+  # parameters, which does not make a big difference in practice anyway.
+  # regws = Network.regularized_params(nn)
+  regws = Network.params(nn)
   creg = params.l2_regularization
   cinv = params.nonvalidity_penalty
   P̂, V̂, p_invalid = Network.forward_normalized(nn, X, A)
@@ -125,8 +131,7 @@ function get_trained_network(tr::Trainer)
 end
 
 function batch_updates!(tr::Trainer, n)
-  regws = Network.regularized_params(tr.network)
-  L(batch...) = losses(tr.network, regws, tr.params, tr.Wmean, tr.Hp, batch)[1]
+  L(net, batch) = losses(net, tr.params, tr.Wmean, tr.Hp, batch)[1]
   data = Iterators.take(tr.batches_stream, n)
   ls = Vector{Float32}()
   Network.train!(tr.network, tr.params.optimiser, L, data, n) do i, l
@@ -155,8 +160,7 @@ function learning_status(tr::Trainer, samples)
   # As done now, this is slighly inefficient as we solve the
   # same neural network inference problem twice
   W, X, A, P, V = samples
-  regws = Network.regularized_params(tr.network)
-  Ls = losses(tr.network, regws, tr.params, tr.Wmean, tr.Hp, samples)
+  Ls = losses(tr.network, tr.params, tr.Wmean, tr.Hp, samples)
   Ls = Network.convert_output_tuple(tr.network, Ls)
   Pnet, _ = Network.forward_normalized(tr.network, X, A)
   Hpnet = entropy_wmean(Pnet, W)

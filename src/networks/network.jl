@@ -194,7 +194,8 @@ end
 
 Update a given network to fit some data.
   - [`opt`](@ref OptimiserSpec) specifies which optimiser to use.
-  - `loss` is a function that maps a batch of samples to a tracked real.
+  - `loss` is a function that maps a model along with a batch of samples to
+     a tracked real.
   - `data` is an iterator over minibatches.
   - `n` is the number of minibatches. If `length` is defined on `data`,
      we must have `length(data) == n`. However, not all finite

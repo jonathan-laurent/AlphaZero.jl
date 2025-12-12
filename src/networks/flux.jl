@@ -20,7 +20,6 @@ array_on_gpu(arr) = error("Usupported array type: ", typeof(arr))
 
 using Flux: relu, softmax, flatten
 using Flux: Chain, Dense, Conv, BatchNorm, SkipConnection
-import Zygote
 
 #####
 ##### Flux Networks
@@ -64,23 +63,14 @@ Network.convert_input(nn::FluxNetwork, x) =
 
 Network.convert_output(nn::FluxNetwork, x) = Flux.cpu(x)
 
-Network.params(nn::FluxNetwork) = Flux.params(nn)
-
-# This should be included in Flux
-function lossgrads(f, args...)
-  val, back = Zygote.pullback(f, args...)
-  grad = back(Zygote.sensitivity(val))
-  return val, grad
-end
+Network.params(nn::FluxNetwork) = Flux.trainables(nn)
 
 function Network.train!(callback, nn::FluxNetwork, opt::Adam, loss, data, n)
-  optimiser = Flux.Adam(opt.lr)
-  params = Flux.params(nn)
+  opt_state = Flux.setup(Flux.Adam(opt.lr), nn)
   for (i, d) in enumerate(data)
-    l, grads = lossgrads(params) do
-      loss(d...)
-    end
-    Flux.update!(optimiser, params, grads)
+    l, grads = Flux.withgradient(nn -> loss(nn, d), nn)
+    Flux.update!(opt_state, nn, grads[1])
+    Flux.adjust!(opt_state; eta=lr[i])
     callback(i, l)
   end
 end
@@ -95,15 +85,11 @@ function Network.train!(
     opt.momentum_high,
     opt.momentum_low,
     opt.momentum_high, n=n)
-  optimiser = Flux.Nesterov(opt.lr_low, opt.momentum_high)
-  params = Flux.params(nn)
+  opt_state = Flux.setup(Flux.Nesterov(opt.lr_low, opt.momentum_high), nn)
   for (i, d) in enumerate(data)
-    l, grads = lossgrads(params) do
-      loss(d...)
-    end
-    Flux.update!(optimiser, params, grads)
-    optimiser.eta = lr[i]
-    optimiser.rho = momentum[i]
+    l, grads = Flux.withgradient(nn -> loss(nn, d), nn)
+    Flux.update!(opt_state, nn, grads[1])
+    Flux.adjust!(opt_state; eta=lr[i], rho=momentum[i])
     callback(i, l)
   end
 end
@@ -143,13 +129,6 @@ function Network.forward(nn::TwoHeadNetwork, state)
   v = nn.vhead(c)
   p = nn.phead(c)
   return (p, v)
-end
-
-# Flux.@functor does not work with abstract types
-function Flux.functor(nn::Net) where Net <: TwoHeadNetwork
-  children = (nn.common, nn.vhead, nn.phead)
-  constructor = cs -> Net(nn.gspec, nn.hyper, cs...)
-  return (children, constructor)
 end
 
 Network.hyperparams(nn::TwoHeadNetwork) = nn.hyper

@@ -129,12 +129,13 @@ module AlphaZero
   const DEFAULT_DL_FRAMEWORK = get(ENV, "ALPHAZERO_DEFAULT_DL_FRAMEWORK", "FLUX")
 
   if DEFAULT_DL_FRAMEWORK == "FLUX"
-    @info "Using the Flux implementation of AlphaZero.NetLib."
+    # @info "Using the Flux implementation of AlphaZero.NetLib."
     @eval begin
       include("networks/flux.jl")
       const NetLib = FluxLib
     end
   elseif DEFAULT_DL_FRAMEWORK == "KNET"
+    error("The Knet backend is currently not available, due to Knet not supporting the latest versions of Julia and CUDA.")
     @info "Using the Knet implementation of AlphaZero.NetLib."
     @eval begin
       include("networks/knet.jl")
