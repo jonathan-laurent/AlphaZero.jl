@@ -50,13 +50,13 @@ function RL.act!(env::World, a)
   return get(env.rewards, env.state, 0.0)
 end
 
-@provide RL.player(env::World) = 1 # An MDP is a one player game
-@provide RL.players(env::World) = [1]
-@provide RL.observations(env::World) = [SA[x, y] for x in 1:env.size[1], y in 1:env.size[2]]
-@provide RL.clone(env::World) = World(env.size, copy(env.rewards), env.state, env.time)
-@provide RL.state(env::World) = env.state
-@provide RL.setstate!(env::World, s) = (env.state = s)
-@provide RL.valid_action_mask(env::World) = BitVector([1, 1, 1, 1])
+RL.player(env::World) = 1 # An MDP is a one player game
+RL.players(env::World) = [1]
+RL.observations(env::World) = [SA[x, y] for x in 1:env.size[1], y in 1:env.size[2]]
+RL.clone(env::World) = World(env.size, copy(env.rewards), env.state, env.time)
+RL.state(env::World) = env.state
+RL.setstate!(env::World, s) = (env.state = s)
+RL.valid_action_mask(env::World) = BitVector([1, 1, 1, 1])
 
 # Additional functions needed by AlphaZero.jl that are not present in 
 # CommonRlInterface.jl. Here, we provide them by overriding some functions from
