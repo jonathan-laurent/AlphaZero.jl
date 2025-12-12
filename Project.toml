@@ -1,6 +1,6 @@
 name = "AlphaZero"
 uuid = "8ed9eb0b-7496-408d-8c8b-2119aeea02cd"
-version = "0.5.5"
+version = "0.5.6"
 authors = ["Jonathan Laurent <jonathan.laurent@cs.cmu.edu>"]
 
 [deps]
