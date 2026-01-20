@@ -6,7 +6,7 @@ module CommonRLInterfaceWrapper
 using ..AlphaZero
 import CommonRLInterface
 using Setfield
-
+using Random: AbstractRNG
 const RL = CommonRLInterface
 
 #####
@@ -119,9 +119,9 @@ GI.clone(env::Env) = @set env.rlenv = RL.clone(env.rlenv)
 
 GI.set_state!(env::Env, state) = RL.setstate!(env.rlenv, state)
 
-function GI.init(spec::Spec)
+function GI.init(spec::Spec, rng::AbstractRNG)
   env = GI.clone(spec.env)
-  RL.reset!(env.rlenv)
+  RL.reset!(env.rlenv, rng)
   return env
 end
 

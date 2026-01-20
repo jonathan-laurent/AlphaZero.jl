@@ -10,7 +10,7 @@ module GameInterface
 export AbstractGameSpec, AbstractGameEnv
 
 using ..AlphaZero: Util
-
+using Random: GLOBAL_RNG
 #####
 ##### Game environments and game specifications
 #####
@@ -43,7 +43,7 @@ Intuitively, a game environment holds a game specification and a current state.
 abstract type AbstractGameEnv end
 
 """
-    init(::AbstractGameSpec) :: AbstractGameEnv
+    init(::AbstractGameSpec, ::AbstractRNG) :: AbstractGameEnv
 
 Create a new game environment in a (possibly random) initial state.
 """
@@ -296,6 +296,8 @@ function init(gspec::AbstractGameSpec, state)
   set_state!(env, state)
   return env
 end
+
+init(gspec::AbstractGameSpec) = init(gspec, GLOBAL_RNG)
 
 #####
 ##### Derived env functions
