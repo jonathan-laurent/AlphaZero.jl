@@ -55,7 +55,7 @@ function SimpleNet(gspec::AbstractGameSpec, hyper::SimpleNetHP)
     hlayers(hyper.depth_common)...)
   vhead = Chain(
     hlayers(hyper.depth_vhead)...,
-    Dense(hsize, 1, tanh))
+    Dense(hsize, 1, identity))
   phead = Chain(
     hlayers(hyper.depth_phead)...,
     Dense(hsize, outdim),

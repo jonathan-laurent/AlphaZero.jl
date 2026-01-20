@@ -16,7 +16,8 @@ self_play = SelfPlayParams(
     alternate_colors=false),
   mcts=MctsParams(
     num_iters_per_turn=50,
-    cpuct=1.0,
+    cpuct=sqrt(2),
+    adaptive_cpuct=true,
     temperature=ConstSchedule(0.),
     dirichlet_noise_ϵ=0.,
     dirichlet_noise_α=1.))
@@ -37,7 +38,6 @@ learning = LearningParams(
   use_gpu=false,
   use_position_averaging=false,
   samples_weighing_policy=CONSTANT_WEIGHT,
-  rewards_renormalization=10,
   l2_regularization=1e-4,
   optimiser=Adam(lr=5e-3),
   batch_size=64,
@@ -45,7 +45,8 @@ learning = LearningParams(
   nonvalidity_penalty=1.,
   min_checkpoints_per_epoch=1,
   max_batches_per_checkpoint=5_000,
-  num_checkpoints=1)
+  num_checkpoints=1,
+  rewards_renormalization=10)
 
 params = Params(
   arena=arena,
