@@ -55,7 +55,7 @@ Setfield = "0.7.0, 0.8, 1"
 StaticArrays = "1.1.1"
 Statistics = "1"
 ThreadPools = "2.0.0"
-cuDNN = "1.4.6"
+cuDNN = "1.4.6, 6"
 julia = "1.6, 1.10, 1.11"
 
 [extras]
