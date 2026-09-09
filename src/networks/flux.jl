@@ -70,7 +70,6 @@ function Network.train!(callback, nn::FluxNetwork, opt::Adam, loss, data, n)
   for (i, d) in enumerate(data)
     l, grads = Flux.withgradient(nn -> loss(nn, d), nn)
     Flux.update!(opt_state, nn, grads[1])
-    Flux.adjust!(opt_state; eta=lr[i])
     callback(i, l)
   end
 end
