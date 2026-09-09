@@ -163,8 +163,9 @@ end
 # Returns statistics for the current player, along with a boolean indicating
 # whether or not a new node has been created.
 function state_info(env, state)
-  if haskey(env.tree, state)
-    return (env.tree[state], false)
+  info = get(env.tree, state, nothing)
+  if !isnothing(info)
+    return (info, false)
   else
     (P, V) = env.oracle(state)
     info = init_state_info(P, V, env.prior_temperature)
