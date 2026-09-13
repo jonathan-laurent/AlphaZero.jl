@@ -93,8 +93,8 @@ end
 ##### Trainer Utility
 #####
 
-struct Trainer
-  network :: AbstractNetwork
+struct Trainer{T <: AbstractNetwork}
+  network :: T
   samples :: AbstractVector{<:TrainingSample}
   params :: LearningParams
   data :: NamedTuple # (W, X, A, P, V) tuple obtained after converting `samples`
@@ -116,7 +116,7 @@ struct Trainer
     batches_stream = map(batches) do b
       Network.convert_input_tuple(network, b)
     end |> Util.cycle_iterator |> Iterators.Stateful
-    return new(network, samples, params, data, Wmean, Hp, batches_stream)
+    return new{typeof(network)}(network, samples, params, data, Wmean, Hp, batches_stream)
   end
 end
 
